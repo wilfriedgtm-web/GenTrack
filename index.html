@@ -3,189 +3,131 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GenTrack — Dashboard</title>
+<title>GenTrack</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500&display=swap');
-:root{
-  --noir:#0A0A0A;--surface:#141414;--surface2:#1C1C1C;--bordure:#242424;
-  --or:#C8922A;--or-pale:rgba(200,146,42,0.08);
-  --vert:#22C55E;--vert-pale:rgba(34,197,94,0.08);
-  --rouge:#EF4444;--rouge-pale:rgba(239,68,68,0.08);
-  --orange:#F97316;--orange-pale:rgba(249,115,22,0.08);
-  --bleu:#3B82F6;--bleu-pale:rgba(59,130,246,0.08);
-  --texte:#F0F0F0;--texte2:#606060;--texte3:#303030;
-}
+:root{--noir:#0A0A0A;--surface:#141414;--surface2:#1C1C1C;--bordure:#242424;--or:#C8922A;--or-pale:rgba(200,146,42,0.08);--vert:#22C55E;--vert-pale:rgba(34,197,94,0.08);--rouge:#EF4444;--rouge-pale:rgba(239,68,68,0.08);--orange:#F97316;--orange-pale:rgba(249,115,22,0.08);--texte:#F0F0F0;--texte2:#606060;--texte3:#303030}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:var(--noir);color:var(--texte);font-family:'Inter',sans-serif;min-height:100vh}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--noir)}::-webkit-scrollbar-thumb{background:var(--bordure);border-radius:2px}
-
 .layout{display:flex;min-height:100vh}
-
-/* SIDEBAR */
 .sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--bordure);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
-.sb-logo{padding:22px 20px 18px;border-bottom:1px solid var(--bordure);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;letter-spacing:-0.3px}
+.sb-logo{padding:22px 20px 18px;border-bottom:1px solid var(--bordure);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px}
 .sb-logo em{color:var(--or);font-style:normal}
 .sb-logo-sub{font-size:10px;color:var(--texte2);font-weight:400;margin-top:2px;font-family:'Inter',sans-serif}
 .sb-nav{padding:12px 10px;flex:1;overflow-y:auto}
 .sb-section{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--texte3);padding:14px 12px 6px;font-weight:600}
 .sb-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;cursor:pointer;transition:background 0.15s;font-size:13px;color:var(--texte2);margin-bottom:2px}
-.sb-item:hover{background:var(--surface2)}
-.sb-item.active{background:var(--or-pale);color:var(--or)}
+.sb-item:hover{background:var(--surface2)}.sb-item.active{background:var(--or-pale);color:var(--or)}
 .sb-item-icon{font-size:15px;width:20px;text-align:center}
-.sb-item-badge{margin-left:auto;background:var(--rouge);color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px}
-.sb-item-badge.green{background:var(--vert)}
+.sb-badge{margin-left:auto;background:var(--rouge);color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;min-width:18px;text-align:center}
 .sb-bottom{padding:14px 10px;border-top:1px solid var(--bordure)}
 .sb-user{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;cursor:pointer}
 .sb-avatar{width:30px;height:30px;border-radius:50%;background:var(--or-pale);border:1.5px solid var(--or);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;color:var(--or);flex-shrink:0}
-.sb-user-name{font-size:12px;font-weight:500}
-.sb-user-role{font-size:10px;color:var(--texte2)}
-
-/* MAIN */
+.sb-user-name{font-size:12px;font-weight:500}.sb-user-role{font-size:10px;color:var(--texte2)}
 .main{flex:1;overflow-y:auto}
-.view{display:none;padding:28px 28px 40px}
-.view.active{display:block}
-
-/* TOPBAR */
+.view{display:none;padding:28px 28px 40px}.view.active{display:block}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px}
 .topbar-date{font-size:11px;color:var(--texte2);margin-bottom:4px}
 .topbar-title{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.5px}
 .topbar-right{display:flex;gap:10px;align-items:center}
-.btn-primary{background:var(--or);color:var(--noir);border:none;border-radius:9px;padding:9px 16px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:opacity 0.2s}
-.btn-primary:hover{opacity:0.9}
-.btn-ghost{background:var(--surface);color:var(--texte2);border:1px solid var(--bordure);border-radius:9px;padding:9px 14px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;transition:border-color 0.15s}
-.btn-ghost:hover{border-color:var(--or);color:var(--texte)}
-.btn-danger{background:var(--rouge-pale);color:var(--rouge);border:1px solid var(--rouge);border-radius:9px;padding:9px 14px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif}
-
-/* KPI */
+.btn{border-radius:9px;padding:9px 16px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;border:none;transition:opacity 0.2s}
+.btn:active{opacity:0.8}
+.btn-or{background:var(--or);color:var(--noir)}
+.btn-ghost{background:var(--surface);color:var(--texte2);border:1px solid var(--bordure) !important;font-family:'Inter',sans-serif;font-weight:400}
+.btn-ghost:hover{border-color:var(--or) !important;color:var(--texte)}
+.btn-danger{background:var(--rouge-pale);color:var(--rouge);border:1px solid var(--rouge) !important}
 .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
 .kpi{background:var(--surface);border-radius:12px;padding:16px;border:1px solid var(--bordure)}
 .kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--texte2);font-weight:600;margin-bottom:10px}
 .kpi-val{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;letter-spacing:-1px;margin-bottom:4px}
-.kpi-val.or{color:var(--or)}.kpi-val.vert{color:var(--vert)}.kpi-val.rouge{color:var(--rouge)}.kpi-val.orange{color:var(--orange)}
-.kpi-sub{font-size:11px;color:var(--texte2)}
-.kpi-evo{font-size:11px;font-weight:600;margin-top:6px}
+.kpi-sub{font-size:11px;color:var(--texte2)}.kpi-evo{font-size:11px;font-weight:600;margin-top:6px}
+.or{color:var(--or)}.vert{color:var(--vert)}.rouge{color:var(--rouge)}.orange{color:var(--orange)}
 .pos{color:var(--vert)}.neg{color:var(--rouge)}.neu{color:var(--texte2)}
-
-/* GRID */
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-.grid-3{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px}
-
-/* CARD */
+.grid-32{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px}
 .card{background:var(--surface);border-radius:12px;border:1px solid var(--bordure);overflow:hidden;margin-bottom:16px}
 .card-header{padding:16px 18px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bordure)}
 .card-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600}
-.card-link{font-size:11px;color:var(--or);cursor:pointer}
-
-/* TABLE */
-.table-row{display:grid;gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--bordure);cursor:pointer;transition:background 0.15s}
-.table-row:hover{background:var(--surface2)}
-.table-row:last-child{border-bottom:none}
-.table-row.header{background:var(--surface2);cursor:default}
-.table-row.header:hover{background:var(--surface2)}
-.tr-clients{grid-template-columns:2fr 1fr 1fr 1fr 30px}
-.tr-alertes{grid-template-columns:3fr 1fr 1fr 30px}
-.tr-carb{grid-template-columns:2fr 1fr 1fr 1fr 30px}
-.tr-maint{grid-template-columns:2fr 1fr 1fr 1fr 30px}
-.tr-rapports{grid-template-columns:2fr 1fr 1fr 100px}
-.col-label{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--texte2);font-weight:600}
+.tr{display:grid;gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--bordure);cursor:pointer;transition:background 0.15s}
+.tr:hover{background:var(--surface2)}.tr:last-child{border-bottom:none}
+.tr.hd{background:var(--surface2);cursor:default}.tr.hd:hover{background:var(--surface2)}
+.tr-clients{grid-template-columns:2fr 80px 80px 100px 20px}
+.tr-saisies{grid-template-columns:1fr 1fr 80px 80px 80px}
+.tr-maint{grid-template-columns:2fr 1fr 1fr 80px}
+.tr-pannes{grid-template-columns:2fr 1fr 1fr 80px 20px}
 .col-name{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600}
 .col-sub{font-size:11px;color:var(--texte2);margin-top:1px}
+.col-label{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--texte2);font-weight:600}
 .col-val{font-size:13px;font-weight:500}
-.col-val.or{color:var(--or)}.col-val.vert{color:var(--vert)}.col-val.orange{color:var(--orange)}.col-val.rouge{color:var(--rouge)}
-.col-arrow{color:var(--texte2);font-size:16px}
-
-/* BADGES */
 .pill{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:4px}
 .pill-ok{background:var(--vert-pale);color:var(--vert)}
 .pill-warn{background:var(--orange-pale);color:var(--orange)}
 .pill-danger{background:var(--rouge-pale);color:var(--rouge)}
-.pill-off{background:var(--surface2);color:var(--texte2)}
-.pill-bleu{background:var(--bleu-pale);color:var(--bleu)}
-
-/* ALERTES LIST */
 .alerte-item{padding:14px 18px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--bordure);cursor:pointer;transition:background 0.15s}
-.alerte-item:hover{background:var(--surface2)}
-.alerte-item:last-child{border-bottom:none}
-.ai-dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0}
-.ai-dot.rouge{background:var(--rouge)}.ai-dot.orange{background:var(--orange)}.ai-dot.bleu{background:var(--bleu)}
-.ai-body{flex:1}
-.ai-titre{font-size:13px;font-weight:600}
-.ai-desc{font-size:11px;color:var(--texte2);margin-top:2px}
+.alerte-item:hover{background:var(--surface2)}.alerte-item:last-child{border-bottom:none}
+.ai-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.ai-body{flex:1}.ai-titre{font-size:13px;font-weight:600}.ai-desc{font-size:11px;color:var(--texte2);margin-top:2px}
 .ai-time{font-size:10px;color:var(--texte2);white-space:nowrap}
-.ai-actions{display:flex;gap:8px;margin-top:10px}
-
-/* CHART */
-.chart-bars{display:flex;align-items:flex-end;gap:5px;height:80px}
-.chart-bar{flex:1;border-radius:4px 4px 0 0;background:var(--or-pale);transition:background 0.2s;cursor:pointer}
-.chart-bar:hover,.chart-bar.active{background:var(--or)}
-.chart-labels{display:flex;gap:5px;margin-top:6px}
-.chart-label{flex:1;font-size:9px;color:var(--texte2);text-align:center}
-
-/* ACTIVITE */
+.ai-actions{display:flex;gap:6px;margin-top:8px}
 .act-item{padding:12px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--bordure)}
 .act-item:last-child{border-bottom:none}
-.act-dot{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
-.ad-vert{background:var(--vert-pale)}.ad-orange{background:var(--orange-pale)}.ad-or{background:var(--or-pale)}.ad-rouge{background:var(--rouge-pale)}.ad-bleu{background:var(--bleu-pale)}
-.act-body{flex:1}
-.act-titre{font-size:12px;font-weight:500}
-.act-detail{font-size:11px;color:var(--texte2);margin-top:1px}
+.act-dot{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.ad-v{background:var(--vert-pale)}.ad-o{background:var(--orange-pale)}.ad-or{background:var(--or-pale)}.ad-r{background:var(--rouge-pale)}
+.act-body{flex:1}.act-titre{font-size:12px;font-weight:500}.act-detail{font-size:11px;color:var(--texte2);margin-top:1px}
 .act-time{font-size:10px;color:var(--texte2);white-space:nowrap}
-
-/* RAPPORT CARD */
-.rapport-card{background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer;border:1px solid var(--bordure);transition:border-color 0.15s}
-.rapport-card:hover{border-color:var(--or)}
-.rapport-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
-.rapport-kpi-v{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700}
-.rapport-kpi-l{font-size:10px;color:var(--texte2);margin-top:2px}
-
-/* MODAL */
+.chart-bars{display:flex;align-items:flex-end;gap:6px;height:80px;margin-bottom:8px}
+.chart-bar{flex:1;border-radius:4px 4px 0 0;background:var(--or-pale);cursor:pointer;transition:background 0.2s;min-height:4px}
+.chart-bar:hover,.chart-bar.active{background:var(--or)}
+.chart-labels{display:flex;gap:6px}
+.chart-label{flex:1;font-size:9px;color:var(--texte2);text-align:center}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:20;align-items:center;justify-content:center;padding:20px}
 .modal-overlay.open{display:flex}
-.modal{background:var(--surface);border-radius:16px;width:100%;max-width:580px;border:1px solid var(--bordure);animation:fadeUp 0.2s ease;overflow:hidden;max-height:90vh;overflow-y:auto}
-@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-.modal-head{padding:18px 20px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--bordure);background:var(--surface2);position:sticky;top:0}
+.modal{background:var(--surface);border-radius:16px;width:100%;max-width:560px;border:1px solid var(--bordure);animation:fu 0.2s ease;overflow:hidden;max-height:90vh;display:flex;flex-direction:column}
+@keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.modal-head{padding:18px 20px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--bordure);background:var(--surface2);flex-shrink:0}
 .modal-nom{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700}
 .modal-sub{font-size:12px;color:var(--texte2);margin-top:2px}
-.modal-close{background:none;border:none;color:var(--texte2);font-size:20px;cursor:pointer;line-height:1;flex-shrink:0}
-.modal-body{padding:20px}
+.modal-close{background:none;border:none;color:var(--texte2);font-size:20px;cursor:pointer}
+.modal-body{padding:20px;overflow-y:auto}
 .modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
 .modal-stat{background:var(--surface2);border-radius:10px;padding:12px}
 .modal-stat-v{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700}
 .modal-stat-l{font-size:11px;color:var(--texte2);margin-top:2px}
-.mg-item{background:var(--surface2);border-radius:10px;padding:12px 14px;border-left:3px solid var(--bordure);margin-bottom:8px}
-.mg-item.ok{border-left-color:var(--vert)}.mg-item.warn{border-left-color:var(--orange)}.mg-item.danger{border-left-color:var(--rouge)}
+.mg{background:var(--surface2);border-radius:10px;padding:12px 14px;border-left:3px solid var(--bordure);margin-bottom:8px}
+.mg.ok{border-left-color:var(--vert)}.mg.warn{border-left-color:var(--orange)}.mg.danger{border-left-color:var(--rouge)}
 .mg-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
 .mg-nom{font-size:13px;font-weight:600}
 .mg-stats{display:flex;gap:12px}
-.mg-stat{font-size:11px;color:var(--texte2)}
-.mg-stat span{color:var(--texte);font-weight:500}
-
-/* FORM */
+.mg-stat{font-size:11px;color:var(--texte2)}.mg-stat span{color:var(--texte);font-weight:500}
 .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
-.field label{font-size:11px;color:var(--texte2);font-weight:500;letter-spacing:0.5px}
+.field label{font-size:11px;color:var(--texte2);font-weight:500;letter-spacing:0.5px;text-transform:uppercase}
 .field input,.field select,.field textarea{background:var(--surface2);border:1px solid var(--bordure);border-radius:10px;padding:12px 14px;color:var(--texte);font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:border-color 0.15s;width:100%}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--or)}
+.field select option{background:var(--surface2)}
 .field textarea{resize:vertical;min-height:80px}
-
-/* TOAST */
-.toast{position:fixed;bottom:24px;right:24px;background:var(--vert);color:white;padding:10px 18px;border-radius:8px;font-size:12px;font-weight:600;z-index:30;opacity:0;transition:opacity 0.25s;pointer-events:none}
+.jauge-wrap{margin-bottom:8px}
+.jauge-row{display:flex;justify-content:space-between;margin-bottom:4px}
+.jauge-l{font-size:11px;color:var(--texte2)}.jauge-p{font-size:11px;font-weight:600}
+.jauge-bar{height:5px;background:var(--bordure);border-radius:3px;overflow:hidden}
+.jauge-fill{height:100%;border-radius:3px}
+.toggle{width:40px;height:22px;border-radius:11px;cursor:pointer;position:relative;transition:background 0.2s;flex-shrink:0}
+.toggle.on{background:var(--vert)}.toggle.off{background:var(--bordure)}
+.toggle-dot{width:18px;height:18px;background:white;border-radius:50%;position:absolute;top:2px;transition:left 0.2s}
+.toggle.on .toggle-dot{left:20px}.toggle.off .toggle-dot{left:2px}
+.toast{position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:8px;font-size:12px;font-weight:600;z-index:30;opacity:0;transition:opacity 0.25s;pointer-events:none}
 .toast.show{opacity:1}
-.toast.warn{background:var(--orange)}
-.toast.err{background:var(--rouge)}
-
-/* EMPTY STATE */
+.toast.ok{background:var(--vert);color:white}
+.toast.warn{background:var(--orange);color:white}
+.toast.err{background:var(--rouge);color:white}
+.loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--texte2);font-size:13px;gap:10px}
+.spinner{width:16px;height:16px;border:2px solid var(--bordure);border-top-color:var(--or);border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
 .empty{padding:40px;text-align:center;color:var(--texte2)}
-.empty-icon{font-size:32px;margin-bottom:12px}
+.empty-icon{font-size:32px;margin-bottom:10px}
 .empty-title{font-size:14px;font-weight:600;color:var(--texte);margin-bottom:6px}
 .empty-sub{font-size:12px}
-
-/* RESPONSIVE */
-@media(max-width:900px){
-  .sidebar{display:none}
-  .kpi-row{grid-template-columns:repeat(2,1fr)}
-  .grid-2,.grid-3{grid-template-columns:1fr}
-  .view{padding:16px}
-}
+@media(max-width:900px){.sidebar{display:none}.kpi-row{grid-template-columns:repeat(2,1fr)}.grid-2,.grid-32{grid-template-columns:1fr}.view{padding:16px}}
 </style>
 </head>
 <body>
@@ -193,23 +135,23 @@ body{background:var(--noir);color:var(--texte);font-family:'Inter',sans-serif;mi
 
 <!-- SIDEBAR -->
 <div class="sidebar">
-  <div class="sb-logo">Gen<em>Track</em><div class="sb-logo-sub">Dashboard Partenaire</div></div>
+  <div class="sb-logo">Gen<em>Track</em><div class="sb-logo-sub">Dashboard</div></div>
   <div class="sb-nav">
     <div class="sb-section">Principal</div>
     <div class="sb-item active" id="nav-accueil" onclick="goTo('accueil')"><div class="sb-item-icon">🏠</div>Vue globale</div>
-    <div class="sb-item" id="nav-clients" onclick="goTo('clients')"><div class="sb-item-icon">🏨</div>Clients<div class="sb-item-badge">12</div></div>
-    <div class="sb-item" id="nav-alertes" onclick="goTo('alertes')"><div class="sb-item-icon">🔔</div>Alertes<div class="sb-item-badge">3</div></div>
-    <div class="sb-section">Analyse</div>
-    <div class="sb-item" id="nav-rapports" onclick="goTo('rapports')"><div class="sb-item-icon">📊</div>Rapports</div>
-    <div class="sb-item" id="nav-carburant" onclick="goTo('carburant')"><div class="sb-item-icon">⛽</div>Carburant</div>
+    <div class="sb-item" id="nav-clients" onclick="goTo('clients')"><div class="sb-item-icon">🏨</div>Clients<div class="sb-badge" id="badge-clients">—</div></div>
+    <div class="sb-item" id="nav-alertes" onclick="goTo('alertes')"><div class="sb-item-icon">🔔</div>Alertes<div class="sb-badge" id="badge-alertes">—</div></div>
+    <div class="sb-section">Saisies</div>
+    <div class="sb-item" id="nav-saisies" onclick="goTo('saisies')"><div class="sb-item-icon">📝</div>Carnet</div>
     <div class="sb-item" id="nav-maintenance" onclick="goTo('maintenance')"><div class="sb-item-icon">🔧</div>Maintenance</div>
+    <div class="sb-item" id="nav-pannes" onclick="goTo('pannes')"><div class="sb-item-icon">🚨</div>Pannes</div>
     <div class="sb-section">Compte</div>
     <div class="sb-item" id="nav-parametres" onclick="goTo('parametres')"><div class="sb-item-icon">⚙️</div>Paramètres</div>
   </div>
   <div class="sb-bottom">
-    <div class="sb-user" onclick="goTo('parametres')">
-      <div class="sb-avatar">ND</div>
-      <div><div class="sb-user-name">Ndoye Sénégal</div><div class="sb-user-role">Partenaire revendeur</div></div>
+    <div class="sb-user">
+      <div class="sb-avatar">GT</div>
+      <div><div class="sb-user-name">GenTrack Admin</div><div class="sb-user-role">Vue globale</div></div>
     </div>
   </div>
 </div>
@@ -217,285 +159,135 @@ body{background:var(--noir);color:var(--texte);font-family:'Inter',sans-serif;mi
 <!-- MAIN -->
 <div class="main">
 
-<!-- ══ VUE GLOBALE ══ -->
+<!-- VUE GLOBALE -->
 <div class="view active" id="view-accueil">
   <div class="topbar">
-    <div><div class="topbar-date">Vendredi 13 juin 2026 · 08h14</div><div class="topbar-title">Vue globale</div></div>
+    <div><div class="topbar-date" id="accueil-date">—</div><div class="topbar-title">Vue globale</div></div>
     <div class="topbar-right">
-      <button class="btn-ghost" onclick="exportPDF()">📥 Exporter</button>
-      <button class="btn-primary" onclick="openAddClient()">+ Nouveau client</button>
+      <button class="btn btn-ghost" onclick="loadAll()">🔄 Actualiser</button>
+      <button class="btn btn-or" onclick="openAddClient()">+ Nouveau client</button>
     </div>
   </div>
   <div class="kpi-row">
-    <div class="kpi"><div class="kpi-label">Clients actifs</div><div class="kpi-val or">12</div><div class="kpi-sub">Dakar · Sénégal</div><div class="kpi-evo pos">↑ +2 ce mois</div></div>
-    <div class="kpi"><div class="kpi-label">Groupes suivis</div><div class="kpi-val or">24</div><div class="kpi-sub">Sur 12 sites</div><div class="kpi-evo neu">→ stable</div></div>
-    <div class="kpi"><div class="kpi-label">Alertes actives</div><div class="kpi-val rouge">3</div><div class="kpi-sub">Intervention requise</div><div class="kpi-evo neg">↑ +1 aujourd'hui</div></div>
-    <div class="kpi"><div class="kpi-label">MRR partenaire</div><div class="kpi-val vert">72k</div><div class="kpi-sub">FCFA ce mois</div><div class="kpi-evo pos">↑ +12k vs mai</div></div>
+    <div class="kpi"><div class="kpi-label">Clients actifs</div><div class="kpi-val or" id="kpi-clients">—</div><div class="kpi-sub" id="kpi-clients-sub">chargement...</div></div>
+    <div class="kpi"><div class="kpi-label">Groupes suivis</div><div class="kpi-val or" id="kpi-groupes">—</div><div class="kpi-sub">Sur tous les sites</div></div>
+    <div class="kpi"><div class="kpi-label">Alertes actives</div><div class="kpi-val rouge" id="kpi-alertes">—</div><div class="kpi-sub">Non résolues</div></div>
+    <div class="kpi"><div class="kpi-label">Saisies aujourd'hui</div><div class="kpi-val vert" id="kpi-saisies">—</div><div class="kpi-sub">Rapports reçus</div></div>
   </div>
-  <div class="grid-3">
+  <div class="grid-32">
     <div class="card">
-      <div class="card-header"><div class="card-title">Clients — Statut en temps réel</div><button class="btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('clients')">Voir tout →</button></div>
-      <div class="table-row header tr-clients"><div class="col-label">Client</div><div class="col-label">Groupes</div><div class="col-label">Carburant</div><div class="col-label">Statut</div><div></div></div>
-      <div class="table-row tr-clients" onclick="openClient('savana')"><div><div class="col-name">Hôtel Savana</div><div class="col-sub">Cocody · 2 groupes</div></div><div class="col-val or">2</div><div class="col-val vert">72%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-      <div class="table-row tr-clients" onclick="openClient('casaMara')"><div><div class="col-name">Casa Mara</div><div class="col-sub">Almadies · 1 groupe</div></div><div class="col-val or">1</div><div class="col-val orange">35%</div><div><span class="pill pill-warn">⚠️ Alerte</span></div><div class="col-arrow">›</div></div>
-      <div class="table-row tr-clients" onclick="openClient('almadies')"><div><div class="col-name">Résidence Almadies</div><div class="col-sub">Almadies · 3 groupes</div></div><div class="col-val or">3</div><div class="col-val vert">81%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-      <div class="table-row tr-clients" onclick="openClient('palmBeach')"><div><div class="col-name">Hotel Palm Beach</div><div class="col-sub">Plateau · 1 groupe</div></div><div class="col-val or">1</div><div class="col-val rouge">18%</div><div><span class="pill pill-danger">🚨 Urgent</span></div><div class="col-arrow">›</div></div>
-      <div class="table-row tr-clients" onclick="openClient('teranga')"><div><div class="col-name">Hôtel Teranga</div><div class="col-sub">Centre · 2 groupes</div></div><div class="col-val or">2</div><div class="col-val vert">65%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-      <div class="table-row tr-clients" onclick="openClient('ngor')"><div><div class="col-name">Lodge Ngor</div><div class="col-sub">Ngor · 1 groupe</div></div><div class="col-val or">1</div><div class="col-val vert">58%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-      <div style="padding:12px 18px;text-align:center"><span style="font-size:11px;color:var(--or);cursor:pointer" onclick="goTo('clients')">+ 6 autres clients → Voir tout</span></div>
+      <div class="card-header"><div class="card-title">Clients — Statut en temps réel</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('clients')">Voir tout →</button></div>
+      <div id="accueil-clients"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
     </div>
     <div class="card">
-      <div class="card-header"><div class="card-title">🔔 Alertes actives</div><button class="btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('alertes')">Voir tout →</button></div>
-      <div class="alerte-item" onclick="openClient('palmBeach')"><div class="ai-dot rouge"></div><div class="ai-body"><div class="ai-titre">Carburant critique — Palm Beach</div><div class="ai-desc">Groupe unique · 18% · Risque arrêt imminent</div></div><div class="ai-time">14min</div></div>
-      <div class="alerte-item" onclick="openClient('casaMara')"><div class="ai-dot orange"></div><div class="ai-body"><div class="ai-titre">Vidange imminente — Casa Mara</div><div class="ai-desc">Perkins 20kVA · 238h/250h atteintes</div></div><div class="ai-time">1h</div></div>
-      <div class="alerte-item" onclick="openClient('savana')"><div class="ai-dot orange"></div><div class="ai-body"><div class="ai-titre">Conso anormale — Hôtel Savana</div><div class="ai-desc">Groupe B · +14% vs théorique</div></div><div class="ai-time">Hier</div></div>
+      <div class="card-header"><div class="card-title">🔔 Alertes actives</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('alertes')">Voir tout →</button></div>
+      <div id="accueil-alertes"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
     </div>
   </div>
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-header"><div class="card-title">Consommation carburant — Juin 2026</div><button class="btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('carburant')">Détail →</button></div>
-      <div style="padding:16px 18px">
-        <div style="font-size:11px;color:var(--texte2);margin-bottom:12px">Total 12 clients · Litres/semaine</div>
-        <div class="chart-bars">
-          <div class="chart-bar" style="height:35%" onclick="showToast('Semaine 1 : 820L consommés')"></div>
-          <div class="chart-bar" style="height:62%" onclick="showToast('Semaine 2 : 1 240L consommés')"></div>
-          <div class="chart-bar" style="height:57%" onclick="showToast('Semaine 3 : 1 140L consommés')"></div>
-          <div class="chart-bar active" style="height:45%" onclick="showToast('Semaine 4 : 910L — en cours')"></div>
-        </div>
-        <div class="chart-labels"><div class="chart-label">S1<br>820L</div><div class="chart-label">S2<br>1 240L</div><div class="chart-label">S3<br>1 140L</div><div class="chart-label">S4<br>910L●</div></div>
-        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--bordure);display:flex;justify-content:space-between">
-          <div><div style="font-size:10px;color:var(--texte2);margin-bottom:2px">TOTAL JUIN</div><div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:var(--or)">4 110 L</div></div>
-          <div style="text-align:right"><div style="font-size:10px;color:var(--texte2);margin-bottom:2px">VS MAI</div><div style="font-size:16px;font-weight:600;color:var(--vert)">↓ −6%</div></div>
-          <div style="text-align:right"><div style="font-size:10px;color:var(--texte2);margin-bottom:2px">COÛT TOTAL</div><div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700">2.87M <span style="font-size:12px;color:var(--texte2)">FCFA</span></div></div>
-        </div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header"><div class="card-title">Activité récente</div><button class="btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('clients')">Tout voir →</button></div>
-      <div class="act-item"><div class="act-dot ad-rouge">🚨</div><div class="act-body"><div class="act-titre">Alerte critique — Palm Beach</div><div class="act-detail">Carburant 18% · Groupe unique</div></div><div class="act-time">08h00</div></div>
-      <div class="act-item"><div class="act-dot ad-vert">📊</div><div class="act-body"><div class="act-titre">Rapports envoyés — 12 clients</div><div class="act-detail">WhatsApp automatiques 08h00</div></div><div class="act-time">08h00</div></div>
-      <div class="act-item"><div class="act-dot ad-or">⛽</div><div class="act-body"><div class="act-titre">Ravitaillement — Hôtel Savana</div><div class="act-detail">+120L · Groupe A · 84 000 FCFA</div></div><div class="act-time">Hier 16h</div></div>
-      <div class="act-item"><div class="act-dot ad-vert">🔧</div><div class="act-body"><div class="act-titre">Maintenance — Résidence Almadies</div><div class="act-detail">Vidange Groupe 1 · Koffi</div></div><div class="act-time">Hier 11h</div></div>
-      <div class="act-item"><div class="act-dot ad-bleu">✅</div><div class="act-body"><div class="act-titre">Nouveau client — Lodge Ngor</div><div class="act-detail">Onboarding WhatsApp activé</div></div><div class="act-time">12 juin</div></div>
-    </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Activité récente</div></div>
+    <div id="accueil-activite"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
   </div>
 </div>
 
-<!-- ══ CLIENTS ══ -->
+<!-- CLIENTS -->
 <div class="view" id="view-clients">
   <div class="topbar">
-    <div><div class="topbar-date">12 clients actifs</div><div class="topbar-title">Clients</div></div>
+    <div><div class="topbar-date">Tous les établissements</div><div class="topbar-title">Clients</div></div>
     <div class="topbar-right">
-      <button class="btn-ghost" onclick="exportPDF()">📥 Exporter</button>
-      <button class="btn-primary" onclick="openAddClient()">+ Nouveau client</button>
+      <button class="btn btn-ghost" onclick="loadClients()">🔄</button>
+      <button class="btn btn-or" onclick="openAddClient()">+ Nouveau client</button>
     </div>
   </div>
   <div class="card">
-    <div class="card-header"><div class="card-title">Tous les clients</div><div style="font-size:11px;color:var(--texte2)">Cliquez pour voir le détail</div></div>
-    <div class="table-row header tr-clients"><div class="col-label">Client</div><div class="col-label">Groupes</div><div class="col-label">Carburant moy.</div><div class="col-label">Statut</div><div></div></div>
-    <div class="table-row tr-clients" onclick="openClient('savana')"><div><div class="col-name">Hôtel Savana</div><div class="col-sub">Cocody · Client depuis avril 2026</div></div><div class="col-val or">2</div><div class="col-val vert">72%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-clients" onclick="openClient('casaMara')"><div><div class="col-name">Casa Mara</div><div class="col-sub">Almadies · Client depuis mai 2026</div></div><div class="col-val or">1</div><div class="col-val orange">35%</div><div><span class="pill pill-warn">⚠️ Alerte</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-clients" onclick="openClient('almadies')"><div><div class="col-name">Résidence Almadies</div><div class="col-sub">Almadies Zone 2 · Client depuis mars 2026</div></div><div class="col-val or">3</div><div class="col-val vert">81%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-clients" onclick="openClient('palmBeach')"><div><div class="col-name">Hotel Palm Beach</div><div class="col-sub">Plateau · Client depuis juin 2026</div></div><div class="col-val or">1</div><div class="col-val rouge">18%</div><div><span class="pill pill-danger">🚨 Urgent</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-clients" onclick="openClient('teranga')"><div><div class="col-name">Hôtel Teranga</div><div class="col-sub">Centre-ville · Client depuis mai 2026</div></div><div class="col-val or">2</div><div class="col-val vert">65%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-clients" onclick="openClient('ngor')"><div><div class="col-name">Lodge Ngor</div><div class="col-sub">Ngor · Client depuis juin 2026</div></div><div class="col-val or">1</div><div class="col-val vert">58%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-clients" onclick="openClient('savana')"><div><div class="col-name">Hôtel Le Plateau</div><div class="col-sub">Plateau · Client depuis avril 2026</div></div><div class="col-val or">2</div><div class="col-val vert">68%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-clients" onclick="openClient('almadies')"><div><div class="col-name">Villa Baobab</div><div class="col-sub">Yoff · Client depuis mai 2026</div></div><div class="col-val or">1</div><div class="col-val vert">74%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-clients" onclick="openClient('teranga')"><div><div class="col-name">Clinique Pasteur</div><div class="col-sub">Fann · Client depuis mars 2026</div></div><div class="col-val or">3</div><div class="col-val vert">88%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-clients" onclick="openClient('casaMara')"><div><div class="col-name">Supermarché Auchan Almadies</div><div class="col-sub">Almadies · Client depuis juin 2026</div></div><div class="col-val or">2</div><div class="col-val orange">42%</div><div><span class="pill pill-warn">⚠️ Alerte</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-clients" onclick="openClient('savana')"><div><div class="col-name">Hôtel Fleur de Lys</div><div class="col-sub">Ouakam · Client depuis mai 2026</div></div><div class="col-val or">1</div><div class="col-val vert">61%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-clients" onclick="openClient('ngor')"><div><div class="col-name">Résidence Les Cocotiers</div><div class="col-sub">Ngor · Client depuis juin 2026</div></div><div class="col-val or">1</div><div class="col-val vert">55%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+    <div class="card-header"><div class="card-title">Liste complète</div><div style="font-size:11px;color:var(--texte2)">Cliquez pour voir le détail</div></div>
+    <div class="tr hd tr-clients">
+      <div class="col-label">Client</div><div class="col-label">Groupes</div><div class="col-label">Saisies</div><div class="col-label">Statut</div><div></div>
+    </div>
+    <div id="clients-list"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
   </div>
 </div>
 
-<!-- ══ ALERTES ══ -->
+<!-- ALERTES -->
 <div class="view" id="view-alertes">
   <div class="topbar">
-    <div><div class="topbar-date">3 alertes nécessitent votre attention</div><div class="topbar-title">Alertes</div></div>
-    <div class="topbar-right"><button class="btn-ghost" onclick="showToast('Toutes les alertes marquées comme lues')">Tout marquer lu</button></div>
-  </div>
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-header"><div class="card-title">🚨 Critique — Action immédiate</div></div>
-    <div class="alerte-item" onclick="openClient('palmBeach')">
-      <div class="ai-dot rouge"></div>
-      <div class="ai-body">
-        <div class="ai-titre">Carburant critique — Hotel Palm Beach</div>
-        <div class="ai-desc">Groupe A · Perkins 15 kVA · Plateau · Niveau : 18% · Risque d'arrêt dans moins de 2h</div>
-        <div class="ai-actions">
-          <button class="btn-danger" onclick="event.stopPropagation();showToast('Message envoyé au patron de Palm Beach ✓','warn')">📱 Contacter le patron</button>
-          <button class="btn-ghost" onclick="event.stopPropagation();openClient('palmBeach')">Voir le groupe →</button>
-        </div>
-      </div>
-      <div class="ai-time">Il y a 14min</div>
-    </div>
-  </div>
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-header"><div class="card-title">⚠️ Important — À traiter aujourd'hui</div></div>
-    <div class="alerte-item" onclick="openClient('casaMara')">
-      <div class="ai-dot orange"></div>
-      <div class="ai-body">
-        <div class="ai-titre">Vidange imminente — Casa Mara</div>
-        <div class="ai-desc">Groupe A · Perkins 20 kVA · 238h / 250h atteintes · Vidange requise dans 12h max</div>
-        <div class="ai-actions">
-          <button class="btn-ghost" onclick="event.stopPropagation();showToast('Technicien notifié ✓','warn')">🔧 Notifier technicien</button>
-          <button class="btn-ghost" onclick="event.stopPropagation();openClient('casaMara')">Voir le groupe →</button>
-        </div>
-      </div>
-      <div class="ai-time">Il y a 1h</div>
-    </div>
-    <div class="alerte-item" onclick="openClient('savana')">
-      <div class="ai-dot orange"></div>
-      <div class="ai-body">
-        <div class="ai-titre">Consommation anormale — Hôtel Savana</div>
-        <div class="ai-desc">Groupe B · Perkins 20 kVA · +14% vs consommation théorique · Possible fuite ou vol</div>
-        <div class="ai-actions">
-          <button class="btn-ghost" onclick="event.stopPropagation();showToast('Rapport envoyé au patron ✓')">📊 Envoyer rapport</button>
-          <button class="btn-ghost" onclick="event.stopPropagation();openClient('savana')">Voir le groupe →</button>
-        </div>
-      </div>
-      <div class="ai-time">Hier 16h</div>
-    </div>
+    <div><div class="topbar-date">En temps réel</div><div class="topbar-title">Alertes</div></div>
+    <div class="topbar-right"><button class="btn btn-ghost" onclick="markAllRead()">Tout marquer lu</button></div>
   </div>
   <div class="card">
-    <div class="card-header"><div class="card-title">✅ Résolues récemment</div></div>
-    <div class="alerte-item"><div class="ai-dot" style="background:var(--vert)"></div><div class="ai-body"><div class="ai-titre">Panne résolue — Résidence Almadies</div><div class="ai-desc">Groupe 2 · Démarreur remplacé · Durée : 3h</div></div><div class="ai-time">10 juin</div></div>
-    <div class="alerte-item"><div class="ai-dot" style="background:var(--vert)"></div><div class="ai-body"><div class="ai-titre">Carburant rechargé — Lodge Ngor</div><div class="ai-desc">+80L · Niveau remonté à 58%</div></div><div class="ai-time">9 juin</div></div>
+    <div class="card-header"><div class="card-title">Alertes non résolues</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="loadAlertes()">🔄</button></div>
+    <div id="alertes-list"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
   </div>
 </div>
 
-<!-- ══ RAPPORTS ══ -->
-<div class="view" id="view-rapports">
+<!-- SAISIES / CARNET -->
+<div class="view" id="view-saisies">
   <div class="topbar">
-    <div><div class="topbar-date">Historique complet</div><div class="topbar-title">Rapports</div></div>
-    <div class="topbar-right"><button class="btn-primary" onclick="exportPDF()">📥 Exporter tout</button></div>
-  </div>
-  <div class="kpi-row">
-    <div class="kpi"><div class="kpi-label">CA juin 2026</div><div class="kpi-val or">240k</div><div class="kpi-sub">FCFA · 12 clients</div><div class="kpi-evo pos">↑ +20%</div></div>
-    <div class="kpi"><div class="kpi-label">Carburant total</div><div class="kpi-val or">4 110L</div><div class="kpi-sub">Tous clients</div><div class="kpi-evo pos">↓ −6% vs mai</div></div>
-    <div class="kpi"><div class="kpi-label">Pannes évitées</div><div class="kpi-val vert">8</div><div class="kpi-sub">Grâce aux alertes</div><div class="kpi-evo pos">↑ ce mois</div></div>
-    <div class="kpi"><div class="kpi-label">Économies générées</div><div class="kpi-val vert">312k</div><div class="kpi-sub">FCFA · Tous clients</div><div class="kpi-evo pos">↑ vs mai</div></div>
+    <div><div class="topbar-date">Journal de bord</div><div class="topbar-title">Carnet</div></div>
+    <div class="topbar-right"><button class="btn btn-or" onclick="openSaisie()">+ Nouvelle saisie</button></div>
   </div>
   <div class="card">
-    <div class="card-header"><div class="card-title">Rapports mensuels — Par client</div></div>
-    <div class="table-row header tr-rapports"><div class="col-label">Client</div><div class="col-label">Coût total</div><div class="col-label">Économie</div><div class="col-label">Actions</div></div>
-    <div class="table-row tr-rapports" onclick="openClient('savana')"><div><div class="col-name">Hôtel Savana</div><div class="col-sub">Juin 2026 · 2 groupes</div></div><div class="col-val or">224k FCFA</div><div class="col-val vert">↓ −8%</div><div style="display:flex;gap:6px"><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();exportPDF()">📥 PDF</button><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();showToast('Rapport envoyé par WhatsApp ✓')">📱 WA</button></div></div>
-    <div class="table-row tr-rapports" onclick="openClient('almadies')"><div><div class="col-name">Résidence Almadies</div><div class="col-sub">Juin 2026 · 3 groupes</div></div><div class="col-val or">312k FCFA</div><div class="col-val vert">↓ −5%</div><div style="display:flex;gap:6px"><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();exportPDF()">📥 PDF</button><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();showToast('Rapport envoyé par WhatsApp ✓')">📱 WA</button></div></div>
-    <div class="table-row tr-rapports" onclick="openClient('teranga')"><div><div class="col-name">Hôtel Teranga</div><div class="col-sub">Juin 2026 · 2 groupes</div></div><div class="col-val or">186k FCFA</div><div class="col-val vert">↓ −3%</div><div style="display:flex;gap:6px"><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();exportPDF()">📥 PDF</button><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();showToast('Rapport envoyé par WhatsApp ✓')">📱 WA</button></div></div>
-    <div class="table-row tr-rapports" onclick="openClient('palmBeach')"><div><div class="col-name">Hotel Palm Beach</div><div class="col-sub">Juin 2026 · 1 groupe</div></div><div class="col-val or">76k FCFA</div><div class="col-val neu">→ stable</div><div style="display:flex;gap:6px"><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();exportPDF()">📥 PDF</button><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();showToast('Rapport envoyé par WhatsApp ✓')">📱 WA</button></div></div>
-    <div class="table-row tr-rapports" onclick="openClient('casaMara')"><div><div class="col-name">Casa Mara</div><div class="col-sub">Juin 2026 · 1 groupe</div></div><div class="col-val or">98k FCFA</div><div class="col-val neg">↑ +8%</div><div style="display:flex;gap:6px"><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();exportPDF()">📥 PDF</button><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();showToast('Rapport envoyé par WhatsApp ✓')">📱 WA</button></div></div>
+    <div class="card-header"><div class="card-title">Saisies récentes</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="loadSaisies()">🔄</button></div>
+    <div class="tr hd tr-saisies">
+      <div class="col-label">Client / Groupe</div><div class="col-label">Date</div><div class="col-label">Carburant</div><div class="col-label">Heures</div><div class="col-label">Opérateur</div>
+    </div>
+    <div id="saisies-list"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
   </div>
 </div>
 
-<!-- ══ CARBURANT ══ -->
-<div class="view" id="view-carburant">
-  <div class="topbar">
-    <div><div class="topbar-date">Suivi en temps réel</div><div class="topbar-title">Carburant</div></div>
-    <div class="topbar-right"><button class="btn-primary" onclick="openSaisie()">+ Saisir ravitaillement</button></div>
-  </div>
-  <div class="kpi-row">
-    <div class="kpi"><div class="kpi-label">Total juin</div><div class="kpi-val or">4 110L</div><div class="kpi-sub">12 clients · 24 groupes</div><div class="kpi-evo pos">↓ −6% vs mai</div></div>
-    <div class="kpi"><div class="kpi-label">Coût total</div><div class="kpi-val or">2.87M</div><div class="kpi-sub">FCFA ce mois</div><div class="kpi-evo pos">↓ économie</div></div>
-    <div class="kpi"><div class="kpi-label">Anomalies détectées</div><div class="kpi-val orange">2</div><div class="kpi-sub">Conso > +10% théorique</div><div class="kpi-evo neg">↑ à surveiller</div></div>
-    <div class="kpi"><div class="kpi-label">Niveaux critiques</div><div class="kpi-val rouge">1</div><div class="kpi-sub">< 20% · Palm Beach</div><div class="kpi-evo neg">Action requise</div></div>
-  </div>
-  <div class="card">
-    <div class="card-header"><div class="card-title">Niveau carburant — Tous les groupes</div></div>
-    <div class="table-row header tr-carb"><div class="col-label">Client / Groupe</div><div class="col-label">Niveau</div><div class="col-label">Conso réelle</div><div class="col-label">Statut</div><div></div></div>
-    <div class="table-row tr-carb" onclick="openClient('palmBeach')"><div><div class="col-name">Palm Beach — Groupe A</div><div class="col-sub">Perkins 15 kVA · Plateau</div></div><div class="col-val rouge">18%</div><div class="col-val neu">1.4 L/h</div><div><span class="pill pill-danger">🚨 Critique</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-carb" onclick="openClient('casaMara')"><div><div class="col-name">Casa Mara — Groupe A</div><div class="col-sub">Perkins 20 kVA · Almadies</div></div><div class="col-val orange">35%</div><div class="col-val orange">1.57 L/h</div><div><span class="pill pill-warn">⚠️ Bas</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-carb" onclick="openClient('savana')"><div><div class="col-name">Hôtel Savana — Groupe B</div><div class="col-sub">Perkins 20 kVA · Cocody</div></div><div class="col-val orange">35%</div><div class="col-val orange">1.57 L/h +14%</div><div><span class="pill pill-warn">⚠️ Anomalie</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-carb" onclick="openClient('ngor')"><div><div class="col-name">Lodge Ngor — Groupe A</div><div class="col-sub">Kipor 10 kVA · Ngor</div></div><div class="col-val vert">58%</div><div class="col-val vert">0.9 L/h</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-carb" onclick="openClient('teranga')"><div><div class="col-name">Hôtel Teranga — Groupe A</div><div class="col-sub">Caterpillar 35 kVA · Centre</div></div><div class="col-val vert">65%</div><div class="col-val vert">2.1 L/h</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-carb" onclick="openClient('savana')"><div><div class="col-name">Hôtel Savana — Groupe A</div><div class="col-sub">Caterpillar 45 kVA · Cocody</div></div><div class="col-val vert">72%</div><div class="col-val vert">1.71 L/h</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-carb" onclick="openClient('almadies')"><div><div class="col-name">Résidence Almadies — Groupe A</div><div class="col-sub">Caterpillar 45 kVA · Almadies</div></div><div class="col-val vert">81%</div><div class="col-val vert">2.3 L/h</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
-  </div>
-</div>
-
-<!-- ══ MAINTENANCE ══ -->
+<!-- MAINTENANCE -->
 <div class="view" id="view-maintenance">
   <div class="topbar">
-    <div><div class="topbar-date">Planification préventive</div><div class="topbar-title">Maintenance</div></div>
-    <div class="topbar-right"><button class="btn-primary" onclick="openSaisie()">+ Enregistrer intervention</button></div>
-  </div>
-  <div class="kpi-row">
-    <div class="kpi"><div class="kpi-label">À faire cette semaine</div><div class="kpi-val orange">2</div><div class="kpi-sub">Interventions planifiées</div></div>
-    <div class="kpi"><div class="kpi-label">Faites ce mois</div><div class="kpi-val vert">5</div><div class="kpi-sub">Interventions réalisées</div></div>
-    <div class="kpi"><div class="kpi-label">Pannes évitées</div><div class="kpi-val vert">8</div><div class="kpi-sub">Grâce aux alertes</div></div>
-    <div class="kpi"><div class="kpi-label">Coût maintenance</div><div class="kpi-val or">340k</div><div class="kpi-sub">FCFA ce mois</div></div>
-  </div>
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-header"><div class="card-title">⚠️ À planifier maintenant</div></div>
-    <div class="table-row header tr-maint"><div class="col-label">Groupe</div><div class="col-label">Type</div><div class="col-label">Échéance</div><div class="col-label">Statut</div><div></div></div>
-    <div class="table-row tr-maint" onclick="openClient('casaMara')"><div><div class="col-name">Casa Mara — Groupe A</div><div class="col-sub">Perkins 20 kVA</div></div><div class="col-val">Vidange huile</div><div class="col-val rouge">Dans 12h</div><div><span class="pill pill-danger">🚨 Urgent</span></div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-maint" onclick="openClient('savana')"><div><div class="col-name">Hôtel Savana — Groupe A</div><div class="col-sub">Caterpillar 45 kVA</div></div><div class="col-val">Filtre carburant</div><div class="col-val orange">Dans 3 sem.</div><div><span class="pill pill-warn">⚠️ Prévoir</span></div><div class="col-arrow">›</div></div>
+    <div><div class="topbar-date">Interventions planifiées et réalisées</div><div class="topbar-title">Maintenance</div></div>
+    <div class="topbar-right"><button class="btn btn-or" onclick="openMaintenance()">+ Enregistrer intervention</button></div>
   </div>
   <div class="card">
-    <div class="card-header"><div class="card-title">✅ Interventions réalisées — Juin 2026</div></div>
-    <div class="table-row header tr-maint"><div class="col-label">Groupe</div><div class="col-label">Type</div><div class="col-label">Date</div><div class="col-label">Coût</div><div></div></div>
-    <div class="table-row tr-maint" onclick="openClient('almadies')"><div><div class="col-name">Résidence Almadies — G1</div><div class="col-sub">Technicien Koffi</div></div><div class="col-val">Vidange huile</div><div class="col-val">12 juin</div><div class="col-val vert">65k FCFA</div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-maint" onclick="openClient('savana')"><div><div class="col-name">Hôtel Savana — Groupe A</div><div class="col-sub">Technicien Moussa</div></div><div class="col-val">Filtre air</div><div class="col-val">10 juin</div><div class="col-val vert">28k FCFA</div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-maint" onclick="openClient('teranga')"><div><div class="col-name">Hôtel Teranga — Groupe B</div><div class="col-sub">Technicien Diallo</div></div><div class="col-val">Vidange + filtre</div><div class="col-val">5 juin</div><div class="col-val vert">95k FCFA</div><div class="col-arrow">›</div></div>
-    <div class="table-row tr-maint" onclick="openClient('ngor')"><div><div class="col-name">Lodge Ngor — Groupe A</div><div class="col-sub">Technicien Koffi</div></div><div class="col-val">Remplacement démarreur</div><div class="col-val">3 juin</div><div class="col-val vert">120k FCFA</div><div class="col-arrow">›</div></div>
+    <div class="card-header"><div class="card-title">Historique des interventions</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="loadMaintenance()">🔄</button></div>
+    <div class="tr hd tr-maint">
+      <div class="col-label">Client / Groupe</div><div class="col-label">Type</div><div class="col-label">Date</div><div class="col-label">Coût</div>
+    </div>
+    <div id="maint-list"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
   </div>
 </div>
 
-<!-- ══ PARAMÈTRES ══ -->
+<!-- PANNES -->
+<div class="view" id="view-pannes">
+  <div class="topbar">
+    <div><div class="topbar-date">Suivi des incidents</div><div class="topbar-title">Pannes</div></div>
+    <div class="topbar-right"><button class="btn btn-danger" onclick="openPanne()">🚨 Signaler une panne</button></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Historique des pannes</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="loadPannes()">🔄</button></div>
+    <div class="tr hd tr-pannes">
+      <div class="col-label">Client / Groupe</div><div class="col-label">Type</div><div class="col-label">Date</div><div class="col-label">Statut</div><div></div>
+    </div>
+    <div id="pannes-list"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
+  </div>
+</div>
+
+<!-- PARAMÈTRES -->
 <div class="view" id="view-parametres">
   <div class="topbar">
-    <div><div class="topbar-date">Configuration du compte</div><div class="topbar-title">Paramètres</div></div>
+    <div><div class="topbar-date">Configuration</div><div class="topbar-title">Paramètres</div></div>
   </div>
   <div class="grid-2">
     <div class="card">
-      <div class="card-header"><div class="card-title">👤 Profil partenaire</div></div>
+      <div class="card-header"><div class="card-title">🔌 Connexion Supabase</div></div>
       <div style="padding:16px 18px">
-        <div class="field"><label>NOM DU PARTENAIRE</label><input value="Ndoye Électrotechnique Sénégal"></div>
-        <div class="field"><label>CONTACT PRINCIPAL</label><input value="+221 77 XXX XX XX"></div>
-        <div class="field"><label>EMAIL</label><input value="contact@ndoye-elec.sn"></div>
-        <div class="field"><label>VILLE</label><input value="Dakar, Sénégal"></div>
-        <button class="btn-primary" onclick="showToast('Profil sauvegardé ✓')">Sauvegarder</button>
+        <div class="field"><label>URL Supabase</label><input id="param-url" value="https://zbpoxjlkqxnqjzxohasq.supabase.co"></div>
+        <div class="field"><label>Clé API (anon)</label><input id="param-key" type="password" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M"></div>
+        <button class="btn btn-or" onclick="saveConfig()">💾 Sauvegarder</button>
+        <div style="margin-top:12px;padding:10px 12px;background:var(--surface2);border-radius:8px;font-size:11px;color:var(--texte2)" id="connexion-status">Statut : <span id="conn-status-text" style="color:var(--or)">vérification...</span></div>
       </div>
     </div>
     <div class="card">
       <div class="card-header"><div class="card-title">🔔 Notifications</div></div>
       <div style="padding:16px 18px;display:flex;flex-direction:column;gap:14px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div><div style="font-size:13px;font-weight:500">Alertes carburant critique</div><div style="font-size:11px;color:var(--texte2)">Notification immédiate</div></div>
-          <div style="width:40px;height:22px;background:var(--vert);border-radius:11px;cursor:pointer;position:relative" onclick="showToast('Paramètre mis à jour ✓')"><div style="width:18px;height:18px;background:white;border-radius:50%;position:absolute;right:2px;top:2px"></div></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div><div style="font-size:13px;font-weight:500">Rappels maintenance</div><div style="font-size:11px;color:var(--texte2)">48h avant échéance</div></div>
-          <div style="width:40px;height:22px;background:var(--vert);border-radius:11px;cursor:pointer;position:relative" onclick="showToast('Paramètre mis à jour ✓')"><div style="width:18px;height:18px;background:white;border-radius:50%;position:absolute;right:2px;top:2px"></div></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div><div style="font-size:13px;font-weight:500">Rapport hebdomadaire</div><div style="font-size:11px;color:var(--texte2)">Chaque lundi 08h00</div></div>
-          <div style="width:40px;height:22px;background:var(--vert);border-radius:11px;cursor:pointer;position:relative" onclick="showToast('Paramètre mis à jour ✓')"><div style="width:18px;height:18px;background:white;border-radius:50%;position:absolute;right:2px;top:2px"></div></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div><div style="font-size:13px;font-weight:500">Anomalies consommation</div><div style="font-size:11px;color:var(--texte2)">Si > +10% théorique</div></div>
-          <div style="width:40px;height:22px;background:var(--bordure);border-radius:11px;cursor:pointer;position:relative" onclick="showToast('Paramètre mis à jour ✓')"><div style="width:18px;height:18px;background:white;border-radius:50%;position:absolute;left:2px;top:2px"></div></div>
-        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:500">Alertes carburant critique</div><div style="font-size:11px;color:var(--texte2)">Notification immédiate</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');showToast('Paramètre mis à jour')"><div class="toggle-dot"></div></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:500">Rappels maintenance</div><div style="font-size:11px;color:var(--texte2)">48h avant échéance</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');showToast('Paramètre mis à jour')"><div class="toggle-dot"></div></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:500">Rapport hebdomadaire</div><div style="font-size:11px;color:var(--texte2)">Chaque lundi 08h00</div></div><div class="toggle on" onclick="this.classList.toggle('on');this.classList.toggle('off');showToast('Paramètre mis à jour')"><div class="toggle-dot"></div></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:500">Anomalies consommation</div><div style="font-size:11px;color:var(--texte2)">Si > +10% théorique</div></div><div class="toggle off" onclick="this.classList.toggle('on');this.classList.toggle('off');showToast('Paramètre mis à jour')"><div class="toggle-dot"></div></div></div>
       </div>
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-header"><div class="card-title">💳 Abonnement</div></div>
-    <div style="padding:16px 18px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <div><div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700">Plan Partenaire</div><div style="font-size:12px;color:var(--texte2);margin-top:2px">12 clients · 24 groupes</div></div>
-        <div><div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;color:var(--or)">72k<span style="font-size:12px;color:var(--texte2)"> FCFA/mois</span></div></div>
-      </div>
-      <div style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:12px">
-        <div style="font-size:11px;color:var(--texte2);margin-bottom:8px">INCLUS DANS VOTRE PLAN</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          <div style="font-size:12px">✅ Clients illimités</div>
-          <div style="font-size:12px">✅ WhatsApp bot</div>
-          <div style="font-size:12px">✅ Alertes temps réel</div>
-          <div style="font-size:12px">✅ Rapports PDF</div>
-          <div style="font-size:12px">✅ Dashboard partenaire</div>
-          <div style="font-size:12px">✅ Support prioritaire</div>
-        </div>
-      </div>
-      <button class="btn-ghost" onclick="showToast('Facturation Wave — Prochain prélèvement le 1er juillet')">Voir la facturation</button>
     </div>
   </div>
 </div>
@@ -504,161 +296,607 @@ body{background:var(--noir);color:var(--texte);font-family:'Inter',sans-serif;mi
 </div><!-- /layout -->
 
 <!-- MODAL CLIENT -->
-<div class="modal-overlay" id="modalClient" onclick="closeModal(event)">
+<div class="modal-overlay" id="modal-client" onclick="closeModal('modal-client',event)">
   <div class="modal">
-    <div class="modal-head">
-      <div><div class="modal-nom" id="modalNom"></div><div class="modal-sub" id="modalSub"></div></div>
-      <button class="modal-close" onclick="closeModalDirect()">✕</button>
-    </div>
-    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-head"><div><div class="modal-nom" id="mc-nom">—</div><div class="modal-sub" id="mc-sub">—</div></div><button class="modal-close" onclick="closeModalDirect('modal-client')">✕</button></div>
+    <div class="modal-body" id="mc-body"></div>
   </div>
 </div>
 
 <!-- MODAL ADD CLIENT -->
-<div class="modal-overlay" id="modalAdd" onclick="closeModalAdd(event)">
+<div class="modal-overlay" id="modal-add" onclick="closeModal('modal-add',event)">
   <div class="modal">
-    <div class="modal-head">
-      <div><div class="modal-nom">Nouveau client</div><div class="modal-sub">Activer GenTrack en 2 minutes</div></div>
-      <button class="modal-close" onclick="document.getElementById('modalAdd').classList.remove('open')">✕</button>
-    </div>
+    <div class="modal-head"><div><div class="modal-nom">Nouveau client</div><div class="modal-sub">Activer GenTrack en 2 minutes</div></div><button class="modal-close" onclick="closeModalDirect('modal-add')">✕</button></div>
     <div class="modal-body">
-      <div class="field"><label>NOM DE L'ÉTABLISSEMENT</label><input placeholder="ex: Hôtel Savana" id="addNom"></div>
-      <div class="field"><label>TYPE</label><select><option>Hôtel</option><option>Restaurant</option><option>Clinique</option><option>Supermarché</option><option>Bureau</option><option>Autre</option></select></div>
-      <div class="field"><label>QUARTIER / VILLE</label><input placeholder="ex: Almadies, Dakar"></div>
-      <div class="field"><label>WHATSAPP DU GARDIEN</label><input placeholder="+221 7X XXX XX XX" type="tel"></div>
-      <div class="field"><label>WHATSAPP DU PATRON</label><input placeholder="+221 7X XXX XX XX" type="tel"></div>
-      <div class="field"><label>NOMBRE DE GROUPES</label><select><option>1 groupe</option><option>2 groupes</option><option>3 groupes</option><option>4 groupes et +</option></select></div>
-      <div class="field"><label>PLAN</label><select><option>Starter — 10 000 FCFA/mois</option><option selected>Business — 25 000 FCFA/mois</option><option>Pro — 60 000 FCFA/mois</option></select></div>
-      <button class="btn-primary" style="width:100%;justify-content:center;padding:14px;margin-top:4px" onclick="addClient()">✅ Activer GenTrack — WhatsApp envoyé automatiquement</button>
+      <div class="field"><label>Nom de l'établissement</label><input id="add-nom" placeholder="ex: Hôtel Savana"></div>
+      <div class="field"><label>Type</label><select id="add-type"><option value="hotel">Hôtel</option><option value="restaurant">Restaurant</option><option value="clinique">Clinique</option><option value="supermarche">Supermarché</option><option value="bureau">Bureau</option><option value="autre">Autre</option></select></div>
+      <div class="field"><label>Quartier</label><input id="add-quartier" placeholder="ex: Almadies"></div>
+      <div class="field"><label>WhatsApp du gardien</label><input id="add-gardien" placeholder="+221 7X XXX XX XX" type="tel"></div>
+      <div class="field"><label>WhatsApp du patron</label><input id="add-patron" placeholder="+221 7X XXX XX XX" type="tel"></div>
+      <div class="field"><label>Plan</label><select id="add-plan"><option value="starter">Starter — 10 000 FCFA/mois</option><option value="business" selected>Business — 20 000 FCFA/mois</option><option value="pro">Pro — 50 000 FCFA/mois</option></select></div>
+      <button class="btn btn-or" style="width:100%;justify-content:center;padding:14px" onclick="saveClient()">✅ Activer GenTrack</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ADD GROUPE -->
+<div class="modal-overlay" id="modal-groupe" onclick="closeModal('modal-groupe',event)">
+  <div class="modal">
+    <div class="modal-head"><div><div class="modal-nom">Ajouter un groupe</div><div class="modal-sub" id="mg-client-nom">—</div></div><button class="modal-close" onclick="closeModalDirect('modal-groupe')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="mg-client-id">
+      <div class="field"><label>Nom du groupe</label><input id="mg-nom" placeholder="ex: Groupe A"></div>
+      <div class="field"><label>Marque</label><select id="mg-marque"><option>Caterpillar</option><option>Perkins</option><option>FG Wilson</option><option>Cummins</option><option>Kipor</option><option>Sdmo</option><option>Autre</option></select></div>
+      <div class="field"><label>Puissance (kVA)</label><input id="mg-puissance" type="number" placeholder="ex: 20"></div>
+      <div class="field"><label>Site / Emplacement</label><input id="mg-site" placeholder="ex: Site principal"></div>
+      <div class="field"><label>Conso théorique (L/h)</label><input id="mg-conso" type="number" step="0.1" placeholder="ex: 1.5"></div>
+      <div class="field"><label>Seuil vidange (heures)</label><input id="mg-seuil" type="number" placeholder="ex: 250" value="250"></div>
+      <button class="btn btn-or" style="width:100%;justify-content:center;padding:14px" onclick="saveGroupe()">✅ Ajouter le groupe</button>
     </div>
   </div>
 </div>
 
 <!-- MODAL SAISIE -->
-<div class="modal-overlay" id="modalSaisie" onclick="closeSaisie(event)">
+<div class="modal-overlay" id="modal-saisie" onclick="closeModal('modal-saisie',event)">
   <div class="modal">
-    <div class="modal-head">
-      <div><div class="modal-nom">Saisir une entrée</div><div class="modal-sub">Enregistrer manuellement</div></div>
-      <button class="modal-close" onclick="document.getElementById('modalSaisie').classList.remove('open')">✕</button>
-    </div>
+    <div class="modal-head"><div><div class="modal-nom">Nouvelle saisie</div><div class="modal-sub">Enregistrer les données du jour</div></div><button class="modal-close" onclick="closeModalDirect('modal-saisie')">✕</button></div>
     <div class="modal-body">
-      <div class="field"><label>CLIENT</label><select><option>Hôtel Savana</option><option>Casa Mara</option><option>Résidence Almadies</option><option>Hotel Palm Beach</option><option>Hôtel Teranga</option><option>Lodge Ngor</option></select></div>
-      <div class="field"><label>GROUPE</label><select><option>Groupe A</option><option>Groupe B</option><option>Groupe C</option></select></div>
-      <div class="field"><label>TYPE D'ENTRÉE</label><select onchange="changeSaisieType(this.value)"><option value="carb">Ravitaillement carburant</option><option value="maint">Maintenance effectuée</option><option value="panne">Signaler une panne</option><option value="demarrage">Démarrage / Arrêt</option></select></div>
-      <div id="saisieCarb">
-        <div class="field"><label>LITRES AJOUTÉS</label><input type="number" placeholder="ex: 80" inputmode="numeric"></div>
-        <div class="field"><label>COÛT (FCFA)</label><input type="number" placeholder="ex: 56000" inputmode="numeric"></div>
-      </div>
-      <div id="saisieMaint" style="display:none">
-        <div class="field"><label>TYPE D'INTERVENTION</label><select><option>Vidange huile moteur</option><option>Filtre à air</option><option>Filtre à carburant</option><option>Remplacement pièce</option><option>Autre</option></select></div>
-        <div class="field"><label>TECHNICIEN</label><input placeholder="Nom du technicien"></div>
-        <div class="field"><label>COÛT (FCFA)</label><input type="number" placeholder="ex: 45000" inputmode="numeric"></div>
-      </div>
-      <div id="saisiePanne" style="display:none">
-        <div class="field"><label>TYPE DE PANNE</label><select><option>Ne démarre pas</option><option>Arrêt inopiné</option><option>Bruit anormal</option><option>Surchauffe</option><option>Autre</option></select></div>
-        <div class="field"><label>DESCRIPTION</label><textarea placeholder="Décrivez la panne..."></textarea></div>
-      </div>
-      <div id="saisieDem" style="display:none">
-        <div class="field"><label>ACTION</label><select><option>Démarrage</option><option>Arrêt</option></select></div>
-        <div class="field"><label>HEURE</label><input type="time" value="07:00"></div>
-        <div class="field"><label>OPÉRATEUR</label><input placeholder="Nom du gardien"></div>
-      </div>
-      <button class="btn-primary" style="width:100%;justify-content:center;padding:14px;margin-top:4px" onclick="submitSaisie()">✅ Enregistrer</button>
+      <div class="field"><label>Client</label><select id="s-client" onchange="loadGroupesForSaisie()"><option value="">Choisir...</option></select></div>
+      <div class="field"><label>Groupe</label><select id="s-groupe"><option value="">Choisir un client d'abord</option></select></div>
+      <div class="field"><label>Niveau carburant (%)</label><input id="s-carb" type="number" min="0" max="100" placeholder="ex: 72"></div>
+      <div class="field"><label>Litres ajoutés</label><input id="s-litres" type="number" step="0.1" placeholder="0" value="0"></div>
+      <div class="field"><label>Coût carburant (FCFA)</label><input id="s-cout" type="number" placeholder="0" value="0"></div>
+      <div class="field"><label>Heures de marche aujourd'hui</label><input id="s-heures" type="number" step="0.1" placeholder="ex: 8"></div>
+      <div class="field"><label>Opérateur</label><input id="s-operateur" placeholder="Nom du gardien"></div>
+      <div class="field"><label>Notes</label><textarea id="s-notes" placeholder="Observations..."></textarea></div>
+      <button class="btn btn-or" style="width:100%;justify-content:center;padding:14px" onclick="saveSaisie()">✅ Enregistrer</button>
     </div>
   </div>
 </div>
 
-<!-- TOAST -->
-<div class="toast" id="toastEl"></div>
+<!-- MODAL MAINTENANCE -->
+<div class="modal-overlay" id="modal-maint" onclick="closeModal('modal-maint',event)">
+  <div class="modal">
+    <div class="modal-head"><div><div class="modal-nom">Intervention maintenance</div><div class="modal-sub">Enregistrer une intervention</div></div><button class="modal-close" onclick="closeModalDirect('modal-maint')">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Client</label><select id="m-client" onchange="loadGroupesFor('m-client','m-groupe')"><option value="">Choisir...</option></select></div>
+      <div class="field"><label>Groupe</label><select id="m-groupe"><option value="">Choisir un client d'abord</option></select></div>
+      <div class="field"><label>Type d'intervention</label><select id="m-type"><option value="vidange">Vidange huile moteur</option><option value="filtre_air">Filtre à air</option><option value="filtre_carb">Filtre à carburant</option><option value="filtre_huile">Filtre à huile</option><option value="courroie">Remplacement courroie</option><option value="demarreur">Remplacement démarreur</option><option value="autre">Autre</option></select></div>
+      <div class="field"><label>Technicien</label><input id="m-tech" placeholder="Nom du technicien"></div>
+      <div class="field"><label>Coût (FCFA)</label><input id="m-cout" type="number" placeholder="ex: 45000"></div>
+      <div class="field"><label>Heures au compteur</label><input id="m-heures" type="number" step="0.1" placeholder="ex: 238"></div>
+      <div class="field"><label>Notes</label><textarea id="m-notes" placeholder="Détails de l'intervention..."></textarea></div>
+      <button class="btn btn-or" style="width:100%;justify-content:center;padding:14px" onclick="saveMaintenance()">✅ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PANNE -->
+<div class="modal-overlay" id="modal-panne" onclick="closeModal('modal-panne',event)">
+  <div class="modal">
+    <div class="modal-head"><div><div class="modal-nom">Signaler une panne</div><div class="modal-sub">Enregistrer un incident</div></div><button class="modal-close" onclick="closeModalDirect('modal-panne')">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Client</label><select id="p-client" onchange="loadGroupesFor('p-client','p-groupe')"><option value="">Choisir...</option></select></div>
+      <div class="field"><label>Groupe</label><select id="p-groupe"><option value="">Choisir un client d'abord</option></select></div>
+      <div class="field"><label>Type de panne</label><select id="p-type"><option value="ne_demarre_pas">Ne démarre pas</option><option value="arret_inopin">Arrêt inopiné</option><option value="bruit_anormal">Bruit anormal</option><option value="surchauffe">Surchauffe</option><option value="fuite">Fuite (carburant/huile)</option><option value="autre">Autre</option></select></div>
+      <div class="field"><label>Description</label><textarea id="p-desc" placeholder="Décrivez la panne..."></textarea></div>
+      <button class="btn btn-danger" style="width:100%;justify-content:center;padding:14px" onclick="savePanne()">🚨 Signaler la panne</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
-// ── DATA ──
-const clients={
-  savana:{nom:'Hôtel Savana',sub:'Cocody · Dakar · Client depuis avril 2026',stats:[{v:'224k',l:'FCFA ce mois',c:'or'},{v:'468L',l:'Carburant consommé',c:''},{v:'281h',l:'Heures de marche',c:''},{v:'0',l:'Pannes ce mois',c:'vert'}],groupes:[{nom:'Groupe A — Caterpillar 45 kVA',carb:72,maint:'OK',conso:'−8%',status:'ok'},{nom:'Groupe B — Perkins 20 kVA',carb:35,maint:'Vidange dans 3 sem.',conso:'+14%',status:'warn'}]},
-  casaMara:{nom:'Casa Mara',sub:'Almadies · Dakar · Client depuis mai 2026',stats:[{v:'98k',l:'FCFA ce mois',c:'or'},{v:'210L',l:'Carburant consommé',c:''},{v:'124h',l:'Heures de marche',c:''},{v:'1',l:'Panne ce mois',c:'orange'}],groupes:[{nom:'Groupe A — Perkins 20 kVA',carb:35,maint:'Vidange dans 12h ⚠️',conso:'+8%',status:'warn'}]},
-  almadies:{nom:'Résidence Almadies',sub:'Almadies Zone 2 · Dakar · Client depuis mars 2026',stats:[{v:'312k',l:'FCFA ce mois',c:'or'},{v:'680L',l:'Carburant consommé',c:''},{v:'390h',l:'Heures de marche',c:''},{v:'0',l:'Pannes ce mois',c:'vert'}],groupes:[{nom:'Groupe A — Caterpillar 45 kVA',carb:81,maint:'OK',conso:'−5%',status:'ok'},{nom:'Groupe B — Perkins 30 kVA',carb:75,maint:'OK',conso:'stable',status:'ok'},{nom:'Groupe C — FG Wilson 20 kVA',carb:68,maint:'OK',conso:'−2%',status:'ok'}]},
-  palmBeach:{nom:'Hotel Palm Beach',sub:'Plateau · Dakar · Client depuis juin 2026',stats:[{v:'76k',l:'FCFA ce mois',c:'or'},{v:'164L',l:'Carburant consommé',c:''},{v:'98h',l:'Heures de marche',c:''},{v:'0',l:'Pannes ce mois',c:'vert'}],groupes:[{nom:'Groupe A — Perkins 15 kVA',carb:18,maint:'OK',conso:'+3%',status:'danger'}]},
-  teranga:{nom:'Hôtel Teranga',sub:'Centre-ville · Dakar · Client depuis mai 2026',stats:[{v:'186k',l:'FCFA ce mois',c:'or'},{v:'402L',l:'Carburant consommé',c:''},{v:'230h',l:'Heures de marche',c:''},{v:'0',l:'Pannes ce mois',c:'vert'}],groupes:[{nom:'Groupe A — Caterpillar 35 kVA',carb:65,maint:'OK',conso:'stable',status:'ok'},{nom:'Groupe B — Perkins 20 kVA',carb:70,maint:'OK',conso:'−4%',status:'ok'}]},
-  ngor:{nom:'Lodge Ngor',sub:'Ngor · Dakar · Client depuis juin 2026',stats:[{v:'42k',l:'FCFA ce mois',c:'or'},{v:'88L',l:'Carburant consommé',c:''},{v:'52h',l:'Heures de marche',c:''},{v:'0',l:'Pannes ce mois',c:'vert'}],groupes:[{nom:'Groupe A — Kipor 10 kVA',carb:58,maint:'OK',conso:'stable',status:'ok'}]}
-};
+// ── CONFIG ──
+const SUPA_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+
+const PLANS = {starter:{label:'Starter',prix:10000},business:{label:'Business',prix:20000},pro:{label:'Pro',prix:50000}};
+const TYPE_MAINT = {vidange:'Vidange huile',filtre_air:'Filtre à air',filtre_carb:'Filtre à carburant',filtre_huile:'Filtre à huile',courroie:'Courroie',demarreur:'Démarreur',autre:'Autre'};
+const TYPE_PANNE = {ne_demarre_pas:'Ne démarre pas',arret_inopin:'Arrêt inopiné',bruit_anormal:'Bruit anormal',surchauffe:'Surchauffe',fuite:'Fuite',autre:'Autre'};
+
+// ── API ──
+async function api(table, opts={}) {
+  const {method='GET',body,query='',select='*'} = opts;
+  let url = `${SUPA_URL}/rest/v1/${table}?select=${select}${query}`;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': `Bearer ${SUPA_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': method==='POST' ? 'return=representation' : ''
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || 'Erreur API');
+  }
+  if (res.status === 204) return [];
+  return res.json();
+}
+
+async function apiPost(table, body) { return api(table, {method:'POST', body}); }
+async function apiPatch(table, id, body) { return api(table, {method:'PATCH', body, query:`&id=eq.${id}`}); }
+
+// ── HELPERS ──
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function fmtNum(n) { return n ? n.toLocaleString('fr-FR') : '0'; }
+function carbColor(n) { return n < 25 ? 'rouge' : n < 50 ? 'orange' : 'vert'; }
+function empty(msg='Aucune donnée') {
+  return `<div class="empty"><div class="empty-icon">📭</div><div class="empty-title">${msg}</div><div class="empty-sub">Les données apparaîtront ici</div></div>`;
+}
 
 // ── NAVIGATION ──
-function goTo(view){
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
-  document.getElementById('view-'+view).classList.add('active');
-  document.getElementById('nav-'+view).classList.add('active');
-  document.querySelector('.main').scrollTop=0;
+function goTo(v) {
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.sb-item').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.getElementById('nav-'+v).classList.add('active');
+  document.querySelector('.main').scrollTop = 0;
+  const loaders = {clients:loadClients,alertes:loadAlertes,saisies:loadSaisies,maintenance:loadMaintenance,pannes:loadPannes};
+  if (loaders[v]) loaders[v]();
 }
 
-// ── CLIENT MODAL ──
-const statusColor={ok:'vert',warn:'orange',danger:'rouge'};
-const statusLabel={ok:'✓ Opérationnel',warn:'⚠️ Maintenance requise',danger:'🚨 Critique'};
+// ── LOAD ALL ──
+async function loadAll() {
+  const now = new Date();
+  document.getElementById('accueil-date').textContent = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) + ' · ' + now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  await Promise.all([loadKPIs(), loadAccueilClients(), loadAccueilAlertes(), loadAccueilActivite()]);
+}
 
-function openClient(id){
-  const c=clients[id];if(!c)return;
-  document.getElementById('modalNom').textContent=c.nom;
-  document.getElementById('modalSub').textContent=c.sub;
-  let html=`<div class="modal-grid">`;
-  c.stats.forEach(s=>{html+=`<div class="modal-stat"><div class="modal-stat-v" style="color:var(--${s.c||'texte'})">${s.v}</div><div class="modal-stat-l">${s.l}</div></div>`;});
-  html+=`</div><div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--texte2);font-weight:600;margin-bottom:10px">Groupes électrogènes</div>`;
-  c.groupes.forEach(g=>{
-    const carbColor=g.carb<25?'rouge':g.carb<50?'orange':'vert';
-    html+=`<div class="mg-item ${g.status}">
-      <div class="mg-top"><div class="mg-nom">${g.nom}</div><span class="pill pill-${g.status==='ok'?'ok':g.status==='warn'?'warn':'danger'}">${statusLabel[g.status]}</span></div>
-      <div class="mg-stats">
-        <div class="mg-stat">⛽ <span style="color:var(--${carbColor})">${g.carb}%</span></div>
-        <div class="mg-stat">🔧 <span>${g.maint}</span></div>
-        <div class="mg-stat">📊 <span>${g.conso}</span></div>
+async function loadKPIs() {
+  try {
+    const [clients, groupes, alertes, saisies] = await Promise.all([
+      api('clients','actif=eq.true'),
+      api('groupes','actif=eq.true'),
+      api('alertes','resolue=eq.false'),
+      api('saisies',{query:`&date=eq.${new Date().toISOString().split('T')[0]}`})
+    ]);
+    document.getElementById('kpi-clients').textContent = clients.length || 0;
+    document.getElementById('kpi-clients-sub').textContent = `${clients.length} établissement${clients.length>1?'s':''}`;
+    document.getElementById('kpi-groupes').textContent = groupes.length || 0;
+    document.getElementById('kpi-alertes').textContent = alertes.length || 0;
+    document.getElementById('kpi-saisies').textContent = saisies.length || 0;
+    document.getElementById('badge-clients').textContent = clients.length || 0;
+    document.getElementById('badge-alertes').textContent = alertes.length || 0;
+  } catch(e) { console.error(e); }
+}
+
+async function loadAccueilClients() {
+  const el = document.getElementById('accueil-clients');
+  try {
+    const clients = await api('clients', {query:'&actif=eq.true&order=created_at.desc&limit=6'});
+    if (!clients.length) { el.innerHTML = empty('Aucun client'); return; }
+    el.innerHTML = clients.map(c => `
+      <div class="tr tr-clients" onclick="openClient('${c.id}')">
+        <div><div class="col-name">${c.nom}</div><div class="col-sub">${c.quartier||''} · ${c.type}</div></div>
+        <div class="col-val or">—</div>
+        <div class="col-val">—</div>
+        <div><span class="pill pill-ok">✓ Actif</span></div>
+        <div style="color:var(--texte2)">›</div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-title">Erreur de chargement</div><div class="empty-sub">${e.message}</div></div>`; }
+}
+
+async function loadAccueilAlertes() {
+  const el = document.getElementById('accueil-alertes');
+  try {
+    const alertes = await api('alertes', {select:'*,clients(nom),groupes(nom)',query:'&resolue=eq.false&order=created_at.desc&limit=5'});
+    if (!alertes.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">Aucune alerte</div><div class="empty-sub">Tout est sous contrôle</div></div>`; return; }
+    el.innerHTML = alertes.map(a => `
+      <div class="alerte-item">
+        <div class="ai-dot" style="background:var(--${a.severite==='danger'?'rouge':'orange'})"></div>
+        <div class="ai-body">
+          <div class="ai-titre">${a.message}</div>
+          <div class="ai-desc">${a.clients?.nom||'—'} · ${a.groupes?.nom||'—'}</div>
+        </div>
+        <div class="ai-time">${fmtDate(a.created_at)}</div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = empty('Erreur chargement alertes'); }
+}
+
+async function loadAccueilActivite() {
+  const el = document.getElementById('accueil-activite');
+  try {
+    const saisies = await api('saisies', {select:'*,clients(nom),groupes(nom)',query:'&order=created_at.desc&limit=5'});
+    if (!saisies.length) { el.innerHTML = empty('Aucune activité'); return; }
+    el.innerHTML = saisies.map(s => `
+      <div class="act-item">
+        <div class="act-dot ad-or">⛽</div>
+        <div class="act-body">
+          <div class="act-titre">Saisie — ${s.clients?.nom||'—'} · ${s.groupes?.nom||'—'}</div>
+          <div class="act-detail">Carburant : ${s.niveau_carburant||'—'}% · ${s.operateur||'—'}</div>
+        </div>
+        <div class="act-time">${fmtDate(s.created_at)}</div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = empty('Erreur chargement activité'); }
+}
+
+// ── CLIENTS ──
+async function loadClients() {
+  const el = document.getElementById('clients-list');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>Chargement...</div>';
+  try {
+    const clients = await api('clients', {query:'&order=created_at.desc'});
+    if (!clients.length) { el.innerHTML = empty('Aucun client — ajoutez votre premier client'); return; }
+    el.innerHTML = clients.map(c => `
+      <div class="tr tr-clients" onclick="openClient('${c.id}')">
+        <div><div class="col-name">${c.nom}</div><div class="col-sub">${c.quartier||''} · ${c.ville||'Dakar'} · ${PLANS[c.plan]?.label||c.plan}</div></div>
+        <div class="col-val or">—</div>
+        <div class="col-val">—</div>
+        <div><span class="pill ${c.actif?'pill-ok':'pill-warn'}">${c.actif?'✓ Actif':'⏸ Inactif'}</span></div>
+        <div style="color:var(--texte2)">›</div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-title">Erreur</div><div class="empty-sub">${e.message}</div></div>`; }
+}
+
+async function openClient(id) {
+  document.getElementById('modal-client').classList.add('open');
+  document.getElementById('mc-nom').textContent = 'Chargement...';
+  document.getElementById('mc-sub').textContent = '';
+  document.getElementById('mc-body').innerHTML = '<div class="loading"><div class="spinner"></div>Chargement...</div>';
+  try {
+    const [client, groupes, saisies, alertes] = await Promise.all([
+      api('clients', {query:`&id=eq.${id}`}).then(r=>r[0]),
+      api('groupes', {query:`&client_id=eq.${id}&actif=eq.true`}),
+      api('saisies', {query:`&client_id=eq.${id}&order=created_at.desc&limit=5`}),
+      api('alertes', {query:`&client_id=eq.${id}&resolue=eq.false`})
+    ]);
+    document.getElementById('mc-nom').textContent = client.nom;
+    document.getElementById('mc-sub').textContent = `${client.quartier||''} · ${client.ville||'Dakar'} · Plan ${PLANS[client.plan]?.label||client.plan} · ${fmtNum(PLANS[client.plan]?.prix||client.prix_mensuel)} FCFA/mois`;
+    const lastSaisie = saisies[0];
+    let html = `
+      <div class="modal-grid">
+        <div class="modal-stat"><div class="modal-stat-v or">${groupes.length}</div><div class="modal-stat-l">Groupes actifs</div></div>
+        <div class="modal-stat"><div class="modal-stat-v ${alertes.length?'rouge':'vert'}">${alertes.length}</div><div class="modal-stat-l">Alertes actives</div></div>
+        <div class="modal-stat"><div class="modal-stat-v">${lastSaisie?.niveau_carburant||'—'}%</div><div class="modal-stat-l">Dernière saisie carburant</div></div>
+        <div class="modal-stat"><div class="modal-stat-v">${fmtDate(lastSaisie?.created_at)||'—'}</div><div class="modal-stat-l">Dernière saisie</div></div>
       </div>
-    </div>`;
-  });
-  html+=`<div style="margin-top:16px;display:flex;gap:8px">
-    <button class="btn-primary" style="flex:1" onclick="showToast('Message WhatsApp envoyé au patron ✓');closeModalDirect()">📱 Contacter le patron</button>
-    <button class="btn-ghost" onclick="exportPDF()">📥 Rapport PDF</button>
-    <button class="btn-ghost" onclick="showToast('Technicien notifié ✓','warn')">🔧 Technicien</button>
-  </div>`;
-  document.getElementById('modalBody').innerHTML=html;
-  document.getElementById('modalClient').classList.add('open');
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--texte2);font-weight:600;margin-bottom:10px">Groupes électrogènes</div>`;
+    if (groupes.length) {
+      html += groupes.map(g => `
+        <div class="mg ok">
+          <div class="mg-top"><div class="mg-nom">${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA</div><span class="pill pill-ok">✓ Actif</span></div>
+          <div class="mg-stats">
+            <div class="mg-stat">📍 <span>${g.site||'—'}</span></div>
+            <div class="mg-stat">⚙️ <span>${g.conso_theorique_lh||'—'} L/h théorique</span></div>
+            <div class="mg-stat">🔧 <span>Vidange à ${g.seuil_vidange_heures||250}h</span></div>
+          </div>
+        </div>`).join('');
+    } else {
+      html += '<div style="padding:16px;text-align:center;color:var(--texte2);font-size:13px">Aucun groupe — ajoutez un groupe</div>';
+    }
+    html += `
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-or" style="flex:1" onclick="showToast('Message WhatsApp envoyé ✓');closeModalDirect('modal-client')">📱 Contacter le patron</button>
+        <button class="btn btn-ghost" onclick="openAddGroupe('${id}','${client.nom}')">+ Ajouter groupe</button>
+        <button class="btn btn-ghost" onclick="deleteClient('${id}','${client.nom}')">🗑️</button>
+      </div>`;
+    if (saisies.length) {
+      html += `<div style="margin-top:16px;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--texte2);font-weight:600;margin-bottom:10px">Dernières saisies</div>`;
+      html += saisies.map(s => `
+        <div class="act-item" style="background:var(--surface2);border-radius:8px;margin-bottom:6px;padding:10px 12px">
+          <div class="act-dot ad-or" style="width:26px;height:26px;font-size:12px">⛽</div>
+          <div class="act-body"><div class="act-titre">${s.niveau_carburant||'—'}% carburant · ${s.heures_marche||0}h de marche</div><div class="act-detail">${s.operateur||'—'} · ${fmtDate(s.date)}</div></div>
+        </div>`).join('');
+    }
+    document.getElementById('mc-body').innerHTML = html;
+  } catch(e) { document.getElementById('mc-body').innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-title">Erreur</div><div class="empty-sub">${e.message}</div></div>`; }
 }
 
-function closeModal(e){if(e.target===document.getElementById('modalClient'))closeModalDirect();}
-function closeModalDirect(){document.getElementById('modalClient').classList.remove('open');}
-
-// ── ADD CLIENT ──
-function openAddClient(){document.getElementById('modalAdd').classList.add('open');}
-function closeModalAdd(e){if(e.target===document.getElementById('modalAdd'))document.getElementById('modalAdd').classList.remove('open');}
-function addClient(){
-  const nom=document.getElementById('addNom').value||'Nouveau client';
-  document.getElementById('modalAdd').classList.remove('open');
-  showToast(`${nom} activé — WhatsApp envoyé ✓`);
+async function saveClient() {
+  const nom = document.getElementById('add-nom').value.trim();
+  if (!nom) { showToast('Nom requis','err'); return; }
+  try {
+    await apiPost('clients', {
+      nom,
+      type: document.getElementById('add-type').value,
+      quartier: document.getElementById('add-quartier').value,
+      whatsapp_gardien: document.getElementById('add-gardien').value,
+      whatsapp_patron: document.getElementById('add-patron').value,
+      plan: document.getElementById('add-plan').value,
+      prix_mensuel: PLANS[document.getElementById('add-plan').value]?.prix || 20000
+    });
+    closeModalDirect('modal-add');
+    showToast(`${nom} ajouté ✓`);
+    loadAll();
+    if (document.getElementById('view-clients').classList.contains('active')) loadClients();
+  } catch(e) { showToast(e.message,'err'); }
 }
 
-// ── SAISIE ──
-function openSaisie(){document.getElementById('modalSaisie').classList.add('open');}
-function closeSaisie(e){if(e.target===document.getElementById('modalSaisie'))document.getElementById('modalSaisie').classList.remove('open');}
-function changeSaisieType(val){
-  document.getElementById('saisieCarb').style.display=val==='carb'?'block':'none';
-  document.getElementById('saisieMaint').style.display=val==='maint'?'block':'none';
-  document.getElementById('saisiePanne').style.display=val==='panne'?'block':'none';
-  document.getElementById('saisieDem').style.display=val==='demarrage'?'block':'none';
-}
-function submitSaisie(){
-  document.getElementById('modalSaisie').classList.remove('open');
-  showToast('Entrée enregistrée ✓');
+async function deleteClient(id, nom) {
+  if (!confirm(`Supprimer ${nom} ? Cette action est irréversible.`)) return;
+  try {
+    await api('clients', {method:'DELETE', query:`&id=eq.${id}`});
+    closeModalDirect('modal-client');
+    showToast(`${nom} supprimé`,'warn');
+    loadAll();
+    if (document.getElementById('view-clients').classList.contains('active')) loadClients();
+  } catch(e) { showToast(e.message,'err'); }
 }
 
-// ── EXPORT ──
-function exportPDF(){showToast('Rapport PDF généré ✓');}
+// ── GROUPES ──
+function openAddGroupe(clientId, clientNom) {
+  closeModalDirect('modal-client');
+  document.getElementById('mg-client-id').value = clientId;
+  document.getElementById('mg-client-nom').textContent = clientNom;
+  document.getElementById('modal-groupe').classList.add('open');
+}
 
-// ── TOAST ──
-function showToast(msg,type){
-  const t=document.getElementById('toastEl');
-  t.textContent=msg;
-  t.className='toast'+(type?' '+type:'');
-  t.classList.add('show');
+async function saveGroupe() {
+  const clientId = document.getElementById('mg-client-id').value;
+  const nom = document.getElementById('mg-nom').value.trim();
+  if (!nom) { showToast('Nom requis','err'); return; }
+  try {
+    await apiPost('groupes', {
+      client_id: clientId,
+      nom,
+      marque: document.getElementById('mg-marque').value,
+      puissance_kva: parseInt(document.getElementById('mg-puissance').value)||null,
+      site: document.getElementById('mg-site').value,
+      conso_theorique_lh: parseFloat(document.getElementById('mg-conso').value)||1.5,
+      seuil_vidange_heures: parseInt(document.getElementById('mg-seuil').value)||250
+    });
+    closeModalDirect('modal-groupe');
+    showToast(`Groupe ${nom} ajouté ✓`);
+    openClient(clientId);
+  } catch(e) { showToast(e.message,'err'); }
+}
+
+// ── ALERTES ──
+async function loadAlertes() {
+  const el = document.getElementById('alertes-list');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>Chargement...</div>';
+  try {
+    const alertes = await api('alertes', {select:'*,clients(nom),groupes(nom)',query:'&resolue=eq.false&order=created_at.desc'});
+    if (!alertes.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">Aucune alerte active</div><div class="empty-sub">Tout est sous contrôle</div></div>`; return; }
+    el.innerHTML = alertes.map(a => `
+      <div class="alerte-item">
+        <div class="ai-dot" style="background:var(--${a.severite==='danger'?'rouge':'orange'})"></div>
+        <div class="ai-body">
+          <div class="ai-titre">${a.message}</div>
+          <div class="ai-desc">${a.clients?.nom||'—'} · ${a.groupes?.nom||'—'} · ${fmtDate(a.created_at)}</div>
+          <div class="ai-actions">
+            <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="resolveAlerte('${a.id}')">✅ Marquer résolue</button>
+            ${a.clients?.nom ? `<button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="showToast('Message envoyé à ${a.clients.nom} ✓')">📱 Contacter</button>` : ''}
+          </div>
+        </div>
+        <div class="ai-time" style="font-size:11px">${a.severite==='danger'?'🚨':'⚠️'}</div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = empty('Erreur chargement'); }
+}
+
+async function resolveAlerte(id) {
+  try {
+    await apiPatch('alertes', id, {resolue:true,lue:true});
+    showToast('Alerte résolue ✓');
+    loadAlertes();
+    loadKPIs();
+  } catch(e) { showToast(e.message,'err'); }
+}
+
+async function markAllRead() {
+  try {
+    await api('alertes', {method:'PATCH', body:{lue:true}, query:'&resolue=eq.false'});
+    showToast('Toutes les alertes marquées lues ✓');
+    loadAlertes();
+  } catch(e) { showToast(e.message,'err'); }
+}
+
+// ── SAISIES ──
+async function loadSaisies() {
+  const el = document.getElementById('saisies-list');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>Chargement...</div>';
+  try {
+    const saisies = await api('saisies', {select:'*,clients(nom),groupes(nom)',query:'&order=created_at.desc&limit=50'});
+    if (!saisies.length) { el.innerHTML = empty('Aucune saisie — enregistrez la première saisie'); return; }
+    el.innerHTML = saisies.map(s => `
+      <div class="tr tr-saisies">
+        <div><div class="col-name">${s.clients?.nom||'—'}</div><div class="col-sub">${s.groupes?.nom||'—'} · ${s.operateur||'—'}</div></div>
+        <div class="col-val">${fmtDate(s.date)}</div>
+        <div class="col-val ${carbColor(s.niveau_carburant)}">${s.niveau_carburant||'—'}%${s.litres_ajoutes>0?` +${s.litres_ajoutes}L`:''}</div>
+        <div class="col-val">${s.heures_marche||0}h</div>
+        <div class="col-val" style="font-size:11px;color:var(--texte2)">${s.notes||'—'}</div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = empty('Erreur chargement'); }
+}
+
+async function openSaisie() {
+  await loadClientSelect('s-client');
+  document.getElementById('modal-saisie').classList.add('open');
+}
+
+async function loadGroupesForSaisie() {
+  const clientId = document.getElementById('s-client').value;
+  await loadGroupesFor('s-client','s-groupe');
+}
+
+async function loadGroupesFor(clientSelectId, groupeSelectId) {
+  const clientId = document.getElementById(clientSelectId).value;
+  const sel = document.getElementById(groupeSelectId);
+  sel.innerHTML = '<option value="">Chargement...</option>';
+  if (!clientId) { sel.innerHTML = '<option value="">Choisir un client d\'abord</option>'; return; }
+  try {
+    const groupes = await api('groupes', {query:`&client_id=eq.${clientId}&actif=eq.true`});
+    sel.innerHTML = groupes.map(g=>`<option value="${g.id}">${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA</option>`).join('');
+  } catch(e) { sel.innerHTML = '<option>Erreur</option>'; }
+}
+
+async function saveSaisie() {
+  const clientId = document.getElementById('s-client').value;
+  const groupeId = document.getElementById('s-groupe').value;
+  if (!clientId || !groupeId) { showToast('Client et groupe requis','err'); return; }
+  try {
+    await apiPost('saisies', {
+      client_id: clientId,
+      groupe_id: groupeId,
+      niveau_carburant: parseInt(document.getElementById('s-carb').value)||null,
+      litres_ajoutes: parseFloat(document.getElementById('s-litres').value)||0,
+      cout_carburant: parseInt(document.getElementById('s-cout').value)||0,
+      heures_marche: parseFloat(document.getElementById('s-heures').value)||0,
+      operateur: document.getElementById('s-operateur').value,
+      notes: document.getElementById('s-notes').value
+    });
+    // Générer alerte si carburant bas
+    const carb = parseInt(document.getElementById('s-carb').value);
+    if (carb && carb < 25) {
+      await apiPost('alertes', {
+        client_id: clientId,
+        groupe_id: groupeId,
+        type: 'carburant_bas',
+        severite: 'danger',
+        message: `Carburant critique — ${carb}% — Risque arrêt imminent`
+      });
+    }
+    closeModalDirect('modal-saisie');
+    showToast('Saisie enregistrée ✓');
+    loadAll();
+    document.getElementById('s-carb').value='';
+    document.getElementById('s-litres').value='0';
+    document.getElementById('s-cout').value='0';
+    document.getElementById('s-heures').value='';
+    document.getElementById('s-operateur').value='';
+    document.getElementById('s-notes').value='';
+  } catch(e) { showToast(e.message,'err'); }
+}
+
+// ── MAINTENANCE ──
+async function loadMaintenance() {
+  const el = document.getElementById('maint-list');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>Chargement...</div>';
+  try {
+    const data = await api('maintenances', {select:'*,clients(nom),groupes(nom)',query:'&order=created_at.desc&limit=50'});
+    if (!data.length) { el.innerHTML = empty('Aucune intervention enregistrée'); return; }
+    el.innerHTML = data.map(m => `
+      <div class="tr tr-maint">
+        <div><div class="col-name">${m.clients?.nom||'—'}</div><div class="col-sub">${m.groupes?.nom||'—'} · ${m.technicien||'—'}</div></div>
+        <div class="col-val">${TYPE_MAINT[m.type]||m.type}</div>
+        <div class="col-val">${fmtDate(m.date_intervention)}</div>
+        <div class="col-val or">${fmtNum(m.cout)} FCFA</div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = empty('Erreur chargement'); }
+}
+
+async function openMaintenance() {
+  await loadClientSelect('m-client');
+  document.getElementById('modal-maint').classList.add('open');
+}
+
+async function saveMaintenance() {
+  const clientId = document.getElementById('m-client').value;
+  const groupeId = document.getElementById('m-groupe').value;
+  if (!clientId || !groupeId) { showToast('Client et groupe requis','err'); return; }
+  try {
+    await apiPost('maintenances', {
+      client_id: clientId,
+      groupe_id: groupeId,
+      type: document.getElementById('m-type').value,
+      technicien: document.getElementById('m-tech').value,
+      cout: parseInt(document.getElementById('m-cout').value)||0,
+      heures_au_compteur: parseFloat(document.getElementById('m-heures').value)||null,
+      notes: document.getElementById('m-notes').value
+    });
+    closeModalDirect('modal-maint');
+    showToast('Maintenance enregistrée ✓');
+    loadMaintenance();
+    loadAll();
+  } catch(e) { showToast(e.message,'err'); }
+}
+
+// ── PANNES ──
+async function loadPannes() {
+  const el = document.getElementById('pannes-list');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>Chargement...</div>';
+  try {
+    const data = await api('pannes', {select:'*,clients(nom),groupes(nom)',query:'&order=created_at.desc&limit=50'});
+    if (!data.length) { el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">Aucune panne enregistrée</div><div class="empty-sub">Excellent !</div></div>`; return; }
+    el.innerHTML = data.map(p => `
+      <div class="tr tr-pannes" onclick="resolvePanne('${p.id}','${p.resolue}')">
+        <div><div class="col-name">${p.clients?.nom||'—'}</div><div class="col-sub">${p.groupes?.nom||'—'} · ${p.description||'—'}</div></div>
+        <div class="col-val">${TYPE_PANNE[p.type]||p.type}</div>
+        <div class="col-val">${fmtDate(p.date_panne)}</div>
+        <div><span class="pill ${p.resolue?'pill-ok':'pill-danger'}">${p.resolue?'✓ Résolue':'🚨 En cours'}</span></div>
+        <div style="color:var(--texte2)">${!p.resolue?'›':''}</div>
+      </div>`).join('');
+  } catch(e) { el.innerHTML = empty('Erreur chargement'); }
+}
+
+async function openPanne() {
+  await loadClientSelect('p-client');
+  document.getElementById('modal-panne').classList.add('open');
+}
+
+async function savePanne() {
+  const clientId = document.getElementById('p-client').value;
+  const groupeId = document.getElementById('p-groupe').value;
+  if (!clientId || !groupeId) { showToast('Client et groupe requis','err'); return; }
+  try {
+    await apiPost('pannes', {
+      client_id: clientId,
+      groupe_id: groupeId,
+      type: document.getElementById('p-type').value,
+      description: document.getElementById('p-desc').value
+    });
+    await apiPost('alertes', {
+      client_id: clientId,
+      groupe_id: groupeId,
+      type: 'panne',
+      severite: 'danger',
+      message: `Panne signalée — ${TYPE_PANNE[document.getElementById('p-type').value]||'—'}`
+    });
+    closeModalDirect('modal-panne');
+    showToast('Panne signalée ✓','warn');
+    loadPannes();
+    loadAll();
+  } catch(e) { showToast(e.message,'err'); }
+}
+
+async function resolvePanne(id, resolue) {
+  if (resolue === 'true') return;
+  if (!confirm('Marquer cette panne comme résolue ?')) return;
+  try {
+    await apiPatch('pannes', id, {resolue:true, date_resolution: new Date().toISOString()});
+    showToast('Panne résolue ✓');
+    loadPannes();
+  } catch(e) { showToast(e.message,'err'); }
+}
+
+// ── UTILS ──
+async function loadClientSelect(selectId) {
+  const sel = document.getElementById(selectId);
+  sel.innerHTML = '<option value="">Chargement...</option>';
+  try {
+    const clients = await api('clients', {query:'&actif=eq.true&order=nom'});
+    sel.innerHTML = '<option value="">Choisir un client...</option>' + clients.map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
+  } catch(e) { sel.innerHTML = '<option>Erreur</option>'; }
+}
+
+function openAddClient() { document.getElementById('modal-add').classList.add('open'); }
+function closeModal(id,e) { if(e.target===document.getElementById(id)) closeModalDirect(id); }
+function closeModalDirect(id) { document.getElementById(id).classList.remove('open'); }
+
+function showToast(msg,type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
   setTimeout(()=>t.classList.remove('show'),2500);
 }
+
+function saveConfig() {
+  showToast('Configuration sauvegardée ✓');
+  document.getElementById('conn-status-text').textContent = 'Connecté ✓';
+  document.getElementById('conn-status-text').style.color = 'var(--vert)';
+}
+
+// ── INIT ──
+loadAll();
 </script>
 </body>
 </html>
