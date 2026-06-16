@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack — Dashboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500&display=swap');
+:root{
+  --noir:#0A0A0A;--surface:#141414;--surface2:#1C1C1C;--bordure:#242424;
+  --or:#C8922A;--or-pale:rgba(200,146,42,0.08);
+  --vert:#22C55E;--vert-pale:rgba(34,197,94,0.08);
+  --rouge:#EF4444;--rouge-pale:rgba(239,68,68,0.08);
+  --orange:#F97316;--orange-pale:rgba(249,115,22,0.08);
+  --bleu:#3B82F6;--bleu-pale:rgba(59,130,246,0.08);
+  --texte:#F0F0F0;--texte2:#606060;--texte3:#303030;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:var(--noir);color:var(--texte);font-family:'Inter',sans-serif;min-height:100vh}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--noir)}::-webkit-scrollbar-thumb{background:var(--bordure);border-radius:2px}
+
+.layout{display:flex;min-height:100vh}
+
+/* SIDEBAR */
+.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--bordure);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.sb-logo{padding:22px 20px 18px;border-bottom:1px solid var(--bordure);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;letter-spacing:-0.3px}
+.sb-logo em{color:var(--or);font-style:normal}
+.sb-logo-sub{font-size:10px;color:var(--texte2);font-weight:400;margin-top:2px;font-family:'Inter',sans-serif}
+.sb-nav{padding:12px 10px;flex:1;overflow-y:auto}
+.sb-section{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--texte3);padding:14px 12px 6px;font-weight:600}
+.sb-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;cursor:pointer;transition:background 0.15s;font-size:13px;color:var(--texte2);margin-bottom:2px}
+.sb-item:hover{background:var(--surface2)}
+.sb-item.active{background:var(--or-pale);color:var(--or)}
+.sb-item-icon{font-size:15px;width:20px;text-align:center}
+.sb-item-badge{margin-left:auto;background:var(--rouge);color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px}
+.sb-item-badge.green{background:var(--vert)}
+.sb-bottom{padding:14px 10px;border-top:1px solid var(--bordure)}
+.sb-user{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;cursor:pointer}
+.sb-avatar{width:30px;height:30px;border-radius:50%;background:var(--or-pale);border:1.5px solid var(--or);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;color:var(--or);flex-shrink:0}
+.sb-user-name{font-size:12px;font-weight:500}
+.sb-user-role{font-size:10px;color:var(--texte2)}
+
+/* MAIN */
+.main{flex:1;overflow-y:auto}
+.view{display:none;padding:28px 28px 40px}
+.view.active{display:block}
+
+/* TOPBAR */
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px}
+.topbar-date{font-size:11px;color:var(--texte2);margin-bottom:4px}
+.topbar-title{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.5px}
+.topbar-right{display:flex;gap:10px;align-items:center}
+.btn-primary{background:var(--or);color:var(--noir);border:none;border-radius:9px;padding:9px 16px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:opacity 0.2s}
+.btn-primary:hover{opacity:0.9}
+.btn-ghost{background:var(--surface);color:var(--texte2);border:1px solid var(--bordure);border-radius:9px;padding:9px 14px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;transition:border-color 0.15s}
+.btn-ghost:hover{border-color:var(--or);color:var(--texte)}
+.btn-danger{background:var(--rouge-pale);color:var(--rouge);border:1px solid var(--rouge);border-radius:9px;padding:9px 14px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif}
+
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.kpi{background:var(--surface);border-radius:12px;padding:16px;border:1px solid var(--bordure)}
+.kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--texte2);font-weight:600;margin-bottom:10px}
+.kpi-val{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;letter-spacing:-1px;margin-bottom:4px}
+.kpi-val.or{color:var(--or)}.kpi-val.vert{color:var(--vert)}.kpi-val.rouge{color:var(--rouge)}.kpi-val.orange{color:var(--orange)}
+.kpi-sub{font-size:11px;color:var(--texte2)}
+.kpi-evo{font-size:11px;font-weight:600;margin-top:6px}
+.pos{color:var(--vert)}.neg{color:var(--rouge)}.neu{color:var(--texte2)}
+
+/* GRID */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.grid-3{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px}
+
+/* CARD */
+.card{background:var(--surface);border-radius:12px;border:1px solid var(--bordure);overflow:hidden;margin-bottom:16px}
+.card-header{padding:16px 18px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bordure)}
+.card-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600}
+.card-link{font-size:11px;color:var(--or);cursor:pointer}
+
+/* TABLE */
+.table-row{display:grid;gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--bordure);cursor:pointer;transition:background 0.15s}
+.table-row:hover{background:var(--surface2)}
+.table-row:last-child{border-bottom:none}
+.table-row.header{background:var(--surface2);cursor:default}
+.table-row.header:hover{background:var(--surface2)}
+.tr-clients{grid-template-columns:2fr 1fr 1fr 1fr 30px}
+.tr-alertes{grid-template-columns:3fr 1fr 1fr 30px}
+.tr-carb{grid-template-columns:2fr 1fr 1fr 1fr 30px}
+.tr-maint{grid-template-columns:2fr 1fr 1fr 1fr 30px}
+.tr-rapports{grid-template-columns:2fr 1fr 1fr 100px}
+.col-label{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--texte2);font-weight:600}
+.col-name{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600}
+.col-sub{font-size:11px;color:var(--texte2);margin-top:1px}
+.col-val{font-size:13px;font-weight:500}
+.col-val.or{color:var(--or)}.col-val.vert{color:var(--vert)}.col-val.orange{color:var(--orange)}.col-val.rouge{color:var(--rouge)}
+.col-arrow{color:var(--texte2);font-size:16px}
+
+/* BADGES */
+.pill{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:4px}
+.pill-ok{background:var(--vert-pale);color:var(--vert)}
+.pill-warn{background:var(--orange-pale);color:var(--orange)}
+.pill-danger{background:var(--rouge-pale);color:var(--rouge)}
+.pill-off{background:var(--surface2);color:var(--texte2)}
+.pill-bleu{background:var(--bleu-pale);color:var(--bleu)}
+
+/* ALERTES LIST */
+.alerte-item{padding:14px 18px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--bordure);cursor:pointer;transition:background 0.15s}
+.alerte-item:hover{background:var(--surface2)}
+.alerte-item:last-child{border-bottom:none}
+.ai-dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.ai-dot.rouge{background:var(--rouge)}.ai-dot.orange{background:var(--orange)}.ai-dot.bleu{background:var(--bleu)}
+.ai-body{flex:1}
+.ai-titre{font-size:13px;font-weight:600}
+.ai-desc{font-size:11px;color:var(--texte2);margin-top:2px}
+.ai-time{font-size:10px;color:var(--texte2);white-space:nowrap}
+.ai-actions{display:flex;gap:8px;margin-top:10px}
+
+/* CHART */
+.chart-bars{display:flex;align-items:flex-end;gap:5px;height:80px}
+.chart-bar{flex:1;border-radius:4px 4px 0 0;background:var(--or-pale);transition:background 0.2s;cursor:pointer}
+.chart-bar:hover,.chart-bar.active{background:var(--or)}
+.chart-labels{display:flex;gap:5px;margin-top:6px}
+.chart-label{flex:1;font-size:9px;color:var(--texte2);text-align:center}
+
+/* ACTIVITE */
+.act-item{padding:12px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--bordure)}
+.act-item:last-child{border-bottom:none}
+.act-dot{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.ad-vert{background:var(--vert-pale)}.ad-orange{background:var(--orange-pale)}.ad-or{background:var(--or-pale)}.ad-rouge{background:var(--rouge-pale)}.ad-bleu{background:var(--bleu-pale)}
+.act-body{flex:1}
+.act-titre{font-size:12px;font-weight:500}
+.act-detail{font-size:11px;color:var(--texte2);margin-top:1px}
+.act-time{font-size:10px;color:var(--texte2);white-space:nowrap}
+
+/* RAPPORT CARD */
+.rapport-card{background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer;border:1px solid var(--bordure);transition:border-color 0.15s}
+.rapport-card:hover{border-color:var(--or)}
+.rapport-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.rapport-kpi-v{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700}
+.rapport-kpi-l{font-size:10px;color:var(--texte2);margin-top:2px}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:20;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:16px;width:100%;max-width:580px;border:1px solid var(--bordure);animation:fadeUp 0.2s ease;overflow:hidden;max-height:90vh;overflow-y:auto}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.modal-head{padding:18px 20px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--bordure);background:var(--surface2);position:sticky;top:0}
+.modal-nom{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700}
+.modal-sub{font-size:12px;color:var(--texte2);margin-top:2px}
+.modal-close{background:none;border:none;color:var(--texte2);font-size:20px;cursor:pointer;line-height:1;flex-shrink:0}
+.modal-body{padding:20px}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.modal-stat{background:var(--surface2);border-radius:10px;padding:12px}
+.modal-stat-v{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700}
+.modal-stat-l{font-size:11px;color:var(--texte2);margin-top:2px}
+.mg-item{background:var(--surface2);border-radius:10px;padding:12px 14px;border-left:3px solid var(--bordure);margin-bottom:8px}
+.mg-item.ok{border-left-color:var(--vert)}.mg-item.warn{border-left-color:var(--orange)}.mg-item.danger{border-left-color:var(--rouge)}
+.mg-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.mg-nom{font-size:13px;font-weight:600}
+.mg-stats{display:flex;gap:12px}
+.mg-stat{font-size:11px;color:var(--texte2)}
+.mg-stat span{color:var(--texte);font-weight:500}
+
+/* FORM */
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field label{font-size:11px;color:var(--texte2);font-weight:500;letter-spacing:0.5px}
+.field input,.field select,.field textarea{background:var(--surface2);border:1px solid var(--bordure);border-radius:10px;padding:12px 14px;color:var(--texte);font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:border-color 0.15s;width:100%}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--or)}
+.field textarea{resize:vertical;min-height:80px}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--vert);color:white;padding:10px 18px;border-radius:8px;font-size:12px;font-weight:600;z-index:30;opacity:0;transition:opacity 0.25s;pointer-events:none}
+.toast.show{opacity:1}
+.toast.warn{background:var(--orange)}
+.toast.err{background:var(--rouge)}
+
+/* EMPTY STATE */
+.empty{padding:40px;text-align:center;color:var(--texte2)}
+.empty-icon{font-size:32px;margin-bottom:12px}
+.empty-title{font-size:14px;font-weight:600;color:var(--texte);margin-bottom:6px}
+.empty-sub{font-size:12px}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  .sidebar{display:none}
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+  .grid-2,.grid-3{grid-template-columns:1fr}
+  .view{padding:16px}
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sb-logo">Gen<em>Track</em><div class="sb-logo-sub">Dashboard Partenaire</div></div>
+  <div class="sb-nav">
+    <div class="sb-section">Principal</div>
+    <div class="sb-item active" id="nav-accueil" onclick="goTo('accueil')"><div class="sb-item-icon">🏠</div>Vue globale</div>
+    <div class="sb-item" id="nav-clients" onclick="goTo('clients')"><div class="sb-item-icon">🏨</div>Clients<div class="sb-item-badge">12</div></div>
+    <div class="sb-item" id="nav-alertes" onclick="goTo('alertes')"><div class="sb-item-icon">🔔</div>Alertes<div class="sb-item-badge">3</div></div>
+    <div class="sb-section">Analyse</div>
+    <div class="sb-item" id="nav-rapports" onclick="goTo('rapports')"><div class="sb-item-icon">📊</div>Rapports</div>
+    <div class="sb-item" id="nav-carburant" onclick="goTo('carburant')"><div class="sb-item-icon">⛽</div>Carburant</div>
+    <div class="sb-item" id="nav-maintenance" onclick="goTo('maintenance')"><div class="sb-item-icon">🔧</div>Maintenance</div>
+    <div class="sb-section">Compte</div>
+    <div class="sb-item" id="nav-parametres" onclick="goTo('parametres')"><div class="sb-item-icon">⚙️</div>Paramètres</div>
+  </div>
+  <div class="sb-bottom">
+    <div class="sb-user" onclick="goTo('parametres')">
+      <div class="sb-avatar">ND</div>
+      <div><div class="sb-user-name">Ndoye Sénégal</div><div class="sb-user-role">Partenaire revendeur</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+<!-- ══ VUE GLOBALE ══ -->
+<div class="view active" id="view-accueil">
+  <div class="topbar">
+    <div><div class="topbar-date">Vendredi 13 juin 2026 · 08h14</div><div class="topbar-title">Vue globale</div></div>
+    <div class="topbar-right">
+      <button class="btn-ghost" onclick="exportPDF()">📥 Exporter</button>
+      <button class="btn-primary" onclick="openAddClient()">+ Nouveau client</button>
+    </div>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-label">Clients actifs</div><div class="kpi-val or">12</div><div class="kpi-sub">Dakar · Sénégal</div><div class="kpi-evo pos">↑ +2 ce mois</div></div>
+    <div class="kpi"><div class="kpi-label">Groupes suivis</div><div class="kpi-val or">24</div><div class="kpi-sub">Sur 12 sites</div><div class="kpi-evo neu">→ stable</div></div>
+    <div class="kpi"><div class="kpi-label">Alertes actives</div><div class="kpi-val rouge">3</div><div class="kpi-sub">Intervention requise</div><div class="kpi-evo neg">↑ +1 aujourd'hui</div></div>
+    <div class="kpi"><div class="kpi-label">MRR partenaire</div><div class="kpi-val vert">72k</div><div class="kpi-sub">FCFA ce mois</div><div class="kpi-evo pos">↑ +12k vs mai</div></div>
+  </div>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Clients — Statut en temps réel</div><button class="btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('clients')">Voir tout →</button></div>
+      <div class="table-row header tr-clients"><div class="col-label">Client</div><div class="col-label">Groupes</div><div class="col-label">Carburant</div><div class="col-label">Statut</div><div></div></div>
+      <div class="table-row tr-clients" onclick="openClient('savana')"><div><div class="col-name">Hôtel Savana</div><div class="col-sub">Cocody · 2 groupes</div></div><div class="col-val or">2</div><div class="col-val vert">72%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+      <div class="table-row tr-clients" onclick="openClient('casaMara')"><div><div class="col-name">Casa Mara</div><div class="col-sub">Almadies · 1 groupe</div></div><div class="col-val or">1</div><div class="col-val orange">35%</div><div><span class="pill pill-warn">⚠️ Alerte</span></div><div class="col-arrow">›</div></div>
+      <div class="table-row tr-clients" onclick="openClient('almadies')"><div><div class="col-name">Résidence Almadies</div><div class="col-sub">Almadies · 3 groupes</div></div><div class="col-val or">3</div><div class="col-val vert">81%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+      <div class="table-row tr-clients" onclick="openClient('palmBeach')"><div><div class="col-name">Hotel Palm Beach</div><div class="col-sub">Plateau · 1 groupe</div></div><div class="col-val or">1</div><div class="col-val rouge">18%</div><div><span class="pill pill-danger">🚨 Urgent</span></div><div class="col-arrow">›</div></div>
+      <div class="table-row tr-clients" onclick="openClient('teranga')"><div><div class="col-name">Hôtel Teranga</div><div class="col-sub">Centre · 2 groupes</div></div><div class="col-val or">2</div><div class="col-val vert">65%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+      <div class="table-row tr-clients" onclick="openClient('ngor')"><div><div class="col-name">Lodge Ngor</div><div class="col-sub">Ngor · 1 groupe</div></div><div class="col-val or">1</div><div class="col-val vert">58%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+      <div style="padding:12px 18px;text-align:center"><span style="font-size:11px;color:var(--or);cursor:pointer" onclick="goTo('clients')">+ 6 autres clients → Voir tout</span></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">🔔 Alertes actives</div><button class="btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('alertes')">Voir tout →</button></div>
+      <div class="alerte-item" onclick="openClient('palmBeach')"><div class="ai-dot rouge"></div><div class="ai-body"><div class="ai-titre">Carburant critique — Palm Beach</div><div class="ai-desc">Groupe unique · 18% · Risque arrêt imminent</div></div><div class="ai-time">14min</div></div>
+      <div class="alerte-item" onclick="openClient('casaMara')"><div class="ai-dot orange"></div><div class="ai-body"><div class="ai-titre">Vidange imminente — Casa Mara</div><div class="ai-desc">Perkins 20kVA · 238h/250h atteintes</div></div><div class="ai-time">1h</div></div>
+      <div class="alerte-item" onclick="openClient('savana')"><div class="ai-dot orange"></div><div class="ai-body"><div class="ai-titre">Conso anormale — Hôtel Savana</div><div class="ai-desc">Groupe B · +14% vs théorique</div></div><div class="ai-time">Hier</div></div>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Consommation carburant — Juin 2026</div><button class="btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('carburant')">Détail →</button></div>
+      <div style="padding:16px 18px">
+        <div style="font-size:11px;color:var(--texte2);margin-bottom:12px">Total 12 clients · Litres/semaine</div>
+        <div class="chart-bars">
+          <div class="chart-bar" style="height:35%" onclick="showToast('Semaine 1 : 820L consommés')"></div>
+          <div class="chart-bar" style="height:62%" onclick="showToast('Semaine 2 : 1 240L consommés')"></div>
+          <div class="chart-bar" style="height:57%" onclick="showToast('Semaine 3 : 1 140L consommés')"></div>
+          <div class="chart-bar active" style="height:45%" onclick="showToast('Semaine 4 : 910L — en cours')"></div>
+        </div>
+        <div class="chart-labels"><div class="chart-label">S1<br>820L</div><div class="chart-label">S2<br>1 240L</div><div class="chart-label">S3<br>1 140L</div><div class="chart-label">S4<br>910L●</div></div>
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--bordure);display:flex;justify-content:space-between">
+          <div><div style="font-size:10px;color:var(--texte2);margin-bottom:2px">TOTAL JUIN</div><div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;color:var(--or)">4 110 L</div></div>
+          <div style="text-align:right"><div style="font-size:10px;color:var(--texte2);margin-bottom:2px">VS MAI</div><div style="font-size:16px;font-weight:600;color:var(--vert)">↓ −6%</div></div>
+          <div style="text-align:right"><div style="font-size:10px;color:var(--texte2);margin-bottom:2px">COÛT TOTAL</div><div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700">2.87M <span style="font-size:12px;color:var(--texte2)">FCFA</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Activité récente</div><button class="btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('clients')">Tout voir →</button></div>
+      <div class="act-item"><div class="act-dot ad-rouge">🚨</div><div class="act-body"><div class="act-titre">Alerte critique — Palm Beach</div><div class="act-detail">Carburant 18% · Groupe unique</div></div><div class="act-time">08h00</div></div>
+      <div class="act-item"><div class="act-dot ad-vert">📊</div><div class="act-body"><div class="act-titre">Rapports envoyés — 12 clients</div><div class="act-detail">WhatsApp automatiques 08h00</div></div><div class="act-time">08h00</div></div>
+      <div class="act-item"><div class="act-dot ad-or">⛽</div><div class="act-body"><div class="act-titre">Ravitaillement — Hôtel Savana</div><div class="act-detail">+120L · Groupe A · 84 000 FCFA</div></div><div class="act-time">Hier 16h</div></div>
+      <div class="act-item"><div class="act-dot ad-vert">🔧</div><div class="act-body"><div class="act-titre">Maintenance — Résidence Almadies</div><div class="act-detail">Vidange Groupe 1 · Koffi</div></div><div class="act-time">Hier 11h</div></div>
+      <div class="act-item"><div class="act-dot ad-bleu">✅</div><div class="act-body"><div class="act-titre">Nouveau client — Lodge Ngor</div><div class="act-detail">Onboarding WhatsApp activé</div></div><div class="act-time">12 juin</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CLIENTS ══ -->
+<div class="view" id="view-clients">
+  <div class="topbar">
+    <div><div class="topbar-date">12 clients actifs</div><div class="topbar-title">Clients</div></div>
+    <div class="topbar-right">
+      <button class="btn-ghost" onclick="exportPDF()">📥 Exporter</button>
+      <button class="btn-primary" onclick="openAddClient()">+ Nouveau client</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Tous les clients</div><div style="font-size:11px;color:var(--texte2)">Cliquez pour voir le détail</div></div>
+    <div class="table-row header tr-clients"><div class="col-label">Client</div><div class="col-label">Groupes</div><div class="col-label">Carburant moy.</div><div class="col-label">Statut</div><div></div></div>
+    <div class="table-row tr-clients" onclick="openClient('savana')"><div><div class="col-name">Hôtel Savana</div><div class="col-sub">Cocody · Client depuis avril 2026</div></div><div class="col-val or">2</div><div class="col-val vert">72%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-clients" onclick="openClient('casaMara')"><div><div class="col-name">Casa Mara</div><div class="col-sub">Almadies · Client depuis mai 2026</div></div><div class="col-val or">1</div><div class="col-val orange">35%</div><div><span class="pill pill-warn">⚠️ Alerte</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-clients" onclick="openClient('almadies')"><div><div class="col-name">Résidence Almadies</div><div class="col-sub">Almadies Zone 2 · Client depuis mars 2026</div></div><div class="col-val or">3</div><div class="col-val vert">81%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-clients" onclick="openClient('palmBeach')"><div><div class="col-name">Hotel Palm Beach</div><div class="col-sub">Plateau · Client depuis juin 2026</div></div><div class="col-val or">1</div><div class="col-val rouge">18%</div><div><span class="pill pill-danger">🚨 Urgent</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-clients" onclick="openClient('teranga')"><div><div class="col-name">Hôtel Teranga</div><div class="col-sub">Centre-ville · Client depuis mai 2026</div></div><div class="col-val or">2</div><div class="col-val vert">65%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-clients" onclick="openClient('ngor')"><div><div class="col-name">Lodge Ngor</div><div class="col-sub">Ngor · Client depuis juin 2026</div></div><div class="col-val or">1</div><div class="col-val vert">58%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-clients" onclick="openClient('savana')"><div><div class="col-name">Hôtel Le Plateau</div><div class="col-sub">Plateau · Client depuis avril 2026</div></div><div class="col-val or">2</div><div class="col-val vert">68%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-clients" onclick="openClient('almadies')"><div><div class="col-name">Villa Baobab</div><div class="col-sub">Yoff · Client depuis mai 2026</div></div><div class="col-val or">1</div><div class="col-val vert">74%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-clients" onclick="openClient('teranga')"><div><div class="col-name">Clinique Pasteur</div><div class="col-sub">Fann · Client depuis mars 2026</div></div><div class="col-val or">3</div><div class="col-val vert">88%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-clients" onclick="openClient('casaMara')"><div><div class="col-name">Supermarché Auchan Almadies</div><div class="col-sub">Almadies · Client depuis juin 2026</div></div><div class="col-val or">2</div><div class="col-val orange">42%</div><div><span class="pill pill-warn">⚠️ Alerte</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-clients" onclick="openClient('savana')"><div><div class="col-name">Hôtel Fleur de Lys</div><div class="col-sub">Ouakam · Client depuis mai 2026</div></div><div class="col-val or">1</div><div class="col-val vert">61%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-clients" onclick="openClient('ngor')"><div><div class="col-name">Résidence Les Cocotiers</div><div class="col-sub">Ngor · Client depuis juin 2026</div></div><div class="col-val or">1</div><div class="col-val vert">55%</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+  </div>
+</div>
+
+<!-- ══ ALERTES ══ -->
+<div class="view" id="view-alertes">
+  <div class="topbar">
+    <div><div class="topbar-date">3 alertes nécessitent votre attention</div><div class="topbar-title">Alertes</div></div>
+    <div class="topbar-right"><button class="btn-ghost" onclick="showToast('Toutes les alertes marquées comme lues')">Tout marquer lu</button></div>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header"><div class="card-title">🚨 Critique — Action immédiate</div></div>
+    <div class="alerte-item" onclick="openClient('palmBeach')">
+      <div class="ai-dot rouge"></div>
+      <div class="ai-body">
+        <div class="ai-titre">Carburant critique — Hotel Palm Beach</div>
+        <div class="ai-desc">Groupe A · Perkins 15 kVA · Plateau · Niveau : 18% · Risque d'arrêt dans moins de 2h</div>
+        <div class="ai-actions">
+          <button class="btn-danger" onclick="event.stopPropagation();showToast('Message envoyé au patron de Palm Beach ✓','warn')">📱 Contacter le patron</button>
+          <button class="btn-ghost" onclick="event.stopPropagation();openClient('palmBeach')">Voir le groupe →</button>
+        </div>
+      </div>
+      <div class="ai-time">Il y a 14min</div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header"><div class="card-title">⚠️ Important — À traiter aujourd'hui</div></div>
+    <div class="alerte-item" onclick="openClient('casaMara')">
+      <div class="ai-dot orange"></div>
+      <div class="ai-body">
+        <div class="ai-titre">Vidange imminente — Casa Mara</div>
+        <div class="ai-desc">Groupe A · Perkins 20 kVA · 238h / 250h atteintes · Vidange requise dans 12h max</div>
+        <div class="ai-actions">
+          <button class="btn-ghost" onclick="event.stopPropagation();showToast('Technicien notifié ✓','warn')">🔧 Notifier technicien</button>
+          <button class="btn-ghost" onclick="event.stopPropagation();openClient('casaMara')">Voir le groupe →</button>
+        </div>
+      </div>
+      <div class="ai-time">Il y a 1h</div>
+    </div>
+    <div class="alerte-item" onclick="openClient('savana')">
+      <div class="ai-dot orange"></div>
+      <div class="ai-body">
+        <div class="ai-titre">Consommation anormale — Hôtel Savana</div>
+        <div class="ai-desc">Groupe B · Perkins 20 kVA · +14% vs consommation théorique · Possible fuite ou vol</div>
+        <div class="ai-actions">
+          <button class="btn-ghost" onclick="event.stopPropagation();showToast('Rapport envoyé au patron ✓')">📊 Envoyer rapport</button>
+          <button class="btn-ghost" onclick="event.stopPropagation();openClient('savana')">Voir le groupe →</button>
+        </div>
+      </div>
+      <div class="ai-time">Hier 16h</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">✅ Résolues récemment</div></div>
+    <div class="alerte-item"><div class="ai-dot" style="background:var(--vert)"></div><div class="ai-body"><div class="ai-titre">Panne résolue — Résidence Almadies</div><div class="ai-desc">Groupe 2 · Démarreur remplacé · Durée : 3h</div></div><div class="ai-time">10 juin</div></div>
+    <div class="alerte-item"><div class="ai-dot" style="background:var(--vert)"></div><div class="ai-body"><div class="ai-titre">Carburant rechargé — Lodge Ngor</div><div class="ai-desc">+80L · Niveau remonté à 58%</div></div><div class="ai-time">9 juin</div></div>
+  </div>
+</div>
+
+<!-- ══ RAPPORTS ══ -->
+<div class="view" id="view-rapports">
+  <div class="topbar">
+    <div><div class="topbar-date">Historique complet</div><div class="topbar-title">Rapports</div></div>
+    <div class="topbar-right"><button class="btn-primary" onclick="exportPDF()">📥 Exporter tout</button></div>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-label">CA juin 2026</div><div class="kpi-val or">240k</div><div class="kpi-sub">FCFA · 12 clients</div><div class="kpi-evo pos">↑ +20%</div></div>
+    <div class="kpi"><div class="kpi-label">Carburant total</div><div class="kpi-val or">4 110L</div><div class="kpi-sub">Tous clients</div><div class="kpi-evo pos">↓ −6% vs mai</div></div>
+    <div class="kpi"><div class="kpi-label">Pannes évitées</div><div class="kpi-val vert">8</div><div class="kpi-sub">Grâce aux alertes</div><div class="kpi-evo pos">↑ ce mois</div></div>
+    <div class="kpi"><div class="kpi-label">Économies générées</div><div class="kpi-val vert">312k</div><div class="kpi-sub">FCFA · Tous clients</div><div class="kpi-evo pos">↑ vs mai</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Rapports mensuels — Par client</div></div>
+    <div class="table-row header tr-rapports"><div class="col-label">Client</div><div class="col-label">Coût total</div><div class="col-label">Économie</div><div class="col-label">Actions</div></div>
+    <div class="table-row tr-rapports" onclick="openClient('savana')"><div><div class="col-name">Hôtel Savana</div><div class="col-sub">Juin 2026 · 2 groupes</div></div><div class="col-val or">224k FCFA</div><div class="col-val vert">↓ −8%</div><div style="display:flex;gap:6px"><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();exportPDF()">📥 PDF</button><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();showToast('Rapport envoyé par WhatsApp ✓')">📱 WA</button></div></div>
+    <div class="table-row tr-rapports" onclick="openClient('almadies')"><div><div class="col-name">Résidence Almadies</div><div class="col-sub">Juin 2026 · 3 groupes</div></div><div class="col-val or">312k FCFA</div><div class="col-val vert">↓ −5%</div><div style="display:flex;gap:6px"><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();exportPDF()">📥 PDF</button><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();showToast('Rapport envoyé par WhatsApp ✓')">📱 WA</button></div></div>
+    <div class="table-row tr-rapports" onclick="openClient('teranga')"><div><div class="col-name">Hôtel Teranga</div><div class="col-sub">Juin 2026 · 2 groupes</div></div><div class="col-val or">186k FCFA</div><div class="col-val vert">↓ −3%</div><div style="display:flex;gap:6px"><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();exportPDF()">📥 PDF</button><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();showToast('Rapport envoyé par WhatsApp ✓')">📱 WA</button></div></div>
+    <div class="table-row tr-rapports" onclick="openClient('palmBeach')"><div><div class="col-name">Hotel Palm Beach</div><div class="col-sub">Juin 2026 · 1 groupe</div></div><div class="col-val or">76k FCFA</div><div class="col-val neu">→ stable</div><div style="display:flex;gap:6px"><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();exportPDF()">📥 PDF</button><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();showToast('Rapport envoyé par WhatsApp ✓')">📱 WA</button></div></div>
+    <div class="table-row tr-rapports" onclick="openClient('casaMara')"><div><div class="col-name">Casa Mara</div><div class="col-sub">Juin 2026 · 1 groupe</div></div><div class="col-val or">98k FCFA</div><div class="col-val neg">↑ +8%</div><div style="display:flex;gap:6px"><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();exportPDF()">📥 PDF</button><button class="btn-ghost" style="padding:5px 8px;font-size:11px" onclick="event.stopPropagation();showToast('Rapport envoyé par WhatsApp ✓')">📱 WA</button></div></div>
+  </div>
+</div>
+
+<!-- ══ CARBURANT ══ -->
+<div class="view" id="view-carburant">
+  <div class="topbar">
+    <div><div class="topbar-date">Suivi en temps réel</div><div class="topbar-title">Carburant</div></div>
+    <div class="topbar-right"><button class="btn-primary" onclick="openSaisie()">+ Saisir ravitaillement</button></div>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-label">Total juin</div><div class="kpi-val or">4 110L</div><div class="kpi-sub">12 clients · 24 groupes</div><div class="kpi-evo pos">↓ −6% vs mai</div></div>
+    <div class="kpi"><div class="kpi-label">Coût total</div><div class="kpi-val or">2.87M</div><div class="kpi-sub">FCFA ce mois</div><div class="kpi-evo pos">↓ économie</div></div>
+    <div class="kpi"><div class="kpi-label">Anomalies détectées</div><div class="kpi-val orange">2</div><div class="kpi-sub">Conso > +10% théorique</div><div class="kpi-evo neg">↑ à surveiller</div></div>
+    <div class="kpi"><div class="kpi-label">Niveaux critiques</div><div class="kpi-val rouge">1</div><div class="kpi-sub">< 20% · Palm Beach</div><div class="kpi-evo neg">Action requise</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Niveau carburant — Tous les groupes</div></div>
+    <div class="table-row header tr-carb"><div class="col-label">Client / Groupe</div><div class="col-label">Niveau</div><div class="col-label">Conso réelle</div><div class="col-label">Statut</div><div></div></div>
+    <div class="table-row tr-carb" onclick="openClient('palmBeach')"><div><div class="col-name">Palm Beach — Groupe A</div><div class="col-sub">Perkins 15 kVA · Plateau</div></div><div class="col-val rouge">18%</div><div class="col-val neu">1.4 L/h</div><div><span class="pill pill-danger">🚨 Critique</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-carb" onclick="openClient('casaMara')"><div><div class="col-name">Casa Mara — Groupe A</div><div class="col-sub">Perkins 20 kVA · Almadies</div></div><div class="col-val orange">35%</div><div class="col-val orange">1.57 L/h</div><div><span class="pill pill-warn">⚠️ Bas</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-carb" onclick="openClient('savana')"><div><div class="col-name">Hôtel Savana — Groupe B</div><div class="col-sub">Perkins 20 kVA · Cocody</div></div><div class="col-val orange">35%</div><div class="col-val orange">1.57 L/h +14%</div><div><span class="pill pill-warn">⚠️ Anomalie</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-carb" onclick="openClient('ngor')"><div><div class="col-name">Lodge Ngor — Groupe A</div><div class="col-sub">Kipor 10 kVA · Ngor</div></div><div class="col-val vert">58%</div><div class="col-val vert">0.9 L/h</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-carb" onclick="openClient('teranga')"><div><div class="col-name">Hôtel Teranga — Groupe A</div><div class="col-sub">Caterpillar 35 kVA · Centre</div></div><div class="col-val vert">65%</div><div class="col-val vert">2.1 L/h</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-carb" onclick="openClient('savana')"><div><div class="col-name">Hôtel Savana — Groupe A</div><div class="col-sub">Caterpillar 45 kVA · Cocody</div></div><div class="col-val vert">72%</div><div class="col-val vert">1.71 L/h</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-carb" onclick="openClient('almadies')"><div><div class="col-name">Résidence Almadies — Groupe A</div><div class="col-sub">Caterpillar 45 kVA · Almadies</div></div><div class="col-val vert">81%</div><div class="col-val vert">2.3 L/h</div><div><span class="pill pill-ok">✓ OK</span></div><div class="col-arrow">›</div></div>
+  </div>
+</div>
+
+<!-- ══ MAINTENANCE ══ -->
+<div class="view" id="view-maintenance">
+  <div class="topbar">
+    <div><div class="topbar-date">Planification préventive</div><div class="topbar-title">Maintenance</div></div>
+    <div class="topbar-right"><button class="btn-primary" onclick="openSaisie()">+ Enregistrer intervention</button></div>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-label">À faire cette semaine</div><div class="kpi-val orange">2</div><div class="kpi-sub">Interventions planifiées</div></div>
+    <div class="kpi"><div class="kpi-label">Faites ce mois</div><div class="kpi-val vert">5</div><div class="kpi-sub">Interventions réalisées</div></div>
+    <div class="kpi"><div class="kpi-label">Pannes évitées</div><div class="kpi-val vert">8</div><div class="kpi-sub">Grâce aux alertes</div></div>
+    <div class="kpi"><div class="kpi-label">Coût maintenance</div><div class="kpi-val or">340k</div><div class="kpi-sub">FCFA ce mois</div></div>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-header"><div class="card-title">⚠️ À planifier maintenant</div></div>
+    <div class="table-row header tr-maint"><div class="col-label">Groupe</div><div class="col-label">Type</div><div class="col-label">Échéance</div><div class="col-label">Statut</div><div></div></div>
+    <div class="table-row tr-maint" onclick="openClient('casaMara')"><div><div class="col-name">Casa Mara — Groupe A</div><div class="col-sub">Perkins 20 kVA</div></div><div class="col-val">Vidange huile</div><div class="col-val rouge">Dans 12h</div><div><span class="pill pill-danger">🚨 Urgent</span></div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-maint" onclick="openClient('savana')"><div><div class="col-name">Hôtel Savana — Groupe A</div><div class="col-sub">Caterpillar 45 kVA</div></div><div class="col-val">Filtre carburant</div><div class="col-val orange">Dans 3 sem.</div><div><span class="pill pill-warn">⚠️ Prévoir</span></div><div class="col-arrow">›</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">✅ Interventions réalisées — Juin 2026</div></div>
+    <div class="table-row header tr-maint"><div class="col-label">Groupe</div><div class="col-label">Type</div><div class="col-label">Date</div><div class="col-label">Coût</div><div></div></div>
+    <div class="table-row tr-maint" onclick="openClient('almadies')"><div><div class="col-name">Résidence Almadies — G1</div><div class="col-sub">Technicien Koffi</div></div><div class="col-val">Vidange huile</div><div class="col-val">12 juin</div><div class="col-val vert">65k FCFA</div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-maint" onclick="openClient('savana')"><div><div class="col-name">Hôtel Savana — Groupe A</div><div class="col-sub">Technicien Moussa</div></div><div class="col-val">Filtre air</div><div class="col-val">10 juin</div><div class="col-val vert">28k FCFA</div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-maint" onclick="openClient('teranga')"><div><div class="col-name">Hôtel Teranga — Groupe B</div><div class="col-sub">Technicien Diallo</div></div><div class="col-val">Vidange + filtre</div><div class="col-val">5 juin</div><div class="col-val vert">95k FCFA</div><div class="col-arrow">›</div></div>
+    <div class="table-row tr-maint" onclick="openClient('ngor')"><div><div class="col-name">Lodge Ngor — Groupe A</div><div class="col-sub">Technicien Koffi</div></div><div class="col-val">Remplacement démarreur</div><div class="col-val">3 juin</div><div class="col-val vert">120k FCFA</div><div class="col-arrow">›</div></div>
+  </div>
+</div>
+
+<!-- ══ PARAMÈTRES ══ -->
+<div class="view" id="view-parametres">
+  <div class="topbar">
+    <div><div class="topbar-date">Configuration du compte</div><div class="topbar-title">Paramètres</div></div>
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header"><div class="card-title">👤 Profil partenaire</div></div>
+      <div style="padding:16px 18px">
+        <div class="field"><label>NOM DU PARTENAIRE</label><input value="Ndoye Électrotechnique Sénégal"></div>
+        <div class="field"><label>CONTACT PRINCIPAL</label><input value="+221 77 XXX XX XX"></div>
+        <div class="field"><label>EMAIL</label><input value="contact@ndoye-elec.sn"></div>
+        <div class="field"><label>VILLE</label><input value="Dakar, Sénégal"></div>
+        <button class="btn-primary" onclick="showToast('Profil sauvegardé ✓')">Sauvegarder</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">🔔 Notifications</div></div>
+      <div style="padding:16px 18px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:13px;font-weight:500">Alertes carburant critique</div><div style="font-size:11px;color:var(--texte2)">Notification immédiate</div></div>
+          <div style="width:40px;height:22px;background:var(--vert);border-radius:11px;cursor:pointer;position:relative" onclick="showToast('Paramètre mis à jour ✓')"><div style="width:18px;height:18px;background:white;border-radius:50%;position:absolute;right:2px;top:2px"></div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:13px;font-weight:500">Rappels maintenance</div><div style="font-size:11px;color:var(--texte2)">48h avant échéance</div></div>
+          <div style="width:40px;height:22px;background:var(--vert);border-radius:11px;cursor:pointer;position:relative" onclick="showToast('Paramètre mis à jour ✓')"><div style="width:18px;height:18px;background:white;border-radius:50%;position:absolute;right:2px;top:2px"></div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:13px;font-weight:500">Rapport hebdomadaire</div><div style="font-size:11px;color:var(--texte2)">Chaque lundi 08h00</div></div>
+          <div style="width:40px;height:22px;background:var(--vert);border-radius:11px;cursor:pointer;position:relative" onclick="showToast('Paramètre mis à jour ✓')"><div style="width:18px;height:18px;background:white;border-radius:50%;position:absolute;right:2px;top:2px"></div></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:13px;font-weight:500">Anomalies consommation</div><div style="font-size:11px;color:var(--texte2)">Si > +10% théorique</div></div>
+          <div style="width:40px;height:22px;background:var(--bordure);border-radius:11px;cursor:pointer;position:relative" onclick="showToast('Paramètre mis à jour ✓')"><div style="width:18px;height:18px;background:white;border-radius:50%;position:absolute;left:2px;top:2px"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">💳 Abonnement</div></div>
+    <div style="padding:16px 18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div><div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700">Plan Partenaire</div><div style="font-size:12px;color:var(--texte2);margin-top:2px">12 clients · 24 groupes</div></div>
+        <div><div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;color:var(--or)">72k<span style="font-size:12px;color:var(--texte2)"> FCFA/mois</span></div></div>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:12px">
+        <div style="font-size:11px;color:var(--texte2);margin-bottom:8px">INCLUS DANS VOTRE PLAN</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div style="font-size:12px">✅ Clients illimités</div>
+          <div style="font-size:12px">✅ WhatsApp bot</div>
+          <div style="font-size:12px">✅ Alertes temps réel</div>
+          <div style="font-size:12px">✅ Rapports PDF</div>
+          <div style="font-size:12px">✅ Dashboard partenaire</div>
+          <div style="font-size:12px">✅ Support prioritaire</div>
+        </div>
+      </div>
+      <button class="btn-ghost" onclick="showToast('Facturation Wave — Prochain prélèvement le 1er juillet')">Voir la facturation</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- MODAL CLIENT -->
+<div class="modal-overlay" id="modalClient" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div><div class="modal-nom" id="modalNom"></div><div class="modal-sub" id="modalSub"></div></div>
+      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- MODAL ADD CLIENT -->
+<div class="modal-overlay" id="modalAdd" onclick="closeModalAdd(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div><div class="modal-nom">Nouveau client</div><div class="modal-sub">Activer GenTrack en 2 minutes</div></div>
+      <button class="modal-close" onclick="document.getElementById('modalAdd').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>NOM DE L'ÉTABLISSEMENT</label><input placeholder="ex: Hôtel Savana" id="addNom"></div>
+      <div class="field"><label>TYPE</label><select><option>Hôtel</option><option>Restaurant</option><option>Clinique</option><option>Supermarché</option><option>Bureau</option><option>Autre</option></select></div>
+      <div class="field"><label>QUARTIER / VILLE</label><input placeholder="ex: Almadies, Dakar"></div>
+      <div class="field"><label>WHATSAPP DU GARDIEN</label><input placeholder="+221 7X XXX XX XX" type="tel"></div>
+      <div class="field"><label>WHATSAPP DU PATRON</label><input placeholder="+221 7X XXX XX XX" type="tel"></div>
+      <div class="field"><label>NOMBRE DE GROUPES</label><select><option>1 groupe</option><option>2 groupes</option><option>3 groupes</option><option>4 groupes et +</option></select></div>
+      <div class="field"><label>PLAN</label><select><option>Starter — 10 000 FCFA/mois</option><option selected>Business — 25 000 FCFA/mois</option><option>Pro — 60 000 FCFA/mois</option></select></div>
+      <button class="btn-primary" style="width:100%;justify-content:center;padding:14px;margin-top:4px" onclick="addClient()">✅ Activer GenTrack — WhatsApp envoyé automatiquement</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SAISIE -->
+<div class="modal-overlay" id="modalSaisie" onclick="closeSaisie(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div><div class="modal-nom">Saisir une entrée</div><div class="modal-sub">Enregistrer manuellement</div></div>
+      <button class="modal-close" onclick="document.getElementById('modalSaisie').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field"><label>CLIENT</label><select><option>Hôtel Savana</option><option>Casa Mara</option><option>Résidence Almadies</option><option>Hotel Palm Beach</option><option>Hôtel Teranga</option><option>Lodge Ngor</option></select></div>
+      <div class="field"><label>GROUPE</label><select><option>Groupe A</option><option>Groupe B</option><option>Groupe C</option></select></div>
+      <div class="field"><label>TYPE D'ENTRÉE</label><select onchange="changeSaisieType(this.value)"><option value="carb">Ravitaillement carburant</option><option value="maint">Maintenance effectuée</option><option value="panne">Signaler une panne</option><option value="demarrage">Démarrage / Arrêt</option></select></div>
+      <div id="saisieCarb">
+        <div class="field"><label>LITRES AJOUTÉS</label><input type="number" placeholder="ex: 80" inputmode="numeric"></div>
+        <div class="field"><label>COÛT (FCFA)</label><input type="number" placeholder="ex: 56000" inputmode="numeric"></div>
+      </div>
+      <div id="saisieMaint" style="display:none">
+        <div class="field"><label>TYPE D'INTERVENTION</label><select><option>Vidange huile moteur</option><option>Filtre à air</option><option>Filtre à carburant</option><option>Remplacement pièce</option><option>Autre</option></select></div>
+        <div class="field"><label>TECHNICIEN</label><input placeholder="Nom du technicien"></div>
+        <div class="field"><label>COÛT (FCFA)</label><input type="number" placeholder="ex: 45000" inputmode="numeric"></div>
+      </div>
+      <div id="saisiePanne" style="display:none">
+        <div class="field"><label>TYPE DE PANNE</label><select><option>Ne démarre pas</option><option>Arrêt inopiné</option><option>Bruit anormal</option><option>Surchauffe</option><option>Autre</option></select></div>
+        <div class="field"><label>DESCRIPTION</label><textarea placeholder="Décrivez la panne..."></textarea></div>
+      </div>
+      <div id="saisieDem" style="display:none">
+        <div class="field"><label>ACTION</label><select><option>Démarrage</option><option>Arrêt</option></select></div>
+        <div class="field"><label>HEURE</label><input type="time" value="07:00"></div>
+        <div class="field"><label>OPÉRATEUR</label><input placeholder="Nom du gardien"></div>
+      </div>
+      <button class="btn-primary" style="width:100%;justify-content:center;padding:14px;margin-top:4px" onclick="submitSaisie()">✅ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toastEl"></div>
+
+<script>
+// ── DATA ──
+const clients={
+  savana:{nom:'Hôtel Savana',sub:'Cocody · Dakar · Client depuis avril 2026',stats:[{v:'224k',l:'FCFA ce mois',c:'or'},{v:'468L',l:'Carburant consommé',c:''},{v:'281h',l:'Heures de marche',c:''},{v:'0',l:'Pannes ce mois',c:'vert'}],groupes:[{nom:'Groupe A — Caterpillar 45 kVA',carb:72,maint:'OK',conso:'−8%',status:'ok'},{nom:'Groupe B — Perkins 20 kVA',carb:35,maint:'Vidange dans 3 sem.',conso:'+14%',status:'warn'}]},
+  casaMara:{nom:'Casa Mara',sub:'Almadies · Dakar · Client depuis mai 2026',stats:[{v:'98k',l:'FCFA ce mois',c:'or'},{v:'210L',l:'Carburant consommé',c:''},{v:'124h',l:'Heures de marche',c:''},{v:'1',l:'Panne ce mois',c:'orange'}],groupes:[{nom:'Groupe A — Perkins 20 kVA',carb:35,maint:'Vidange dans 12h ⚠️',conso:'+8%',status:'warn'}]},
+  almadies:{nom:'Résidence Almadies',sub:'Almadies Zone 2 · Dakar · Client depuis mars 2026',stats:[{v:'312k',l:'FCFA ce mois',c:'or'},{v:'680L',l:'Carburant consommé',c:''},{v:'390h',l:'Heures de marche',c:''},{v:'0',l:'Pannes ce mois',c:'vert'}],groupes:[{nom:'Groupe A — Caterpillar 45 kVA',carb:81,maint:'OK',conso:'−5%',status:'ok'},{nom:'Groupe B — Perkins 30 kVA',carb:75,maint:'OK',conso:'stable',status:'ok'},{nom:'Groupe C — FG Wilson 20 kVA',carb:68,maint:'OK',conso:'−2%',status:'ok'}]},
+  palmBeach:{nom:'Hotel Palm Beach',sub:'Plateau · Dakar · Client depuis juin 2026',stats:[{v:'76k',l:'FCFA ce mois',c:'or'},{v:'164L',l:'Carburant consommé',c:''},{v:'98h',l:'Heures de marche',c:''},{v:'0',l:'Pannes ce mois',c:'vert'}],groupes:[{nom:'Groupe A — Perkins 15 kVA',carb:18,maint:'OK',conso:'+3%',status:'danger'}]},
+  teranga:{nom:'Hôtel Teranga',sub:'Centre-ville · Dakar · Client depuis mai 2026',stats:[{v:'186k',l:'FCFA ce mois',c:'or'},{v:'402L',l:'Carburant consommé',c:''},{v:'230h',l:'Heures de marche',c:''},{v:'0',l:'Pannes ce mois',c:'vert'}],groupes:[{nom:'Groupe A — Caterpillar 35 kVA',carb:65,maint:'OK',conso:'stable',status:'ok'},{nom:'Groupe B — Perkins 20 kVA',carb:70,maint:'OK',conso:'−4%',status:'ok'}]},
+  ngor:{nom:'Lodge Ngor',sub:'Ngor · Dakar · Client depuis juin 2026',stats:[{v:'42k',l:'FCFA ce mois',c:'or'},{v:'88L',l:'Carburant consommé',c:''},{v:'52h',l:'Heures de marche',c:''},{v:'0',l:'Pannes ce mois',c:'vert'}],groupes:[{nom:'Groupe A — Kipor 10 kVA',carb:58,maint:'OK',conso:'stable',status:'ok'}]}
+};
+
+// ── NAVIGATION ──
+function goTo(view){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
+  document.getElementById('view-'+view).classList.add('active');
+  document.getElementById('nav-'+view).classList.add('active');
+  document.querySelector('.main').scrollTop=0;
+}
+
+// ── CLIENT MODAL ──
+const statusColor={ok:'vert',warn:'orange',danger:'rouge'};
+const statusLabel={ok:'✓ Opérationnel',warn:'⚠️ Maintenance requise',danger:'🚨 Critique'};
+
+function openClient(id){
+  const c=clients[id];if(!c)return;
+  document.getElementById('modalNom').textContent=c.nom;
+  document.getElementById('modalSub').textContent=c.sub;
+  let html=`<div class="modal-grid">`;
+  c.stats.forEach(s=>{html+=`<div class="modal-stat"><div class="modal-stat-v" style="color:var(--${s.c||'texte'})">${s.v}</div><div class="modal-stat-l">${s.l}</div></div>`;});
+  html+=`</div><div style="font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--texte2);font-weight:600;margin-bottom:10px">Groupes électrogènes</div>`;
+  c.groupes.forEach(g=>{
+    const carbColor=g.carb<25?'rouge':g.carb<50?'orange':'vert';
+    html+=`<div class="mg-item ${g.status}">
+      <div class="mg-top"><div class="mg-nom">${g.nom}</div><span class="pill pill-${g.status==='ok'?'ok':g.status==='warn'?'warn':'danger'}">${statusLabel[g.status]}</span></div>
+      <div class="mg-stats">
+        <div class="mg-stat">⛽ <span style="color:var(--${carbColor})">${g.carb}%</span></div>
+        <div class="mg-stat">🔧 <span>${g.maint}</span></div>
+        <div class="mg-stat">📊 <span>${g.conso}</span></div>
+      </div>
+    </div>`;
+  });
+  html+=`<div style="margin-top:16px;display:flex;gap:8px">
+    <button class="btn-primary" style="flex:1" onclick="showToast('Message WhatsApp envoyé au patron ✓');closeModalDirect()">📱 Contacter le patron</button>
+    <button class="btn-ghost" onclick="exportPDF()">📥 Rapport PDF</button>
+    <button class="btn-ghost" onclick="showToast('Technicien notifié ✓','warn')">🔧 Technicien</button>
+  </div>`;
+  document.getElementById('modalBody').innerHTML=html;
+  document.getElementById('modalClient').classList.add('open');
+}
+
+function closeModal(e){if(e.target===document.getElementById('modalClient'))closeModalDirect();}
+function closeModalDirect(){document.getElementById('modalClient').classList.remove('open');}
+
+// ── ADD CLIENT ──
+function openAddClient(){document.getElementById('modalAdd').classList.add('open');}
+function closeModalAdd(e){if(e.target===document.getElementById('modalAdd'))document.getElementById('modalAdd').classList.remove('open');}
+function addClient(){
+  const nom=document.getElementById('addNom').value||'Nouveau client';
+  document.getElementById('modalAdd').classList.remove('open');
+  showToast(`${nom} activé — WhatsApp envoyé ✓`);
+}
+
+// ── SAISIE ──
+function openSaisie(){document.getElementById('modalSaisie').classList.add('open');}
+function closeSaisie(e){if(e.target===document.getElementById('modalSaisie'))document.getElementById('modalSaisie').classList.remove('open');}
+function changeSaisieType(val){
+  document.getElementById('saisieCarb').style.display=val==='carb'?'block':'none';
+  document.getElementById('saisieMaint').style.display=val==='maint'?'block':'none';
+  document.getElementById('saisiePanne').style.display=val==='panne'?'block':'none';
+  document.getElementById('saisieDem').style.display=val==='demarrage'?'block':'none';
+}
+function submitSaisie(){
+  document.getElementById('modalSaisie').classList.remove('open');
+  showToast('Entrée enregistrée ✓');
+}
+
+// ── EXPORT ──
+function exportPDF(){showToast('Rapport PDF généré ✓');}
+
+// ── TOAST ──
+function showToast(msg,type){
+  const t=document.getElementById('toastEl');
+  t.textContent=msg;
+  t.className='toast'+(type?' '+type:'');
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+</script>
+</body>
+</html>
