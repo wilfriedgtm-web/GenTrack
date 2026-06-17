@@ -454,9 +454,9 @@ async function loadAll() {
 async function loadKPIs() {
   try {
     const [clients, groupes, alertes, saisies] = await Promise.all([
-      api('clients','actif=eq.true'),
-      api('groupes','actif=eq.true'),
-      api('alertes','resolue=eq.false'),
+      api('clients',{query:'&actif=eq.true'}),
+      api('groupes',{query:'&actif=eq.true'}),
+      api('alertes',{query:'&resolue=eq.false'}),
       api('saisies',{query:`&date=eq.${new Date().toISOString().split('T')[0]}`})
     ]);
     document.getElementById('kpi-clients').textContent = clients.length || 0;
