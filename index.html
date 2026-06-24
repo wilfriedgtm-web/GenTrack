@@ -259,11 +259,17 @@ body{background:var(--noir);color:var(--texte);font-family:'Inter',sans-serif;mi
   </div>
 </div>
 
-<!-- GROUPES (vue détaillée statut) -->
+<!-- GROUPES -->
 <div class="view" id="view-groupes">
   <div class="topbar">
     <div><div class="topbar-date">Statut en temps réel</div><div class="topbar-title">Groupes électrogènes</div></div>
-    <div class="topbar-right"><button class="btn btn-ghost" onclick="loadGroupes()">🔄 Actualiser</button></div>
+    <div class="topbar-right">
+      <div style="display:flex;background:var(--surface2);border:1px solid var(--bordure);border-radius:9px;overflow:hidden">
+        <button id="toggle-hotels" onclick="setGroupeMode('hotels')" style="padding:8px 16px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:var(--or);color:var(--noir)">🏨 Par hôtel</button>
+        <button id="toggle-detail" onclick="setGroupeMode('detail')" style="padding:8px 16px;font-size:12px;font-weight:500;border:none;cursor:pointer;background:transparent;color:var(--texte2)">⚡ Par groupe</button>
+      </div>
+      <button class="btn btn-ghost" onclick="loadGroupes()">🔄</button>
+    </div>
   </div>
   <div class="filter-bar">
     <select class="filter-select" id="filtre-client-groupes" onchange="loadGroupes()"><option value="">Tous les clients</option></select>
@@ -667,8 +673,101 @@ async function loadAccueilActivite() {
   } catch(e){el.innerHTML=empty('Erreur');}
 }
 
+// ── GROUPES MODE ──
+let groupeMode = 'hotels'; // 'hotels' | 'detail'
+
+function setGroupeMode(mode) {
+  groupeMode = mode;
+  const btnHotels = document.getElementById('toggle-hotels');
+  const btnDetail = document.getElementById('toggle-detail');
+  if(mode === 'hotels') {
+    btnHotels.style.background = 'var(--or)'; btnHotels.style.color = 'var(--noir)';
+    btnDetail.style.background = 'transparent'; btnDetail.style.color = 'var(--texte2)';
+    document.getElementById('filtre-client-groupes').style.display = 'none';
+  } else {
+    btnDetail.style.background = 'var(--or)'; btnDetail.style.color = 'var(--noir)';
+    btnHotels.style.background = 'transparent'; btnHotels.style.color = 'var(--texte2)';
+    document.getElementById('filtre-client-groupes').style.display = '';
+  }
+  loadGroupes();
+}
+
+// ── GROUPES VUE AGRÉGÉE PAR HÔTEL ──
+async function loadGroupesHotels() {
+  const el = document.getElementById('groupes-list');
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const dateDebut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
+    const [clients, groupes, saisies, alertes, pannes, saisies30] = await Promise.all([
+      api('clients', {query:'&actif=eq.true&order=nom'}),
+      api('groupes', {query:'&actif=eq.true'}),
+      api('saisies', {query:`&date=eq.${today}`}),
+      api('alertes', {query:'&resolue=eq.false'}),
+      api('pannes', {query:'&resolue=eq.false'}),
+      api('saisies', {query:`&date=gte.${dateDebut30}`})
+    ]);
+    if(!clients.length) { el.innerHTML = empty('Aucun client'); return; }
+
+    el.innerHTML = clients.map(client => {
+      const cGroupes = groupes.filter(g => g.client_id === client.id);
+      const cSaisies = saisies.filter(s => s.client_id === client.id);
+      const cAlertes = alertes.filter(a => a.client_id === client.id);
+      const cPannes  = pannes.filter(p => p.client_id === client.id);
+      const cSaisies30 = saisies30.filter(s => s.client_id === client.id);
+
+      // Statut global
+      let status = 'unknown';
+      if(cSaisies.length > 0) {
+        if(cPannes.length > 0 || cAlertes.some(a=>a.severite==='danger')) status = 'danger';
+        else if(cAlertes.length > 0 || cSaisies.some(s=>s.niveau_carburant<50)) status = 'warn';
+        else status = 'ok';
+      }
+
+      // Agrégats
+      const totalHeuresJour = cSaisies.reduce((a,s) => a+(s.heures_marche||0), 0);
+      const totalLitres30   = cSaisies30.reduce((a,s) => a+(s.litres_ajoutes||0), 0);
+      const coutEstime30    = Math.round(totalLitres30 * (client.prix_litre_fcfa||695));
+      const saisiesOK       = cSaisies.length;
+
+      // Statut label
+      const statusLabel = status==='ok'?'✅ Normal':status==='warn'?'⚠️ Attention':status==='danger'?'🚨 Critique':'❓ Pas de saisie';
+      const statusPill  = status==='ok'?'pill-ok':status==='warn'?'pill-warn':status==='danger'?'pill-danger':'';
+
+      // Alertes résumé
+      const alertesDanger  = cAlertes.filter(a=>a.severite==='danger');
+      const alertesWarn    = cAlertes.filter(a=>a.severite!=='danger');
+
+      return `<div class="groupe-card ${status}" onclick="openClient('${client.id}')" style="margin-bottom:12px">
+        <div class="gc-top">
+          <div>
+            <div class="gc-nom">🏨 ${client.nom}</div>
+            <div class="gc-client">${client.ville||'—'} · ${cGroupes.length} groupe${cGroupes.length>1?'s':''}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            ${cPannes.length>0?`<span class="pill pill-danger">🚨 ${cPannes.length} panne${cPannes.length>1?'s':''}</span>`:''}
+            <span class="pill ${statusPill}">${statusLabel}</span>
+          </div>
+        </div>
+        <div class="gc-stats" style="margin-bottom:${cAlertes.length>0?'10px':'0'}">
+          <div class="gc-stat">⚡ <span>${cGroupes.length} groupe${cGroupes.length>1?'s':''}</span></div>
+          <div class="gc-stat">🕐 <span>${totalHeuresJour.toFixed(1)}h aujourd'hui</span></div>
+          ${totalLitres30>0?`<div class="gc-stat">⛽ <span>${totalLitres30.toFixed(0)}L ce mois</span></div>`:''}
+          ${coutEstime30>0?`<div class="gc-stat">💰 <span>${fmtNum(coutEstime30)} FCFA estimés</span></div>`:''}
+          <div class="gc-stat">📋 <span>${saisiesOK}/${cGroupes.length} saisies aujourd'hui</span></div>
+        </div>
+        ${cAlertes.length>0?`
+        <div style="padding-top:10px;border-top:1px solid var(--bordure)">
+          ${alertesDanger.map(a=>`<div style="font-size:11px;color:var(--rouge);margin-bottom:3px">🚨 ${a.message}</div>`).join('')}
+          ${alertesWarn.map(a=>`<div style="font-size:11px;color:var(--orange);margin-bottom:3px">⚠️ ${a.message}</div>`).join('')}
+        </div>`:''}
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = empty('Erreur chargement'); console.error(e); }
+}
+
 // ── GROUPES VUE DÉTAILLÉE ──
 async function loadGroupes() {
+  if(groupeMode === 'hotels') { await loadGroupesHotels(); return; }
   const el = document.getElementById('groupes-list');
   el.innerHTML='<div class="loading"><div class="spinner"></div>Chargement...</div>';
   const filtreClient = document.getElementById('filtre-client-groupes')?.value||'';
