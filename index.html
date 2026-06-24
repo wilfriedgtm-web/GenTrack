@@ -272,7 +272,8 @@ body{background:var(--noir);color:var(--texte);font-family:'Inter',sans-serif;mi
     </div>
   </div>
   <div class="filter-bar">
-    <select class="filter-select" id="filtre-client-groupes" onchange="loadGroupes()"><option value="">Tous les clients</option></select>
+    <select class="filter-select" id="filtre-groupe-hotelier" onchange="onFiltreGroupeHotelier()"><option value="">Tous les groupes</option></select>
+    <select class="filter-select" id="filtre-client-groupes" onchange="loadGroupes()"><option value="">Tous les hôtels</option></select>
   </div>
   <div id="groupes-list"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
 </div>
@@ -833,14 +834,30 @@ async function loadGroupes() {
 async function initHistoFilters() {
   try {
     const clients = await api('clients',{query:'&actif=eq.true&order=nom'});
+    // Groupes hôteliers distincts
+    const groupes = [...new Set(clients.map(c=>c.groupe_hotelier).filter(Boolean))].sort();
+    const fgh = document.getElementById('filtre-groupe-hotelier');
+    if(fgh) fgh.innerHTML='<option value="">Tous les groupes</option>'+groupes.map(g=>`<option value="${g}">${g}</option>`).join('');
+    // Hôtels
     const sel = document.getElementById('histo-client');
     const cur = sel.value;
     sel.innerHTML='<option value="">Tous les clients</option>'+clients.map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
     if(cur)sel.value=cur;
-    // Filtre groupes clients accueil
     const fg = document.getElementById('filtre-client-groupes');
-    if(fg) fg.innerHTML='<option value="">Tous les clients</option>'+clients.map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
+    if(fg) fg.innerHTML='<option value="">Tous les hôtels</option>'+clients.map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
   } catch(e){}
+}
+
+async function onFiltreGroupeHotelier() {
+  const groupe = document.getElementById('filtre-groupe-hotelier').value;
+  const fch = document.getElementById('filtre-client-groupes');
+  try {
+    let q = '&actif=eq.true&order=nom';
+    if(groupe) q += `&groupe_hotelier=eq.${encodeURIComponent(groupe)}`;
+    const clients = await api('clients',{query:q});
+    fch.innerHTML='<option value="">Tous les hôtels</option>'+clients.map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
+  } catch(e){}
+  loadGroupes();
 }
 
 async function loadHistorique() {
@@ -985,6 +1002,13 @@ async function openClient(id) {
     document.getElementById('mc-nom').textContent=client.nom;
     document.getElementById('mc-sub').textContent=`${client.quartier||''} · ${client.ville||'Dakar'} · Plan ${PLANS[client.plan]?.label||client.plan} · ${fmtNum(PLANS[client.plan]?.prix||client.prix_mensuel)} FCFA/mois`;
     const lastSaisie=saisies[0];
+    // Calcul coûts ce mois
+    const dateDebutMois = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
+    const saisiesMois = saisies.filter(s=>s.date>=dateDebutMois);
+    const totalLitresMois = saisiesMois.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
+    const coutCarburant = Math.round(totalLitresMois*(client.prix_litre_fcfa||695));
+    const coutMaint = maints.reduce((a,m)=>a+(m.cout||0),0);
+    const coutTotal = coutCarburant + coutMaint;
     // Pane infos
     let html=`<div class="modal-grid">
       <div class="modal-stat"><div class="modal-stat-v or">${groupes.length}</div><div class="modal-stat-l">Groupes actifs</div></div>
@@ -992,6 +1016,16 @@ async function openClient(id) {
       <div class="modal-stat"><div class="modal-stat-v">${lastSaisie?.niveau_carburant!=null?lastSaisie.niveau_carburant+'%':'—'}</div><div class="modal-stat-l">Dernier carburant</div></div>
       <div class="modal-stat"><div class="modal-stat-v">${fmtDate(lastSaisie?.date)||'—'}</div><div class="modal-stat-l">Dernière saisie</div></div>
     </div>
+    ${totalLitresMois>0||coutMaint>0?`
+    <div style="background:var(--or-pale);border:1px solid rgba(200,146,42,0.2);border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--or);font-weight:600;margin-bottom:10px">💰 Coûts estimés — 30 derniers jours</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div><div style="font-size:18px;font-weight:700;font-family:Space Grotesk,sans-serif">${totalLitresMois.toFixed(0)}L</div><div style="font-size:11px;color:var(--texte2)">Litres consommés</div></div>
+        <div><div style="font-size:18px;font-weight:700;font-family:Space Grotesk,sans-serif;color:var(--or)">${fmtNum(coutCarburant)} FCFA</div><div style="font-size:11px;color:var(--texte2)">Coût carburant</div></div>
+        <div><div style="font-size:18px;font-weight:700;font-family:Space Grotesk,sans-serif;color:var(--or)">${fmtNum(coutTotal)} FCFA</div><div style="font-size:11px;color:var(--texte2)">Total opérationnel</div></div>
+      </div>
+      ${coutMaint>0?`<div style="margin-top:8px;font-size:11px;color:var(--texte2)">🔧 Maintenance : ${fmtNum(coutMaint)} FCFA</div>`:''}
+    </div>`:''}
     <div class="section-label">Groupes électrogènes</div>`;
     html += groupes.length ? groupes.map(g=>{
       const gs=saisies.filter(s=>s.groupe_id===g.id);
