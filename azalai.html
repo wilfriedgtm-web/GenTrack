@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Azalaï Hotels — Tableau de bord opérationnel</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+:root {
+  --bordeaux:#8B1A2E;
+  --bordeaux-pale:rgba(139,26,46,0.08);
+  --bordeaux-mid:rgba(139,26,46,0.15);
+  --or:#C9A96E;
+  --or-pale:rgba(201,169,110,0.12);
+  --or-mid:rgba(201,169,110,0.25);
+  --noir:#1A1008;
+  --surface:#FDFAF5;
+  --surface2:#F5EFE6;
+  --surface3:#EDE3D4;
+  --bordure:#DDD0BC;
+  --texte:#2C1810;
+  --texte2:#7A6855;
+  --texte3:#B5A090;
+  --vert:#2D7A4F;
+  --vert-pale:rgba(45,122,79,0.08);
+  --rouge:#C0392B;
+  --rouge-pale:rgba(192,57,43,0.08);
+  --orange:#D4761E;
+  --orange-pale:rgba(212,118,30,0.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--surface);color:var(--texte);font-family:'Inter',sans-serif;min-height:100vh}
+
+/* HEADER */
+.header{background:var(--bordeaux);color:white;padding:0}
+.header-top{display:flex;justify-content:space-between;align-items:center;padding:20px 40px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.header-logo{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;letter-spacing:3px;text-transform:uppercase}
+.header-logo span{color:var(--or);font-weight:400}
+.header-tagline{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.5);margin-top:3px}
+.header-meta{text-align:right}
+.header-date{font-size:12px;color:rgba(255,255,255,0.6)}
+.header-title{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--or);margin-top:3px}
+.header-nav{display:flex;gap:0;padding:0 40px}
+.nav-item{padding:14px 20px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.6);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s}
+.nav-item:hover{color:white}
+.nav-item.active{color:var(--or);border-bottom-color:var(--or)}
+
+/* LAYOUT */
+.container{max-width:1200px;margin:0 auto;padding:36px 40px}
+
+/* SECTION */
+.section-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--texte);margin-bottom:4px;letter-spacing:0.5px}
+.section-sub{font-size:11px;color:var(--texte2);letter-spacing:1px;text-transform:uppercase;margin-bottom:20px}
+
+/* KPIs */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:36px}
+.kpi{background:white;border-radius:4px;padding:20px 22px;border:1px solid var(--bordure);border-top:3px solid var(--bordeaux);position:relative}
+.kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--texte2);font-weight:600;margin-bottom:12px}
+.kpi-val{font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:600;color:var(--bordeaux);letter-spacing:-1px;margin-bottom:4px;line-height:1}
+.kpi-val.or{color:var(--or)}
+.kpi-val.vert{color:var(--vert)}
+.kpi-val.rouge{color:var(--rouge)}
+.kpi-sub{font-size:11px;color:var(--texte2)}
+
+/* ALERT BANNER */
+.alert-banner{background:var(--rouge-pale);border:1px solid rgba(192,57,43,0.3);border-left:4px solid var(--rouge);border-radius:4px;padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px}
+.alert-banner-icon{font-size:18px}
+.alert-banner-text{flex:1}
+.alert-banner-title{font-size:13px;font-weight:600;color:var(--rouge)}
+.alert-banner-sub{font-size:11px;color:var(--texte2);margin-top:2px}
+
+/* HOTELS CARDS */
+.hotels-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:36px}
+.hotel-card{background:white;border-radius:4px;border:1px solid var(--bordure);overflow:hidden;cursor:pointer;transition:box-shadow 0.2s}
+.hotel-card:hover{box-shadow:0 4px 20px rgba(139,26,46,0.1)}
+.hotel-card-top{padding:18px 20px;border-bottom:1px solid var(--bordure)}
+.hotel-card-flag{width:100%;height:4px;margin-bottom:14px;border-radius:2px}
+.hotel-card-nom{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--texte);margin-bottom:2px}
+.hotel-card-ville{font-size:11px;color:var(--texte2);letter-spacing:1px;text-transform:uppercase}
+.hotel-card-body{padding:16px 20px}
+.hotel-stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--surface2)}
+.hotel-stat-row:last-child{border-bottom:none}
+.hotel-stat-label{font-size:11px;color:var(--texte2)}
+.hotel-stat-val{font-size:12px;font-weight:600;color:var(--texte)}
+.hotel-card-footer{padding:12px 20px;background:var(--surface2);display:flex;justify-content:space-between;align-items:center}
+.status-pill{padding:4px 12px;border-radius:2px;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase}
+.sp-ok{background:var(--vert-pale);color:var(--vert)}
+.sp-warn{background:var(--orange-pale);color:var(--orange)}
+.sp-danger{background:var(--rouge-pale);color:var(--rouge)}
+.sp-unknown{background:var(--surface3);color:var(--texte2)}
+
+/* DIVIDER */
+.divider{height:1px;background:var(--bordure);margin:32px 0;position:relative}
+.divider::after{content:'◆';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--surface);padding:0 12px;color:var(--or);font-size:10px}
+
+/* INCIDENTS */
+.incidents-grid{display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:36px}
+.card{background:white;border-radius:4px;border:1px solid var(--bordure);overflow:hidden}
+.card-head{padding:16px 20px;border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:center}
+.card-head-title{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600}
+.card-head-sub{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--texte2)}
+
+/* PANNES LIST */
+.panne-item{padding:14px 20px;border-bottom:1px solid var(--surface2);display:flex;gap:14px;align-items:flex-start}
+.panne-item:last-child{border-bottom:none}
+.panne-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.panne-body{flex:1}
+.panne-titre{font-size:13px;font-weight:500;color:var(--texte)}
+.panne-detail{font-size:11px;color:var(--texte2);margin-top:2px}
+.panne-time{font-size:10px;color:var(--texte2);white-space:nowrap}
+
+/* MAINTENANCE LIST */
+.maint-item{padding:12px 20px;border-bottom:1px solid var(--surface2);display:flex;gap:12px;align-items:center}
+.maint-item:last-child{border-bottom:none}
+.maint-icon{width:32px;height:32px;border-radius:4px;background:var(--or-pale);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.maint-body{flex:1}
+.maint-titre{font-size:12px;font-weight:500}
+.maint-detail{font-size:11px;color:var(--texte2);margin-top:1px}
+.maint-cout{font-size:12px;font-weight:600;color:var(--bordeaux);white-space:nowrap}
+
+/* GRAPHIQUES */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:36px}
+.chart-card{background:white;border-radius:4px;border:1px solid var(--bordure);overflow:hidden}
+.chart-body{padding:20px}
+
+/* SAISIES TABLE */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{padding:10px 14px;text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--texte2);border-bottom:2px solid var(--bordure);font-weight:600}
+td{padding:11px 14px;border-bottom:1px solid var(--surface2);color:var(--texte)}
+tr:hover td{background:var(--surface)}
+.td-hotel{font-weight:500;color:var(--bordeaux)}
+.td-ok{color:var(--vert);font-weight:600}
+.td-warn{color:var(--orange);font-weight:600}
+.td-danger{color:var(--rouge);font-weight:600}
+
+/* FOOTER */
+.footer{background:var(--bordeaux);color:rgba(255,255,255,0.5);text-align:center;padding:20px;font-size:11px;letter-spacing:1px;margin-top:40px}
+.footer strong{color:var(--or)}
+
+/* LOADING */
+.loading{padding:40px;text-align:center;color:var(--texte2);font-size:13px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--bordure);border-top-color:var(--bordeaux);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{padding:30px;text-align:center;color:var(--texte2);font-size:12px}
+
+/* VIEWS */
+.view{display:none}.view.active{display:block}
+
+/* TABS */
+.tabs{display:flex;gap:0;margin-bottom:28px;border-bottom:2px solid var(--bordure)}
+.tab{padding:12px 20px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--texte2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s}
+.tab:hover{color:var(--texte)}
+.tab.active{color:var(--bordeaux);border-bottom-color:var(--bordeaux);font-weight:600}
+
+@media(max-width:900px){
+  .container{padding:20px}.kpi-row{grid-template-columns:repeat(2,1fr)}
+  .hotels-grid{grid-template-columns:1fr}.incidents-grid{grid-template-columns:1fr}
+  .charts-grid{grid-template-columns:1fr}.header-top{padding:16px 20px}
+  .header-nav{padding:0 20px}.nav-item{padding:12px 14px;font-size:10px}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="header-logo">Azalaï <span>Hotels</span></div>
+      <div class="header-tagline">Tableau de bord opérationnel</div>
+    </div>
+    <div class="header-meta">
+      <div class="header-date" id="header-date">—</div>
+      <div class="header-title">Équipements critiques · Groupes électrogènes</div>
+    </div>
+  </div>
+  <div class="header-nav">
+    <div class="nav-item active" onclick="goTo('vue-groupe')">Vue groupe</div>
+    <div class="nav-item" onclick="goTo('historique')">Historique</div>
+    <div class="nav-item" onclick="goTo('incidents')">Incidents</div>
+  </div>
+</div>
+
+<!-- VUE GROUPE -->
+<div class="view active" id="view-vue-groupe">
+<div class="container">
+
+  <div id="alert-banner-wrap"></div>
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Hôtels du groupe</div>
+      <div class="kpi-val" id="kpi-hotels">—</div>
+      <div class="kpi-sub">Sites suivis</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Heures de marche — Aujourd'hui</div>
+      <div class="kpi-val or" id="kpi-heures">—</div>
+      <div class="kpi-sub">Total groupe</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Coût carburant — Ce mois</div>
+      <div class="kpi-val or" id="kpi-cout">—</div>
+      <div class="kpi-sub" id="kpi-litres">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Incidents en cours</div>
+      <div class="kpi-val rouge" id="kpi-incidents">—</div>
+      <div class="kpi-sub">Pannes non résolues</div>
+    </div>
+  </div>
+
+  <!-- HOTELS -->
+  <div class="section-title">Statut des établissements</div>
+  <div class="section-sub" id="section-date-sub">Données du jour</div>
+  <div class="hotels-grid" id="hotels-grid">
+    <div class="loading"><span class="spinner"></span>Chargement...</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ALERTES + MAINTENANCE -->
+  <div class="incidents-grid">
+    <div class="card">
+      <div class="card-head">
+        <div class="card-head-title">Alertes & Incidents actifs</div>
+        <div class="card-head-sub" id="alertes-count">—</div>
+      </div>
+      <div id="alertes-list"><div class="loading"><span class="spinner"></span></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div class="card-head-title">Dernières maintenances</div>
+        <div class="card-head-sub">30 jours</div>
+      </div>
+      <div id="maint-list"><div class="loading"><span class="spinner"></span></div></div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- HISTORIQUE -->
+<div class="view" id="view-historique">
+<div class="container">
+  <div class="section-title">Historique opérationnel</div>
+  <div class="section-sub">30 derniers jours — Groupe Azalaï</div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="card-head"><div class="card-head-title">⛽ Niveau carburant moyen</div><div class="card-head-sub">% par jour</div></div>
+      <div class="chart-body"><canvas id="chart-carb" height="200"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-head"><div class="card-head-title">🕐 Heures de marche</div><div class="card-head-sub">Total groupe par jour</div></div>
+      <div class="chart-body"><canvas id="chart-heures" height="200"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-head"><div class="card-head-title">💧 Litres ajoutés</div><div class="card-head-sub">Ravitaillements par jour</div></div>
+      <div class="chart-body"><canvas id="chart-litres" height="200"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="card-head"><div class="card-head-title">💰 Coût carburant estimé</div><div class="card-head-sub">FCFA par jour</div></div>
+      <div class="chart-body"><canvas id="chart-cout" height="200"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-head-title">Journal des saisies</div><div class="card-head-sub">30 derniers jours</div></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date</th><th>Hôtel</th><th>Groupe</th><th>Carburant</th><th>Heures</th><th>Huile</th><th>Litres +</th><th>Opérateur</th></tr></thead>
+        <tbody id="saisies-tbody"><tr><td colspan="8" class="empty">Chargement...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- INCIDENTS -->
+<div class="view" id="view-incidents">
+<div class="container">
+  <div class="section-title">Incidents & Pannes</div>
+  <div class="section-sub">Historique complet — Groupe Azalaï</div>
+  <div class="card">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Date</th><th>Hôtel</th><th>Groupe</th><th>Type</th><th>Description</th><th>Statut</th></tr></thead>
+        <tbody id="pannes-tbody"><tr><td colspan="6" class="empty">Chargement...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="footer">
+  Powered by <strong>GenTrack</strong> · Gestion intelligente des équipements critiques via WhatsApp
+</div>
+
+<script>
+const SUPA_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+const GROUPE_HOTELIER = 'Azalai';
+const TYPE_PANNE = {ne_demarre_pas:'Ne démarre pas',arret_inopin:'Arrêt inopiné',bruit_anormal:'Bruit anormal',surchauffe:'Surchauffe',fuite:'Fuite',autre:'Autre'};
+const TYPE_MAINT = {vidange:'Vidange huile',filtre_air:'Filtre à air',filtre_carb:'Filtre à carburant',filtre_huile:'Filtre à huile',courroie:'Courroie',demarreur:'Démarreur',autre:'Autre'};
+
+let charts = {};
+
+async function api(table, opts={}) {
+  const {method='GET',body,query='',select='*'} = opts;
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?select=${select}${query}`,{
+    method,
+    headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json'},
+    body:body?JSON.stringify(body):undefined
+  });
+  if(res.status===204)return[];
+  return res.json();
+}
+
+function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function fmtDateShort(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});}
+function fmtNum(n){return n?Math.round(n).toLocaleString('fr-FR'):'0';}
+
+function goTo(v) {
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  event.target.classList.add('active');
+  if(v==='historique') loadHistorique();
+  if(v==='incidents') loadIncidents();
+}
+
+async function loadAll() {
+  const now = new Date();
+  document.getElementById('header-date').textContent = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('section-date-sub').textContent = `Données du ${now.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})}`;
+
+  const today = now.toISOString().split('T')[0];
+  const dateDebut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
+
+  // Charger uniquement les clients Azalaï
+  const [clients, groupes, saisiesJour, saisies30, alertes, pannes, maints] = await Promise.all([
+    api('clients',{query:`&groupe_hotelier=eq.${GROUPE_HOTELIER}&actif=eq.true&order=nom`}),
+    api('groupes',{query:'&actif=eq.true'}),
+    api('saisies',{query:`&date=eq.${today}`}),
+    api('saisies',{query:`&date=gte.${dateDebut30}&order=date.desc`}),
+    api('alertes',{query:'&resolue=eq.false'}),
+    api('pannes',{query:'&order=date_panne.desc&limit=20'}),
+    api('maintenances',{query:`&date_intervention=gte.${dateDebut30}&order=date_intervention.desc&limit=6`})
+  ]);
+
+  // Filtrer groupes/saisies/alertes/pannes pour Azalaï uniquement
+  const clientIds = clients.map(c=>c.id);
+  const cGroupes = groupes.filter(g=>clientIds.includes(g.client_id));
+  const cSaisiesJour = saisiesJour.filter(s=>clientIds.includes(s.client_id));
+  const cSaisies30 = saisies30.filter(s=>clientIds.includes(s.client_id));
+  const cAlertes = alertes.filter(a=>clientIds.includes(a.client_id));
+  const cPannes = pannes.filter(p=>clientIds.includes(p.client_id));
+  const cMaints = maints.filter(m=>clientIds.includes(m.client_id));
+
+  // KPIs globaux
+  const totalHeures = cSaisiesJour.reduce((a,s)=>a+(s.heures_marche||0),0);
+  const totalLitres30 = cSaisies30.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
+  // Prix litre moyen Azalaï
+  const prixMoyen = clients.length ? Math.round(clients.reduce((a,c)=>a+(c.prix_litre_fcfa||695),0)/clients.length) : 695;
+  const coutTotal30 = Math.round(totalLitres30 * prixMoyen);
+  const pannesEnCours = cPannes.filter(p=>!p.resolue).length;
+
+  document.getElementById('kpi-hotels').textContent = clients.length;
+  document.getElementById('kpi-heures').textContent = totalHeures.toFixed(1)+'h';
+  document.getElementById('kpi-cout').textContent = fmtNum(coutTotal30)+' FCFA';
+  document.getElementById('kpi-litres').textContent = `${fmtNum(totalLitres30)} litres consommés`;
+  document.getElementById('kpi-incidents').textContent = pannesEnCours;
+
+  // Bannière alerte
+  const critiques = cAlertes.filter(a=>a.severite==='danger');
+  const bannerEl = document.getElementById('alert-banner-wrap');
+  if(critiques.length>0){
+    bannerEl.innerHTML=`<div class="alert-banner"><div class="alert-banner-icon">🚨</div><div class="alert-banner-text"><div class="alert-banner-title">${critiques.length} situation${critiques.length>1?'s':''} critique${critiques.length>1?'s':''} nécessitant une intervention immédiate</div><div class="alert-banner-sub">${critiques.map(a=>a.message).join(' · ')}</div></div></div>`;
+  } else { bannerEl.innerHTML=''; }
+
+  // Hotels cards
+  const hotelsEl = document.getElementById('hotels-grid');
+  hotelsEl.innerHTML = clients.map(client=>{
+    const hGroupes = cGroupes.filter(g=>g.client_id===client.id);
+    const hSaisies = cSaisiesJour.filter(s=>s.client_id===client.id);
+    const hAlertes = cAlertes.filter(a=>a.client_id===client.id);
+    const hPannes  = cPannes.filter(p=>p.client_id===client.id&&!p.resolue);
+
+    let status='unknown';
+    if(hSaisies.length>0){
+      if(hPannes.length>0||hAlertes.some(a=>a.severite==='danger'))status='danger';
+      else if(hAlertes.length>0||hSaisies.some(s=>s.niveau_carburant<50))status='warn';
+      else status='ok';
+    }
+
+    const totalH = hSaisies.reduce((a,s)=>a+(s.heures_marche||0),0);
+    const totalL30 = cSaisies30.filter(s=>s.client_id===client.id).reduce((a,s)=>a+(s.litres_ajoutes||0),0);
+    const cout30 = Math.round(totalL30*(client.prix_litre_fcfa||695));
+    const carbMoy = hSaisies.length ? Math.round(hSaisies.reduce((a,s)=>a+(s.niveau_carburant||0),0)/hSaisies.length) : null;
+    const flagColor = status==='ok'?'var(--vert)':status==='warn'?'var(--orange)':status==='danger'?'var(--rouge)':'var(--bordure)';
+    const statusLabel = status==='ok'?'Normal':status==='warn'?'Attention':status==='danger'?'Critique':'Pas de saisie';
+    const statusClass = status==='ok'?'sp-ok':status==='warn'?'sp-warn':status==='danger'?'sp-danger':'sp-unknown';
+
+    return `<div class="hotel-card">
+      <div class="hotel-card-top">
+        <div class="hotel-card-flag" style="background:${flagColor}"></div>
+        <div class="hotel-card-nom">${client.nom}</div>
+        <div class="hotel-card-ville">${client.ville||'—'} · ${hGroupes.length} groupe${hGroupes.length>1?'s':''}</div>
+      </div>
+      <div class="hotel-card-body">
+        <div class="hotel-stat-row">
+          <div class="hotel-stat-label">Heures de marche aujourd'hui</div>
+          <div class="hotel-stat-val">${totalH.toFixed(1)}h</div>
+        </div>
+        <div class="hotel-stat-row">
+          <div class="hotel-stat-label">Carburant moyen</div>
+          <div class="hotel-stat-val ${carbMoy!=null?(carbMoy<25?'td-danger':carbMoy<50?'td-warn':''):''}">
+            ${carbMoy!=null?carbMoy+'%':'—'}
+          </div>
+        </div>
+        <div class="hotel-stat-row">
+          <div class="hotel-stat-label">Litres ce mois</div>
+          <div class="hotel-stat-val">${totalL30>0?fmtNum(totalL30)+'L':'—'}</div>
+        </div>
+        <div class="hotel-stat-row">
+          <div class="hotel-stat-label">Coût estimé ce mois</div>
+          <div class="hotel-stat-val" style="color:var(--bordeaux)">${cout30>0?fmtNum(cout30)+' FCFA':'—'}</div>
+        </div>
+        <div class="hotel-stat-row">
+          <div class="hotel-stat-label">Saisies aujourd'hui</div>
+          <div class="hotel-stat-val ${hSaisies.length===hGroupes.length?'td-ok':hSaisies.length>0?'td-warn':'td-danger'}">
+            ${hSaisies.length}/${hGroupes.length}
+          </div>
+        </div>
+        ${hPannes.length>0?`<div class="hotel-stat-row"><div class="hotel-stat-label">Pannes en cours</div><div class="hotel-stat-val td-danger">🚨 ${hPannes.length}</div></div>`:''}
+      </div>
+      <div class="hotel-card-footer">
+        <span class="status-pill ${statusClass}">${statusLabel}</span>
+        <span style="font-size:10px;color:var(--texte2)">${hSaisies[0]?.operateur||'—'}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Alertes
+  const alertesEl = document.getElementById('alertes-list');
+  document.getElementById('alertes-count').textContent = cAlertes.length ? `${cAlertes.length} active${cAlertes.length>1?'s':''}` : 'Aucune';
+  if(!cAlertes.length){
+    alertesEl.innerHTML=`<div class="empty">✅ Aucun incident actif — tous les équipements sont opérationnels</div>`;
+  } else {
+    // Enrichir avec nom client
+    const clientMap = Object.fromEntries(clients.map(c=>[c.id,c.nom]));
+    alertesEl.innerHTML = cAlertes.map(a=>`
+      <div class="panne-item">
+        <div class="panne-dot" style="background:${a.severite==='danger'?'var(--rouge)':'var(--orange)'}"></div>
+        <div class="panne-body">
+          <div class="panne-titre">${a.message}</div>
+          <div class="panne-detail">${clientMap[a.client_id]||'—'} · ${fmtDate(a.created_at)}</div>
+        </div>
+        <div class="panne-time">${a.severite==='danger'?'🚨':'⚠️'}</div>
+      </div>`).join('');
+  }
+
+  // Maintenances
+  const maintEl = document.getElementById('maint-list');
+  const clientMap = Object.fromEntries(clients.map(c=>[c.id,c.nom]));
+  if(!cMaints.length){
+    maintEl.innerHTML=`<div class="empty">Aucune maintenance ce mois</div>`;
+  } else {
+    maintEl.innerHTML = cMaints.map(m=>`
+      <div class="maint-item">
+        <div class="maint-icon">🔧</div>
+        <div class="maint-body">
+          <div class="maint-titre">${TYPE_MAINT[m.type]||m.type}</div>
+          <div class="maint-detail">${clientMap[m.client_id]||'—'} · ${m.technicien||'—'} · ${fmtDate(m.date_intervention)}</div>
+        </div>
+        <div class="maint-cout">${m.cout>0?fmtNum(m.cout)+' FCFA':'—'}</div>
+      </div>`).join('');
+  }
+
+  // Stocker pour historique
+  window._azalai = { clients, clientIds, cGroupes, cSaisies30, cPannes, cMaints, prixMoyen };
+}
+
+async function loadHistorique() {
+  if(!window._azalai) await loadAll();
+  const { clients, cSaisies30, prixMoyen } = window._azalai;
+  const clientMap = Object.fromEntries(clients.map(c=>[c.id,c.nom]));
+  const prixMap = Object.fromEntries(clients.map(c=>[c.id,c.prix_litre_fcfa||695]));
+
+  // Grouper par date
+  const byDate = {};
+  cSaisies30.forEach(s=>{
+    if(!byDate[s.date])byDate[s.date]={carb:[],heures:0,litres:0,cout:0};
+    if(s.niveau_carburant!=null)byDate[s.date].carb.push(s.niveau_carburant);
+    byDate[s.date].heures += s.heures_marche||0;
+    byDate[s.date].litres += s.litres_ajoutes||0;
+    byDate[s.date].cout += (s.litres_ajoutes||0)*(prixMap[s.client_id]||695);
+  });
+  const dates = Object.keys(byDate).sort();
+  const labels = dates.map(fmtDateShort);
+
+  const chartOpts = (color) => ({
+    responsive:true,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{color:'#EDE3D4'},ticks:{color:'#7A6855',font:{size:9}}},
+      y:{grid:{color:'#EDE3D4'},ticks:{color:'#7A6855',font:{size:9}},beginAtZero:false}
+    }
+  });
+
+  // Carburant
+  const carbData = dates.map(d=>byDate[d].carb.length?Math.round(byDate[d].carb.reduce((a,b)=>a+b)/byDate[d].carb.length):null);
+  if(charts.carb)charts.carb.destroy();
+  charts.carb = new Chart(document.getElementById('chart-carb').getContext('2d'),{
+    type:'line',data:{labels,datasets:[{data:carbData,borderColor:'#8B1A2E',backgroundColor:'rgba(139,26,46,0.06)',borderWidth:2,tension:0.3,fill:true,spanGaps:true,pointRadius:3,pointBackgroundColor:'#8B1A2E'}]},
+    options:{...chartOpts(),scales:{...chartOpts().scales,y:{...chartOpts().scales.y,min:0,max:100,ticks:{...chartOpts().scales.y.ticks,callback:v=>v+'%'}}}}
+  });
+
+  // Heures
+  const heuresData = dates.map(d=>byDate[d].heures||null);
+  if(charts.heures)charts.heures.destroy();
+  charts.heures = new Chart(document.getElementById('chart-heures').getContext('2d'),{
+    type:'bar',data:{labels,datasets:[{data:heuresData,backgroundColor:'rgba(201,169,110,0.3)',borderColor:'#C9A96E',borderWidth:1,borderRadius:3}]},
+    options:{...chartOpts(),scales:{...chartOpts().scales,y:{...chartOpts().scales.y,beginAtZero:true,ticks:{...chartOpts().scales.y.ticks,callback:v=>v+'h'}}}}
+  });
+
+  // Litres
+  const litresData = dates.map(d=>byDate[d].litres||null);
+  if(charts.litres)charts.litres.destroy();
+  charts.litres = new Chart(document.getElementById('chart-litres').getContext('2d'),{
+    type:'bar',data:{labels,datasets:[{data:litresData,backgroundColor:'rgba(45,122,79,0.2)',borderColor:'#2D7A4F',borderWidth:1,borderRadius:3}]},
+    options:{...chartOpts(),scales:{...chartOpts().scales,y:{...chartOpts().scales.y,beginAtZero:true,ticks:{...chartOpts().scales.y.ticks,callback:v=>v+'L'}}}}
+  });
+
+  // Coût
+  const coutData = dates.map(d=>byDate[d].cout?Math.round(byDate[d].cout):null);
+  if(charts.cout)charts.cout.destroy();
+  charts.cout = new Chart(document.getElementById('chart-cout').getContext('2d'),{
+    type:'line',data:{labels,datasets:[{data:coutData,borderColor:'#C9A96E',backgroundColor:'rgba(201,169,110,0.08)',borderWidth:2,tension:0.3,fill:true,spanGaps:true,pointRadius:3,pointBackgroundColor:'#C9A96E'}]},
+    options:{...chartOpts(),scales:{...chartOpts().scales,y:{...chartOpts().scales.y,beginAtZero:true,ticks:{...chartOpts().scales.y.ticks,callback:v=>fmtNum(v)}}}}
+  });
+
+  // Table saisies
+  const tbody = document.getElementById('saisies-tbody');
+  if(!cSaisies30.length){tbody.innerHTML=`<tr><td colspan="8" class="empty">Aucune saisie</td></tr>`;return;}
+  tbody.innerHTML = cSaisies30.slice(0,30).map(s=>`
+    <tr>
+      <td>${fmtDate(s.date)}</td>
+      <td class="td-hotel">${clientMap[s.client_id]||'—'}</td>
+      <td>${s.groupe_id?.slice(-4)||'—'}</td>
+      <td class="${s.niveau_carburant!=null?(s.niveau_carburant<25?'td-danger':s.niveau_carburant<50?'td-warn':'td-ok'):''}">
+        ${s.niveau_carburant!=null?s.niveau_carburant+'%':'—'}
+      </td>
+      <td>${s.heures_marche||0}h</td>
+      <td class="${s.niveau_huile==='critique'?'td-danger':s.niveau_huile==='bas'?'td-warn':'td-ok'}">${s.niveau_huile||'normal'}</td>
+      <td class="${s.litres_ajoutes>0?'td-ok':''}">${s.litres_ajoutes>0?'+'+s.litres_ajoutes+'L':'—'}</td>
+      <td>${s.operateur||'—'}</td>
+    </tr>`).join('');
+}
+
+async function loadIncidents() {
+  if(!window._azalai) await loadAll();
+  const { clients, cPannes } = window._azalai;
+  const clientMap = Object.fromEntries(clients.map(c=>[c.id,c.nom]));
+  const tbody = document.getElementById('pannes-tbody');
+  if(!cPannes.length){tbody.innerHTML=`<tr><td colspan="6" class="empty">✅ Aucun incident enregistré</td></tr>`;return;}
+  tbody.innerHTML = cPannes.map(p=>`
+    <tr>
+      <td>${fmtDate(p.date_panne)}</td>
+      <td class="td-hotel">${clientMap[p.client_id]||'—'}</td>
+      <td>—</td>
+      <td>${TYPE_PANNE[p.type]||p.type}</td>
+      <td>${p.description||'—'}</td>
+      <td><span class="status-pill ${p.resolue?'sp-ok':'sp-danger'}">${p.resolue?'Résolu':'En cours'}</span></td>
+    </tr>`).join('');
+}
+
+loadAll();
+</script>
+</body>
+</html>
