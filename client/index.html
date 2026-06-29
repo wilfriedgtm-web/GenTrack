@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack — Suivi équipements</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+:root{
+  --surface:#FAFAFA;--surface2:#F4F4F4;--surface3:#EBEBEB;
+  --bordure:#E0E0E0;--texte:#1A1A1A;--texte2:#6B6B6B;--texte3:#A0A0A0;
+  --accent:#1A1A1A;
+  --vert:#16A34A;--vp:rgba(22,163,74,0.08);
+  --rouge:#DC2626;--rp:rgba(220,38,38,0.08);--rb:rgba(220,38,38,0.25);
+  --orange:#D97706;--op:rgba(217,119,6,0.08);--ob:rgba(217,119,6,0.25);
+  --bleu:#2563EB;--bp:rgba(37,99,235,0.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--surface);color:var(--texte);font-family:'Inter',sans-serif;min-height:100vh}
+.header{background:white;border-bottom:1px solid var(--bordure);padding:16px 32px;display:flex;justify-content:space-between;align-items:center}
+.header-nom{font-size:16px;font-weight:600;color:var(--texte)}
+.header-sub{font-size:12px;color:var(--texte2);margin-top:2px}
+.header-badge{font-size:11px;color:var(--texte2);background:var(--surface2);padding:4px 10px;border-radius:20px;border:1px solid var(--bordure)}
+.header-logo{font-size:11px;color:var(--texte3);letter-spacing:0.5px}
+.container{max-width:860px;margin:0 auto;padding:28px 24px 60px}
+.section-label{font-size:11px;color:var(--texte2);text-transform:uppercase;letter-spacing:1px;font-weight:500;margin-bottom:10px;margin-top:4px}
+
+/* BANNIÈRE */
+.banner{border-radius:8px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:12px}
+.banner.danger{background:var(--rp);border:1px solid var(--rb)}
+.banner.warn{background:var(--op);border:1px solid var(--ob)}
+.banner-icon{font-size:18px;flex-shrink:0}
+.banner-titre{font-size:13px;font-weight:600}
+.banner-sub{font-size:12px;color:var(--texte2);margin-top:2px}
+
+/* KPIs */
+.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+.kpi{background:white;border-radius:8px;border:1px solid var(--bordure);padding:14px 16px}
+.kpi-label{font-size:11px;color:var(--texte2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;font-weight:500}
+.kpi-val{font-size:24px;font-weight:600;color:var(--texte);letter-spacing:-0.5px}
+.kpi-sub{font-size:11px;color:var(--texte2);margin-top:3px}
+
+/* GROUPES */
+.groupe-card{background:white;border-radius:8px;border:1px solid var(--bordure);overflow:hidden;margin-bottom:10px}
+.gc-header{padding:14px 16px;border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:flex-start;background:var(--surface2)}
+.gc-nom{font-size:14px;font-weight:600;color:var(--texte)}
+.gc-sub{font-size:12px;color:var(--texte2);margin-top:2px}
+.gc-body{padding:14px 16px}
+.gc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+.gc-stat-label{font-size:11px;color:var(--texte2)}
+.gc-stat-val{font-size:15px;font-weight:600;color:var(--texte);margin-top:3px}
+.gc-bar{height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;margin-bottom:10px}
+.gc-bar-fill{height:100%;border-radius:3px;transition:width 0.5s}
+.gc-action{background:var(--rp);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--rouge);font-weight:500;border:1px solid var(--rb)}
+.gc-action.warn{background:var(--op);color:var(--orange);border-color:var(--ob)}
+.gc-action.ok{background:var(--vp);color:var(--vert);border-color:rgba(22,163,74,0.25)}
+
+/* PILLS */
+.pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500}
+.pill-ok{background:var(--vp);color:var(--vert)}
+.pill-warn{background:var(--op);color:var(--orange)}
+.pill-danger{background:var(--rp);color:var(--rouge)}
+
+/* PANNES / ALERTES */
+.incident-item{padding:12px 16px;border-bottom:1px solid var(--bordure);display:flex;gap:12px;align-items:flex-start}
+.incident-item:last-child{border-bottom:none}
+.ii-dot{width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.ii-body{flex:1}
+.ii-titre{font-size:13px;font-weight:500;color:var(--texte)}
+.ii-sub{font-size:12px;color:var(--texte2);margin-top:2px}
+.ii-date{font-size:11px;color:var(--texte3);white-space:nowrap}
+
+/* GRAPHIQUE */
+.chart-card{background:white;border-radius:8px;border:1px solid var(--bordure);overflow:hidden;margin-bottom:16px}
+.chart-head{padding:12px 16px;border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:center;background:var(--surface2)}
+.chart-title{font-size:13px;font-weight:600;color:var(--texte)}
+.chart-body{padding:16px}
+.chart-insight{margin-top:10px;padding-top:10px;border-top:1px solid var(--bordure);font-size:12px;color:var(--texte2)}
+
+/* SAISIES TABLE */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{padding:8px 14px;text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--texte2);border-bottom:2px solid var(--bordure);font-weight:600;white-space:nowrap}
+td{padding:10px 14px;border-bottom:1px solid var(--surface3);color:var(--texte)}
+tr:hover td{background:var(--surface)}
+.td-ok{color:var(--vert);font-weight:500}.td-warn{color:var(--orange);font-weight:500}.td-danger{color:var(--rouge);font-weight:500}
+
+/* FOOTER */
+.footer{text-align:center;padding:20px;font-size:11px;color:var(--texte3);border-top:1px solid var(--bordure);margin-top:40px}
+.footer strong{color:var(--texte2)}
+
+.loading{padding:40px;text-align:center;color:var(--texte2);font-size:13px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--bordure);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{padding:30px;text-align:center;color:var(--texte2);font-size:13px}
+.error-page{max-width:400px;margin:80px auto;text-align:center;padding:20px}
+.error-page h1{font-size:20px;font-weight:600;margin-bottom:8px}
+.error-page p{color:var(--texte2);font-size:14px}
+
+@media(max-width:600px){
+  .container{padding:16px}.kpi-row{grid-template-columns:repeat(2,1fr)}
+  .gc-stats{grid-template-columns:repeat(2,1fr)}.header{padding:14px 16px}
+}
+</style>
+</head>
+<body>
+
+<div id="app"><div class="loading" style="padding:80px;text-align:center"><span class="spinner"></span>Chargement...</div></div>
+
+<script>
+const SUPA_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+
+const TYPE_PANNE = {ne_demarre_pas:'Ne démarre pas',arret_inopin:'Arrêt inopiné',bruit_anormal:'Bruit anormal',surchauffe:'Surchauffe',fuite:'Fuite',autre:'Autre'};
+const TYPE_MAINT = {vidange:'Vidange huile',filtre_air:'Filtre à air',filtre_carb:'Filtre carburant',filtre_huile:'Filtre huile',autre:'Autre'};
+
+let charts = {};
+
+async function api(table, q='') {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?select=*${q}`, {
+    headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`}
+  });
+  if(!res.ok)return[];
+  return res.json();
+}
+
+function fmtNum(n){return Math.round(n).toLocaleString('fr-FR');}
+function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function fmtDateShort(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});}
+function carbColor(n){return n<25?'var(--rouge)':n<50?'var(--orange)':'var(--vert)';}
+function autoColor(j){return j<2?'var(--rouge)':j<5?'var(--orange)':'var(--vert)';}
+function calcAuto(g,s){
+  if(!s||s.niveau_carburant==null)return null;
+  const L=(g.capacite_reservoir_litres||500)*s.niveau_carburant/100;
+  const cJ=(g.conso_theorique_lh||1.8)*8;
+  return Math.round((L/cJ)*10)/10;
+}
+
+async function init() {
+  const params = new URLSearchParams(window.location.search);
+  const clientId = params.get('id');
+  if(!clientId){
+    document.getElementById('app').innerHTML=`<div class="error-page"><h1>Lien invalide</h1><p>Ce lien ne contient pas d'identifiant client valide.</p></div>`;
+    return;
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+  const dateDebut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
+  const dateDebut14 = new Date(Date.now()-14*86400000).toISOString().split('T')[0];
+
+  const [clients,groupes,saisiesJ,saisies30,alertes,pannes,maints] = await Promise.all([
+    api('clients',`&id=eq.${clientId}`),
+    api('groupes',`&client_id=eq.${clientId}&actif=eq.true`),
+    api('saisies',`&client_id=eq.${clientId}&date=eq.${today}&order=created_at.desc`),
+    api('saisies',`&client_id=eq.${clientId}&date=gte.${dateDebut30}&order=date.asc`),
+    api('alertes',`&client_id=eq.${clientId}&resolue=eq.false`),
+    api('pannes',`&client_id=eq.${clientId}&order=date_panne.desc&limit=10`),
+    api('maintenances',`&client_id=eq.${clientId}&order=date_intervention.desc&limit=6`),
+  ]);
+
+  const client = clients[0];
+  if(!client){
+    document.getElementById('app').innerHTML=`<div class="error-page"><h1>Client introuvable</h1><p>Ce lien n'est plus valide. Contactez votre gestionnaire GenTrack.</p></div>`;
+    return;
+  }
+
+  document.title = `${client.nom} — GenTrack`;
+
+  // Calculs
+  const litres30 = saisies30.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
+  const cout30   = Math.round(litres30*(client.prix_litre_fcfa||695));
+  const heures30 = saisies30.reduce((a,s)=>a+(s.heures_marche||0),0);
+  const joursAvec = new Set(saisies30.map(s=>s.date)).size;
+  const taux = groupes.length>0?Math.round(joursAvec/(30*groupes.length)*100):0;
+  const pannesEnCours = pannes.filter(p=>!p.resolue);
+
+  // Autonomie minimale
+  let minAuto = null, minGroupe = null;
+  groupes.forEach(g=>{
+    const s = saisiesJ.filter(x=>x.groupe_id===g.id)[0];
+    const j = calcAuto(g,s);
+    if(j!==null&&(minAuto===null||j<minAuto)){minAuto=j;minGroupe=g;}
+  });
+
+  const status = pannesEnCours.length>0||alertes.some(a=>a.severite==='danger')?'danger':
+    alertes.length>0||(minAuto!==null&&minAuto<5)?'warn':'ok';
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  // Bannière
+  let bannerHtml = '';
+  if(pannesEnCours.length>0){
+    bannerHtml=`<div class="banner danger"><div class="banner-icon">🚨</div><div><div class="banner-titre">${pannesEnCours.length} panne${pannesEnCours.length>1?'s':''} en cours</div><div class="banner-sub">Intervention requise — contactez votre technicien</div></div></div>`;
+  } else if(minAuto!==null&&minAuto<2){
+    bannerHtml=`<div class="banner danger"><div class="banner-icon">⛽</div><div><div class="banner-titre">Carburant critique — ${minAuto} jour${minAuto>1?'s':''} d'autonomie</div><div class="banner-sub">${minGroupe?.nom} · Commander le carburant maintenant</div></div></div>`;
+  } else if(minAuto!==null&&minAuto<5){
+    bannerHtml=`<div class="banner warn"><div class="banner-icon">⛽</div><div><div class="banner-titre">Plein à planifier — ${minAuto} jours d'autonomie</div><div class="banner-sub">${minGroupe?.nom} · Planifiez la commande dans les prochains jours</div></div></div>`;
+  }
+
+  // Groupes HTML
+  const groupesHtml = groupes.map(g=>{
+    const s = saisiesJ.filter(x=>x.groupe_id===g.id)[0];
+    const carb = s?.niveau_carburant;
+    const j = calcAuto(g,s);
+    const huile = s?.niveau_huile||'—';
+    const huileColor = huile==='critique'?'var(--rouge)':huile==='bas'?'var(--orange)':'var(--vert)';
+    const status = pannesEnCours.some(p=>p.groupe_id===g.id)||carb<25?'danger':carb<50||j<5?'warn':'ok';
+    const heureSaisie = s?.created_at?new Date(s.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dakar'}):null;
+    const cmdL = g.capacite_reservoir_litres&&carb!=null?Math.round(g.capacite_reservoir_litres*(1-carb/100)):null;
+    const cmdCout = cmdL?Math.round(cmdL*(client.prix_litre_fcfa||695)):null;
+
+    let actionHtml = '';
+    if(j!==null&&j<2&&cmdL){
+      actionHtml=`<div class="gc-action">🚨 Commander ${fmtNum(cmdL)}L maintenant · ~${fmtNum(cmdCout)} FCFA</div>`;
+    } else if(j!==null&&j<5&&cmdL){
+      actionHtml=`<div class="gc-action warn">⛽ Planifier ${fmtNum(cmdL)}L dans ${Math.round(j-2)} jours · ~${fmtNum(cmdCout)} FCFA</div>`;
+    } else if(s){
+      actionHtml=`<div class="gc-action ok">✅ Aucune action requise — prochain plein estimé dans ~${j||'—'} jours</div>`;
+    }
+
+    return `<div class="groupe-card">
+      <div class="gc-header">
+        <div>
+          <div class="gc-nom">${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA</div>
+          <div class="gc-sub">${heureSaisie?`Saisi à ${heureSaisie}`:s?'Saisi aujourd\'hui':'Pas de saisie aujourd\'hui'}${s?.operateur?' · '+s.operateur:''}</div>
+        </div>
+        <span class="pill ${status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok'}">${carb!=null?carb+'%':'—'}</span>
+      </div>
+      <div class="gc-body">
+        <div class="gc-stats">
+          <div>
+            <div class="gc-stat-label">Autonomie</div>
+            <div class="gc-stat-val" style="color:${j!==null?autoColor(j):'var(--texte2)'}">${j!==null?j+'j':'—'}</div>
+          </div>
+          <div>
+            <div class="gc-stat-label">Heures/jour</div>
+            <div class="gc-stat-val">${s?.heures_marche!=null?s.heures_marche+'h':'—'}</div>
+          </div>
+          <div>
+            <div class="gc-stat-label">Huile</div>
+            <div class="gc-stat-val" style="color:${huileColor}">${huile}</div>
+          </div>
+          <div>
+            <div class="gc-stat-label">Total</div>
+            <div class="gc-stat-val">${g.heures_total||0}h</div>
+          </div>
+        </div>
+        ${carb!=null?`<div class="gc-bar"><div class="gc-bar-fill" style="width:${carb}%;background:${carbColor(carb)}"></div></div>`:''}
+        ${actionHtml}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Graphique 14 jours
+  const saisies14 = saisies30.filter(s=>s.date>=dateDebut14);
+  const byDate = {};
+  saisies14.forEach(s=>{
+    if(!byDate[s.date])byDate[s.date]=[];
+    if(s.niveau_carburant!=null)byDate[s.date].push(s.niveau_carburant);
+  });
+  const dates14 = Object.keys(byDate).sort();
+  const carbData = dates14.map(d=>byDate[d].length?Math.round(byDate[d].reduce((a,b)=>a+b)/byDate[d].length):null);
+  const trend = carbData.length>=2&&carbData[carbData.length-1]!==null&&carbData[0]!==null
+    ? Math.round(carbData[carbData.length-1]-carbData[0]):null;
+  const trendTxt = trend!==null?(trend<0?`Baisse de ${Math.abs(trend)} points en 14 jours`:`Stable sur 14 jours`):'Données insuffisantes';
+
+  // Pannes HTML
+  const pannesHtml = pannes.length
+    ? pannes.map(p=>`<div class="incident-item">
+        <div class="ii-dot" style="background:${p.resolue?'var(--vert)':'var(--rouge)'}"></div>
+        <div class="ii-body">
+          <div class="ii-titre">${groupes.find(g=>g.id===p.groupe_id)?.nom||'—'} · ${TYPE_PANNE[p.type]||p.type}</div>
+          <div class="ii-sub">${p.description||'—'}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="pill ${p.resolue?'pill-ok':'pill-danger'}">${p.resolue?'Résolue':'En cours'}</span>
+          <div class="ii-date">${fmtDate(p.date_panne)}</div>
+        </div>
+      </div>`).join('')
+    : '<div class="empty">✅ Aucune panne enregistrée</div>';
+
+  // Maintenances HTML
+  const maintsHtml = maints.length
+    ? maints.map(m=>`<div class="incident-item">
+        <div class="ii-dot" style="background:var(--bleu)"></div>
+        <div class="ii-body">
+          <div class="ii-titre">${groupes.find(g=>g.id===m.groupe_id)?.nom||'—'} · ${TYPE_MAINT[m.type]||m.type}</div>
+          <div class="ii-sub">${m.technicien||'—'}${m.cout>0?' · '+fmtNum(m.cout)+' FCFA':''}</div>
+        </div>
+        <div class="ii-date">${fmtDate(m.date_intervention)}</div>
+      </div>`).join('')
+    : '<div class="empty">Aucune maintenance enregistrée</div>';
+
+  // Saisies tableau
+  const saisiesRecentes = [...saisies30].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,14);
+  const saisiesHtml = saisiesRecentes.length
+    ? `<div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Groupe</th><th>Carburant</th><th>Autonomie</th><th>Heures</th><th>Huile</th><th>Litres +</th><th>Opérateur</th></tr></thead>
+        <tbody>${saisiesRecentes.map(s=>{
+          const g = groupes.find(x=>x.id===s.groupe_id);
+          const j = calcAuto(g,s);
+          return`<tr>
+            <td>${fmtDate(s.date)}</td>
+            <td style="font-weight:500">${g?.nom||'—'}</td>
+            <td class="${s.niveau_carburant!=null?(s.niveau_carburant<25?'td-danger':s.niveau_carburant<50?'td-warn':'td-ok'):''}">${s.niveau_carburant!=null?s.niveau_carburant+'%':'—'}</td>
+            <td class="${j!==null?(j<2?'td-danger':j<5?'td-warn':'td-ok'):''}">${j!==null?j+'j':'—'}</td>
+            <td>${s.heures_marche||0}h</td>
+            <td class="${s.niveau_huile==='critique'?'td-danger':s.niveau_huile==='bas'?'td-warn':'td-ok'}">${s.niveau_huile||'—'}</td>
+            <td class="${s.litres_ajoutes>0?'td-ok':''}">${s.litres_ajoutes>0?'+'+s.litres_ajoutes+'L':'—'}</td>
+            <td style="color:var(--texte2)">${s.operateur||'—'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`
+    : '<div class="empty">Aucune saisie</div>';
+
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <div>
+        <div class="header-nom">${client.nom}</div>
+        <div class="header-sub">${client.ville||'—'} · ${dateStr}</div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="pill ${status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok'}">${status==='danger'?'Critique':status==='warn'?'Attention':'Normal'}</span>
+        <div class="header-logo">GenTrack</div>
+      </div>
+    </div>
+
+    <div class="container">
+      ${bannerHtml}
+
+      <div class="kpi-row">
+        <div class="kpi">
+          <div class="kpi-label">Coût carburant — 30 jours</div>
+          <div class="kpi-val">${cout30>0?fmtNum(cout30):'—'}</div>
+          <div class="kpi-sub">FCFA · ${fmtNum(litres30)}L</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Autonomie minimale</div>
+          <div class="kpi-val" style="color:${minAuto!==null?autoColor(minAuto):'var(--texte2)'}">${minAuto!==null?minAuto+'j':'—'}</div>
+          <div class="kpi-sub">${minGroupe?.nom||'Sur vos groupes'}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Taux de saisie — 30j</div>
+          <div class="kpi-val" style="color:${taux>=80?'var(--vert)':taux>=50?'var(--orange)':'var(--rouge)'}">${taux}%</div>
+          <div class="kpi-sub">${joursAvec} jours saisis</div>
+        </div>
+      </div>
+
+      <div class="section-label">Groupes électrogènes — statut du jour</div>
+      ${groupesHtml||'<div class="empty">Aucun groupe configuré</div>'}
+
+      <div class="chart-card" style="margin-top:20px">
+        <div class="chart-head">
+          <div class="chart-title">Évolution carburant — 14 jours</div>
+          <div style="font-size:11px;color:var(--texte2)">Niveau moyen</div>
+        </div>
+        <div class="chart-body">
+          <canvas id="main-chart" height="130"></canvas>
+          <div class="chart-insight">${trendTxt}</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px">
+        <div>
+          <div class="section-label">Incidents & pannes</div>
+          <div style="background:white;border-radius:8px;border:1px solid var(--bordure);overflow:hidden">${pannesHtml}</div>
+        </div>
+        <div>
+          <div class="section-label">Maintenances</div>
+          <div style="background:white;border-radius:8px;border:1px solid var(--bordure);overflow:hidden">${maintsHtml}</div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px">
+        <div class="section-label">Historique des saisies — 30 jours</div>
+        <div style="background:white;border-radius:8px;border:1px solid var(--bordure);overflow:hidden">${saisiesHtml}</div>
+      </div>
+    </div>
+
+    <div class="footer">Suivi assuré par <strong>GenTrack</strong> · Données mises à jour en temps réel</div>
+  `;
+
+  // Graphique
+  setTimeout(()=>{
+    const ctx = document.getElementById('main-chart');
+    if(!ctx)return;
+    new Chart(ctx.getContext('2d'),{
+      type:'line',
+      data:{
+        labels:dates14.map(fmtDateShort),
+        datasets:[{
+          data:carbData,
+          borderColor:'#1A1A1A',
+          backgroundColor:'rgba(26,26,26,0.04)',
+          borderWidth:1.5,
+          tension:0.3,
+          fill:true,
+          spanGaps:true,
+          pointRadius:3,
+          pointBackgroundColor:'#1A1A1A'
+        }]
+      },
+      options:{
+        responsive:true,
+        plugins:{legend:{display:false}},
+        scales:{
+          x:{grid:{color:'#EBEBEB'},ticks:{color:'#6B6B6B',font:{size:10}}},
+          y:{grid:{color:'#EBEBEB'},ticks:{color:'#6B6B6B',font:{size:10},callback:v=>v+'%'},min:0,max:100}
+        }
+      }
+    });
+  },100);
+}
+
+init();
+</script>
+</body>
+</html>
