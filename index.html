@@ -3,327 +3,169 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GenTrack</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<title>GenTrack — Dashboard Admin</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500&display=swap');
-:root{--noir:#0A0A0A;--surface:#141414;--surface2:#1C1C1C;--bordure:#242424;--or:#C8922A;--or-pale:rgba(200,146,42,0.08);--vert:#22C55E;--vert-pale:rgba(34,197,94,0.08);--rouge:#EF4444;--rouge-pale:rgba(239,68,68,0.08);--orange:#F97316;--orange-pale:rgba(249,115,22,0.08);--bleu:#3B82F6;--bleu-pale:rgba(59,130,246,0.08);--texte:#F0F0F0;--texte2:#606060;--texte3:#303030}
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{background:var(--noir);color:var(--texte);font-family:'Inter',sans-serif;min-height:100vh}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--noir)}::-webkit-scrollbar-thumb{background:var(--bordure);border-radius:2px}
-.layout{display:flex;min-height:100vh}
-.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--bordure);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
-.sb-logo{padding:22px 20px 18px;border-bottom:1px solid var(--bordure);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px}
+:root{--noir:#0A0A0A;--s:#141414;--s2:#1C1C1C;--s3:#242424;--b:#2A2A2A;--or:#C8922A;--or-p:rgba(200,146,42,0.1);--vert:#22C55E;--vp:rgba(34,197,94,0.1);--rouge:#EF4444;--rp:rgba(239,68,68,0.1);--orange:#F97316;--op:rgba(249,115,22,0.1);--bleu:#3B82F6;--bp:rgba(59,130,246,0.1);--t:#F0F0F0;--t2:#808080;--t3:#404040}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--noir);color:var(--t);font-family:'Inter',sans-serif;display:flex;min-height:100vh}
+.sb{width:200px;flex-shrink:0;background:var(--s);border-right:1px solid var(--b);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.sb-logo{padding:20px 16px 16px;border-bottom:1px solid var(--b);font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700}
 .sb-logo em{color:var(--or);font-style:normal}
-.sb-logo-sub{font-size:10px;color:var(--texte2);font-weight:400;margin-top:2px;font-family:'Inter',sans-serif}
-.sb-nav{padding:12px 10px;flex:1;overflow-y:auto}
-.sb-section{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--texte3);padding:14px 12px 6px;font-weight:600}
-.sb-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;cursor:pointer;transition:background 0.15s;font-size:13px;color:var(--texte2);margin-bottom:2px}
-.sb-item:hover{background:var(--surface2)}.sb-item.active{background:var(--or-pale);color:var(--or)}
-.sb-item-icon{font-size:15px;width:20px;text-align:center}
-.sb-badge{margin-left:auto;background:var(--rouge);color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;min-width:18px;text-align:center}
-.sb-bottom{padding:14px 10px;border-top:1px solid var(--bordure)}
-.sb-user{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px}
-.sb-avatar{width:30px;height:30px;border-radius:50%;background:var(--or-pale);border:1.5px solid var(--or);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;color:var(--or);flex-shrink:0}
-.sb-user-name{font-size:12px;font-weight:500}.sb-user-role{font-size:10px;color:var(--texte2)}
+.sb-logo-sub{font-size:10px;color:var(--t2);font-weight:400;margin-top:2px;font-family:'Inter',sans-serif}
+.sb-nav{padding:10px 8px;flex:1}
+.sb-sec{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--t3);padding:12px 10px 5px;font-weight:600}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--t2);margin-bottom:2px;transition:background 0.15s;text-decoration:none}
+.sb-item:hover{background:var(--s2);color:var(--t)}
+.sb-item.active{background:var(--or-p);color:var(--or)}
+.sb-item-icon{font-size:14px;width:18px;text-align:center}
+.sb-badge{margin-left:auto;background:var(--rouge);color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px}
+.sb-bottom{padding:12px 8px;border-top:1px solid var(--b)}
+.sb-user{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--or-p);border:1.5px solid var(--or);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--or);flex-shrink:0;font-family:'Space Grotesk',sans-serif}
+.sb-un{font-size:12px;font-weight:500}.sb-ur{font-size:10px;color:var(--t2)}
 .main{flex:1;overflow-y:auto}
-.view{display:none;padding:28px 28px 40px}.view.active{display:block}
+.view{display:none;padding:28px 28px 48px}.view.active{display:block}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px}
-.topbar-date{font-size:11px;color:var(--texte2);margin-bottom:4px}
+.topbar-date{font-size:11px;color:var(--t2);margin-bottom:4px}
 .topbar-title{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.5px}
-.topbar-right{display:flex;gap:10px;align-items:center}
-.btn{border-radius:9px;padding:9px 16px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;border:none;transition:opacity 0.2s}
+.btn{border-radius:8px;padding:8px 14px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;border:none;transition:opacity 0.2s}
 .btn:active{opacity:0.8}
 .btn-or{background:var(--or);color:var(--noir)}
-.btn-ghost{background:var(--surface);color:var(--texte2);border:1px solid var(--bordure) !important;font-family:'Inter',sans-serif;font-weight:400}
-.btn-ghost:hover{border-color:var(--or) !important;color:var(--texte)}
-.btn-danger{background:var(--rouge-pale);color:var(--rouge);border:1px solid var(--rouge) !important}
-
-/* ALERTE BANNER */
-.alert-banner{background:var(--rouge-pale);border:1px solid var(--rouge);border-radius:12px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px;cursor:pointer}
-.alert-banner:hover{background:rgba(239,68,68,0.12)}
-.alert-banner-icon{font-size:20px;flex-shrink:0}
-.alert-banner-text{flex:1}
-.alert-banner-title{font-size:13px;font-weight:700;color:var(--rouge)}
-.alert-banner-sub{font-size:11px;color:var(--texte2);margin-top:2px}
-.alert-banner-arrow{color:var(--rouge);font-size:16px}
-
-/* KPIs */
+.btn-ghost{background:var(--s);color:var(--t2);border:1px solid var(--b) !important;font-family:'Inter',sans-serif;font-weight:400}
+.btn-ghost:hover{border-color:var(--or) !important;color:var(--t)}
+.btn-icon{background:var(--s2);color:var(--t2);border:1px solid var(--b) !important;padding:6px 10px;font-size:13px}
+.btn-icon:hover{color:var(--or);border-color:var(--or) !important}
 .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
-.kpi{background:var(--surface);border-radius:12px;padding:16px;border:1px solid var(--bordure);position:relative;overflow:hidden}
-.kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--texte2);font-weight:600;margin-bottom:10px}
-.kpi-val{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;letter-spacing:-1px;margin-bottom:4px}
-.kpi-sub{font-size:11px;color:var(--texte2)}.kpi-evo{font-size:11px;font-weight:600;margin-top:6px}
+.kpi{background:var(--s);border-radius:10px;padding:14px 16px;border:1px solid var(--b)}
+.kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--t2);font-weight:600;margin-bottom:8px}
+.kpi-val{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;letter-spacing:-0.5px}
+.kpi-sub{font-size:11px;color:var(--t2);margin-top:3px}
 .or{color:var(--or)}.vert{color:var(--vert)}.rouge{color:var(--rouge)}.orange{color:var(--orange)}.bleu{color:var(--bleu)}
-
-/* GRIDS */
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
-.grid-32{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px}
-.grid-23{display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:16px}
-
-/* CARDS */
-.card{background:var(--surface);border-radius:12px;border:1px solid var(--bordure);overflow:hidden;margin-bottom:16px}
-.card-header{padding:16px 18px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bordure)}
+.card{background:var(--s);border-radius:10px;border:1px solid var(--b);overflow:hidden;margin-bottom:16px}
+.card-head{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--b);background:var(--s2)}
 .card-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600}
-.card-sub{font-size:11px;color:var(--texte2)}
-
-/* TABLES */
-.tr{display:grid;gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--bordure);cursor:pointer;transition:background 0.15s}
-.tr:hover{background:var(--surface2)}.tr:last-child{border-bottom:none}
-.tr.hd{background:var(--surface2);cursor:default}.tr.hd:hover{background:var(--surface2)}
-.tr-clients{grid-template-columns:2fr 80px 80px 100px 20px}
-.tr-saisies{grid-template-columns:1fr 1fr 80px 80px 80px 80px}
-.tr-maint{grid-template-columns:2fr 1fr 1fr 80px}
-.tr-pannes{grid-template-columns:2fr 1fr 1fr 80px 20px}
-.col-name{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600}
-.col-sub{font-size:11px;color:var(--texte2);margin-top:1px}
-.col-label{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--texte2);font-weight:600}
-.col-val{font-size:13px;font-weight:500}
-
-/* PILLS */
-.pill{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;display:inline-flex;align-items:center;gap:4px}
-.pill-ok{background:var(--vert-pale);color:var(--vert)}
-.pill-warn{background:var(--orange-pale);color:var(--orange)}
-.pill-danger{background:var(--rouge-pale);color:var(--rouge)}
-.pill-bleu{background:var(--bleu-pale);color:var(--bleu)}
-
-/* STATUT GROUPE */
-.groupe-card{background:var(--surface2);border-radius:10px;padding:14px;border:1px solid var(--bordure);border-left:3px solid var(--bordure);margin-bottom:8px;cursor:pointer;transition:background 0.15s}
-.groupe-card:hover{background:#222}
-.groupe-card.ok{border-left-color:var(--vert)}
-.groupe-card.warn{border-left-color:var(--orange)}
-.groupe-card.danger{border-left-color:var(--rouge)}
-.groupe-card.unknown{border-left-color:var(--texte3)}
-.gc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-.gc-nom{font-size:13px;font-weight:600;font-family:'Space Grotesk',sans-serif}
-.gc-client{font-size:11px;color:var(--texte2);margin-top:2px}
-.gc-stats{display:flex;gap:16px;flex-wrap:wrap}
-.gc-stat{font-size:11px;color:var(--texte2)}
-.gc-stat span{color:var(--texte);font-weight:600}
-.gc-bar-wrap{margin-top:10px}
-.gc-bar-label{display:flex;justify-content:space-between;margin-bottom:4px;font-size:10px;color:var(--texte2)}
-.gc-bar{height:4px;background:var(--bordure);border-radius:3px;overflow:hidden}
-.gc-bar-fill{height:100%;border-radius:3px;transition:width 0.5s}
-
-/* ALERTES */
-.alerte-item{padding:14px 18px;display:flex;align-items:flex-start;gap:12px;border-bottom:1px solid var(--bordure);cursor:pointer;transition:background 0.15s}
-.alerte-item:hover{background:var(--surface2)}.alerte-item:last-child{border-bottom:none}
-.ai-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}
-.ai-body{flex:1}.ai-titre{font-size:13px;font-weight:600}.ai-desc{font-size:11px;color:var(--texte2);margin-top:2px}
-.ai-time{font-size:10px;color:var(--texte2);white-space:nowrap}
-.ai-actions{display:flex;gap:6px;margin-top:8px}
-
-/* ACTIVITE */
-.act-item{padding:12px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--bordure)}
-.act-item:last-child{border-bottom:none}
-.act-dot{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
-.ad-v{background:var(--vert-pale)}.ad-o{background:var(--orange-pale)}.ad-or{background:var(--or-pale)}.ad-r{background:var(--rouge-pale)}.ad-b{background:var(--bleu-pale)}
-.act-body{flex:1}.act-titre{font-size:12px;font-weight:500}.act-detail{font-size:11px;color:var(--texte2);margin-top:1px}
-.act-time{font-size:10px;color:var(--texte2);white-space:nowrap}
-
-/* CHARTS */
-.chart-wrap{padding:16px 18px;position:relative}
-.chart-canvas{width:100%!important}
-.chart-tabs{display:flex;gap:6px;padding:12px 18px 0;border-bottom:1px solid var(--bordure)}
-.chart-tab{padding:7px 14px;border-radius:8px 8px 0 0;font-size:12px;cursor:pointer;color:var(--texte2);font-weight:500;border:1px solid transparent;border-bottom:none;margin-bottom:-1px}
-.chart-tab.active{background:var(--surface);border-color:var(--bordure);color:var(--or);font-weight:600}
-.chart-content{display:none}.chart-content.active{display:block}
-
-/* JAUGE */
-.jauge-wrap{margin-bottom:10px}
-.jauge-row{display:flex;justify-content:space-between;margin-bottom:4px}
-.jauge-l{font-size:11px;color:var(--texte2)}.jauge-p{font-size:11px;font-weight:600}
-.jauge-bar{height:6px;background:var(--bordure);border-radius:3px;overflow:hidden}
-.jauge-fill{height:100%;border-radius:3px;transition:width 0.5s}
-
-/* MODAL */
+.card-sub{font-size:11px;color:var(--t2)}
+.pill{padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700}
+.pill-ok{background:var(--vp);color:var(--vert)}
+.pill-warn{background:var(--op);color:var(--orange)}
+.pill-danger{background:var(--rp);color:var(--rouge)}
+.pill-gray{background:var(--s3);color:var(--t2)}
+.client-row{display:grid;grid-template-columns:2fr 70px 60px 80px 90px;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--b);cursor:pointer;transition:background 0.15s}
+.client-row:hover{background:var(--s2)}.client-row:last-child{border-bottom:none}
+.client-row.hd{background:var(--s2);cursor:default}.client-row.hd:hover{background:var(--s2)}
+.cr-nom{font-size:13px;font-weight:600;font-family:'Space Grotesk',sans-serif;color:var(--t)}
+.cr-sub{font-size:11px;color:var(--t2);margin-top:1px}
+.cr-val{font-size:13px;font-weight:500}
+.cr-actions{display:flex;gap:6px}
+.col-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--t2);font-weight:600}
+.detail-panel{display:none;background:var(--s);border-radius:10px;border:1px solid var(--b);margin-bottom:16px;overflow:hidden;animation:su 0.2s ease}
+.detail-panel.open{display:block}
+@keyframes su{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.dp-head{padding:14px 16px;background:var(--s2);border-bottom:1px solid var(--b);display:flex;justify-content:space-between;align-items:center}
+.dp-nom{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700}
+.dp-sub{font-size:11px;color:var(--t2);margin-top:2px}
+.dp-close{background:none;border:none;color:var(--t2);font-size:18px;cursor:pointer}
+.dp-body{padding:16px}
+.dp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.dp-kpi{background:var(--s2);border-radius:8px;padding:11px 13px}
+.dp-kpi-val{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;margin-bottom:2px}
+.dp-kpi-label{font-size:11px;color:var(--t2)}
+.groupe-item{background:var(--s2);border-radius:8px;padding:11px 13px;margin-bottom:8px;border-left:3px solid var(--b)}
+.gi-ok{border-left-color:var(--vert)}.gi-warn{border-left-color:var(--orange)}.gi-danger{border-left-color:var(--rouge)}
+.gi-top{display:flex;justify-content:space-between;margin-bottom:8px}
+.gi-nom{font-size:13px;font-weight:600}
+.gi-stats{display:flex;gap:12px;flex-wrap:wrap}
+.gi-stat{font-size:11px;color:var(--t2)}.gi-stat span{color:var(--t);font-weight:500}
+.gi-bar{height:3px;background:var(--b);border-radius:2px;overflow:hidden;margin-top:8px}
+.gi-bar-fill{height:100%;border-radius:2px}
+.alerte-item{padding:11px 16px;display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid var(--b)}
+.alerte-item:last-child{border-bottom:none}
+.ai-dot{width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.ai-body{flex:1}.ai-titre{font-size:12px;font-weight:600}.ai-desc{font-size:11px;color:var(--t2);margin-top:1px}
+.ai-time{font-size:10px;color:var(--t2);white-space:nowrap}
+.lien-box{background:var(--s2);border-radius:8px;padding:10px 13px;display:flex;align-items:center;gap:10px;margin-bottom:8px;border:1px solid var(--b)}
+.lien-url{font-size:12px;color:var(--bleu);font-family:monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lien-label{font-size:10px;color:var(--t2);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.8px;font-weight:600}
+.toast{position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:8px;font-size:12px;font-weight:600;z-index:30;opacity:0;transition:opacity 0.25s;pointer-events:none}
+.toast.show{opacity:1}.toast.ok{background:var(--vert);color:white}.toast.err{background:var(--rouge);color:white}
+.loading{display:flex;align-items:center;justify-content:center;padding:32px;color:var(--t2);font-size:13px;gap:8px}
+.spinner{width:14px;height:14px;border:2px solid var(--b);border-top-color:var(--or);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{padding:32px;text-align:center;color:var(--t2);font-size:13px}
+.section-label{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--t2);font-weight:600;margin-bottom:8px;margin-top:4px}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:20;align-items:center;justify-content:center;padding:20px}
 .modal-overlay.open{display:flex}
-.modal{background:var(--surface);border-radius:16px;width:100%;max-width:620px;border:1px solid var(--bordure);animation:fu 0.2s ease;overflow:hidden;max-height:92vh;display:flex;flex-direction:column}
-.modal-wide{max-width:820px}
-@keyframes fu{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-.modal-head{padding:18px 20px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--bordure);background:var(--surface2);flex-shrink:0}
-.modal-nom{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700}
-.modal-sub{font-size:12px;color:var(--texte2);margin-top:2px}
-.modal-close{background:none;border:none;color:var(--texte2);font-size:20px;cursor:pointer}
-.modal-body{padding:20px;overflow-y:auto}
-.modal-tabs{display:flex;gap:0;border-bottom:1px solid var(--bordure);margin:-20px -20px 20px}
-.modal-tab{padding:12px 18px;font-size:12px;cursor:pointer;color:var(--texte2);font-weight:500;border-bottom:2px solid transparent}
-.modal-tab.active{color:var(--or);border-bottom-color:var(--or);font-weight:600}
-.modal-pane{display:none}.modal-pane.active{display:block}
-.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-.modal-stat{background:var(--surface2);border-radius:10px;padding:12px}
-.modal-stat-v{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700}
-.modal-stat-l{font-size:11px;color:var(--texte2);margin-top:2px}
-
-/* FORMS */
+.modal{background:var(--s);border-radius:14px;width:100%;max-width:500px;border:1px solid var(--b);overflow:hidden}
+.modal-head{padding:16px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--b);background:var(--s2)}
+.modal-nom{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700}
+.modal-close{background:none;border:none;color:var(--t2);font-size:18px;cursor:pointer}
+.modal-body{padding:18px}
 .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
-.field label{font-size:11px;color:var(--texte2);font-weight:500;letter-spacing:0.5px;text-transform:uppercase}
-.field input,.field select,.field textarea{background:var(--surface2);border:1px solid var(--bordure);border-radius:10px;padding:12px 14px;color:var(--texte);font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:border-color 0.15s;width:100%}
-.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--or)}
-.field select option{background:var(--surface2)}
-.field textarea{resize:vertical;min-height:80px}
-.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-
-/* MISC */
-.mg{background:var(--surface2);border-radius:10px;padding:12px 14px;border-left:3px solid var(--bordure);margin-bottom:8px}
-.mg.ok{border-left-color:var(--vert)}.mg.warn{border-left-color:var(--orange)}.mg.danger{border-left-color:var(--rouge)}
-.mg-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.mg-nom{font-size:13px;font-weight:600}
-.mg-stats{display:flex;gap:12px;flex-wrap:wrap}
-.mg-stat{font-size:11px;color:var(--texte2)}.mg-stat span{color:var(--texte);font-weight:500}
-.toast{position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:8px;font-size:12px;font-weight:600;z-index:30;opacity:0;transition:opacity 0.25s;pointer-events:none}
-.toast.show{opacity:1}.toast.ok{background:var(--vert);color:white}.toast.warn{background:var(--orange);color:white}.toast.err{background:var(--rouge);color:white}
-.loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--texte2);font-size:13px;gap:10px}
-.spinner{width:16px;height:16px;border:2px solid var(--bordure);border-top-color:var(--or);border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0}
-@keyframes spin{to{transform:rotate(360deg)}}
-.empty{padding:40px;text-align:center;color:var(--texte2)}
-.empty-icon{font-size:32px;margin-bottom:10px}
-.empty-title{font-size:14px;font-weight:600;color:var(--texte);margin-bottom:6px}
-.empty-sub{font-size:12px}
-.section-label{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--texte2);font-weight:600;margin-bottom:10px;margin-top:4px}
-.pos{color:var(--vert)}.neg{color:var(--rouge)}.neu{color:var(--texte2)}
-
-/* FILTRE SELECT */
-.filter-bar{display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
-.filter-select{background:var(--surface);border:1px solid var(--bordure);border-radius:8px;padding:7px 12px;color:var(--texte);font-size:12px;font-family:'Inter',sans-serif;outline:none;cursor:pointer}
-.filter-select:focus{border-color:var(--or)}
-
-@media(max-width:900px){
-  .sidebar{display:none}.kpi-row{grid-template-columns:repeat(2,1fr)}
-  .grid-2,.grid-32,.grid-23,.grid-3{grid-template-columns:1fr}.view{padding:16px}
-  .tr-saisies{grid-template-columns:1fr 80px 80px}.tr-clients{grid-template-columns:2fr 100px 20px}
-}
+.field label{font-size:11px;color:var(--t2);font-weight:500;letter-spacing:0.5px;text-transform:uppercase}
+.field input,.field select{background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Inter',sans-serif;outline:none;width:100%}
+.field input:focus,.field select:focus{border-color:var(--or)}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:800px){.sb{display:none}.kpi-row{grid-template-columns:repeat(2,1fr)}.view{padding:16px}.client-row{grid-template-columns:2fr 80px 80px}}
 </style>
 </head>
 <body>
-<div class="layout">
 
-<!-- SIDEBAR -->
-<div class="sidebar">
-  <div class="sb-logo">Gen<em>Track</em><div class="sb-logo-sub">Dashboard Admin</div></div>
+<div class="sb">
+  <div class="sb-logo">Gen<em>Track</em><div class="sb-logo-sub">Admin</div></div>
   <div class="sb-nav">
-    <div class="sb-section">Principal</div>
-    <div class="sb-item active" id="nav-accueil" onclick="goTo('accueil')"><div class="sb-item-icon">🏠</div>Vue globale</div>
-    <div class="sb-item" id="nav-groupes" onclick="goTo('groupes')"><div class="sb-item-icon">⚡</div>Groupes<div class="sb-badge" id="badge-groupes">—</div></div>
-    <div class="sb-item" id="nav-alertes" onclick="goTo('alertes')"><div class="sb-item-icon">🔔</div>Alertes<div class="sb-badge" id="badge-alertes">—</div></div>
-    <div class="sb-section">Données</div>
-    <div class="sb-item" id="nav-historique" onclick="goTo('historique')"><div class="sb-item-icon">📊</div>Historique</div>
-    <div class="sb-item" id="nav-clients" onclick="goTo('clients')"><div class="sb-item-icon">🏨</div>Clients</div>
-    <div class="sb-item" id="nav-maintenance" onclick="goTo('maintenance')"><div class="sb-item-icon">🔧</div>Maintenance</div>
-    <div class="sb-item" id="nav-pannes" onclick="goTo('pannes')"><div class="sb-item-icon">🚨</div>Pannes</div>
+    <div class="sb-sec">Principal</div>
+    <div class="sb-item active" onclick="goTo('accueil')"><div class="sb-item-icon">🏠</div>Vue opérateur</div>
+    <div class="sb-item" onclick="goTo('clients')"><div class="sb-item-icon">🏨</div>Clients<div class="sb-badge" id="badge-alertes">—</div></div>
+    <div class="sb-item" onclick="goTo('alertes')"><div class="sb-item-icon">🔔</div>Alertes</div>
+    <div class="sb-sec">Données</div>
+    <div class="sb-item" onclick="goTo('pannes')"><div class="sb-item-icon">🚨</div>Pannes</div>
+    <div class="sb-item" onclick="goTo('maintenance')"><div class="sb-item-icon">🔧</div>Maintenance</div>
   </div>
   <div class="sb-bottom">
-    <div class="sb-user">
-      <div class="sb-avatar">GT</div>
-      <div><div class="sb-user-name">GenTrack Admin</div><div class="sb-user-role">Vue globale</div></div>
-    </div>
+    <div class="sb-user"><div class="sb-av">GT</div><div><div class="sb-un">GenTrack</div><div class="sb-ur">Admin</div></div></div>
   </div>
 </div>
 
-<!-- MAIN -->
 <div class="main">
 
-<!-- VUE GLOBALE -->
+<!-- VUE OPÉRATEUR -->
 <div class="view active" id="view-accueil">
   <div class="topbar">
-    <div><div class="topbar-date" id="accueil-date">—</div><div class="topbar-title">Vue globale</div></div>
-    <div class="topbar-right">
-      <button class="btn btn-ghost" onclick="loadAll()">🔄 Actualiser</button>
+    <div><div class="topbar-date" id="accueil-date">—</div><div class="topbar-title">Vue opérateur</div></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost" onclick="loadAll()">🔄</button>
       <button class="btn btn-or" onclick="openAddClient()">+ Nouveau client</button>
     </div>
   </div>
-  <div id="alert-banner-wrap"></div>
+
   <div class="kpi-row">
-    <div class="kpi"><div class="kpi-label">Clients actifs</div><div class="kpi-val or" id="kpi-clients">—</div><div class="kpi-sub" id="kpi-clients-sub">établissements</div></div>
-    <div class="kpi"><div class="kpi-label">Groupes suivis</div><div class="kpi-val or" id="kpi-groupes">—</div><div class="kpi-sub">Sur tous les sites</div></div>
+    <div class="kpi"><div class="kpi-label">Clients actifs</div><div class="kpi-val or" id="kpi-clients">—</div><div class="kpi-sub" id="kpi-clients-sub">—</div></div>
+    <div class="kpi"><div class="kpi-label">MRR</div><div class="kpi-val or" id="kpi-mrr">—</div><div class="kpi-sub">FCFA / mois</div></div>
     <div class="kpi"><div class="kpi-label">Alertes actives</div><div class="kpi-val rouge" id="kpi-alertes">—</div><div class="kpi-sub">Non résolues</div></div>
-    <div class="kpi"><div class="kpi-label">Saisies aujourd'hui</div><div class="kpi-val vert" id="kpi-saisies">—</div><div class="kpi-sub" id="kpi-saisies-sub">Rapports reçus</div></div>
+    <div class="kpi"><div class="kpi-label">Saisies ce matin</div><div class="kpi-val vert" id="kpi-saisies">—</div><div class="kpi-sub" id="kpi-saisies-sub">—</div></div>
   </div>
-  <div class="grid-32">
-    <div class="card">
-      <div class="card-header"><div class="card-title">⚡ Statut des groupes — Temps réel</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('groupes')">Voir tout →</button></div>
-      <div style="padding:14px 18px" id="accueil-groupes"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
-    </div>
-    <div>
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-header"><div class="card-title">🔔 Alertes actives</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('alertes')">Voir tout →</button></div>
-        <div id="accueil-alertes"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><div class="card-title">🕐 Activité récente</div></div>
-        <div id="accueil-activite"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
-      </div>
-    </div>
-  </div>
-</div>
 
-<!-- GROUPES -->
-<div class="view" id="view-groupes">
-  <div class="topbar">
-    <div><div class="topbar-date">Statut en temps réel</div><div class="topbar-title">Groupes électrogènes</div></div>
-    <div class="topbar-right">
-      <div style="display:flex;background:var(--surface2);border:1px solid var(--bordure);border-radius:9px;overflow:hidden">
-        <button id="toggle-hotels" onclick="setGroupeMode('hotels')" style="padding:8px 16px;font-size:12px;font-weight:600;border:none;cursor:pointer;background:var(--or);color:var(--noir)">🏨 Par hôtel</button>
-        <button id="toggle-detail" onclick="setGroupeMode('detail')" style="padding:8px 16px;font-size:12px;font-weight:500;border:none;cursor:pointer;background:transparent;color:var(--texte2)">⚡ Par groupe</button>
-      </div>
-      <button class="btn btn-ghost" onclick="loadGroupes()">🔄</button>
-    </div>
-  </div>
-  <div class="filter-bar">
-    <select class="filter-select" id="filtre-groupe-hotelier" onchange="onFiltreGroupeHotelier()"><option value="">Tous les groupes</option></select>
-    <select class="filter-select" id="filtre-client-groupes" onchange="loadGroupes()"><option value="">Tous les hôtels</option></select>
-  </div>
-  <div id="groupes-list"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
-</div>
-
-<!-- HISTORIQUE + GRAPHIQUES -->
-<div class="view" id="view-historique">
-  <div class="topbar">
-    <div><div class="topbar-date">Analyse sur la période</div><div class="topbar-title">Historique & Graphiques</div></div>
-    <div class="topbar-right">
-      <select class="filter-select" id="histo-periode" onchange="loadHistorique()">
-        <option value="7">7 derniers jours</option>
-        <option value="14">14 jours</option>
-        <option value="30" selected>30 jours</option>
-        <option value="90">3 mois</option>
-      </select>
-    </div>
-  </div>
-  <div class="filter-bar">
-    <select class="filter-select" id="histo-client" onchange="loadHistorique()"><option value="">Tous les clients</option></select>
-    <select class="filter-select" id="histo-groupe" onchange="loadHistorique()"><option value="">Tous les groupes</option></select>
-  </div>
-  <div class="grid-3" id="histo-kpis">
-    <div class="kpi"><div class="kpi-label">Heures de marche</div><div class="kpi-val or" id="hk-heures">—</div><div class="kpi-sub">Sur la période</div></div>
-    <div class="kpi"><div class="kpi-label">Litres consommés</div><div class="kpi-val bleu" id="hk-litres">—</div><div class="kpi-sub">Ravitaillements</div></div>
-    <div class="kpi"><div class="kpi-label">Pannes</div><div class="kpi-val rouge" id="hk-pannes">—</div><div class="kpi-sub">Incidents signalés</div></div>
-  </div>
-  <div class="card" style="margin-bottom:16px">
-    <div class="chart-tabs">
-      <div class="chart-tab active" onclick="switchChartTab('carburant')">⛽ Carburant</div>
-      <div class="chart-tab" onclick="switchChartTab('heures')">🕐 Heures de marche</div>
-      <div class="chart-tab" onclick="switchChartTab('litres')">💧 Litres ajoutés</div>
-      <div class="chart-tab" onclick="switchChartTab('huile')">🛢️ Huile</div>
-    </div>
-    <div class="chart-wrap">
-      <canvas id="main-chart" class="chart-canvas" height="220"></canvas>
-    </div>
-  </div>
-  <div class="grid-2">
-    <div class="card">
-      <div class="card-header"><div class="card-title">📋 Dernières saisies</div></div>
-      <div id="histo-saisies"><div class="loading"><div class="spinner"></div></div></div>
-    </div>
-    <div class="card">
-      <div class="card-header"><div class="card-title">🚨 Dernières pannes</div></div>
-      <div id="histo-pannes-list"><div class="loading"><div class="spinner"></div></div></div>
-    </div>
-  </div>
   <div class="card">
-    <div class="card-header"><div class="card-title">🔧 Dernières maintenances</div></div>
-    <div id="histo-maint-list"><div class="loading"><div class="spinner"></div></div></div>
+    <div class="card-head">
+      <div class="card-title">Santé des clients</div>
+      <div class="card-sub">Taux de saisie · Alertes · Statut</div>
+    </div>
+    <div class="client-row hd">
+      <div class="col-label">Client</div>
+      <div class="col-label">Saisies</div>
+      <div class="col-label">Alertes</div>
+      <div class="col-label">Statut</div>
+      <div class="col-label">Lien client</div>
+    </div>
+    <div id="clients-sante"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
+  </div>
+
+  <div id="detail-panel-accueil" class="detail-panel"></div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title">🔔 Alertes récentes</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('alertes')">Voir tout →</button></div>
+    <div id="alertes-accueil"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 </div>
 
@@ -331,14 +173,20 @@ body{background:var(--noir);color:var(--texte);font-family:'Inter',sans-serif;mi
 <div class="view" id="view-clients">
   <div class="topbar">
     <div><div class="topbar-date">Tous les établissements</div><div class="topbar-title">Clients</div></div>
-    <div class="topbar-right">
+    <div style="display:flex;gap:8px">
       <button class="btn btn-ghost" onclick="loadClients()">🔄</button>
       <button class="btn btn-or" onclick="openAddClient()">+ Nouveau client</button>
     </div>
   </div>
   <div class="card">
-    <div class="card-header"><div class="card-title">Liste complète</div><div class="card-sub">Cliquez pour le détail</div></div>
-    <div class="tr hd tr-clients"><div class="col-label">Client</div><div class="col-label">Groupes</div><div class="col-label">Saisies</div><div class="col-label">Statut</div><div></div></div>
+    <div class="card-head"><div class="card-title">Liste complète</div></div>
+    <div class="client-row hd">
+      <div class="col-label">Client</div>
+      <div class="col-label">Saisies</div>
+      <div class="col-label">Alertes</div>
+      <div class="col-label">Statut</div>
+      <div class="col-label">Lien client</div>
+    </div>
     <div id="clients-list"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
   </div>
 </div>
@@ -346,25 +194,12 @@ body{background:var(--noir);color:var(--texte);font-family:'Inter',sans-serif;mi
 <!-- ALERTES -->
 <div class="view" id="view-alertes">
   <div class="topbar">
-    <div><div class="topbar-date">En temps réel</div><div class="topbar-title">Alertes</div></div>
-    <div class="topbar-right"><button class="btn btn-ghost" onclick="markAllRead()">Tout marquer lu</button></div>
+    <div><div class="topbar-date">Temps réel</div><div class="topbar-title">Alertes</div></div>
+    <div><button class="btn btn-ghost" onclick="loadAlertes()">🔄</button></div>
   </div>
   <div class="card">
-    <div class="card-header"><div class="card-title">Alertes non résolues</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="loadAlertes()">🔄</button></div>
-    <div id="alertes-list"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
-  </div>
-</div>
-
-<!-- MAINTENANCE -->
-<div class="view" id="view-maintenance">
-  <div class="topbar">
-    <div><div class="topbar-date">Interventions planifiées et réalisées</div><div class="topbar-title">Maintenance</div></div>
-    <div class="topbar-right"><button class="btn btn-or" onclick="openMaintenance()">+ Enregistrer intervention</button></div>
-  </div>
-  <div class="card">
-    <div class="card-header"><div class="card-title">Historique des interventions</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="loadMaintenance()">🔄</button></div>
-    <div class="tr hd tr-maint"><div class="col-label">Client / Groupe</div><div class="col-label">Type</div><div class="col-label">Date</div><div class="col-label">Coût</div></div>
-    <div id="maint-list"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
+    <div class="card-head"><div class="card-title">Alertes non résolues</div></div>
+    <div id="alertes-list"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 </div>
 
@@ -372,138 +207,63 @@ body{background:var(--noir);color:var(--texte);font-family:'Inter',sans-serif;mi
 <div class="view" id="view-pannes">
   <div class="topbar">
     <div><div class="topbar-date">Suivi des incidents</div><div class="topbar-title">Pannes</div></div>
-    <div class="topbar-right"><button class="btn btn-danger" onclick="openPanne()">🚨 Signaler une panne</button></div>
   </div>
   <div class="card">
-    <div class="card-header"><div class="card-title">Historique des pannes</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="loadPannes()">🔄</button></div>
-    <div class="tr hd tr-pannes"><div class="col-label">Client / Groupe</div><div class="col-label">Type</div><div class="col-label">Date</div><div class="col-label">Statut</div><div></div></div>
-    <div id="pannes-list"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
+    <div class="card-head"><div class="card-title">Historique des pannes</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="loadPannes()">🔄</button></div>
+    <div id="pannes-list"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 </div>
 
-</div><!-- /main -->
-</div><!-- /layout -->
-
-<!-- MODALS -->
-<!-- Modal Client détail -->
-<div class="modal-overlay" id="modal-client" onclick="closeModal('modal-client',event)">
-  <div class="modal modal-wide">
-    <div class="modal-head">
-      <div><div class="modal-nom" id="mc-nom">—</div><div class="modal-sub" id="mc-sub">—</div></div>
-      <button class="modal-close" onclick="closeModalDirect('modal-client')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="modal-tabs">
-        <div class="modal-tab active" onclick="switchModalTab('mc','infos')">Infos & Groupes</div>
-        <div class="modal-tab" onclick="switchModalTab('mc','graphes')">📊 Graphiques</div>
-        <div class="modal-tab" onclick="switchModalTab('mc','historique')">Historique</div>
-      </div>
-      <div class="modal-pane active" id="mc-pane-infos" id="mc-body"></div>
-      <div class="modal-pane" id="mc-pane-graphes">
-        <div style="margin-bottom:12px"><canvas id="mc-chart-carb" height="160"></canvas></div>
-        <div><canvas id="mc-chart-heures" height="160"></canvas></div>
-      </div>
-      <div class="modal-pane" id="mc-pane-historique" id="mc-histo"></div>
-    </div>
+<!-- MAINTENANCE -->
+<div class="view" id="view-maintenance">
+  <div class="topbar">
+    <div><div class="topbar-date">Interventions</div><div class="topbar-title">Maintenance</div></div>
+    <div><button class="btn btn-or" onclick="openMaintenance()">+ Enregistrer</button></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><div class="card-title">Historique des interventions</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="loadMaintenance()">🔄</button></div>
+    <div id="maint-list"><div class="loading"><div class="spinner"></div></div></div>
   </div>
 </div>
 
-<!-- Modal Ajouter Client -->
+</div>
+
+<!-- MODAL NOUVEAU CLIENT -->
 <div class="modal-overlay" id="modal-add" onclick="closeModal('modal-add',event)">
   <div class="modal">
-    <div class="modal-head"><div><div class="modal-nom">Nouveau client</div><div class="modal-sub">Ajouter un établissement</div></div><button class="modal-close" onclick="closeModalDirect('modal-add')">✕</button></div>
+    <div class="modal-head"><div class="modal-nom">Nouveau client</div><button class="modal-close" onclick="closeModalDirect('modal-add')">✕</button></div>
     <div class="modal-body">
       <div class="field"><label>Nom de l'établissement</label><input id="add-nom" placeholder="Ex: Hôtel Ivoire"></div>
       <div class="field-row">
         <div class="field"><label>Type</label><select id="add-type"><option value="hotel">Hôtel</option><option value="residence">Résidence</option><option value="autre">Autre</option></select></div>
-        <div class="field"><label>Plan</label><select id="add-plan"><option value="starter">Starter — 10 000 FCFA</option><option value="business" selected>Business — 20 000 FCFA</option><option value="pro">Pro — 50 000 FCFA</option></select></div>
+        <div class="field"><label>Plan</label><select id="add-plan"><option value="starter">Starter — 10 000</option><option value="business" selected>Business — 20 000</option><option value="pro">Pro — 50 000</option></select></div>
       </div>
       <div class="field-row">
-        <div class="field"><label>Quartier</label><input id="add-quartier" placeholder="Ex: Plateau"></div>
         <div class="field"><label>Ville</label><input id="add-ville" placeholder="Ex: Dakar" value="Dakar"></div>
+        <div class="field"><label>Groupe hôtelier</label><input id="add-groupe" placeholder="Ex: Azalai (optionnel)"></div>
       </div>
       <div class="field"><label>WhatsApp Patron</label><input id="add-patron" placeholder="+221771234567"></div>
       <div class="field"><label>WhatsApp Gardien</label><input id="add-gardien" placeholder="+221771234568"></div>
-      <button class="btn btn-or" style="width:100%;justify-content:center;padding:14px" onclick="saveClient()">✅ Créer le client</button>
+      <div class="field"><label>Prix litre FCFA</label><input id="add-prix" type="number" placeholder="695" value="695"></div>
+      <button class="btn btn-or" style="width:100%;justify-content:center;padding:13px;margin-top:4px" onclick="saveClient()">✅ Créer le client</button>
     </div>
   </div>
 </div>
 
-<!-- Modal Ajouter Groupe -->
-<div class="modal-overlay" id="modal-groupe" onclick="closeModal('modal-groupe',event)">
-  <div class="modal">
-    <div class="modal-head"><div><div class="modal-nom">Nouveau groupe</div><div class="modal-sub" id="mg-client-nom">—</div></div><button class="modal-close" onclick="closeModalDirect('modal-groupe')">✕</button></div>
-    <input type="hidden" id="mg-client-id">
-    <div class="modal-body">
-      <div class="field"><label>Nom du groupe</label><input id="mg-nom" placeholder="Ex: Groupe A"></div>
-      <div class="field-row">
-        <div class="field"><label>Marque</label><input id="mg-marque" placeholder="Ex: Caterpillar"></div>
-        <div class="field"><label>Puissance (kVA)</label><input id="mg-puissance" type="number" placeholder="Ex: 45"></div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>Conso. théorique (L/h)</label><input id="mg-conso" type="number" step="0.1" placeholder="Ex: 1.8" value="1.5"></div>
-        <div class="field"><label>Seuil vidange (heures)</label><input id="mg-seuil" type="number" placeholder="Ex: 250" value="250"></div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>Fréquence plein (jours)</label><input id="mg-freq" type="number" placeholder="Ex: 2" value="2"></div>
-        <div class="field"><label>Site</label><input id="mg-site" placeholder="Ex: Site principal"></div>
-      </div>
-      <button class="btn btn-or" style="width:100%;justify-content:center;padding:14px" onclick="saveGroupe()">✅ Ajouter le groupe</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Saisie -->
-<div class="modal-overlay" id="modal-saisie" onclick="closeModal('modal-saisie',event)">
-  <div class="modal">
-    <div class="modal-head"><div><div class="modal-nom">Nouvelle saisie</div><div class="modal-sub">Données quotidiennes</div></div><button class="modal-close" onclick="closeModalDirect('modal-saisie')">✕</button></div>
-    <div class="modal-body">
-      <div class="field"><label>Client</label><select id="s-client" onchange="loadGroupesFor('s-client','s-groupe')"><option value="">Choisir...</option></select></div>
-      <div class="field"><label>Groupe</label><select id="s-groupe"><option value="">Choisir un client d'abord</option></select></div>
-      <div class="field-row">
-        <div class="field"><label>Niveau carburant (%)</label><input id="s-carb" type="number" min="0" max="100" placeholder="Ex: 72"></div>
-        <div class="field"><label>Litres ajoutés</label><input id="s-litres" type="number" step="0.1" placeholder="0" value="0"></div>
-      </div>
-      <div class="field-row">
-        <div class="field"><label>Heures de marche</label><input id="s-heures" type="number" step="0.1" placeholder="Ex: 8"></div>
-        <div class="field"><label>Niveau d'huile</label><select id="s-huile"><option value="normal">✅ Normal</option><option value="bas">⚠️ Bas</option><option value="critique">🚨 Critique</option></select></div>
-      </div>
-      <div class="field"><label>Opérateur</label><input id="s-operateur" placeholder="Prénom du gardien"></div>
-      <div class="field"><label>Notes</label><textarea id="s-notes" placeholder="Observations..."></textarea></div>
-      <button class="btn btn-or" style="width:100%;justify-content:center;padding:14px" onclick="saveSaisie()">✅ Enregistrer la saisie</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Maintenance -->
+<!-- MODAL MAINTENANCE -->
 <div class="modal-overlay" id="modal-maint" onclick="closeModal('modal-maint',event)">
   <div class="modal">
-    <div class="modal-head"><div><div class="modal-nom">Nouvelle intervention</div><div class="modal-sub">Maintenance</div></div><button class="modal-close" onclick="closeModalDirect('modal-maint')">✕</button></div>
+    <div class="modal-head"><div class="modal-nom">Nouvelle intervention</div><button class="modal-close" onclick="closeModalDirect('modal-maint')">✕</button></div>
     <div class="modal-body">
       <div class="field"><label>Client</label><select id="m-client" onchange="loadGroupesFor('m-client','m-groupe')"><option value="">Choisir...</option></select></div>
-      <div class="field"><label>Groupe</label><select id="m-groupe"><option value="">Choisir un client d'abord</option></select></div>
-      <div class="field"><label>Type</label><select id="m-type"><option value="vidange">Vidange huile</option><option value="filtre_air">Filtre à air</option><option value="filtre_carb">Filtre à carburant</option><option value="filtre_huile">Filtre à huile</option><option value="courroie">Courroie</option><option value="demarreur">Démarreur</option><option value="autre">Autre</option></select></div>
+      <div class="field"><label>Groupe</label><select id="m-groupe"><option value="">Choisir un client</option></select></div>
+      <div class="field"><label>Type</label><select id="m-type"><option value="vidange">Vidange huile</option><option value="filtre_air">Filtre à air</option><option value="filtre_carb">Filtre carburant</option><option value="filtre_huile">Filtre huile</option><option value="autre">Autre</option></select></div>
       <div class="field-row">
-        <div class="field"><label>Technicien</label><input id="m-tech" placeholder="Nom du technicien"></div>
-        <div class="field"><label>Coût (FCFA)</label><input id="m-cout" type="number" placeholder="ex: 45000"></div>
+        <div class="field"><label>Technicien</label><input id="m-tech" placeholder="Nom"></div>
+        <div class="field"><label>Coût (FCFA)</label><input id="m-cout" type="number" placeholder="45000"></div>
       </div>
-      <div class="field"><label>Heures au compteur</label><input id="m-heures" type="number" step="0.1" placeholder="ex: 238"></div>
-      <div class="field"><label>Notes</label><textarea id="m-notes" placeholder="Détails..."></textarea></div>
-      <button class="btn btn-or" style="width:100%;justify-content:center;padding:14px" onclick="saveMaintenance()">✅ Enregistrer</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal Panne -->
-<div class="modal-overlay" id="modal-panne" onclick="closeModal('modal-panne',event)">
-  <div class="modal">
-    <div class="modal-head"><div><div class="modal-nom">Signaler une panne</div><div class="modal-sub">Enregistrer un incident</div></div><button class="modal-close" onclick="closeModalDirect('modal-panne')">✕</button></div>
-    <div class="modal-body">
-      <div class="field"><label>Client</label><select id="p-client" onchange="loadGroupesFor('p-client','p-groupe')"><option value="">Choisir...</option></select></div>
-      <div class="field"><label>Groupe</label><select id="p-groupe"><option value="">Choisir un client d'abord</option></select></div>
-      <div class="field"><label>Type de panne</label><select id="p-type"><option value="ne_demarre_pas">Ne démarre pas</option><option value="arret_inopin">Arrêt inopiné</option><option value="bruit_anormal">Bruit anormal</option><option value="surchauffe">Surchauffe</option><option value="fuite">Fuite (carburant/huile)</option><option value="autre">Autre</option></select></div>
-      <div class="field"><label>Description</label><textarea id="p-desc" placeholder="Décrivez la panne..."></textarea></div>
-      <button class="btn btn-danger" style="width:100%;justify-content:center;padding:14px" onclick="savePanne()">🚨 Signaler la panne</button>
+      <div class="field"><label>Notes</label><input id="m-notes" placeholder="Détails..."></div>
+      <button class="btn btn-or" style="width:100%;justify-content:center;padding:13px;margin-top:4px" onclick="saveMaintenance()">✅ Enregistrer</button>
     </div>
   </div>
 </div>
@@ -513,732 +273,353 @@ body{background:var(--noir);color:var(--texte);font-family:'Inter',sans-serif;mi
 <script>
 const SUPA_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
-
-const PLANS = {starter:{label:'Starter',prix:10000},business:{label:'Business',prix:20000},pro:{label:'Pro',prix:50000}};
-const TYPE_MAINT = {vidange:'Vidange huile',filtre_air:'Filtre à air',filtre_carb:'Filtre à carburant',filtre_huile:'Filtre à huile',courroie:'Courroie',demarreur:'Démarreur',autre:'Autre'};
+const BASE_URL = 'https://gen-track.vercel.app';
+const PLANS = {starter:10000,business:20000,pro:50000};
+const TYPE_MAINT = {vidange:'Vidange huile',filtre_air:'Filtre air',filtre_carb:'Filtre carburant',filtre_huile:'Filtre huile',autre:'Autre'};
 const TYPE_PANNE = {ne_demarre_pas:'Ne démarre pas',arret_inopin:'Arrêt inopiné',bruit_anormal:'Bruit anormal',surchauffe:'Surchauffe',fuite:'Fuite',autre:'Autre'};
 
-let mainChart = null;
-let currentChartTab = 'carburant';
-let chartData = [];
+let selectedClientId = null;
 
-// ── API ──
-async function api(table, opts={}) {
-  const {method='GET',body,query='',select='*'} = opts;
-  const url = `${SUPA_URL}/rest/v1/${table}?select=${select}${query}`;
-  const res = await fetch(url, {
+async function api(table, q='', select='*', method='GET', body=null) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?select=${select}${q}`, {
     method,
-    headers: {'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json','Prefer':method==='POST'?'return=representation':''},
-    body: body ? JSON.stringify(body) : undefined
+    headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json','Prefer':method==='POST'?'return=representation':''},
+    body:body?JSON.stringify(body):undefined
   });
-  if (!res.ok) { const err = await res.json(); throw new Error(err.message||'Erreur API'); }
-  if (res.status === 204) return [];
+  if(res.status===204)return[];
   return res.json();
 }
-async function apiPost(t,b){return api(t,{method:'POST',body:b});}
-async function apiPatch(t,id,b){return api(t,{method:'PATCH',body:b,query:`&id=eq.${id}`});}
 
-// ── HELPERS ──
-function fmtDate(d){if(!d)return'—';const dt=new Date(d);return dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});}
-function fmtDateShort(d){if(!d)return'—';const dt=new Date(d);return dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});}
-function fmtNum(n){return n?n.toLocaleString('fr-FR'):'0';}
-function carbColor(n){return n<25?'rouge':n<50?'orange':'vert';}
-function empty(msg='Aucune donnée'){return`<div class="empty"><div class="empty-icon">📭</div><div class="empty-title">${msg}</div><div class="empty-sub">Les données apparaîtront ici</div></div>`;}
-function joursDepuis(d){if(!d)return null;return Math.floor((Date.now()-new Date(d))/(86400000));}
+function fmtNum(n){return Math.round(n).toLocaleString('fr-FR');}
+function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function carbColor(n){return n<25?'var(--rouge)':n<50?'var(--orange)':'var(--vert)';}
+function autoColor(j){return j<2?'var(--rouge)':j<5?'var(--orange)':'var(--vert)';}
+function calcAuto(g, s) {
+  if(!s||s.niveau_carburant==null)return null;
+  const L = (g.capacite_reservoir_litres||500)*s.niveau_carburant/100;
+  const cJ = (g.conso_theorique_lh||1.8)*8;
+  return Math.round((L/cJ)*10)/10;
+}
+function statusClient(hSJ, hG, hA, hP) {
+  if(hP.length>0||hA.some(a=>a.severite==='danger'))return'danger';
+  if(hA.length>0||hSJ.some(s=>s.niveau_carburant<50))return'warn';
+  if(hSJ.length===0&&hG.length>0)return'warn';
+  return'ok';
+}
+function clientLien(c) {
+  if(c.groupe_hotelier==='Azalai'||c.groupe_hotelier==='Azalaï') return `${BASE_URL}/azalai`;
+  return `${BASE_URL}/client?id=${c.id}`;
+}
 
-// ── NAVIGATION ──
 function goTo(v) {
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.sb-item').forEach(x=>x.classList.remove('active'));
   document.getElementById('view-'+v).classList.add('active');
-  document.getElementById('nav-'+v).classList.add('active');
+  document.getElementById('nav-'+v)?.classList.add('active');
   document.querySelector('.main').scrollTop=0;
-  const loaders={clients:loadClients,alertes:loadAlertes,groupes:loadGroupes,maintenance:loadMaintenance,pannes:loadPannes,historique:()=>{initHistoFilters();loadHistorique();}};
+  const loaders={clients:loadClients,alertes:loadAlertes,pannes:loadPannes,maintenance:loadMaintenance};
   if(loaders[v])loaders[v]();
 }
 
-function switchChartTab(tab) {
-  currentChartTab = tab;
-  document.querySelectorAll('.chart-tab').forEach(t=>t.classList.remove('active'));
-  event.target.classList.add('active');
-  renderMainChart();
-}
+function showToast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),2500);}
+function openAddClient(){document.getElementById('modal-add').classList.add('open');}
+function openMaintenance(){loadClientSelect('m-client');document.getElementById('modal-maint').classList.add('open');}
+function closeModal(id,e){if(e.target===document.getElementById(id))closeModalDirect(id);}
+function closeModalDirect(id){document.getElementById(id).classList.remove('open');}
 
-function switchModalTab(prefix, pane) {
-  document.querySelectorAll(`#modal-${prefix=='mc'?'client':''}  .modal-tab`).forEach(t=>t.classList.remove('active'));
-  event.target.classList.add('active');
-  document.querySelectorAll(`[id^="${prefix}-pane-"]`).forEach(p=>p.classList.remove('active'));
-  document.getElementById(`${prefix}-pane-${pane}`).classList.add('active');
-}
-
-// ── LOAD ALL ──
 async function loadAll() {
   const now = new Date();
   document.getElementById('accueil-date').textContent = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+' · '+now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-  await Promise.all([loadKPIs(),loadAccueilGroupes(),loadAccueilAlertes(),loadAccueilActivite()]);
+  const today = now.toISOString().split('T')[0];
+
+  const [clients,groupes,saisies,alertes,pannes] = await Promise.all([
+    api('clients','&actif=eq.true&order=nom'),
+    api('groupes','&actif=eq.true'),
+    api('saisies',`&date=eq.${today}&order=created_at.desc`),
+    api('alertes','&resolue=eq.false&order=created_at.desc'),
+    api('pannes','&resolue=eq.false'),
+  ]);
+
+  const mrr = clients.reduce((a,c)=>a+(PLANS[c.plan]||20000),0);
+  document.getElementById('kpi-clients').textContent = clients.length;
+  document.getElementById('kpi-clients-sub').textContent = `${clients.length} établissement${clients.length>1?'s':''}`;
+  document.getElementById('kpi-mrr').textContent = fmtNum(mrr);
+  document.getElementById('kpi-alertes').textContent = alertes.length;
+  document.getElementById('kpi-saisies').textContent = saisies.length;
+  document.getElementById('kpi-saisies-sub').textContent = `sur ${groupes.length} groupe${groupes.length>1?'s':''}`;
+  document.getElementById('badge-alertes').textContent = alertes.length||0;
+
+  renderClientsSante('clients-sante', clients, groupes, saisies, alertes, pannes, 'detail-panel-accueil');
+  renderAlertesAccueil(alertes, clients, groupes);
 }
 
-async function loadKPIs() {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const [clients,groupes,alertes,saisies,totalGroupes] = await Promise.all([
-      api('clients',{query:'&actif=eq.true'}),
-      api('groupes',{query:'&actif=eq.true'}),
-      api('alertes',{query:'&resolue=eq.false'}),
-      api('saisies',{query:`&date=eq.${today}`}),
-      api('groupes',{query:'&actif=eq.true',select:'id'})
-    ]);
-    document.getElementById('kpi-clients').textContent=clients.length||0;
-    document.getElementById('kpi-clients-sub').textContent=`${clients.length} établissement${clients.length>1?'s':''}`;
-    document.getElementById('kpi-groupes').textContent=groupes.length||0;
-    document.getElementById('kpi-alertes').textContent=alertes.length||0;
-    document.getElementById('kpi-saisies').textContent=saisies.length||0;
-    document.getElementById('kpi-saisies-sub').textContent=`sur ${totalGroupes.length} groupe${totalGroupes.length>1?'s':''}`;
-    document.getElementById('badge-alertes').textContent=alertes.length||0;
-    document.getElementById('badge-groupes').textContent=groupes.length||0;
-    // Banner alerte
-    const banner = document.getElementById('alert-banner-wrap');
-    const critiques = alertes.filter(a=>a.severite==='danger');
-    if(critiques.length>0){
-      banner.innerHTML=`<div class="alert-banner" onclick="goTo('alertes')"><div class="alert-banner-icon">🚨</div><div class="alert-banner-text"><div class="alert-banner-title">${critiques.length} alerte${critiques.length>1?'s':''} critique${critiques.length>1?'s':''} en cours</div><div class="alert-banner-sub">Cliquez pour voir les détails et prendre en charge</div></div><div class="alert-banner-arrow">›</div></div>`;
-    } else { banner.innerHTML=''; }
-  } catch(e){console.error(e);}
-}
-
-async function loadAccueilGroupes() {
-  const el = document.getElementById('accueil-groupes');
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const [groupes,saisies,alertes] = await Promise.all([
-      api('groupes',{select:'*,clients(nom)',query:'&actif=eq.true&order=created_at.asc&limit=8'}),
-      api('saisies',{query:`&date=eq.${today}`}),
-      api('alertes',{query:'&resolue=eq.false'})
-    ]);
-    if(!groupes.length){el.innerHTML=empty('Aucun groupe');return;}
-    el.innerHTML = groupes.map(g=>{
-      const s = saisies.find(x=>x.groupe_id===g.id);
-      const a = alertes.filter(x=>x.groupe_id===g.id);
-      const carb = s?.niveau_carburant;
-      const huile = s?.niveau_huile||'normal';
-      let status='unknown', statusLabel='Pas de saisie';
-      if(s){
-        if(a.some(x=>x.severite==='danger')||carb<25||huile==='critique'){status='danger';statusLabel='Critique';}
-        else if(a.length>0||carb<50||huile==='bas'){status='warn';statusLabel='Attention';}
-        else{status='ok';statusLabel='Normal';}
-      }
-      const carbBar = carb!=null?`<div class="gc-bar-wrap"><div class="gc-bar-label"><span>Carburant</span><span>${carb}%</span></div><div class="gc-bar"><div class="gc-bar-fill" style="width:${carb}%;background:${carb<25?'var(--rouge)':carb<50?'var(--orange)':'var(--vert)'}"></div></div></div>`:'';
-      return `<div class="groupe-card ${status}" onclick="openClient('${g.client_id}')">
-        <div class="gc-top">
-          <div><div class="gc-nom">${g.nom}</div><div class="gc-client">${g.clients?.nom||'—'} · ${g.marque||''} ${g.puissance_kva||''}kVA</div></div>
-          <span class="pill ${status==='ok'?'pill-ok':status==='warn'?'pill-warn':status==='danger'?'pill-danger':''}">
-            ${status==='ok'?'✓':status==='warn'?'⚠️':status==='danger'?'🚨':'❓'} ${statusLabel}
-          </span>
-        </div>
-        <div class="gc-stats">
-          ${s?`<div class="gc-stat">⛽ <span>${carb!=null?carb+'%':'—'}</span></div><div class="gc-stat">🕐 <span>${s.heures_marche||0}h</span></div><div class="gc-stat">🛢️ <span>${huile}</span></div>${s.litres_ajoutes>0?`<div class="gc-stat">💧 <span>+${s.litres_ajoutes}L</span></div>`:''} ${s.operateur?`<div class="gc-stat">👤 <span>${s.operateur}</span></div>`:''}` :'<div class="gc-stat" style="color:var(--texte3)">Aucune saisie aujourd\'hui</div>'}
-        </div>
-        ${carbBar}
-      </div>`;
-    }).join('');
-  } catch(e){el.innerHTML=empty('Erreur chargement');}
-}
-
-async function loadAccueilAlertes() {
-  const el = document.getElementById('accueil-alertes');
-  try {
-    const alertes = await api('alertes',{select:'*,clients(nom),groupes(nom)',query:'&resolue=eq.false&order=created_at.desc&limit=4'});
-    if(!alertes.length){el.innerHTML=`<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">Aucune alerte</div><div class="empty-sub">Tout est sous contrôle</div></div>`;return;}
-    el.innerHTML = alertes.map(a=>`
-      <div class="alerte-item">
-        <div class="ai-dot" style="background:var(--${a.severite==='danger'?'rouge':'orange'})"></div>
-        <div class="ai-body"><div class="ai-titre">${a.message}</div><div class="ai-desc">${a.clients?.nom||'—'} · ${a.groupes?.nom||'—'}</div></div>
-        <div class="ai-time">${a.severite==='danger'?'🚨':'⚠️'}</div>
-      </div>`).join('');
-  } catch(e){el.innerHTML=empty('Erreur');}
-}
-
-async function loadAccueilActivite() {
-  const el = document.getElementById('accueil-activite');
-  try {
-    const saisies = await api('saisies',{select:'*,clients(nom),groupes(nom)',query:'&order=created_at.desc&limit=5'});
-    if(!saisies.length){el.innerHTML=empty('Aucune activité');return;}
-    el.innerHTML = saisies.map(s=>`
-      <div class="act-item">
-        <div class="act-dot ad-or">⛽</div>
-        <div class="act-body">
-          <div class="act-titre">${s.clients?.nom||'—'} · ${s.groupes?.nom||'—'}</div>
-          <div class="act-detail">${s.niveau_carburant!=null?s.niveau_carburant+'% carburant · ':''}${s.heures_marche||0}h · ${s.operateur||'—'}</div>
-        </div>
-        <div class="act-time">${fmtDate(s.date)}</div>
-      </div>`).join('');
-  } catch(e){el.innerHTML=empty('Erreur');}
-}
-
-// ── GROUPES MODE ──
-let groupeMode = 'hotels'; // 'hotels' | 'detail'
-
-function setGroupeMode(mode) {
-  groupeMode = mode;
-  const btnHotels = document.getElementById('toggle-hotels');
-  const btnDetail = document.getElementById('toggle-detail');
-  if(mode === 'hotels') {
-    btnHotels.style.background = 'var(--or)'; btnHotels.style.color = 'var(--noir)';
-    btnDetail.style.background = 'transparent'; btnDetail.style.color = 'var(--texte2)';
-    document.getElementById('filtre-client-groupes').style.display = 'none';
-  } else {
-    btnDetail.style.background = 'var(--or)'; btnDetail.style.color = 'var(--noir)';
-    btnHotels.style.background = 'transparent'; btnHotels.style.color = 'var(--texte2)';
-    document.getElementById('filtre-client-groupes').style.display = '';
-  }
-  loadGroupes();
-}
-
-// ── GROUPES VUE AGRÉGÉE PAR HÔTEL ──
-async function loadGroupesHotels() {
-  const el = document.getElementById('groupes-list');
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const dateDebut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
-    const [clients, groupes, saisies, alertes, pannes, saisies30] = await Promise.all([
-      api('clients', {query:'&actif=eq.true&order=nom'}),
-      api('groupes', {query:'&actif=eq.true'}),
-      api('saisies', {query:`&date=eq.${today}`}),
-      api('alertes', {query:'&resolue=eq.false'}),
-      api('pannes', {query:'&resolue=eq.false'}),
-      api('saisies', {query:`&date=gte.${dateDebut30}`})
-    ]);
-    if(!clients.length) { el.innerHTML = empty('Aucun client'); return; }
-
-    el.innerHTML = clients.map(client => {
-      const cGroupes = groupes.filter(g => g.client_id === client.id);
-      const cSaisies = saisies.filter(s => s.client_id === client.id);
-      const cAlertes = alertes.filter(a => a.client_id === client.id);
-      const cPannes  = pannes.filter(p => p.client_id === client.id);
-      const cSaisies30 = saisies30.filter(s => s.client_id === client.id);
-
-      // Statut global
-      let status = 'unknown';
-      if(cSaisies.length > 0) {
-        if(cPannes.length > 0 || cAlertes.some(a=>a.severite==='danger')) status = 'danger';
-        else if(cAlertes.length > 0 || cSaisies.some(s=>s.niveau_carburant<50)) status = 'warn';
-        else status = 'ok';
-      }
-
-      // Agrégats
-      const totalHeuresJour = cSaisies.reduce((a,s) => a+(s.heures_marche||0), 0);
-      const totalLitres30   = cSaisies30.reduce((a,s) => a+(s.litres_ajoutes||0), 0);
-      const coutEstime30    = Math.round(totalLitres30 * (client.prix_litre_fcfa||695));
-      const saisiesOK       = cSaisies.length;
-
-      // Statut label
-      const statusLabel = status==='ok'?'✅ Normal':status==='warn'?'⚠️ Attention':status==='danger'?'🚨 Critique':'❓ Pas de saisie';
-      const statusPill  = status==='ok'?'pill-ok':status==='warn'?'pill-warn':status==='danger'?'pill-danger':'';
-
-      // Alertes résumé
-      const alertesDanger  = cAlertes.filter(a=>a.severite==='danger');
-      const alertesWarn    = cAlertes.filter(a=>a.severite!=='danger');
-
-      return `<div class="groupe-card ${status}" onclick="openClient('${client.id}')" style="margin-bottom:12px">
-        <div class="gc-top">
-          <div>
-            <div class="gc-nom">🏨 ${client.nom}</div>
-            <div class="gc-client">${client.ville||'—'} · ${cGroupes.length} groupe${cGroupes.length>1?'s':''}</div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            ${cPannes.length>0?`<span class="pill pill-danger">🚨 ${cPannes.length} panne${cPannes.length>1?'s':''}</span>`:''}
-            <span class="pill ${statusPill}">${statusLabel}</span>
-          </div>
-        </div>
-        <div class="gc-stats" style="margin-bottom:${cAlertes.length>0?'10px':'0'}">
-          <div class="gc-stat">⚡ <span>${cGroupes.length} groupe${cGroupes.length>1?'s':''}</span></div>
-          <div class="gc-stat">🕐 <span>${totalHeuresJour.toFixed(1)}h aujourd'hui</span></div>
-          ${totalLitres30>0?`<div class="gc-stat">⛽ <span>${totalLitres30.toFixed(0)}L ce mois</span></div>`:''}
-          ${coutEstime30>0?`<div class="gc-stat">💰 <span>${fmtNum(coutEstime30)} FCFA estimés</span></div>`:''}
-          <div class="gc-stat">📋 <span>${saisiesOK}/${cGroupes.length} saisies aujourd'hui</span></div>
-        </div>
-        ${cAlertes.length>0?`
-        <div style="padding-top:10px;border-top:1px solid var(--bordure)">
-          ${alertesDanger.map(a=>`<div style="font-size:11px;color:var(--rouge);margin-bottom:3px">🚨 ${a.message}</div>`).join('')}
-          ${alertesWarn.map(a=>`<div style="font-size:11px;color:var(--orange);margin-bottom:3px">⚠️ ${a.message}</div>`).join('')}
-        </div>`:''}
-      </div>`;
-    }).join('');
-  } catch(e) { el.innerHTML = empty('Erreur chargement'); console.error(e); }
-}
-
-// ── GROUPES VUE DÉTAILLÉE ──
-async function loadGroupes() {
-  if(groupeMode === 'hotels') { await loadGroupesHotels(); return; }
-  const el = document.getElementById('groupes-list');
-  el.innerHTML='<div class="loading"><div class="spinner"></div>Chargement...</div>';
-  const filtreClient = document.getElementById('filtre-client-groupes')?.value||'';
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    let q = '&actif=eq.true&order=created_at.asc';
-    if(filtreClient) q+=`&client_id=eq.${filtreClient}`;
-    const [groupes,saisies,alertes,pannes,maintenances] = await Promise.all([
-      api('groupes',{select:'*,clients(nom,whatsapp_patron)',query:q}),
-      api('saisies',{query:`&date=eq.${today}`}),
-      api('alertes',{query:'&resolue=eq.false'}),
-      api('pannes',{query:'&resolue=eq.false'}),
-      api('maintenances',{query:'&order=created_at.desc&limit=50'})
-    ]);
-    if(!groupes.length){el.innerHTML=empty('Aucun groupe');return;}
-    el.innerHTML = groupes.map(g=>{
-      const s = saisies.find(x=>x.groupe_id===g.id);
-      const a = alertes.filter(x=>x.groupe_id===g.id);
-      const p = pannes.filter(x=>x.groupe_id===g.id);
-      const lastMaint = maintenances.find(x=>x.groupe_id===g.id);
-      const carb = s?.niveau_carburant;
-      const huile = s?.niveau_huile||'normal';
-      let status='unknown';
-      if(s){
-        if(a.some(x=>x.severite==='danger')||carb<25||huile==='critique')status='danger';
-        else if(a.length>0||carb<50||huile==='bas'||p.length>0)status='warn';
-        else status='ok';
-      }
-      const pctVidange = g.seuil_vidange_heures ? Math.min(100,Math.round((g.heures_total||0)/g.seuil_vidange_heures*100)) : 0;
-      const vidangeColor = pctVidange>90?'var(--rouge)':pctVidange>70?'var(--orange)':'var(--vert)';
-      return `<div class="groupe-card ${status}">
-        <div class="gc-top">
-          <div>
-            <div class="gc-nom">${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA</div>
-            <div class="gc-client">${g.clients?.nom||'—'}${g.site?' · '+g.site:''}</div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            ${p.length>0?`<span class="pill pill-danger">🚨 ${p.length} panne${p.length>1?'s':''}</span>`:''}
-            ${a.length>0?`<span class="pill pill-warn">⚠️ ${a.length} alerte${a.length>1?'s':''}</span>`:''}
-            <span class="pill ${status==='ok'?'pill-ok':status==='warn'?'pill-warn':status==='danger'?'pill-danger':''}">
-              ${status==='ok'?'✓ OK':status==='warn'?'⚠️ Attention':status==='danger'?'🚨 Critique':'❓ Inconnu'}
-            </span>
-          </div>
-        </div>
-        <div class="gc-stats" style="margin-bottom:10px">
-          <div class="gc-stat">⛽ Carburant : <span class="${carbColor(carb)}">${carb!=null?carb+'%':'—'}</span></div>
-          <div class="gc-stat">🕐 Heures/jour : <span>${s?.heures_marche!=null?s.heures_marche+'h':'—'}</span></div>
-          <div class="gc-stat">🛢️ Huile : <span class="${huile==='critique'?'rouge':huile==='bas'?'orange':'vert'}">${huile}</span></div>
-          <div class="gc-stat">⚙️ Total : <span>${g.heures_total||0}h</span></div>
-          ${s?.litres_ajoutes>0?`<div class="gc-stat">💧 Plein : <span>+${s.litres_ajoutes}L</span></div>`:''}
-          ${s?.operateur?`<div class="gc-stat">👤 <span>${s.operateur}</span></div>`:''}
-          ${lastMaint?`<div class="gc-stat">🔧 Dernière maint. : <span>${fmtDate(lastMaint.created_at)}</span></div>`:''}
-        </div>
-        ${carb!=null?`<div class="gc-bar-wrap"><div class="gc-bar-label"><span>Carburant</span><span>${carb}%</span></div><div class="gc-bar"><div class="gc-bar-fill" style="width:${carb}%;background:${carb<25?'var(--rouge)':carb<50?'var(--orange)':'var(--vert)'}"></div></div></div>`:''}
-        <div class="gc-bar-wrap"><div class="gc-bar-label"><span>Heures avant vidange</span><span>${g.heures_total||0}h / ${g.seuil_vidange_heures||250}h (${pctVidange}%)</span></div><div class="gc-bar"><div class="gc-bar-fill" style="width:${pctVidange}%;background:${vidangeColor}"></div></div></div>
-        ${a.length>0?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bordure)">${a.map(x=>`<div style="font-size:11px;color:${x.severite==='danger'?'var(--rouge)':'var(--orange)'};margin-bottom:3px">• ${x.message}</div>`).join('')}</div>`:''}
-      </div>`;
-    }).join('');
-  } catch(e){el.innerHTML=empty('Erreur chargement');}
-}
-
-// ── HISTORIQUE & GRAPHIQUES ──
-async function initHistoFilters() {
-  try {
-    const clients = await api('clients',{query:'&actif=eq.true&order=nom'});
-    // Groupes hôteliers distincts
-    const groupes = [...new Set(clients.map(c=>c.groupe_hotelier).filter(Boolean))].sort();
-    const fgh = document.getElementById('filtre-groupe-hotelier');
-    if(fgh) fgh.innerHTML='<option value="">Tous les groupes</option>'+groupes.map(g=>`<option value="${g}">${g}</option>`).join('');
-    // Hôtels
-    const sel = document.getElementById('histo-client');
-    const cur = sel.value;
-    sel.innerHTML='<option value="">Tous les clients</option>'+clients.map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
-    if(cur)sel.value=cur;
-    const fg = document.getElementById('filtre-client-groupes');
-    if(fg) fg.innerHTML='<option value="">Tous les hôtels</option>'+clients.map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
-  } catch(e){}
-}
-
-async function onFiltreGroupeHotelier() {
-  const groupe = document.getElementById('filtre-groupe-hotelier').value;
-  const fch = document.getElementById('filtre-client-groupes');
-  try {
-    let q = '&actif=eq.true&order=nom';
-    if(groupe) q += `&groupe_hotelier=eq.${encodeURIComponent(groupe)}`;
-    const clients = await api('clients',{query:q});
-    fch.innerHTML='<option value="">Tous les hôtels</option>'+clients.map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
-  } catch(e){}
-  loadGroupes();
-}
-
-async function loadHistorique() {
-  const jours = parseInt(document.getElementById('histo-periode')?.value||30);
-  const clientId = document.getElementById('histo-client')?.value||'';
-  const groupeId = document.getElementById('histo-groupe')?.value||'';
-  const dateDebut = new Date(Date.now()-jours*86400000).toISOString().split('T')[0];
-  try {
-    let qSaisies = `&date=gte.${dateDebut}&order=date.asc`;
-    let qPannes = `&date_panne=gte.${dateDebut}`;
-    let qMaint = `&date_intervention=gte.${dateDebut}&order=date_intervention.desc&limit=10`;
-    if(clientId){qSaisies+=`&client_id=eq.${clientId}`;qPannes+=`&client_id=eq.${clientId}`;qMaint+=`&client_id=eq.${clientId}`;}
-    if(groupeId){qSaisies+=`&groupe_id=eq.${groupeId}`;qPannes+=`&groupe_id=eq.${groupeId}`;}
-    const [saisies,pannes,maints] = await Promise.all([
-      api('saisies',{select:'*,clients(nom),groupes(nom)',query:qSaisies}),
-      api('pannes',{select:'*,clients(nom),groupes(nom)',query:qPannes}),
-      api('maintenances',{select:'*,clients(nom),groupes(nom)',query:qMaint})
-    ]);
-    chartData = saisies;
-    // KPIs histo
-    const totalH = saisies.reduce((a,s)=>a+(s.heures_marche||0),0);
-    const totalL = saisies.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
-    document.getElementById('hk-heures').textContent=totalH.toFixed(1)+'h';
-    document.getElementById('hk-litres').textContent=totalL.toFixed(0)+'L';
-    document.getElementById('hk-pannes').textContent=pannes.length;
-    renderMainChart();
-    // Dernières saisies
-    const sSorted = [...saisies].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,8);
-    document.getElementById('histo-saisies').innerHTML = sSorted.length
-      ? sSorted.map(s=>`<div class="act-item"><div class="act-dot ad-or">⛽</div><div class="act-body"><div class="act-titre">${s.clients?.nom||'—'} · ${s.groupes?.nom||'—'}</div><div class="act-detail">${s.niveau_carburant!=null?s.niveau_carburant+'%':'—'} · ${s.heures_marche||0}h · ${s.operateur||'—'}</div></div><div class="act-time">${fmtDate(s.date)}</div></div>`).join('')
-      : empty('Aucune saisie');
-    // Pannes
-    document.getElementById('histo-pannes-list').innerHTML = pannes.length
-      ? pannes.slice(0,6).map(p=>`<div class="act-item"><div class="act-dot ad-r">🚨</div><div class="act-body"><div class="act-titre">${p.clients?.nom||'—'} · ${p.groupes?.nom||'—'}</div><div class="act-detail">${TYPE_PANNE[p.type]||p.type} · ${p.description||'—'}</div></div><div class="act-time"><span class="pill ${p.resolue?'pill-ok':'pill-danger'}">${p.resolue?'✓':'En cours'}</span></div></div>`).join('')
-      : `<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">Aucune panne</div></div>`;
-    // Maintenances
-    document.getElementById('histo-maint-list').innerHTML = maints.length
-      ? maints.map(m=>`<div class="act-item"><div class="act-dot ad-b">🔧</div><div class="act-body"><div class="act-titre">${m.clients?.nom||'—'} · ${m.groupes?.nom||'—'}</div><div class="act-detail">${TYPE_MAINT[m.type]||m.type}${m.technicien?' · '+m.technicien:''}${m.cout>0?' · '+fmtNum(m.cout)+' FCFA':''}</div></div><div class="act-time">${fmtDate(m.date_intervention)}</div></div>`).join('')
-      : empty('Aucune maintenance');
-    // Filtre groupe
-    if(clientId){
-      const groupes = await api('groupes',{query:`&client_id=eq.${clientId}&actif=eq.true`});
-      const gsel = document.getElementById('histo-groupe');
-      const gcur = gsel.value;
-      gsel.innerHTML='<option value="">Tous les groupes</option>'+groupes.map(g=>`<option value="${g.id}">${g.nom}</option>`).join('');
-      if(gcur)gsel.value=gcur;
-    }
-  } catch(e){console.error(e);}
-}
-
-function renderMainChart() {
-  if(!chartData.length) return;
-  // Grouper par date
-  const byDate = {};
-  chartData.forEach(s=>{
-    const d = s.date;
-    if(!byDate[d]) byDate[d]={carburant:[],heures:[],litres:[],huile:[]};
-    if(s.niveau_carburant!=null) byDate[d].carburant.push(s.niveau_carburant);
-    if(s.heures_marche) byDate[d].heures.push(s.heures_marche);
-    if(s.litres_ajoutes>0) byDate[d].litres.push(s.litres_ajoutes);
-  });
-  const labels = Object.keys(byDate).sort().map(fmtDateShort);
-  const dates = Object.keys(byDate).sort();
-  let dataset, label, color, yLabel;
-  if(currentChartTab==='carburant'){
-    dataset=dates.map(d=>byDate[d].carburant.length?Math.round(byDate[d].carburant.reduce((a,b)=>a+b)/byDate[d].carburant.length):null);
-    label='Niveau carburant moyen (%)';color='#C8922A';yLabel='%';
-  } else if(currentChartTab==='heures'){
-    dataset=dates.map(d=>byDate[d].heures.reduce((a,b)=>a+b,0)||null);
-    label='Heures de marche totales';color='#3B82F6';yLabel='h';
-  } else if(currentChartTab==='litres'){
-    dataset=dates.map(d=>byDate[d].litres.reduce((a,b)=>a+b,0)||null);
-    label='Litres ajoutés';color='#22C55E';yLabel='L';
-  } else {
-    dataset=dates.map(d=>byDate[d].carburant.length?Math.round(byDate[d].carburant.reduce((a,b)=>a+b)/byDate[d].carburant.length):null);
-    label='Carburant (%)';color='#F97316';yLabel='%';
-  }
-  const ctx = document.getElementById('main-chart').getContext('2d');
-  if(mainChart) mainChart.destroy();
-  mainChart = new Chart(ctx,{
-    type:'line',
-    data:{
-      labels,
-      datasets:[{
-        label,data:dataset,borderColor:color,backgroundColor:color+'22',
-        borderWidth:2,pointBackgroundColor:color,pointRadius:4,
-        tension:0.3,fill:true,spanGaps:true
-      }]
-    },
-    options:{
-      responsive:true,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y}${yLabel}`}}},
-      scales:{
-        x:{grid:{color:'#242424'},ticks:{color:'#606060',font:{size:10}}},
-        y:{grid:{color:'#242424'},ticks:{color:'#606060',font:{size:10}},beginAtZero:currentChartTab!=='carburant'}
-      }
-    }
-  });
-}
-
-// ── CLIENTS ──
-async function loadClients() {
-  const el = document.getElementById('clients-list');
-  el.innerHTML='<div class="loading"><div class="spinner"></div>Chargement...</div>';
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const [clients,groupes,saisies] = await Promise.all([
-      api('clients',{query:'&order=created_at.desc'}),
-      api('groupes',{query:'&actif=eq.true'}),
-      api('saisies',{query:`&date=eq.${today}`})
-    ]);
-    if(!clients.length){el.innerHTML=empty('Aucun client');return;}
-    el.innerHTML = clients.map(c=>{
-      const cg = groupes.filter(g=>g.client_id===c.id);
-      const cs = saisies.filter(s=>s.client_id===c.id);
-      return `<div class="tr tr-clients" onclick="openClient('${c.id}')">
-        <div><div class="col-name">${c.nom}</div><div class="col-sub">${c.quartier||''} · ${c.ville||'Dakar'} · ${PLANS[c.plan]?.label||c.plan}</div></div>
-        <div class="col-val or">${cg.length} groupe${cg.length>1?'s':''}</div>
-        <div class="col-val ${cs.length===cg.length?'vert':cs.length>0?'orange':'rouge'}">${cs.length}/${cg.length}</div>
-        <div><span class="pill ${c.actif?'pill-ok':'pill-warn'}">${c.actif?'✓ Actif':'⏸ Inactif'}</span></div>
-        <div style="color:var(--texte2)">›</div>
-      </div>`;
-    }).join('');
-  } catch(e){el.innerHTML=`<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-title">Erreur</div><div class="empty-sub">${e.message}</div></div>`;}
-}
-
-async function openClient(id) {
-  document.getElementById('modal-client').classList.add('open');
-  document.getElementById('mc-nom').textContent='Chargement...';
-  document.getElementById('mc-sub').textContent='';
-  document.getElementById('mc-pane-infos').innerHTML='<div class="loading"><div class="spinner"></div>Chargement...</div>';
-  try {
-    const dateDebut = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
-    const [client,groupes,saisies,alertes,pannes,maints] = await Promise.all([
-      api('clients',{query:`&id=eq.${id}`}).then(r=>r[0]),
-      api('groupes',{query:`&client_id=eq.${id}&actif=eq.true`}),
-      api('saisies',{query:`&client_id=eq.${id}&order=date.desc&limit=30`}),
-      api('alertes',{query:`&client_id=eq.${id}&resolue=eq.false`}),
-      api('pannes',{query:`&client_id=eq.${id}&order=created_at.desc&limit=5`}),
-      api('maintenances',{query:`&client_id=eq.${id}&order=created_at.desc&limit=5`})
-    ]);
-    document.getElementById('mc-nom').textContent=client.nom;
-    document.getElementById('mc-sub').textContent=`${client.quartier||''} · ${client.ville||'Dakar'} · Plan ${PLANS[client.plan]?.label||client.plan} · ${fmtNum(PLANS[client.plan]?.prix||client.prix_mensuel)} FCFA/mois`;
-    const lastSaisie=saisies[0];
-    // Calcul coûts ce mois
-    const dateDebutMois = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
-    const saisiesMois = saisies.filter(s=>s.date>=dateDebutMois);
-    const totalLitresMois = saisiesMois.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
-    const coutCarburant = Math.round(totalLitresMois*(client.prix_litre_fcfa||695));
-    const coutMaint = maints.reduce((a,m)=>a+(m.cout||0),0);
-    const coutTotal = coutCarburant + coutMaint;
-    // Pane infos
-    let html=`<div class="modal-grid">
-      <div class="modal-stat"><div class="modal-stat-v or">${groupes.length}</div><div class="modal-stat-l">Groupes actifs</div></div>
-      <div class="modal-stat"><div class="modal-stat-v ${alertes.length?'rouge':'vert'}">${alertes.length}</div><div class="modal-stat-l">Alertes actives</div></div>
-      <div class="modal-stat"><div class="modal-stat-v">${lastSaisie?.niveau_carburant!=null?lastSaisie.niveau_carburant+'%':'—'}</div><div class="modal-stat-l">Dernier carburant</div></div>
-      <div class="modal-stat"><div class="modal-stat-v">${fmtDate(lastSaisie?.date)||'—'}</div><div class="modal-stat-l">Dernière saisie</div></div>
-    </div>
-    ${totalLitresMois>0||coutMaint>0?`
-    <div style="background:var(--or-pale);border:1px solid rgba(200,146,42,0.2);border-radius:10px;padding:14px;margin-bottom:16px">
-      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--or);font-weight:600;margin-bottom:10px">💰 Coûts estimés — 30 derniers jours</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-        <div><div style="font-size:18px;font-weight:700;font-family:Space Grotesk,sans-serif">${totalLitresMois.toFixed(0)}L</div><div style="font-size:11px;color:var(--texte2)">Litres consommés</div></div>
-        <div><div style="font-size:18px;font-weight:700;font-family:Space Grotesk,sans-serif;color:var(--or)">${fmtNum(coutCarburant)} FCFA</div><div style="font-size:11px;color:var(--texte2)">Coût carburant</div></div>
-        <div><div style="font-size:18px;font-weight:700;font-family:Space Grotesk,sans-serif;color:var(--or)">${fmtNum(coutTotal)} FCFA</div><div style="font-size:11px;color:var(--texte2)">Total opérationnel</div></div>
+function renderClientsSante(elId, clients, groupes, saisies, alertes, pannes, detailId) {
+  const el = document.getElementById(elId);
+  if(!clients.length){el.innerHTML='<div class="empty">Aucun client</div>';return;}
+  el.innerHTML = clients.map(c=>{
+    const hG  = groupes.filter(g=>g.client_id===c.id);
+    const hSJ = saisies.filter(s=>s.client_id===c.id);
+    const hA  = alertes.filter(a=>a.client_id===c.id);
+    const hP  = pannes.filter(p=>p.client_id===c.id);
+    const status = statusClient(hSJ,hG,hA,hP);
+    const lien = clientLien(c);
+    const pillClass = status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok';
+    const statusLabel = status==='danger'?'Critique':status==='warn'?'Attention':'Normal';
+    const tauxColor = hSJ.length===hG.length?'var(--vert)':hSJ.length>0?'var(--orange)':'var(--rouge)';
+    return `<div class="client-row" onclick="openClientDetail('${c.id}','${detailId}')">
+      <div>
+        <div class="cr-nom">${c.nom}</div>
+        <div class="cr-sub">${c.ville||'—'} · ${hG.length} groupe${hG.length>1?'s':''} · ${c.plan||'business'}</div>
       </div>
-      ${coutMaint>0?`<div style="margin-top:8px;font-size:11px;color:var(--texte2)">🔧 Maintenance : ${fmtNum(coutMaint)} FCFA</div>`:''}
-    </div>`:''}
-    <div class="section-label">Groupes électrogènes</div>`;
-    html += groupes.length ? groupes.map(g=>{
-      const gs=saisies.filter(s=>s.groupe_id===g.id);
-      const last=gs[0];
-      const pctV=g.seuil_vidange_heures?Math.min(100,Math.round((g.heures_total||0)/g.seuil_vidange_heures*100)):0;
-      return `<div class="mg ${pctV>90?'danger':pctV>70?'warn':'ok'}">
-        <div class="mg-top"><div class="mg-nom">${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA</div><span class="pill ${pctV>90?'pill-danger':pctV>70?'pill-warn':'pill-ok'}">${pctV>90?'🚨 Vidange!':pctV>70?'⚠️ Bientôt':'✓ OK'}</span></div>
-        <div class="mg-stats">
-          <div class="mg-stat">⛽ <span>${last?.niveau_carburant!=null?last.niveau_carburant+'%':'—'}</span></div>
-          <div class="mg-stat">⚙️ <span>${g.heures_total||0}h / ${g.seuil_vidange_heures||250}h (${pctV}%)</span></div>
-          <div class="mg-stat">📋 <span>${gs.length} saisies/30j</span></div>
-          ${last?.operateur?`<div class="mg-stat">👤 <span>${last.operateur}</span></div>`:''}
-        </div>
-      </div>`;
-    }).join('') : '<div style="padding:16px;text-align:center;color:var(--texte2);font-size:13px">Aucun groupe</div>';
-    if(pannes.length){
-      html+=`<div class="section-label" style="margin-top:12px">Dernières pannes</div>`;
-      html+=pannes.map(p=>`<div style="background:var(--rouge-pale);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:12px"><span style="font-weight:600">${TYPE_PANNE[p.type]||p.type}</span> · ${p.description||'—'} · ${fmtDate(p.date_panne)} <span class="pill ${p.resolue?'pill-ok':'pill-danger'}" style="float:right">${p.resolue?'✓ Résolue':'En cours'}</span></div>`).join('');
-    }
-    if(maints.length){
-      html+=`<div class="section-label" style="margin-top:12px">Dernières maintenances</div>`;
-      html+=maints.map(m=>`<div style="background:var(--bleu-pale);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:12px"><span style="font-weight:600">${TYPE_MAINT[m.type]||m.type}</span>${m.technicien?' · '+m.technicien:''} · ${fmtDate(m.date_intervention)}</div>`).join('');
-    }
-    html+=`<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-or" style="flex:1" onclick="showToast('Contactez via WhatsApp : ${client.whatsapp_patron}')">📱 ${client.whatsapp_patron||'Patron'}</button>
-      <button class="btn btn-ghost" onclick="openAddGroupe('${id}','${client.nom}')">+ Groupe</button>
-      <button class="btn btn-ghost" onclick="deleteClient('${id}','${client.nom}')">🗑️</button>
+      <div class="cr-val" style="color:${tauxColor}">${hSJ.length}/${hG.length}</div>
+      <div class="cr-val ${hA.length>0?'rouge':''}">${hA.length||'—'}</div>
+      <div><span class="pill ${pillClass}">${statusLabel}</span></div>
+      <div class="cr-actions" onclick="event.stopPropagation()">
+        <button class="btn btn-icon" title="Copier le lien" onclick="copyLien('${lien}')">📋</button>
+        <button class="btn btn-icon" title="Ouvrir" onclick="window.open('${lien}','_blank')">↗</button>
+      </div>
     </div>`;
-    document.getElementById('mc-pane-infos').innerHTML=html;
-    // Graphiques modal
-    renderClientCharts(saisies,groupes);
-    // Historique saisies
-    document.getElementById('mc-pane-historique').innerHTML = saisies.length
-      ? `<table style="width:100%;border-collapse:collapse;font-size:12px">
-          <tr style="color:var(--texte2);font-size:10px;text-transform:uppercase;letter-spacing:1px">
-            <td style="padding:8px 0">Date</td><td>Groupe</td><td>Carburant</td><td>Heures</td><td>Huile</td><td>Litres+</td><td>Opérateur</td>
-          </tr>
-          ${saisies.map(s=>{
-            const g=groupes.find(x=>x.id===s.groupe_id);
-            return`<tr style="border-top:1px solid var(--bordure)">
-              <td style="padding:8px 0;color:var(--texte2)">${fmtDate(s.date)}</td>
-              <td style="font-weight:500">${g?.nom||'—'}</td>
-              <td class="${carbColor(s.niveau_carburant)}">${s.niveau_carburant!=null?s.niveau_carburant+'%':'—'}</td>
-              <td>${s.heures_marche||0}h</td>
-              <td class="${s.niveau_huile==='critique'?'rouge':s.niveau_huile==='bas'?'orange':'vert'}">${s.niveau_huile||'normal'}</td>
-              <td class="bleu">${s.litres_ajoutes>0?'+'+s.litres_ajoutes+'L':'—'}</td>
-              <td style="color:var(--texte2)">${s.operateur||'—'}</td>
-            </tr>`;
-          }).join('')}
-        </table>`
-      : empty('Aucun historique');
-  } catch(e){document.getElementById('mc-pane-infos').innerHTML=`<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-title">Erreur</div><div class="empty-sub">${e.message}</div></div>`;}
+  }).join('');
 }
 
-function renderClientCharts(saisies, groupes) {
-  const byDate={};
-  saisies.forEach(s=>{
-    if(!byDate[s.date])byDate[s.date]={carb:[],h:[]};
-    if(s.niveau_carburant!=null)byDate[s.date].carb.push(s.niveau_carburant);
-    if(s.heures_marche)byDate[s.date].h.push(s.heures_marche);
-  });
-  const dates=Object.keys(byDate).sort().slice(-14);
-  const labels=dates.map(fmtDateShort);
-  const carbData=dates.map(d=>byDate[d].carb.length?Math.round(byDate[d].carb.reduce((a,b)=>a+b)/byDate[d].carb.length):null);
-  const hData=dates.map(d=>byDate[d].h.reduce((a,b)=>a+b,0)||null);
-  ['mc-chart-carb','mc-chart-heures'].forEach(id=>{const c=document.getElementById(id);if(c._chart)c._chart.destroy();});
-  const ctx1=document.getElementById('mc-chart-carb').getContext('2d');
-  const c1=new Chart(ctx1,{type:'line',data:{labels,datasets:[{label:'Carburant %',data:carbData,borderColor:'#C8922A',backgroundColor:'#C8922A22',borderWidth:2,tension:0.3,fill:true,spanGaps:true,pointRadius:3}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.parsed.y}%`}}},scales:{x:{grid:{color:'#242424'},ticks:{color:'#606060',font:{size:9}}},y:{grid:{color:'#242424'},ticks:{color:'#606060',font:{size:9}},min:0,max:100}}}});
-  document.getElementById('mc-chart-carb')._chart=c1;
-  const ctx2=document.getElementById('mc-chart-heures').getContext('2d');
-  const c2=new Chart(ctx2,{type:'bar',data:{labels,datasets:[{label:'Heures/jour',data:hData,backgroundColor:'#3B82F622',borderColor:'#3B82F6',borderWidth:1,borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#242424'},ticks:{color:'#606060',font:{size:9}}},y:{grid:{color:'#242424'},ticks:{color:'#606060',font:{size:9}},beginAtZero:true}}}});
-  document.getElementById('mc-chart-heures')._chart=c2;
+async function openClientDetail(clientId, detailId) {
+  const panel = document.getElementById(detailId);
+  if(selectedClientId===clientId&&panel.classList.contains('open')){
+    panel.classList.remove('open');selectedClientId=null;return;
+  }
+  selectedClientId = clientId;
+  panel.classList.add('open');
+  panel.innerHTML = '<div class="loading"><div class="spinner"></div>Chargement...</div>';
+  panel.scrollIntoView({behavior:'smooth',block:'start'});
+
+  const today = new Date().toISOString().split('T')[0];
+  const dateDebut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
+  const [client,groupes,saisiesJ,saisies30,alertes,pannes,maints] = await Promise.all([
+    api('clients',`&id=eq.${clientId}`).then(r=>r[0]),
+    api('groupes',`&client_id=eq.${clientId}&actif=eq.true`),
+    api('saisies',`&client_id=eq.${clientId}&date=eq.${today}&order=created_at.desc`),
+    api('saisies',`&client_id=eq.${clientId}&date=gte.${dateDebut30}`),
+    api('alertes',`&client_id=eq.${clientId}&resolue=eq.false`),
+    api('pannes',`&client_id=eq.${clientId}&resolue=eq.false`),
+    api('maintenances',`&client_id=eq.${clientId}&order=created_at.desc&limit=3`),
+  ]);
+
+  const litres30 = saisies30.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
+  const cout30   = Math.round(litres30*(client.prix_litre_fcfa||695));
+  const heures30 = saisies30.reduce((a,s)=>a+(s.heures_marche||0),0);
+  const lien = clientLien(client);
+
+  const groupesHtml = groupes.map(g=>{
+    const s = saisiesJ.filter(x=>x.groupe_id===g.id)[0];
+    const j = calcAuto(g,s);
+    const carb = s?.niveau_carburant;
+    const status = pannes.some(p=>p.groupe_id===g.id)||carb<25?'danger':carb<50||j<5?'warn':'ok';
+    const heureSaisie = s?.created_at?new Date(s.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dakar'}):null;
+    return `<div class="groupe-item gi-${status}">
+      <div class="gi-top">
+        <div class="gi-nom">${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA</div>
+        <span class="pill ${status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok'}">${carb!=null?carb+'%':'—'}</span>
+      </div>
+      <div class="gi-stats">
+        <div class="gi-stat">⏱️ Autonomie : <span style="color:${j!==null?autoColor(j):'var(--t2)'}">${j!==null?j+'j':'—'}</span></div>
+        <div class="gi-stat">🕐 <span>${s?.heures_marche!=null?s.heures_marche+'h':'—'}</span></div>
+        <div class="gi-stat">🛢️ <span>${s?.niveau_huile||'—'}</span></div>
+        ${heureSaisie?`<div class="gi-stat">🕗 <span>${heureSaisie}</span></div>`:''}
+        ${s?.operateur?`<div class="gi-stat">👤 <span>${s.operateur}</span></div>`:''}
+      </div>
+      ${carb!=null?`<div class="gi-bar"><div class="gi-bar-fill" style="width:${carb}%;background:${carbColor(carb)}"></div></div>`:''}
+    </div>`;
+  }).join('');
+
+  const alertesHtml = alertes.length
+    ? alertes.map(a=>`<div style="padding:8px 0;border-bottom:1px solid var(--b);font-size:12px;color:${a.severite==='danger'?'var(--rouge)':'var(--orange)'}">• ${a.message}</div>`).join('')
+    : `<div style="font-size:12px;color:var(--vert)">✅ Aucune alerte active</div>`;
+
+  panel.innerHTML = `
+    <div class="dp-head">
+      <div>
+        <div class="dp-nom">${client.nom}</div>
+        <div class="dp-sub">${client.ville||'—'} · Plan ${client.plan||'business'} · ${fmtNum(PLANS[client.plan]||20000)} FCFA/mois</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="copyLien('${lien}')">📋 Copier lien client</button>
+        <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="window.open('${lien}','_blank')">↗ Ouvrir</button>
+        <button class="dp-close" onclick="document.getElementById('${detailId}').classList.remove('open');selectedClientId=null">✕</button>
+      </div>
+    </div>
+    <div class="dp-body">
+      <div class="dp-grid">
+        <div class="dp-kpi"><div class="dp-kpi-val or">${cout30>0?fmtNum(cout30):'—'}</div><div class="dp-kpi-label">FCFA carburant / 30j</div></div>
+        <div class="dp-kpi"><div class="dp-kpi-val">${Math.round(heures30)}h</div><div class="dp-kpi-label">Heures de marche / 30j</div></div>
+        <div class="dp-kpi"><div class="dp-kpi-val ${pannes.length>0?'rouge':alertes.length>0?'orange':'vert'}">${pannes.length>0?pannes.length+' panne'+(pannes.length>1?'s':''):alertes.length>0?alertes.length+' alerte'+(alertes.length>1?'s':''):'✓ OK'}</div><div class="dp-kpi-label">Incidents actifs</div></div>
+      </div>
+      <div class="section-label">Lien client partageable</div>
+      <div class="lien-box">
+        <div style="flex:1"><div class="lien-label">${client.groupe_hotelier?'Page groupe':'Page client'}</div><div class="lien-url">${lien}</div></div>
+        <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px;flex-shrink:0" onclick="copyLien('${lien}')">Copier</button>
+      </div>
+      <div class="section-label" style="margin-top:12px">Groupes — aujourd'hui</div>
+      ${groupesHtml||'<div class="empty">Aucun groupe</div>'}
+      <div class="section-label" style="margin-top:12px">Alertes actives</div>
+      <div>${alertesHtml}</div>
+      ${maints.length?`<div class="section-label" style="margin-top:12px">Dernières maintenances</div>${maints.map(m=>`<div style="padding:8px 0;border-bottom:1px solid var(--b);font-size:12px;color:var(--t2)">${TYPE_MAINT[m.type]||m.type}${m.technicien?' · '+m.technicien:''} · ${fmtDate(m.date_intervention)}${m.cout>0?' · '+fmtNum(m.cout)+' FCFA':''}</div>`).join('')}`:''}
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b);display:flex;gap:8px">
+        <button class="btn btn-ghost" style="font-size:12px" onclick="showToast('WhatsApp patron : ${client.whatsapp_patron||'—'}')">📱 ${client.whatsapp_patron||'Patron'}</button>
+        <button class="btn btn-ghost" style="font-size:12px;color:var(--rouge)" onclick="deleteClient('${client.id}','${client.nom}')">🗑️ Supprimer</button>
+      </div>
+    </div>`;
+}
+
+function copyLien(url) {
+  navigator.clipboard.writeText(url).then(()=>showToast('Lien copié ✓')).catch(()=>showToast('Erreur copie','err'));
+}
+
+function renderAlertesAccueil(alertes, clients, groupes) {
+  const el = document.getElementById('alertes-accueil');
+  const clientMap = Object.fromEntries(clients.map(c=>[c.id,c.nom]));
+  const groupeMap = Object.fromEntries(groupes.map(g=>[g.id,g.nom]));
+  if(!alertes.length){el.innerHTML='<div class="empty">✅ Aucune alerte active</div>';return;}
+  el.innerHTML = alertes.slice(0,5).map(a=>`
+    <div class="alerte-item">
+      <div class="ai-dot" style="background:${a.severite==='danger'?'var(--rouge)':'var(--orange)'}"></div>
+      <div class="ai-body"><div class="ai-titre">${a.message}</div><div class="ai-desc">${clientMap[a.client_id]||'—'}${a.groupe_id?' · '+groupeMap[a.groupe_id]:''}</div></div>
+      <div class="ai-time">${a.severite==='danger'?'🚨':'⚠️'}</div>
+    </div>`).join('');
+}
+
+async function loadClients() {
+  const today = new Date().toISOString().split('T')[0];
+  const [clients,groupes,saisies,alertes,pannes] = await Promise.all([
+    api('clients','&order=nom'),
+    api('groupes','&actif=eq.true'),
+    api('saisies',`&date=eq.${today}`),
+    api('alertes','&resolue=eq.false'),
+    api('pannes','&resolue=eq.false'),
+  ]);
+  renderClientsSante('clients-list',clients,groupes,saisies,alertes,pannes,'detail-panel-accueil');
+}
+
+async function loadAlertes() {
+  const el = document.getElementById('alertes-list');
+  const [alertes,clients,groupes] = await Promise.all([
+    api('alertes','&resolue=eq.false&order=created_at.desc'),
+    api('clients',''),api('groupes',''),
+  ]);
+  const clientMap = Object.fromEntries(clients.map(c=>[c.id,c.nom]));
+  const groupeMap = Object.fromEntries(groupes.map(g=>[g.id,g.nom]));
+  if(!alertes.length){el.innerHTML='<div class="empty">✅ Aucune alerte active</div>';return;}
+  el.innerHTML = alertes.map(a=>`
+    <div class="alerte-item">
+      <div class="ai-dot" style="background:${a.severite==='danger'?'var(--rouge)':'var(--orange)'}"></div>
+      <div class="ai-body">
+        <div class="ai-titre">${a.message}</div>
+        <div class="ai-desc">${clientMap[a.client_id]||'—'}${a.groupe_id?' · '+groupeMap[a.groupe_id]:''} · ${fmtDate(a.created_at)}</div>
+      </div>
+      <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;flex-shrink:0" onclick="resolveAlerte('${a.id}')">✅ Résoudre</button>
+    </div>`).join('');
+}
+
+async function resolveAlerte(id){
+  await api('alertes',`&id=eq.${id}`,'*','PATCH',{resolue:true});
+  showToast('Alerte résolue ✓');loadAlertes();loadAll();
+}
+
+async function loadPannes() {
+  const el = document.getElementById('pannes-list');
+  const [pannes,clients,groupes] = await Promise.all([
+    api('pannes','&order=created_at.desc&limit=30'),
+    api('clients',''),api('groupes',''),
+  ]);
+  const clientMap = Object.fromEntries(clients.map(c=>[c.id,c.nom]));
+  const groupeMap = Object.fromEntries(groupes.map(g=>[g.id,g.nom]));
+  if(!pannes.length){el.innerHTML='<div class="empty">✅ Aucune panne enregistrée</div>';return;}
+  el.innerHTML = pannes.map(p=>`
+    <div class="alerte-item">
+      <div class="ai-dot" style="background:${p.resolue?'var(--vert)':'var(--rouge)'}"></div>
+      <div class="ai-body">
+        <div class="ai-titre">${clientMap[p.client_id]||'—'} · ${groupeMap[p.groupe_id]||'—'}</div>
+        <div class="ai-desc">${TYPE_PANNE[p.type]||p.type} · ${p.description||'—'} · ${fmtDate(p.date_panne)}</div>
+      </div>
+      <span class="pill ${p.resolue?'pill-ok':'pill-danger'}">${p.resolue?'Résolue':'En cours'}</span>
+    </div>`).join('');
+}
+
+async function loadMaintenance() {
+  const el = document.getElementById('maint-list');
+  const [maints,clients,groupes] = await Promise.all([
+    api('maintenances','&order=created_at.desc&limit=30'),
+    api('clients',''),api('groupes',''),
+  ]);
+  const clientMap = Object.fromEntries(clients.map(c=>[c.id,c.nom]));
+  const groupeMap = Object.fromEntries(groupes.map(g=>[g.id,g.nom]));
+  if(!maints.length){el.innerHTML='<div class="empty">Aucune intervention</div>';return;}
+  el.innerHTML = maints.map(m=>`
+    <div class="alerte-item">
+      <div class="ai-dot" style="background:var(--bleu)"></div>
+      <div class="ai-body">
+        <div class="ai-titre">${clientMap[m.client_id]||'—'} · ${groupeMap[m.groupe_id]||'—'}</div>
+        <div class="ai-desc">${TYPE_MAINT[m.type]||m.type}${m.technicien?' · '+m.technicien:''} · ${fmtDate(m.date_intervention)}</div>
+      </div>
+      <div class="ai-time or">${m.cout>0?fmtNum(m.cout)+' FCFA':'—'}</div>
+    </div>`).join('');
 }
 
 async function saveClient() {
-  const nom=document.getElementById('add-nom').value.trim();
+  const nom = document.getElementById('add-nom').value.trim();
   if(!nom){showToast('Nom requis','err');return;}
   try {
-    await apiPost('clients',{nom,type:document.getElementById('add-type').value,quartier:document.getElementById('add-quartier').value,ville:document.getElementById('add-ville').value||'Dakar',whatsapp_gardien:document.getElementById('add-gardien').value,whatsapp_patron:document.getElementById('add-patron').value,plan:document.getElementById('add-plan').value,prix_mensuel:PLANS[document.getElementById('add-plan').value]?.prix||20000});
+    await api('clients','','*','POST',{
+      nom, type:document.getElementById('add-type').value,
+      ville:document.getElementById('add-ville').value||'Dakar',
+      groupe_hotelier:document.getElementById('add-groupe').value||null,
+      whatsapp_patron:document.getElementById('add-patron').value,
+      whatsapp_gardien:document.getElementById('add-gardien').value,
+      plan:document.getElementById('add-plan').value,
+      prix_litre_fcfa:parseInt(document.getElementById('add-prix').value)||695,
+      prix_mensuel:PLANS[document.getElementById('add-plan').value]||20000,
+      actif:true
+    });
     closeModalDirect('modal-add');showToast(`${nom} ajouté ✓`);loadAll();
-    if(document.getElementById('view-clients').classList.contains('active'))loadClients();
-  } catch(e){showToast(e.message,'err');}
+  } catch(e){showToast('Erreur','err');}
 }
 
 async function deleteClient(id,nom) {
-  if(!confirm(`Supprimer ${nom} ? Action irréversible.`))return;
-  try { await api('clients',{method:'DELETE',query:`&id=eq.${id}`});closeModalDirect('modal-client');showToast(`${nom} supprimé`,'warn');loadAll();} catch(e){showToast(e.message,'err');}
+  if(!confirm(`Supprimer ${nom} ?`))return;
+  await api('clients',`&id=eq.${id}`,'*','DELETE');
+  document.getElementById('detail-panel-accueil').classList.remove('open');
+  showToast(`${nom} supprimé`,'err');loadAll();
 }
 
-// ── GROUPES ──
-function openAddGroupe(clientId,clientNom){closeModalDirect('modal-client');document.getElementById('mg-client-id').value=clientId;document.getElementById('mg-client-nom').textContent=clientNom;document.getElementById('modal-groupe').classList.add('open');}
-async function saveGroupe() {
-  const clientId=document.getElementById('mg-client-id').value;
-  const nom=document.getElementById('mg-nom').value.trim();
-  if(!nom){showToast('Nom requis','err');return;}
-  try {
-    await apiPost('groupes',{client_id:clientId,nom,marque:document.getElementById('mg-marque').value,puissance_kva:parseInt(document.getElementById('mg-puissance').value)||null,site:document.getElementById('mg-site').value,conso_theorique_lh:parseFloat(document.getElementById('mg-conso').value)||1.5,seuil_vidange_heures:parseInt(document.getElementById('mg-seuil').value)||250,frequence_plein_jours:parseInt(document.getElementById('mg-freq').value)||2});
-    closeModalDirect('modal-groupe');showToast(`Groupe ${nom} ajouté ✓`);openClient(clientId);
-  } catch(e){showToast(e.message,'err');}
-}
-
-// ── ALERTES ──
-async function loadAlertes() {
-  const el=document.getElementById('alertes-list');
-  el.innerHTML='<div class="loading"><div class="spinner"></div>Chargement...</div>';
-  try {
-    const alertes=await api('alertes',{select:'*,clients(nom),groupes(nom)',query:'&resolue=eq.false&order=created_at.desc'});
-    if(!alertes.length){el.innerHTML=`<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">Aucune alerte active</div><div class="empty-sub">Tout est sous contrôle</div></div>`;return;}
-    el.innerHTML=alertes.map(a=>`
-      <div class="alerte-item">
-        <div class="ai-dot" style="background:var(--${a.severite==='danger'?'rouge':'orange'})"></div>
-        <div class="ai-body">
-          <div class="ai-titre">${a.message}</div>
-          <div class="ai-desc">${a.clients?.nom||'—'} · ${a.groupes?.nom||'—'} · ${fmtDate(a.created_at)}</div>
-          <div class="ai-actions">
-            <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="resolveAlerte('${a.id}')">✅ Résoudre</button>
-          </div>
-        </div>
-        <div class="ai-time" style="font-size:16px">${a.severite==='danger'?'🚨':'⚠️'}</div>
-      </div>`).join('');
-  } catch(e){el.innerHTML=empty('Erreur');}
-}
-
-async function resolveAlerte(id){try{await apiPatch('alertes',id,{resolue:true,lue:true});showToast('Alerte résolue ✓');loadAlertes();loadKPIs();}catch(e){showToast(e.message,'err');}}
-async function markAllRead(){try{await api('alertes',{method:'PATCH',body:{lue:true},query:'&resolue=eq.false'});showToast('Toutes les alertes marquées lues ✓');loadAlertes();}catch(e){showToast(e.message,'err');}}
-
-// ── SAISIES ──
-async function openSaisie(){await loadClientSelect('s-client');document.getElementById('modal-saisie').classList.add('open');}
-async function saveSaisie() {
-  const clientId=document.getElementById('s-client').value;
-  const groupeId=document.getElementById('s-groupe').value;
-  if(!clientId||!groupeId){showToast('Client et groupe requis','err');return;}
-  const carb=parseInt(document.getElementById('s-carb').value);
-  const huile=document.getElementById('s-huile').value;
-  try {
-    await apiPost('saisies',{client_id:clientId,groupe_id:groupeId,niveau_carburant:carb||null,litres_ajoutes:parseFloat(document.getElementById('s-litres').value)||0,heures_marche:parseFloat(document.getElementById('s-heures').value)||0,niveau_huile:huile,operateur:document.getElementById('s-operateur').value,notes:document.getElementById('s-notes').value,date:new Date().toISOString().split('T')[0]});
-    if(carb&&carb<25)await apiPost('alertes',{client_id:clientId,groupe_id:groupeId,type:'carburant_bas',severite:'danger',message:`Carburant critique — ${carb}% — Risque arrêt imminent`});
-    if(huile==='critique')await apiPost('alertes',{client_id:clientId,groupe_id:groupeId,type:'huile_critique',severite:'danger',message:`Huile critique — Changement immédiat requis`});
-    closeModalDirect('modal-saisie');showToast('Saisie enregistrée ✓');loadAll();
-  } catch(e){showToast(e.message,'err');}
-}
-
-// ── MAINTENANCE ──
-async function loadMaintenance() {
-  const el=document.getElementById('maint-list');
-  el.innerHTML='<div class="loading"><div class="spinner"></div>Chargement...</div>';
-  try {
-    const data=await api('maintenances',{select:'*,clients(nom),groupes(nom)',query:'&order=created_at.desc&limit=50'});
-    if(!data.length){el.innerHTML=empty('Aucune intervention');return;}
-    el.innerHTML=data.map(m=>`<div class="tr tr-maint"><div><div class="col-name">${m.clients?.nom||'—'}</div><div class="col-sub">${m.groupes?.nom||'—'} · ${m.technicien||'—'}</div></div><div class="col-val">${TYPE_MAINT[m.type]||m.type}</div><div class="col-val">${fmtDate(m.date_intervention)}</div><div class="col-val or">${fmtNum(m.cout)} FCFA</div></div>`).join('');
-  } catch(e){el.innerHTML=empty('Erreur');}
-}
-async function openMaintenance(){await loadClientSelect('m-client');document.getElementById('modal-maint').classList.add('open');}
-async function saveMaintenance() {
-  const clientId=document.getElementById('m-client').value;
-  const groupeId=document.getElementById('m-groupe').value;
-  if(!clientId||!groupeId){showToast('Client et groupe requis','err');return;}
-  try {
-    await apiPost('maintenances',{client_id:clientId,groupe_id:groupeId,type:document.getElementById('m-type').value,technicien:document.getElementById('m-tech').value,cout:parseInt(document.getElementById('m-cout').value)||0,heures_au_compteur:parseFloat(document.getElementById('m-heures').value)||null,notes:document.getElementById('m-notes').value});
-    closeModalDirect('modal-maint');showToast('Maintenance enregistrée ✓');loadMaintenance();loadAll();
-  } catch(e){showToast(e.message,'err');}
-}
-
-// ── PANNES ──
-async function loadPannes() {
-  const el=document.getElementById('pannes-list');
-  el.innerHTML='<div class="loading"><div class="spinner"></div>Chargement...</div>';
-  try {
-    const data=await api('pannes',{select:'*,clients(nom),groupes(nom)',query:'&order=created_at.desc&limit=50'});
-    if(!data.length){el.innerHTML=`<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">Aucune panne enregistrée</div></div>`;return;}
-    el.innerHTML=data.map(p=>`<div class="tr tr-pannes" onclick="resolvePanne('${p.id}','${p.resolue}')"><div><div class="col-name">${p.clients?.nom||'—'}</div><div class="col-sub">${p.groupes?.nom||'—'} · ${p.description||'—'}</div></div><div class="col-val">${TYPE_PANNE[p.type]||p.type}</div><div class="col-val">${fmtDate(p.date_panne)}</div><div><span class="pill ${p.resolue?'pill-ok':'pill-danger'}">${p.resolue?'✓ Résolue':'🚨 En cours'}</span></div><div style="color:var(--texte2)">${!p.resolue?'›':''}</div></div>`).join('');
-  } catch(e){el.innerHTML=empty('Erreur');}
-}
-async function openPanne(){await loadClientSelect('p-client');document.getElementById('modal-panne').classList.add('open');}
-async function savePanne() {
-  const clientId=document.getElementById('p-client').value;
-  const groupeId=document.getElementById('p-groupe').value;
-  if(!clientId||!groupeId){showToast('Client et groupe requis','err');return;}
-  try {
-    await apiPost('pannes',{client_id:clientId,groupe_id:groupeId,type:document.getElementById('p-type').value,description:document.getElementById('p-desc').value});
-    await apiPost('alertes',{client_id:clientId,groupe_id:groupeId,type:'panne',severite:'danger',message:`Panne signalée — ${TYPE_PANNE[document.getElementById('p-type').value]||'—'}`});
-    closeModalDirect('modal-panne');showToast('Panne signalée ✓','warn');loadPannes();loadAll();
-  } catch(e){showToast(e.message,'err');}
-}
-async function resolvePanne(id,resolue){if(resolue==='true')return;if(!confirm('Marquer cette panne comme résolue ?'))return;try{await apiPatch('pannes',id,{resolue:true,date_resolution:new Date().toISOString()});showToast('Panne résolue ✓');loadPannes();}catch(e){showToast(e.message,'err');}}
-
-// ── UTILS ──
 async function loadClientSelect(selectId) {
-  const sel=document.getElementById(selectId);
-  sel.innerHTML='<option value="">Chargement...</option>';
-  try {
-    const clients=await api('clients',{query:'&actif=eq.true&order=nom'});
-    sel.innerHTML='<option value="">Choisir un client...</option>'+clients.map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
-  } catch(e){sel.innerHTML='<option>Erreur</option>';}
+  const sel = document.getElementById(selectId);
+  const clients = await api('clients','&actif=eq.true&order=nom');
+  sel.innerHTML='<option value="">Choisir...</option>'+clients.map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
 }
-async function loadGroupesFor(clientSelectId,groupeSelectId) {
-  const clientId=document.getElementById(clientSelectId).value;
-  const sel=document.getElementById(groupeSelectId);
-  sel.innerHTML='<option value="">Chargement...</option>';
-  if(!clientId){sel.innerHTML='<option value="">Choisir un client d\'abord</option>';return;}
-  try {
-    const groupes=await api('groupes',{query:`&client_id=eq.${clientId}&actif=eq.true`});
-    sel.innerHTML=groupes.map(g=>`<option value="${g.id}">${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA</option>`).join('');
-  } catch(e){sel.innerHTML='<option>Erreur</option>';}
-}
-function openAddClient(){document.getElementById('modal-add').classList.add('open');}
-function closeModal(id,e){if(e.target===document.getElementById(id))closeModalDirect(id);}
-function closeModalDirect(id){document.getElementById(id).classList.remove('open');}
-function showToast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),2500);}
 
-// ── INIT ──
+async function loadGroupesFor(cId, gId) {
+  const clientId = document.getElementById(cId).value;
+  const sel = document.getElementById(gId);
+  if(!clientId){sel.innerHTML='<option>Choisir un client</option>';return;}
+  const groupes = await api('groupes',`&client_id=eq.${clientId}&actif=eq.true`);
+  sel.innerHTML = groupes.map(g=>`<option value="${g.id}">${g.nom}</option>`).join('');
+}
+
+async function saveMaintenance() {
+  const clientId = document.getElementById('m-client').value;
+  const groupeId = document.getElementById('m-groupe').value;
+  if(!clientId||!groupeId){showToast('Client et groupe requis','err');return;}
+  await api('maintenances','','*','POST',{
+    client_id:clientId, groupe_id:groupeId,
+    type:document.getElementById('m-type').value,
+    technicien:document.getElementById('m-tech').value,
+    cout:parseInt(document.getElementById('m-cout').value)||0,
+    notes:document.getElementById('m-notes').value,
+    date_intervention:new Date().toISOString().split('T')[0]
+  });
+  closeModalDirect('modal-maint');showToast('Maintenance enregistrée ✓');loadMaintenance();
+}
+
 loadAll();
-initHistoFilters();
 </script>
 </body>
 </html>
