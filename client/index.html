@@ -199,10 +199,10 @@ async function init() {
     api('saisies',`&client_id=eq.${clientId}&date=eq.${today}&order=created_at.desc`),
     api('saisies',`&client_id=eq.${clientId}&date=gte.${dateDebut30}&order=date.asc`),
     api('alertes',`&client_id=eq.${clientId}&resolue=eq.false`),
-    api('pannes',`&client_id=eq.\${clientId}&order=date_panne.desc&limit=10`),
-    api('maintenances',`&client_id=eq.\${clientId}&order=date_intervention.desc&limit=6`),
-    api('pannes',`&client_id=eq.\${clientId}&date_panne=gte.\${dateDebutAnnee}&resolue=eq.true`),
-    api('saisies',`&client_id=eq.\${clientId}&date=gte.\${new Date().getFullYear()+'-01-01'}`),
+    api('pannes',`&client_id=eq.${clientId}&order=date_panne.desc&limit=20`),
+    api('maintenances',`&client_id=eq.${clientId}&order=date_intervention.desc&limit=6`),
+    api('pannes',`&client_id=eq.${clientId}&date_panne=gte.${dateDebutAnnee}`),
+    api('saisies',`&client_id=eq.${clientId}&date=gte.${new Date().getFullYear()+'-01-01'}`),
   ]);
 
   const client = clients[0];
