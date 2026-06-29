@@ -260,10 +260,11 @@ async function loadAll() {
   const coutRepAnnee = cPannesAnnee.reduce((a,p)=>a+(p.cout_reparation||0),0);
 
   _data = { clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPannes, today, dateDebut7 };
+  window._azalai = { ..._data, cPannesAnnee, cSaisiesAnnee };
 
   renderCoutsAnnuels(coutCarburantAnnee, coutRepAnnee, cPannesAnnee);
   renderBanner(clients, cGroupes, cSaisiesJ, cAlertes, cPannes);
-  renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPannes);
+  renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPannes, cPannesAnnee, cSaisiesAnnee);
   renderWeek(clients, cGroupes, cSaisies30.filter(s=>s.date>=dateDebut7), cAlertes, cPannes);
 }
 
@@ -311,7 +312,7 @@ function renderBanner(clients, cGroupes, cSaisiesJ, cAlertes, cPannes) {
   el.innerHTML=`<div class="action-banner" onclick="openDetail('${cibleId}')"><div class="ab-icon">🚨</div><div class="ab-body"><div class="ab-titre">${total} action${total>1?'s':''} requise${total>1?'s':''} aujourd'hui</div><div class="ab-sub">${subs.join(' · ')}</div></div><div class="ab-arrow">›</div></div>`;
 }
 
-function renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPannes) {
+function renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPannes, cPannesAnnee, cSaisiesAnnee) {
   const el = document.getElementById('hotels-grid');
   if(!clients.length){el.innerHTML='<div class="empty">Aucun établissement</div>';return;}
 
@@ -339,14 +340,18 @@ function renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPanne
     const litres30 = saisies30C.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
     totalCout30 = Math.round(litres30*(c.prix_litre_fcfa||695));
 
-    const hPannesAnnee = cPannesAnnee.filter(p=>p.client_id===clientId);
-  const hSaisiesAnnee = cSaisiesAnnee.filter(s=>s.client_id===clientId);
-  const cCoutCarburantAnnee = Math.round(hSaisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0)*(client.prix_litre_fcfa||695));
-  const cCoutRepAnnee = hPannesAnnee.reduce((a,p)=>a+(p.cout_reparation||0),0);
+    const oPannesAnnee = (window._azalai?.cPannesAnnee||[]).filter(p=>p.client_id===clientId);
+  const oSaisiesAnnee = (window._azalai?.cSaisiesAnnee||[]).filter(s=>s.client_id===clientId);
+  const cCoutCarburantAnnee = Math.round(oSaisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0)*(client.prix_litre_fcfa||695));
+  const cCoutRepAnnee = oPannesAnnee.reduce((a,p)=>a+(p.cout_reparation||0),0);
   const status = statusClass(minAuto??99, hP.length);
     const flagColor = status==='danger'?'var(--rouge)':status==='warn'?'var(--orange)':'var(--vert)';
     const pillClass = status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok';
     const statusLabel = status==='danger'?'Critique':status==='warn'?'Attention':'Normal';
+    const hPannesAnnee = (cPannesAnnee||[]).filter(p=>p.client_id===c.id);
+    const hSaisiesAnnee = (cSaisiesAnnee||[]).filter(s=>s.client_id===c.id);
+    const hCoutCarburantAnnee = Math.round(hSaisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0)*(c.prix_litre_fcfa||695));
+    const hCoutRepAnnee = hPannesAnnee.reduce((a,p)=>a+(p.cout_reparation||0),0);
     const isSelected = selectedClientId===c.id;
 
     return `<div class="hotel-card${isSelected?' selected':''}" onclick="openDetail('${c.id}')">
@@ -366,6 +371,7 @@ function renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPanne
         </div>
       </div>
       <div class="hc-bar"><div class="hc-bar-fill" style="width:${carbMoy||0}%;background:${carbColor(carbMoy||0)}"></div></div>
+      \${(hCoutCarburantAnnee>0||hCoutRepAnnee>0)?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 16px;background:var(--surface2);border-top:1px solid var(--bordure)"><div style="font-size:10px;color:var(--texte2)">⛽ <span style="font-weight:500;color:var(--texte)">'+(hCoutCarburantAnnee>0?fmtNum(hCoutCarburantAnnee)+' FCFA':'—')+'</span></div><div style="font-size:10px;color:var(--texte2)">🔧 <span style="font-weight:500;color:'+(hCoutRepAnnee>0?'var(--orange)':'var(--vert)')+'">'+fmtNum(hCoutRepAnnee)+' FCFA</span></div></div>':''}
       <div class="hc-footer">
         <span class="pill ${pillClass}">${statusLabel}</span>
         <span style="font-size:11px;color:var(--texte2)">${hSJ.length}/${hG.length} saisies</span>
@@ -410,10 +416,10 @@ async function openDetail(clientId) {
     if(j!==null&&(minAuto===null||j<minAuto)){minAuto=j;minGroupe=g;minSaisie=s;}
   });
 
-  const hPannesAnnee = cPannesAnnee.filter(p=>p.client_id===clientId);
-  const hSaisiesAnnee = cSaisiesAnnee.filter(s=>s.client_id===clientId);
-  const cCoutCarburantAnnee = Math.round(hSaisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0)*(client.prix_litre_fcfa||695));
-  const cCoutRepAnnee = hPannesAnnee.reduce((a,p)=>a+(p.cout_reparation||0),0);
+  const oPannesAnnee = (window._azalai?.cPannesAnnee||[]).filter(p=>p.client_id===clientId);
+  const oSaisiesAnnee = (window._azalai?.cSaisiesAnnee||[]).filter(s=>s.client_id===clientId);
+  const cCoutCarburantAnnee = Math.round(oSaisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0)*(client.prix_litre_fcfa||695));
+  const cCoutRepAnnee = oPannesAnnee.reduce((a,p)=>a+(p.cout_reparation||0),0);
   const status = statusClass(minAuto??99, hP.length);
   const bmAutoClass = status==='danger'?'danger':status==='warn'?'warn':'normal';
 
