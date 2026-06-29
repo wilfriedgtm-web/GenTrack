@@ -136,6 +136,12 @@ body{background:var(--surface);color:var(--texte);font-family:'Inter',sans-serif
 .footer{background:var(--bx);color:rgba(255,255,255,0.4);text-align:center;padding:18px;font-size:11px;letter-spacing:1px;margin-top:40px}
 .footer strong{color:var(--or)}
 
+.tooltip-wrap{position:relative;display:inline-flex;align-items:center;gap:4px}
+.tooltip-icon{width:15px;height:15px;border-radius:50%;border:1px solid var(--texte3);color:var(--texte3);font-size:10px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;line-height:1;user-select:none}
+.tooltip-icon:hover{border-color:var(--texte2);color:var(--texte2)}
+.tooltip-bubble{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--texte);color:white;font-size:11px;line-height:1.5;padding:8px 12px;border-radius:6px;width:220px;z-index:10;font-weight:400;font-family:'Inter',sans-serif}
+.tooltip-bubble::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--texte)}
+.tooltip-wrap:hover .tooltip-bubble{display:block}
 .loading{padding:40px;text-align:center;color:var(--texte2);font-size:13px}
 .spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--bordure);border-top-color:var(--bx);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -338,11 +344,11 @@ function renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPanne
         <div class="hc-metrics">
           <div class="hc-metric">
             <div class="hc-metric-val" style="color:${minAuto!==null?autoColor(minAuto):'var(--texte2)'}">${minAuto!==null?minAuto+'j':'—'}</div>
-            <div class="hc-metric-label">Autonomie min.</div>
+            <div class="hc-metric-label"><span class="tooltip-wrap">Autonomie min.<span class="tooltip-icon">i</span><span class="tooltip-bubble">Litres restants divise par consommation journaliere estimee (conso theorique x 8h/jour).</span></span></div>
           </div>
           <div class="hc-metric">
             <div class="hc-metric-val" style="color:var(--texte)">${totalCout30>0?Math.round(totalCout30/1000)+'k':'—'}</div>
-            <div class="hc-metric-label">FCFA ce mois</div>
+            <div class="hc-metric-label"><span class="tooltip-wrap">FCFA ce mois<span class="tooltip-icon">i</span><span class="tooltip-bubble">Litres ajoutes lors des pleins multiplies par le prix au litre configure. 30 derniers jours.</span></span></div>
           </div>
         </div>
       </div>
@@ -482,12 +488,12 @@ async function openDetail(clientId) {
     <div class="dp-body">
       <div class="biz-metrics">
         <div class="bm normal">
-          <div class="bm-label">Coût carburant — 30 jours</div>
+          <div class="bm-label"><span class="tooltip-wrap">Coût carburant — 30 jours<span class="tooltip-icon">ℹ</span><span class="tooltip-bubble">Litres ajoutés × \${client.prix_litre_fcfa||695} FCFA/L sur les 30 derniers jours.</span></span></div>
           <div class="bm-val" style="color:var(--texte)">${cout30>0?fmtNum(cout30):'—'}</div>
           <div class="bm-sub">FCFA · ${fmtNum(litres30)}L consommés</div>
         </div>
         <div class="bm ${bmAutoClass}">
-          <div class="bm-label" style="color:${status==='danger'?'var(--rouge)':status==='warn'?'var(--orange)':'var(--texte2)'}">Autonomie la plus basse</div>
+          <div class="bm-label" style="color:${status==='danger'?'var(--rouge)':status==='warn'?'var(--orange)':'var(--texte2)'}"><span class="tooltip-wrap">Autonomie la plus basse<span class="tooltip-icon">i</span><span class="tooltip-bubble" style="color:white">Litres restants divise par consommation journaliere estimee. Base sur la derniere saisie du jour.</span></span></div>
           <div class="bm-val" style="color:${status==='danger'?'var(--rouge)':status==='warn'?'var(--orange)':'var(--vert)'}">${minAuto!==null?minAuto+' jours':'—'}</div>
           <div class="bm-sub" style="color:${status==='danger'?'var(--rouge)':status==='warn'?'var(--orange)':'var(--texte2)'}">${minGroupe?.nom||'—'}</div>
         </div>
