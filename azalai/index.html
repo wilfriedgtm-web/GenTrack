@@ -340,18 +340,14 @@ function renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPanne
     const litres30 = saisies30C.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
     totalCout30 = Math.round(litres30*(c.prix_litre_fcfa||695));
 
-    const oPannesAnnee = (window._azalai?.cPannesAnnee||[]).filter(p=>p.client_id===clientId);
-  const oSaisiesAnnee = (window._azalai?.cSaisiesAnnee||[]).filter(s=>s.client_id===clientId);
-  const cCoutCarburantAnnee = Math.round(oSaisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0)*(client.prix_litre_fcfa||695));
-  const cCoutRepAnnee = oPannesAnnee.reduce((a,p)=>a+(p.cout_reparation||0),0);
-  const status = statusClass(minAuto??99, hP.length);
-    const flagColor = status==='danger'?'var(--rouge)':status==='warn'?'var(--orange)':'var(--vert)';
-    const pillClass = status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok';
-    const statusLabel = status==='danger'?'Critique':status==='warn'?'Attention':'Normal';
     const hPannesAnnee = (cPannesAnnee||[]).filter(p=>p.client_id===c.id);
     const hSaisiesAnnee = (cSaisiesAnnee||[]).filter(s=>s.client_id===c.id);
     const hCoutCarburantAnnee = Math.round(hSaisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0)*(c.prix_litre_fcfa||695));
     const hCoutRepAnnee = hPannesAnnee.reduce((a,p)=>a+(p.cout_reparation||0),0);
+    const status = statusClass(minAuto??99, hP.length);
+    const flagColor = status==='danger'?'var(--rouge)':status==='warn'?'var(--orange)':'var(--vert)';
+    const pillClass = status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok';
+    const statusLabel = status==='danger'?'Critique':status==='warn'?'Attention':'Normal';
     const isSelected = selectedClientId===c.id;
 
     return `<div class="hotel-card${isSelected?' selected':''}" onclick="openDetail('${c.id}')">
@@ -371,7 +367,7 @@ function renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPanne
         </div>
       </div>
       <div class="hc-bar"><div class="hc-bar-fill" style="width:${carbMoy||0}%;background:${carbColor(carbMoy||0)}"></div></div>
-      \${(hCoutCarburantAnnee>0||hCoutRepAnnee>0)?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 16px;background:var(--surface2);border-top:1px solid var(--bordure)"><div style="font-size:10px;color:var(--texte2)">⛽ <span style="font-weight:500;color:var(--texte)">'+(hCoutCarburantAnnee>0?fmtNum(hCoutCarburantAnnee)+' FCFA':'—')+'</span></div><div style="font-size:10px;color:var(--texte2)">🔧 <span style="font-weight:500;color:'+(hCoutRepAnnee>0?'var(--orange)':'var(--vert)')+'">'+fmtNum(hCoutRepAnnee)+' FCFA</span></div></div>':''}
+      ${(hCoutCarburantAnnee>0||hCoutRepAnnee>0)?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 16px;background:var(--surface2);border-top:1px solid var(--bordure)"><div style="font-size:10px;color:var(--texte2)">⛽ <span style="font-weight:500;color:var(--texte)">'+(hCoutCarburantAnnee>0?fmtNum(hCoutCarburantAnnee)+' FCFA':'—')+'</span></div><div style="font-size:10px;color:var(--texte2)">🔧 <span style="font-weight:500;color:'+(hCoutRepAnnee>0?'var(--orange)':'var(--vert)')+'">'+fmtNum(hCoutRepAnnee)+' FCFA</span></div></div>':''}
       <div class="hc-footer">
         <span class="pill ${pillClass}">${statusLabel}</span>
         <span style="font-size:11px;color:var(--texte2)">${hSJ.length}/${hG.length} saisies</span>
