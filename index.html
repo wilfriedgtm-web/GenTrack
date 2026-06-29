@@ -228,6 +228,29 @@ body{background:var(--noir);color:var(--t);font-family:'Inter',sans-serif;displa
 
 </div>
 
+<!-- MODAL RÉSOLUTION PANNE -->
+<div class="modal-overlay" id="modal-resoudre" onclick="closeModal('modal-resoudre',event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-nom">✅ Marquer résolue</div>
+        <div style="font-size:11px;color:var(--t2);margin-top:2px" id="rp-panne-label">—</div>
+      </div>
+      <button class="modal-close" onclick="closeModalDirect('modal-resoudre')">✕</button>
+    </div>
+    <input type="hidden" id="rp-panne-id">
+    <div class="modal-body">
+      <div class="field"><label>Note de résolution</label><input id="rp-note" placeholder="Ex: Démarreur remplacé, test effectué"></div>
+      <div class="field"><label>Intervenant / Technicien</label><input id="rp-intervenant" placeholder="Ex: Mamadou Diallo"></div>
+      <div class="field-row">
+        <div class="field"><label>Coût réparation (FCFA)</label><input id="rp-cout" type="number" placeholder="Ex: 85000"></div>
+        <div class="field"><label>Pièce remplacée</label><input id="rp-piece" placeholder="Ex: Démarreur"></div>
+      </div>
+      <button class="btn btn-or" style="width:100%;justify-content:center;padding:13px;margin-top:4px" onclick="saveResolution()">✅ Confirmer la résolution</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL NOUVEAU CLIENT -->
 <div class="modal-overlay" id="modal-add" onclick="closeModal('modal-add',event)">
   <div class="modal">
@@ -462,6 +485,7 @@ async function openClientDetail(clientId, detailId) {
       ${groupesHtml||'<div class="empty">Aucun groupe</div>'}
       <div class="section-label" style="margin-top:12px">Alertes actives</div>
       <div>${alertesHtml}</div>
+      ${pannes.filter(p=>!p.resolue).length>0?`<div class="section-label" style="margin-top:12px">Pannes en cours</div>${pannes.filter(p=>!p.resolue).map(p=>'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--b);font-size:12px"><div><div style="font-weight:600;color:var(--rouge)">🚨 '+(TYPE_PANNE[p.type]||p.type)+'</div><div style="color:var(--t2);margin-top:2px">'+(p.description||'—')+' · '+fmtDate(p.date_panne)+'</div></div><button class=\"btn btn-ghost\" style=\"padding:4px 10px;font-size:11px;color:var(--vert);border-color:var(--vert) !important\" onclick=\"openResoudre(\''+p.id+'\',\''+client.nom+'\',\''+((groupes.find(g=>g.id===p.groupe_id)||{}).nom||'—')+'\',\''+( TYPE_PANNE[p.type]||p.type)+'\')\" >✅ Résoudre</button></div>').join('')}`:''}
       ${maints.length?`<div class="section-label" style="margin-top:12px">Dernières maintenances</div>${maints.map(m=>`<div style="padding:8px 0;border-bottom:1px solid var(--b);font-size:12px;color:var(--t2)">${TYPE_MAINT[m.type]||m.type}${m.technicien?' · '+m.technicien:''} · ${fmtDate(m.date_intervention)}${m.cout>0?' · '+fmtNum(m.cout)+' FCFA':''}</div>`).join('')}`:''}
       <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b);display:flex;gap:8px">
         <button class="btn btn-ghost" style="font-size:12px" onclick="showToast('WhatsApp patron : ${client.whatsapp_patron||'—'}')">📱 ${client.whatsapp_patron||'Patron'}</button>
@@ -527,21 +551,58 @@ async function resolveAlerte(id){
 async function loadPannes() {
   const el = document.getElementById('pannes-list');
   const [pannes,clients,groupes] = await Promise.all([
-    api('pannes','&order=created_at.desc&limit=30'),
+    api('pannes','&order=created_at.desc&limit=50'),
     api('clients',''),api('groupes',''),
   ]);
   const clientMap = Object.fromEntries(clients.map(c=>[c.id,c.nom]));
   const groupeMap = Object.fromEntries(groupes.map(g=>[g.id,g.nom]));
   if(!pannes.length){el.innerHTML='<div class="empty">✅ Aucune panne enregistrée</div>';return;}
   el.innerHTML = pannes.map(p=>`
-    <div class="alerte-item">
+    <div class="alerte-item" style="${p.resolue?'opacity:0.6':''}">
       <div class="ai-dot" style="background:${p.resolue?'var(--vert)':'var(--rouge)'}"></div>
       <div class="ai-body">
         <div class="ai-titre">${clientMap[p.client_id]||'—'} · ${groupeMap[p.groupe_id]||'—'}</div>
         <div class="ai-desc">${TYPE_PANNE[p.type]||p.type} · ${p.description||'—'} · ${fmtDate(p.date_panne)}</div>
+        ${p.resolue?`<div style="font-size:11px;color:var(--vert);margin-top:3px">✅ Résolu le ${fmtDate(p.date_resolution)}${p.resolu_par?' par '+p.resolu_par:''}${p.resolu_via?' via '+p.resolu_via:''}${p.cout_reparation>0?' · '+fmtNum(p.cout_reparation)+' FCFA':''}</div>`:''}
+        ${p.intervenant&&!p.resolue?`<div style="font-size:11px;color:var(--t2);margin-top:2px">Intervenant : ${p.intervenant}</div>`:''}
       </div>
-      <span class="pill ${p.resolue?'pill-ok':'pill-danger'}">${p.resolue?'Résolue':'En cours'}</span>
+      ${!p.resolue
+        ?`<button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;flex-shrink:0;color:var(--vert);border-color:var(--vert) !important" onclick="openResoudre('${p.id}','${clientMap[p.client_id]||'—'}','${groupeMap[p.groupe_id]||'—'}','${TYPE_PANNE[p.type]||p.type}')">✅ Résoudre</button>`
+        :`<span class="pill pill-ok">Résolue</span>`
+      }
     </div>`).join('');
+}
+
+function openResoudre(panneId, clientNom, groupeNom, type) {
+  document.getElementById('rp-panne-id').value = panneId;
+  document.getElementById('rp-panne-label').textContent = clientNom+' · '+groupeNom+' · '+type;
+  document.getElementById('rp-note').value = '';
+  document.getElementById('rp-intervenant').value = '';
+  document.getElementById('rp-cout').value = '';
+  document.getElementById('rp-piece').value = '';
+  document.getElementById('modal-resoudre').classList.add('open');
+}
+
+async function saveResolution() {
+  const id = document.getElementById('rp-panne-id').value;
+  const cout = parseInt(document.getElementById('rp-cout').value)||0;
+  try {
+    await api('pannes',`&id=eq.${id}`,'*','PATCH',{
+      resolue: true,
+      date_resolution: new Date().toISOString(),
+      resolu_par: 'Admin GenTrack',
+      resolu_via: 'Dashboard',
+      resolution_note: document.getElementById('rp-note').value||null,
+      intervenant: document.getElementById('rp-intervenant').value||null,
+      cout_reparation: cout,
+      piece_remplacee: document.getElementById('rp-piece').value||null,
+    });
+    // Résoudre aussi l'alerte panne associée
+    await api('alertes',`&type=eq.panne&resolue=eq.false`,'*','PATCH',{resolue:true});
+    closeModalDirect('modal-resoudre');
+    showToast('Panne marquée résolue ✓');
+    loadPannes();loadAll();
+  } catch(e){showToast('Erreur','err');}
 }
 
 async function loadMaintenance() {
