@@ -190,6 +190,7 @@ body{background:var(--surface);color:var(--texte);font-family:'Inter',sans-serif
   <!-- RÉSUMÉ SEMAINE GROUPE -->
   <div class="section-title">Cette semaine — Groupe Azalaï</div>
   <div class="section-sub">Consolidé sur tous les établissements</div>
+  <div id="couts-annuels-wrap"></div>
   <div class="week-grid" id="week-grid">
     <div class="loading" style="grid-column:1/-1"><span class="spinner"></span></div>
   </div>
@@ -235,24 +236,32 @@ async function loadAll() {
   const dateDebut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
   const dateDebut7  = new Date(Date.now()-7*86400000).toISOString().split('T')[0];
 
-  const [clients, groupes, saisiesJour, saisies30, alertes, pannes] = await Promise.all([
+  const dateDebutAnnee = new Date(new Date().getFullYear(),0,1).toISOString().split('T')[0];
+  const [clients, groupes, saisiesJour, saisies30, alertes, pannes, pannesAnnee, saisiesAnnee] = await Promise.all([
     api('clients', `&groupe_hotelier=eq.${GROUPE}&actif=eq.true&order=nom`),
     api('groupes', '&actif=eq.true'),
     api('saisies', `&date=eq.${today}&order=created_at.desc`),
     api('saisies', `&date=gte.${dateDebut30}&order=date.desc`),
     api('alertes', '&resolue=eq.false'),
     api('pannes',  '&resolue=eq.false'),
+    api('pannes',  `&resolue=eq.true&date_panne=gte.${dateDebutAnnee}`),
+    api('saisies', `&date=gte.${dateDebutAnnee}`),
   ]);
 
   const clientIds = clients.map(c=>c.id);
-  const cGroupes   = groupes.filter(g=>clientIds.includes(g.client_id));
-  const cSaisiesJ  = saisiesJour.filter(s=>clientIds.includes(s.client_id));
-  const cSaisies30 = saisies30.filter(s=>clientIds.includes(s.client_id));
-  const cAlertes   = alertes.filter(a=>clientIds.includes(a.client_id));
-  const cPannes    = pannes.filter(p=>clientIds.includes(p.client_id));
+  const cGroupes      = groupes.filter(g=>clientIds.includes(g.client_id));
+  const cSaisiesJ     = saisiesJour.filter(s=>clientIds.includes(s.client_id));
+  const cSaisies30    = saisies30.filter(s=>clientIds.includes(s.client_id));
+  const cAlertes      = alertes.filter(a=>clientIds.includes(a.client_id));
+  const cPannes       = pannes.filter(p=>clientIds.includes(p.client_id));
+  const cPannesAnnee  = (pannesAnnee||[]).filter(p=>clientIds.includes(p.client_id));
+  const cSaisiesAnnee = (saisiesAnnee||[]).filter(s=>clientIds.includes(s.client_id));
+  const coutCarburantAnnee = Math.round(cSaisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0) * (clients[0]?.prix_litre_fcfa||695));
+  const coutRepAnnee = cPannesAnnee.reduce((a,p)=>a+(p.cout_reparation||0),0);
 
   _data = { clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPannes, today, dateDebut7 };
 
+  renderCoutsAnnuels(coutCarburantAnnee, coutRepAnnee, cPannesAnnee);
   renderBanner(clients, cGroupes, cSaisiesJ, cAlertes, cPannes);
   renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPannes);
   renderWeek(clients, cGroupes, cSaisies30.filter(s=>s.date>=dateDebut7), cAlertes, cPannes);
@@ -330,7 +339,11 @@ function renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPanne
     const litres30 = saisies30C.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
     totalCout30 = Math.round(litres30*(c.prix_litre_fcfa||695));
 
-    const status = statusClass(minAuto??99, hP.length);
+    const hPannesAnnee = cPannesAnnee.filter(p=>p.client_id===clientId);
+  const hSaisiesAnnee = cSaisiesAnnee.filter(s=>s.client_id===clientId);
+  const cCoutCarburantAnnee = Math.round(hSaisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0)*(client.prix_litre_fcfa||695));
+  const cCoutRepAnnee = hPannesAnnee.reduce((a,p)=>a+(p.cout_reparation||0),0);
+  const status = statusClass(minAuto??99, hP.length);
     const flagColor = status==='danger'?'var(--rouge)':status==='warn'?'var(--orange)':'var(--vert)';
     const pillClass = status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok';
     const statusLabel = status==='danger'?'Critique':status==='warn'?'Attention':'Normal';
@@ -397,6 +410,10 @@ async function openDetail(clientId) {
     if(j!==null&&(minAuto===null||j<minAuto)){minAuto=j;minGroupe=g;minSaisie=s;}
   });
 
+  const hPannesAnnee = cPannesAnnee.filter(p=>p.client_id===clientId);
+  const hSaisiesAnnee = cSaisiesAnnee.filter(s=>s.client_id===clientId);
+  const cCoutCarburantAnnee = Math.round(hSaisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0)*(client.prix_litre_fcfa||695));
+  const cCoutRepAnnee = hPannesAnnee.reduce((a,p)=>a+(p.cout_reparation||0),0);
   const status = statusClass(minAuto??99, hP.length);
   const bmAutoClass = status==='danger'?'danger':status==='warn'?'warn':'normal';
 
@@ -499,6 +516,10 @@ async function openDetail(clientId) {
         </div>
       </div>
 
+      ${(cCoutCarburantAnnee>0||cCoutRepAnnee>0)?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="background:var(--surface2);border-radius:5px;padding:11px 13px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--texte2);font-weight:500;margin-bottom:5px">⛽ Carburant ${new Date().getFullYear()}</div><div style="font-size:20px;font-weight:600;color:var(--texte)">${fmtNum(cCoutCarburantAnnee)}</div><div style="font-size:11px;color:var(--texte2);margin-top:2px">FCFA</div></div>
+        <div style="background:var(--surface2);border-radius:5px;padding:11px 13px;border-top:2px solid ${cCoutRepAnnee>0?'var(--orange)':'var(--vert)'}"><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--texte2);font-weight:500;margin-bottom:5px">🔧 Réparations ${new Date().getFullYear()}</div><div style="font-size:20px;font-weight:600;color:${cCoutRepAnnee>0?'var(--orange)':'var(--vert)'}">${fmtNum(cCoutRepAnnee)}</div><div style="font-size:11px;color:var(--texte2);margin-top:2px">${hPannesAnnee.length} intervention${hPannesAnnee.length>1?'s':''}</div></div>
+      </div>`:''}
       ${actionHtml}
 
       ${hA.length>0?`<div style="margin-bottom:14px">${alertesHtml}</div>`:''}
@@ -562,6 +583,24 @@ function closeDetail() {
   selectedClientId = null;
   document.getElementById('detail-panel').classList.remove('open');
   document.querySelectorAll('.hotel-card').forEach(el=>el.classList.remove('selected'));
+}
+
+function renderCoutsAnnuels(coutCarburantAnnee, coutRepAnnee, cPannesAnnee) {
+  const el = document.getElementById('couts-annuels-wrap');
+  if(!el) return;
+  const annee = new Date().getFullYear();
+  el.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+    <div style="background:white;border-radius:6px;border:1px solid var(--bordure);padding:14px 16px">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--texte2);font-weight:500;margin-bottom:8px">⛽ Carburant — ${annee}</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;color:var(--texte)">${coutCarburantAnnee>0?fmtNum(coutCarburantAnnee):'—'}</div>
+      <div style="font-size:11px;color:var(--texte2);margin-top:4px">FCFA · coût d'exploitation</div>
+    </div>
+    <div style="background:white;border-radius:6px;border:1px solid var(--bordure);border-top:3px solid ${coutRepAnnee>0?'var(--orange)':'var(--vert)'};padding:14px 16px">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--texte2);font-weight:500;margin-bottom:8px">🔧 Réparations — ${annee}</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;color:${coutRepAnnee>0?'var(--orange)':'var(--vert)'}">${fmtNum(coutRepAnnee)}</div>
+      <div style="font-size:11px;color:var(--texte2);margin-top:3px">${cPannesAnnee.length} intervention${cPannesAnnee.length>1?'s':''} résolue${cPannesAnnee.length>1?'s':''}</div>
+    </div>
+  </div>`;
 }
 
 function renderWeek(clients, cGroupes, saisies7, cAlertes, cPannes) {

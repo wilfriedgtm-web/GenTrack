@@ -192,14 +192,17 @@ async function init() {
   const dateDebut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
   const dateDebut14 = new Date(Date.now()-14*86400000).toISOString().split('T')[0];
 
-  const [clients,groupes,saisiesJ,saisies30,alertes,pannes,maints] = await Promise.all([
+  const dateDebutAnnee = new Date(new Date().getFullYear(),0,1).toISOString();
+  const [clients,groupes,saisiesJ,saisies30,alertes,pannes,maints,pannesAnnee,saisiesAnnee] = await Promise.all([
     api('clients',`&id=eq.${clientId}`),
     api('groupes',`&client_id=eq.${clientId}&actif=eq.true`),
     api('saisies',`&client_id=eq.${clientId}&date=eq.${today}&order=created_at.desc`),
     api('saisies',`&client_id=eq.${clientId}&date=gte.${dateDebut30}&order=date.asc`),
     api('alertes',`&client_id=eq.${clientId}&resolue=eq.false`),
-    api('pannes',`&client_id=eq.${clientId}&order=date_panne.desc&limit=10`),
-    api('maintenances',`&client_id=eq.${clientId}&order=date_intervention.desc&limit=6`),
+    api('pannes',`&client_id=eq.\${clientId}&order=date_panne.desc&limit=10`),
+    api('maintenances',`&client_id=eq.\${clientId}&order=date_intervention.desc&limit=6`),
+    api('pannes',`&client_id=eq.\${clientId}&date_panne=gte.\${dateDebutAnnee}&resolue=eq.true`),
+    api('saisies',`&client_id=eq.\${clientId}&date=gte.\${new Date().getFullYear()+'-01-01'}`),
   ]);
 
   const client = clients[0];
@@ -210,7 +213,18 @@ async function init() {
 
   document.title = `${client.nom} — GenTrack`;
 
-  // Calculs
+  // Calculs annuels
+  const coutCarburantAnnee = Math.round(
+    saisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0) * (client.prix_litre_fcfa||695)
+  );
+  const coutReparationsAnnee = pannesAnnee.reduce((a,p)=>a+(p.cout_reparation||0),0);
+  const nbReparations = pannesAnnee.length;
+  const detailReparations = pannesAnnee
+    .filter(p=>p.cout_reparation>0)
+    .sort((a,b)=>b.cout_reparation-a.cout_reparation)
+    .slice(0,3);
+
+  // Calculs 30 jours
   const litres30 = saisies30.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
   const cout30   = Math.round(litres30*(client.prix_litre_fcfa||695));
   const heures30 = saisies30.reduce((a,s)=>a+(s.heures_marche||0),0);
@@ -412,7 +426,22 @@ async function init() {
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px">
+      <!-- COÛTS ANNUELS -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;margin-bottom:16px">
+        <div style="background:white;border-radius:8px;border:1px solid var(--bordure);padding:16px 18px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--texte2);font-weight:500;margin-bottom:8px">⛽ Carburant — ${new Date().getFullYear()}</div>
+          <div style="font-size:26px;font-weight:600;color:var(--texte);letter-spacing:-0.5px">${coutCarburantAnnee>0?fmtNum(coutCarburantAnnee):'—'}</div>
+          <div style="font-size:12px;color:var(--texte2);margin-top:4px">FCFA · coût d'exploitation</div>
+        </div>
+        <div style="background:white;border-radius:8px;border:1px solid var(--bordure);padding:16px 18px;border-top:3px solid ${coutReparationsAnnee>0?'var(--orange)':'var(--vert)'}">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--texte2);font-weight:500;margin-bottom:8px">🔧 Réparations — ${new Date().getFullYear()}</div>
+          <div style="font-size:26px;font-weight:600;color:${coutReparationsAnnee>0?'var(--orange)':'var(--vert)'};letter-spacing:-0.5px">${coutReparationsAnnee>0?fmtNum(coutReparationsAnnee):'0'}</div>
+          <div style="font-size:12px;color:var(--texte2);margin-top:4px">${nbReparations>0?nbReparations+' intervention'+(nbReparations>1?'s':''):'Aucune intervention'}</div>
+          ${detailReparations.length>0?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--bordure)">${detailReparations.map(p=>`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--texte2);margin-bottom:3px"><span>${p.piece_remplacee||TYPE_PANNE[p.type]||p.type}</span><span style="font-weight:500;color:var(--texte)">${fmtNum(p.cout_reparation)} FCFA</span></div>`).join('')}</div>`:''}
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:0">
         <div>
           <div class="section-label">Incidents & pannes</div>
           <div style="background:white;border-radius:8px;border:1px solid var(--bordure);overflow:hidden">${pannesHtml}</div>
