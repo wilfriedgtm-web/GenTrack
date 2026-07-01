@@ -355,20 +355,25 @@ async function loadAll() {
   document.getElementById('accueil-date').textContent = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+' · '+now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   const today = now.toISOString().split('T')[0];
 
-  const [clients,groupes,saisies,alertes,pannes] = await Promise.all([
+  const [clients,groupes,allSaisies,alertes,pannes] = await Promise.all([
     api('clients','&actif=eq.true&order=nom'),
     api('groupes','&actif=eq.true'),
-    api('saisies',`&date=eq.${today}&order=created_at.desc`),
+    api('saisies',`&order=created_at.desc&limit=100`),
     api('alertes','&resolue=eq.false&order=created_at.desc'),
     api('pannes','&resolue=eq.false'),
   ]);
+  // Dernière saisie par groupe
+  const latestByGroupe = {};
+  allSaisies.forEach(s=>{ if(!latestByGroupe[s.groupe_id]) latestByGroupe[s.groupe_id]=s; });
+  const saisies = Object.values(latestByGroupe);
 
   const mrr = clients.reduce((a,c)=>a+(PLANS[c.plan]||20000),0);
   document.getElementById('kpi-clients').textContent = clients.length;
   document.getElementById('kpi-clients-sub').textContent = `${clients.length} établissement${clients.length>1?'s':''}`;
   document.getElementById('kpi-mrr').textContent = fmtNum(mrr);
   document.getElementById('kpi-alertes').textContent = alertes.length;
-  document.getElementById('kpi-saisies').textContent = saisies.length;
+  const saisiesAujourdhui = allSaisies.filter(s=>s.date===today);
+  document.getElementById('kpi-saisies').textContent = saisiesAujourdhui.length;
   document.getElementById('kpi-saisies-sub').textContent = `sur ${groupes.length} groupe${groupes.length>1?'s':''}`;
   document.getElementById('badge-alertes').textContent = alertes.length||0;
 
@@ -388,13 +393,14 @@ function renderClientsSante(elId, clients, groupes, saisies, alertes, pannes, de
     const lien = clientLien(c);
     const pillClass = status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok';
     const statusLabel = status==='danger'?'Critique':status==='warn'?'Attention':'Normal';
-    const tauxColor = hSJ.length===hG.length?'var(--vert)':hSJ.length>0?'var(--orange)':'var(--rouge)';
+    const hSJToday = hSJ.filter(s=>s.date===new Date().toISOString().split('T')[0]);
+    const tauxColor = hSJToday.length===hG.length?'var(--vert)':hSJToday.length>0?'var(--orange)':'var(--rouge)';
     return `<div class="client-row" onclick="openClientDetail('${c.id}','${detailId}')">
       <div>
         <div class="cr-nom">${c.nom}</div>
         <div class="cr-sub">${c.ville||'—'} · ${hG.length} groupe${hG.length>1?'s':''} · ${c.plan||'business'}</div>
       </div>
-      <div class="cr-val" style="color:${tauxColor}">${hSJ.length}/${hG.length}</div>
+      <div class="cr-val" style="color:${tauxColor}">${hSJToday.length}/${hG.length}</div>
       <div class="cr-val ${hA.length>0?'rouge':''}">${hA.length||'—'}</div>
       <div><span class="pill ${pillClass}">${statusLabel}</span></div>
       <div class="cr-actions" onclick="event.stopPropagation()">
@@ -420,7 +426,7 @@ async function openClientDetail(clientId, detailId) {
   const [client,groupes,saisiesJ,saisies30,alertes,pannes,maints] = await Promise.all([
     api('clients',`&id=eq.${clientId}`).then(r=>r[0]),
     api('groupes',`&client_id=eq.${clientId}&actif=eq.true`),
-    api('saisies',`&client_id=eq.${clientId}&date=eq.${today}&order=created_at.desc`),
+    api('saisies',`&client_id=eq.${clientId}&order=created_at.desc&limit=20`),
     api('saisies',`&client_id=eq.${clientId}&date=gte.${dateDebut30}`),
     api('alertes',`&client_id=eq.${clientId}&resolue=eq.false`),
     api('pannes',`&client_id=eq.${clientId}&resolue=eq.false`),
@@ -433,7 +439,10 @@ async function openClientDetail(clientId, detailId) {
   const lien = clientLien(client);
 
   const groupesHtml = groupes.map(g=>{
-    const s = saisiesJ.filter(x=>x.groupe_id===g.id)[0];
+    const latestSaisies = {};
+    saisiesJ.forEach(s=>{ if(!latestSaisies[s.groupe_id]) latestSaisies[s.groupe_id]=s; });
+    const s = latestSaisies[g.id] || null;
+    const joursRetard = s ? Math.round((new Date(today)-new Date(s.date))/86400000) : null;
     const j = calcAuto(g,s);
     const carb = s?.niveau_carburant;
     const status = pannes.some(p=>p.groupe_id===g.id)||carb<25?'danger':carb<50||j<5?'warn':'ok';
@@ -513,14 +522,17 @@ function renderAlertesAccueil(alertes, clients, groupes) {
 
 async function loadClients() {
   const today = new Date().toISOString().split('T')[0];
-  const [clients,groupes,saisies,alertes,pannes] = await Promise.all([
+  const [clients,groupes,allSaisies2,alertes,pannes] = await Promise.all([
     api('clients','&order=nom'),
     api('groupes','&actif=eq.true'),
-    api('saisies',`&date=eq.${today}`),
+    api('saisies',`&order=created_at.desc&limit=200`),
     api('alertes','&resolue=eq.false'),
     api('pannes','&resolue=eq.false'),
   ]);
-  renderClientsSante('clients-list',clients,groupes,saisies,alertes,pannes,'detail-panel-accueil');
+  const latestByGroupe2 = {};
+  allSaisies2.forEach(s=>{ if(!latestByGroupe2[s.groupe_id]) latestByGroupe2[s.groupe_id]=s; });
+  const saisies2 = Object.values(latestByGroupe2);
+  renderClientsSante('clients-list',clients,groupes,saisies2,alertes,pannes,'detail-panel-accueil');
 }
 
 async function loadAlertes() {
