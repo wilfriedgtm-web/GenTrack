@@ -240,7 +240,7 @@ async function loadAll() {
   const [clients, groupes, saisiesJour, saisies30, alertes, pannes, pannesAnnee, saisiesAnnee] = await Promise.all([
     api('clients', `&groupe_hotelier=eq.${GROUPE}&actif=eq.true&order=nom`),
     api('groupes', '&actif=eq.true'),
-    api('saisies', `&date=eq.${today}&order=created_at.desc`),
+    api('saisies', `&order=created_at.desc&limit=50`),
     api('saisies', `&date=gte.${dateDebut30}&order=date.desc`),
     api('alertes', '&resolue=eq.false'),
     api('pannes',  '&resolue=eq.false'),
@@ -250,7 +250,13 @@ async function loadAll() {
 
   const clientIds = clients.map(c=>c.id);
   const cGroupes      = groupes.filter(g=>clientIds.includes(g.client_id));
-  const cSaisiesJ     = saisiesJour.filter(s=>clientIds.includes(s.client_id));
+  // Prendre la dernière saisie par groupe (pas seulement celle du jour)
+  const allSaisies = saisiesJour.filter(s=>clientIds.includes(s.client_id));
+  const latestByGroupe = {};
+  allSaisies.forEach(s=>{
+    if(!latestByGroupe[s.groupe_id]) latestByGroupe[s.groupe_id] = s;
+  });
+  const cSaisiesJ = Object.values(latestByGroupe);
   const cSaisies30    = saisies30.filter(s=>clientIds.includes(s.client_id));
   const cAlertes      = alertes.filter(a=>clientIds.includes(a.client_id));
   const cPannes       = pannes.filter(p=>clientIds.includes(p.client_id));
@@ -368,6 +374,17 @@ function renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPanne
       </div>
       <div class="hc-bar"><div class="hc-bar-fill" style="width:${carbMoy||0}%;background:${carbColor(carbMoy||0)}"></div></div>
       ${(hCoutCarburantAnnee>0||hCoutRepAnnee>0)?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 16px;background:var(--surface2);border-top:1px solid var(--bordure)"><div style="font-size:10px;color:var(--texte2)">⛽ <span style="font-weight:500;color:var(--texte)">'+(hCoutCarburantAnnee>0?fmtNum(hCoutCarburantAnnee)+' FCFA':'—')+'</span></div><div style="font-size:10px;color:var(--texte2)">🔧 <span style="font-weight:500;color:'+(hCoutRepAnnee>0?'var(--orange)':'var(--vert)')+'">'+fmtNum(hCoutRepAnnee)+' FCFA</span></div></div>':''}
+      <div style="padding:8px 16px;background:var(--surface2);border-top:1px solid var(--bordure);font-size:11px;color:var(--texte2)">
+        ${(()=>{
+          const derniereSaisie = hSJ.filter(s=>cGroupes.some(g=>g.id===s.groupe_id&&g.client_id===c.id))[0];
+          if(!derniereSaisie) return '—';
+          const joursRetard = Math.round((new Date(today)-new Date(derniereSaisie.date))/86400000);
+          const heure = derniereSaisie.created_at ? new Date(derniereSaisie.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dakar'}) : '';
+          if(joursRetard===0) return '✓ Saisi aujourd\'hui à '+heure;
+          if(joursRetard===1) return '⚠️ Données d\'hier à '+heure;
+          return '⚠️ Dernière saisie il y a '+joursRetard+' jours';
+        })()}
+      </div>
       <div class="hc-footer">
         <span class="pill ${pillClass}">${statusLabel}</span>
         <span style="font-size:11px;color:var(--texte2)">${hSJ.length}/${hG.length} saisies</span>
@@ -459,7 +476,14 @@ async function openDetail(clientId) {
       <div class="gd-header" style="border-left:3px solid ${flagG}">
         <div>
           <div class="gd-nom">${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA</div>
-          <div class="gd-saisie">${heureSaisie?`Saisi à ${heureSaisie}`:'Pas de saisie aujourd\'hui'}${s?.operateur?' · '+s.operateur:''}</div>
+          <div class="gd-saisie">${(()=>{
+            if(!s) return 'Aucune saisie enregistrée';
+            const jr = Math.round((new Date(today)-new Date(s.date))/86400000);
+            const h = s.created_at ? new Date(s.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dakar'}) : '—';
+            if(jr===0) return 'Saisi à '+h+(s.operateur?' · '+s.operateur:'');
+            if(jr===1) return '⚠️ Données d\'hier à '+h+(s.operateur?' · '+s.operateur:'');
+            return '⚠️ Dernière saisie il y a '+jr+' jours'+(s.operateur?' · '+s.operateur:'');
+          })()}</div>
         </div>
         <span class="pill ${statusG==='danger'?'pill-danger':statusG==='warn'?'pill-warn':'pill-ok'}">${carb!=null?carb+'%':'—'}</span>
       </div>

@@ -196,7 +196,7 @@ async function init() {
   const [clients,groupes,saisiesJ,saisies30,alertes,pannes,maints,pannesAnnee,saisiesAnnee] = await Promise.all([
     api('clients',`&id=eq.${clientId}`),
     api('groupes',`&client_id=eq.${clientId}&actif=eq.true`),
-    api('saisies',`&client_id=eq.${clientId}&date=eq.${today}&order=created_at.desc`),
+    api('saisies',`&client_id=eq.${clientId}&order=created_at.desc&limit=20`),
     api('saisies',`&client_id=eq.${clientId}&date=gte.${dateDebut30}&order=date.asc`),
     api('alertes',`&client_id=eq.${clientId}&resolue=eq.false`),
     api('pannes',`&client_id=eq.${clientId}&order=date_panne.desc&limit=20`),
@@ -235,7 +235,9 @@ async function init() {
   // Autonomie minimale
   let minAuto = null, minGroupe = null;
   groupes.forEach(g=>{
-    const s = saisiesJ.filter(x=>x.groupe_id===g.id)[0];
+    const saisiesGroupe = saisiesJ.filter(x=>x.groupe_id===g.id);
+    const s = saisiesGroupe[0] || null;
+    const sIsToday = s && s.date === today;
     const j = calcAuto(g,s);
     if(j!==null&&(minAuto===null||j<minAuto)){minAuto=j;minGroupe=g;}
   });
@@ -258,7 +260,9 @@ async function init() {
 
   // Groupes HTML
   const groupesHtml = groupes.map(g=>{
-    const s = saisiesJ.filter(x=>x.groupe_id===g.id)[0];
+    const saisiesGroupe2 = saisiesJ.filter(x=>x.groupe_id===g.id);
+    const s = saisiesGroupe2[0] || null;
+    const sIsToday = s && s.date === today;
     const carb = s?.niveau_carburant;
     const j = calcAuto(g,s);
     const huile = s?.niveau_huile||'—';
@@ -281,7 +285,13 @@ async function init() {
       <div class="gc-header">
         <div>
           <div class="gc-nom">${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA</div>
-          <div class="gc-sub">${heureSaisie?`Saisi à ${heureSaisie}`:s?'Saisi aujourd\'hui':'Pas de saisie aujourd\'hui'}${s?.operateur?' · '+s.operateur:''}</div>
+          <div class="gc-sub">${(()=>{
+            if(!s) return 'Aucune saisie enregistrée';
+            const joursRetard = Math.round((new Date(today)-new Date(s.date))/(86400000));
+            if(joursRetard===0) return (heureSaisie?'Saisi à '+heureSaisie:'Saisi aujourd\'hui')+(s.operateur?' · '+s.operateur:'');
+            if(joursRetard===1) return '⚠️ Données d\'hier à '+(heureSaisie||'—')+(s.operateur?' · '+s.operateur:'');
+            return '⚠️ Dernière saisie il y a '+joursRetard+' jours'+(s.operateur?' · '+s.operateur:'');
+          })()}</div>
         </div>
         <span class="pill ${status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok'}">${carb!=null?carb+'%':'—'}</span>
       </div>
