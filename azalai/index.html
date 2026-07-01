@@ -270,7 +270,7 @@ async function loadAll() {
 
   renderCoutsAnnuels(coutCarburantAnnee, coutRepAnnee, cPannesAnnee);
   renderBanner(clients, cGroupes, cSaisiesJ, cAlertes, cPannes);
-  renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPannes, cPannesAnnee, cSaisiesAnnee);
+  renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPannes, cPannesAnnee, cSaisiesAnnee, today);
   renderWeek(clients, cGroupes, cSaisies30.filter(s=>s.date>=dateDebut7), cAlertes, cPannes);
 }
 
@@ -318,7 +318,7 @@ function renderBanner(clients, cGroupes, cSaisiesJ, cAlertes, cPannes) {
   el.innerHTML=`<div class="action-banner" onclick="openDetail('${cibleId}')"><div class="ab-icon">🚨</div><div class="ab-body"><div class="ab-titre">${total} action${total>1?'s':''} requise${total>1?'s':''} aujourd'hui</div><div class="ab-sub">${subs.join(' · ')}</div></div><div class="ab-arrow">›</div></div>`;
 }
 
-function renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPannes, cPannesAnnee, cSaisiesAnnee) {
+function renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPannes, cPannesAnnee, cSaisiesAnnee, today) {
   const el = document.getElementById('hotels-grid');
   if(!clients.length){el.innerHTML='<div class="empty">Aucun établissement</div>';return;}
 
