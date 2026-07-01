@@ -368,7 +368,7 @@ function renderHotels(clients, cGroupes, cSaisiesJ, cSaisies30, cAlertes, cPanne
           </div>
           <div class="hc-metric">
             <div class="hc-metric-val" style="color:var(--texte)">${totalCout30>0?Math.round(totalCout30/1000)+'k':'—'}</div>
-            <div class="hc-metric-label"><span class="tooltip-wrap">FCFA ce mois<span class="tooltip-icon">i</span><span class="tooltip-bubble">Litres ajoutes lors des pleins multiplies par le prix au litre configure. 30 derniers jours.</span></span></div>
+            <div class="hc-metric-label"><span class="tooltip-wrap">FCFA ce mois<span class="tooltip-icon">i</span><span class="tooltip-bubble">Total des litres ajoutés lors des pleins × prix au litre. Ne prend en compte que les pleins enregistrés ce mois.</span></span></div>
           </div>
         </div>
       </div>
@@ -531,7 +531,7 @@ async function openDetail(clientId) {
     <div class="dp-body">
       <div class="biz-metrics">
         <div class="bm normal">
-          <div class="bm-label"><span class="tooltip-wrap">Coût carburant — 30 jours<span class="tooltip-icon">ℹ</span><span class="tooltip-bubble">Litres ajoutés × \${client.prix_litre_fcfa||695} FCFA/L sur les 30 derniers jours.</span></span></div>
+          <div class="bm-label"><span class="tooltip-wrap">Coût carburant — 30 jours<span class="tooltip-icon">ℹ</span><span class="tooltip-bubble">Total des litres ajoutés lors des pleins, multiplié par le prix au litre configuré. Ne prend en compte que les pleins enregistrés.</span></span></div>
           <div class="bm-val" style="color:var(--texte)">${cout30>0?fmtNum(cout30):'—'}</div>
           <div class="bm-sub">FCFA · ${fmtNum(litres30)}L consommés</div>
         </div>
