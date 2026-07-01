@@ -276,7 +276,7 @@ async function init() {
     if(j!==null&&j<2&&cmdL){
       actionHtml=`<div class="gc-action">🚨 Commander ${fmtNum(cmdL)}L maintenant · ~${fmtNum(cmdCout)} FCFA</div>`;
     } else if(j!==null&&j<5&&cmdL){
-      actionHtml=`<div class="gc-action warn">⛽ Planifier ${fmtNum(cmdL)}L dans ${Math.round(j-2)} jours · ~${fmtNum(cmdCout)} FCFA</div>`;
+      actionHtml=`<div class="gc-action warn">⛽ Planifier ${fmtNum(cmdL)}L dans ${Math.max(1,Math.round(j-2))} jour${Math.round(j-2)>1?'s':''} · ~${fmtNum(cmdCout)} FCFA</div>`;
     } else if(s){
       actionHtml=`<div class="gc-action ok">✅ Aucune action requise — prochain plein estimé dans ~${j||'—'} jours</div>`;
     }

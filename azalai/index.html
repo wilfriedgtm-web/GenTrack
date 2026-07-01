@@ -443,7 +443,7 @@ async function openDetail(clientId) {
     const coutCmd   = litresCmd ? Math.round(litresCmd*(client.prix_litre_fcfa||695)) : 0;
     if(minAuto!==null&&minAuto<5) {
       const urgence = minAuto<2?'danger':'warn';
-      const delai   = minAuto<2?'avant demain soir':`dans ${Math.round(minAuto-2)} jours`;
+      const delai   = minAuto<2?'maintenant — urgent':`dans ${Math.max(1,Math.round(minAuto-2))} jour${Math.round(minAuto-2)>1?'s':''}`;
       actionHtml = `<div class="action-card ${urgence}">
         <div>
           <div class="ac-titre">Commander ${fmtNum(litresCmd)}L ${delai}</div>
