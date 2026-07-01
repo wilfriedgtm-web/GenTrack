@@ -311,7 +311,7 @@ async function init() {
           </div>
           <div>
             <div class="gc-stat-label">Total</div>
-            <div class="gc-stat-val">${g.heures_total||0}h</div>
+            <div class="gc-stat-val" style="color:${g.heures_total>=(g.seuil_vidange_heures||250)?'var(--rouge)':g.heures_total>=(g.seuil_vidange_heures||250)*0.8?'var(--orange)':'var(--texte)'}">${g.heures_total||0}h${g.seuil_vidange_heures?' / '+g.seuil_vidange_heures+'h':''}</div>
           </div>
         </div>
         ${carb!=null?`<div class="gc-bar"><div class="gc-bar-fill" style="width:${carb}%;background:${carbColor(carb)}"></div></div>`:''}
