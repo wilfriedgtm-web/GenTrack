@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Azalaï Dakar — Pilote GenTrack</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+:root{
+  --bx:#8B1A2E;--bx-pale:rgba(139,26,46,0.08);--bx-mid:rgba(139,26,46,0.15);
+  --or:#C9A96E;--or-pale:rgba(201,169,110,0.12);
+  --surface:#FDFAF5;--surface2:#F5EFE6;--surface3:#EDE3D4;
+  --bordure:#DDD0BC;--texte:#2C1810;--texte2:#7A6855;--texte3:#B5A090;
+  --vert:#2D7A4F;--vert-pale:rgba(45,122,79,0.08);
+  --rouge:#C0392B;--rouge-pale:rgba(192,57,43,0.08);--rouge-bordure:rgba(192,57,43,0.3);
+  --orange:#D4761E;--orange-pale:rgba(212,118,30,0.08);--orange-bordure:rgba(212,118,30,0.3);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--surface);color:var(--texte);font-family:'Inter',sans-serif;min-height:100vh}
+
+.header{background:var(--bx);color:white}
+.header-top{display:flex;justify-content:space-between;align-items:center;padding:20px 36px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.logo{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;letter-spacing:3px;text-transform:uppercase}
+.logo span{color:var(--or);font-weight:400}
+.logo-sub{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-top:2px}
+.header-date{font-size:11px;color:rgba(255,255,255,0.5);text-align:right}
+.header-title{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--or);margin-top:3px;text-align:right}
+
+.container{max-width:960px;margin:0 auto;padding:32px 36px 60px}
+
+/* ONGLETS */
+.tabs{display:flex;gap:4px;margin-bottom:28px;border-bottom:1px solid var(--bordure)}
+.tab{padding:11px 20px;font-size:12px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--texte2);cursor:pointer;border-bottom:2px solid transparent;transition:color 0.15s,border-color 0.15s}
+.tab:hover{color:var(--texte)}
+.tab.active{color:var(--bx);border-bottom-color:var(--bx)}
+.tab-panel{display:none}
+.tab-panel.active{display:block;animation:fadeIn 0.2s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* BANNIERE ACTION */
+.action-banner{background:var(--rouge-pale);border:1px solid var(--rouge-bordure);border-radius:6px;padding:14px 18px;display:flex;align-items:center;gap:14px;margin-bottom:28px}
+.ab-icon{font-size:20px;flex-shrink:0}
+.ab-body{flex:1}
+.ab-titre{font-size:13px;font-weight:600;color:var(--rouge)}
+.ab-sub{font-size:12px;color:var(--texte2);margin-top:2px}
+
+/* SECTION TITRE */
+.section-title{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--texte);margin-bottom:4px}
+.section-sub{font-size:11px;color:var(--texte2);letter-spacing:0.5px;margin-bottom:16px}
+
+/* 2 MÉTRIQUES BUSINESS */
+.biz-metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.bm{border-radius:6px;border:1px solid var(--bordure);padding:16px 18px}
+.bm.normal{background:var(--surface2)}
+.bm.danger{background:var(--rouge-pale);border-color:var(--rouge-bordure)}
+.bm.warn{background:var(--orange-pale);border-color:var(--orange-bordure)}
+.bm-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--texte2);margin-bottom:8px;font-weight:600}
+.bm-val{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:600;line-height:1;letter-spacing:-0.5px}
+.bm-sub{font-size:11px;color:var(--texte2);margin-top:5px}
+
+/* CARDS COÛTS ANNUELS */
+.couts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.cout-card{background:white;border-radius:6px;border:1px solid var(--bordure);padding:14px 16px}
+.cout-card.maint{border-top:3px solid var(--orange)}
+.cout-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--texte2);font-weight:500;margin-bottom:8px}
+.cout-val{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;color:var(--texte)}
+.cout-sub{font-size:11px;color:var(--texte2);margin-top:4px}
+
+/* GROUPES */
+.groupe-detail{border:1px solid var(--bordure);border-radius:6px;overflow:hidden;margin-bottom:10px;background:white}
+.gd-header{padding:12px 14px;border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:center;background:var(--surface2)}
+.gd-nom{font-size:13px;font-weight:600}
+.gd-saisie{font-size:11px;color:var(--texte2);margin-top:2px}
+.gd-body{padding:12px 14px}
+.gd-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.gd-stat-label{font-size:11px;color:var(--texte2)}
+.gd-stat-val{font-size:14px;font-weight:600;margin-top:2px}
+.gd-bar{height:4px;background:var(--bordure);border-radius:2px;overflow:hidden}
+.gd-bar-fill{height:100%;border-radius:2px}
+
+/* GRAPHIQUE */
+.chart-card{border:1px solid var(--bordure);border-radius:6px;overflow:hidden;margin-bottom:18px;background:white}
+.chart-head{padding:12px 16px;border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:center;background:var(--surface2)}
+.chart-head-title{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600}
+.chart-body{padding:16px}
+.chart-insight{margin-top:10px;padding-top:10px;border-top:1px solid var(--bordure);font-size:12px}
+
+/* TABLE (onglet Technique) */
+.table-card{border:1px solid var(--bordure);border-radius:6px;overflow:hidden;margin-bottom:22px;background:white}
+.table-head{padding:12px 16px;border-bottom:1px solid var(--bordure);background:var(--surface2)}
+.table-head-title{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600}
+.table-head-sub{font-size:11px;color:var(--texte2);margin-top:2px}
+table.data{width:100%;border-collapse:collapse;font-size:12px}
+table.data th{text-align:left;padding:9px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--texte2);border-bottom:1px solid var(--bordure);background:var(--surface2);font-weight:600}
+table.data td{padding:9px 14px;border-bottom:1px solid var(--surface3);color:var(--texte)}
+table.data tr:last-child td{border-bottom:none}
+table.data tr:hover td{background:var(--surface2)}
+
+.pill{padding:3px 10px;border-radius:2px;font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;display:inline-block}
+.pill-ok{background:var(--vert-pale);color:var(--vert)}
+.pill-warn{background:var(--orange-pale);color:var(--orange)}
+.pill-danger{background:var(--rouge-pale);color:var(--rouge)}
+
+/* DIVIDER */
+.divider{height:1px;background:var(--bordure);margin:28px 0;position:relative}
+.divider::after{content:'◆';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--surface);padding:0 12px;color:var(--or);font-size:9px}
+
+/* FOOTER */
+.footer{background:var(--bx);color:rgba(255,255,255,0.4);text-align:center;padding:18px;font-size:11px;letter-spacing:1px;margin-top:40px}
+.footer strong{color:var(--or)}
+
+.loading{padding:40px;text-align:center;color:var(--texte2);font-size:13px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--bordure);border-top-color:var(--bx);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{padding:30px;text-align:center;color:var(--texte2);font-size:12px}
+
+@media(max-width:700px){
+  .container{padding:20px}
+  .biz-metrics{grid-template-columns:1fr}.couts-grid{grid-template-columns:1fr}
+  .gd-stats{grid-template-columns:repeat(2,1fr)}
+  .header-top{padding:16px 20px}
+  table.data{font-size:11px}
+  table.data th,table.data td{padding:7px 8px}
+  .tabs{overflow-x:auto}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="logo">Azalaï <span>Dakar</span></div>
+      <div class="logo-sub">Pilote GenTrack</div>
+    </div>
+    <div>
+      <div class="header-date" id="header-date">—</div>
+      <div class="header-title">Groupes électrogènes</div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="tabs">
+    <div class="tab active" data-tab="operations" onclick="switchTab('operations')">Opérations</div>
+    <div class="tab" data-tab="technique" onclick="switchTab('technique')">Technique</div>
+  </div>
+
+  <!-- ═══════════════ ONGLET OPÉRATIONS (Madior Sène) ═══════════════ -->
+  <div class="tab-panel active" id="panel-operations">
+    <div id="op-banner-wrap"></div>
+
+    <div class="section-title">Vue d'ensemble</div>
+    <div class="section-sub" id="op-date">Données du jour</div>
+    <div class="biz-metrics" id="op-metrics">
+      <div class="loading" style="grid-column:1/-1"><span class="spinner"></span>Chargement...</div>
+    </div>
+
+    <div class="couts-grid" id="op-couts"></div>
+
+    <div style="font-size:11px;color:var(--texte2);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:10px">Groupes</div>
+    <div id="op-groupes"></div>
+
+    <div id="op-alertes"></div>
+
+    <div class="chart-card" style="margin-top:6px">
+      <div class="chart-head">
+        <div class="chart-head-title">Évolution carburant — 14 jours</div>
+        <div style="font-size:11px;color:var(--texte2)">Niveau moyen des 2 groupes</div>
+      </div>
+      <div class="chart-body">
+        <canvas id="op-chart" height="130"></canvas>
+        <div class="chart-insight" id="op-chart-insight" style="color:var(--texte2)"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ ONGLET TECHNIQUE (Modeste) ═══════════════ -->
+  <div class="tab-panel" id="panel-technique">
+    <div class="section-title">État des groupes</div>
+    <div class="section-sub">Heures de marche, vidange, pannes</div>
+    <div id="tech-groupes">
+      <div class="loading"><span class="spinner"></span>Chargement...</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-title">Coûts</div>
+    <div class="section-sub" id="tech-cout-periode">Année en cours</div>
+    <div class="couts-grid" id="tech-couts"></div>
+
+    <div class="section-title" style="margin-top:8px">Pannes en cours</div>
+    <div class="section-sub">Interventions requises</div>
+    <div class="table-card" id="tech-pannes-ouvertes"></div>
+
+    <div class="section-title">Historique des pannes résolues</div>
+    <div class="section-sub">Coût, intervenant, résolution</div>
+    <div class="table-card" id="tech-pannes-resolues"></div>
+
+    <div class="section-title">Historique des saisies</div>
+    <div class="section-sub">30 dernières saisies</div>
+    <div class="table-card" id="tech-saisies"></div>
+  </div>
+
+</div>
+
+<div class="footer">Powered by <strong>GenTrack</strong> · Pilote Azalaï Dakar</div>
+
+<script>
+const SUPA_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+const NOM_CLIENT_LIKE = 'Dakar'; // filtre ILIKE sur clients.nom
+
+let chartInstance = null;
+
+async function api(table, q='', select='*') {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?select=${select}${q}`, {
+    headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`}
+  });
+  if(!res.ok) return [];
+  return res.json();
+}
+
+function fmtNum(n){return Math.round(n||0).toLocaleString('fr-FR');}
+function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function fmtDateShort(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});}
+function carbColor(n){return n<25?'var(--rouge)':n<50?'var(--orange)':'var(--vert)';}
+function autoColor(j){return j<2?'var(--rouge)':j<5?'var(--orange)':'var(--vert)';}
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+}
+
+function calcAuto(groupe, saisie) {
+  if(!saisie||saisie.niveau_carburant==null) return null;
+  const cap = groupe.capacite_reservoir_litres||500;
+  const cH  = groupe.conso_theorique_lh||1.8;
+  const cJ  = cH * 8;
+  const L   = cap * saisie.niveau_carburant / 100;
+  return Math.round((L/cJ)*10)/10;
+}
+
+const panneLabels = { ne_demarre_pas:'Ne démarre pas', arret_inopin:'Arrêt inopiné', bruit_anormal:'Bruit anormal', surchauffe:'Surchauffe', fuite:'Fuite', autre:'Autre' };
+
+async function loadAll() {
+  const now = new Date();
+  document.getElementById('header-date').textContent = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('op-date').textContent = `Données du ${now.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})}`;
+
+  const today = now.toISOString().split('T')[0];
+  const dateDebut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
+  const dateDebutAnnee = new Date(now.getFullYear(),0,1).toISOString().split('T')[0];
+
+  const clients = await api('clients', `&nom=ilike.*${NOM_CLIENT_LIKE}*&order=nom`);
+  if(!clients.length){
+    document.querySelector('.container').innerHTML = '<div class="empty">Client Azalaï Dakar introuvable. Vérifiez que le nom dans la table clients contient "Dakar".</div>';
+    return;
+  }
+  const client = clients[0];
+
+  const [groupes, saisiesJour, saisies30, saisiesAnnee, alertes, pannesOuvertes, pannesResolues] = await Promise.all([
+    api('groupes', `&client_id=eq.${client.id}&actif=eq.true&order=nom`),
+    api('saisies', `&client_id=eq.${client.id}&date=eq.${today}&order=created_at.desc`),
+    api('saisies', `&client_id=eq.${client.id}&date=gte.${dateDebut30}&order=date.desc,created_at.desc`),
+    api('saisies', `&client_id=eq.${client.id}&date=gte.${dateDebutAnnee}`),
+    api('alertes', `&client_id=eq.${client.id}&resolue=eq.false`),
+    api('pannes', `&client_id=eq.${client.id}&resolue=eq.false&order=date_panne.desc`),
+    api('pannes', `&client_id=eq.${client.id}&resolue=eq.true&order=date_resolution.desc&limit=20`),
+  ]);
+
+  const prixLitre = client.prix_litre_fcfa || 695;
+  const coutCarburantAnnee = Math.round(saisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0) * prixLitre);
+  const coutMaintenanceAnnee = pannesResolues
+    .filter(p=>p.date_resolution >= dateDebutAnnee)
+    .reduce((a,p)=>a+(p.cout_reparation||0),0);
+
+  renderOperations(client, groupes, saisiesJour, saisies30, alertes, pannesOuvertes, coutCarburantAnnee, coutMaintenanceAnnee, prixLitre);
+  renderTechnique(client, groupes, saisies30, pannesOuvertes, pannesResolues, coutCarburantAnnee, coutMaintenanceAnnee);
+}
+
+// ════════════════════════════════════════
+// ONGLET OPÉRATIONS
+// ════════════════════════════════════════
+function renderOperations(client, groupes, saisiesJour, saisies30, alertes, pannesOuvertes, coutCarburantAnnee, coutMaintenanceAnnee, prixLitre){
+
+  // Bannière si urgence
+  const urgents = groupes.map(g=>{
+    const s = saisiesJour.filter(x=>x.groupe_id===g.id)[0];
+    const j = calcAuto(g,s);
+    return {groupe:g.nom, jours:j};
+  }).filter(u=>u.jours!==null && u.jours<2);
+  const bannerEl = document.getElementById('op-banner-wrap');
+  const totalUrgences = urgents.length + pannesOuvertes.length;
+  if(totalUrgences>0){
+    const subs = [];
+    if(urgents.length) subs.push(urgents.map(u=>`${u.groupe} critique (${u.jours}j)`).join(' · '));
+    if(pannesOuvertes.length) subs.push(`${pannesOuvertes.length} panne${pannesOuvertes.length>1?'s':''} en cours`);
+    bannerEl.innerHTML = `<div class="action-banner"><div class="ab-icon">🚨</div><div class="ab-body"><div class="ab-titre">${totalUrgences} action${totalUrgences>1?'s':''} requise${totalUrgences>1?'s':''}</div><div class="ab-sub">${subs.join(' · ')}</div></div></div>`;
+  } else {
+    bannerEl.innerHTML = '';
+  }
+
+  // Métriques business : coût carburant 30j + autonomie la plus basse
+  const litres30 = saisies30.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
+  const cout30 = Math.round(litres30 * prixLitre);
+  let minAuto = null, minGroupe = null;
+  groupes.forEach(g=>{
+    const s = saisiesJour.filter(x=>x.groupe_id===g.id)[0];
+    const j = calcAuto(g,s);
+    if(j!==null && (minAuto===null || j<minAuto)){ minAuto=j; minGroupe=g; }
+  });
+  const status = (minAuto!==null && minAuto<2) || pannesOuvertes.length>0 ? 'danger' : (minAuto!==null && minAuto<5) ? 'warn' : 'normal';
+  document.getElementById('op-metrics').innerHTML = `
+    <div class="bm normal">
+      <div class="bm-label">Coût carburant — 30 jours</div>
+      <div class="bm-val" style="color:var(--texte)">${cout30>0?fmtNum(cout30):'—'}</div>
+      <div class="bm-sub">FCFA · ${fmtNum(litres30)}L ajoutés</div>
+    </div>
+    <div class="bm ${status}">
+      <div class="bm-label" style="color:${status==='danger'?'var(--rouge)':status==='warn'?'var(--orange)':'var(--texte2)'}">Autonomie la plus basse</div>
+      <div class="bm-val" style="color:${status==='danger'?'var(--rouge)':status==='warn'?'var(--orange)':'var(--vert)'}">${minAuto!==null?minAuto+' jours':'—'}</div>
+      <div class="bm-sub" style="color:${status==='danger'?'var(--rouge)':status==='warn'?'var(--orange)':'var(--texte2)'}">${minGroupe?.nom||'—'}</div>
+    </div>
+  `;
+
+  // Coûts annuels
+  document.getElementById('op-couts').innerHTML = `
+    <div class="cout-card">
+      <div class="cout-label">⛽ Carburant — ${new Date().getFullYear()}</div>
+      <div class="cout-val">${coutCarburantAnnee>0?fmtNum(coutCarburantAnnee):'—'}</div>
+      <div class="cout-sub">FCFA</div>
+    </div>
+    <div class="cout-card maint">
+      <div class="cout-label">🔧 Maintenance — ${new Date().getFullYear()}</div>
+      <div class="cout-val" style="color:${coutMaintenanceAnnee>0?'var(--orange)':'var(--vert)'}">${fmtNum(coutMaintenanceAnnee)}</div>
+      <div class="cout-sub">FCFA de réparations</div>
+    </div>
+  `;
+
+  // Cartes groupes
+  document.getElementById('op-groupes').innerHTML = groupes.map(g=>{
+    const s = saisiesJour.filter(x=>x.groupe_id===g.id)[0];
+    const j = calcAuto(g,s);
+    const carb = s?.niveau_carburant;
+    return `<div class="groupe-detail">
+      <div class="gd-header">
+        <div><div class="gd-nom">${g.nom} ${g.reference?'· '+g.reference:''}</div><div class="gd-saisie">${g.marque||''} ${g.puissance_kva||''}kVA</div></div>
+        <div class="pill ${!s?'pill-warn':carb<25?'pill-danger':carb<50?'pill-warn':'pill-ok'}">${!s?'Pas de saisie':carb+'%'}</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Carburant</div><div class="gd-stat-val" style="color:${s?carbColor(carb):'var(--texte2)'}">${s?carb+'%':'—'}</div></div>
+          <div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:${j!==null?autoColor(j):'var(--texte2)'}">${j!==null?j+'j':'—'}</div></div>
+          <div><div class="gd-stat-label">Heures marche</div><div class="gd-stat-val">${s?.heures_marche||'—'}${s?.heures_marche?'h':''}</div></div>
+          <div><div class="gd-stat-label">Huile</div><div class="gd-stat-val">${s?.niveau_huile||'—'}</div></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Alertes
+  const alEl = document.getElementById('op-alertes');
+  if(alertes && alertes.length){
+    alEl.innerHTML = `<div style="margin:14px 0"><div style="font-size:11px;color:var(--texte2);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:8px">Alertes actives</div>` +
+      alertes.map(a=>`<div class="action-banner" style="margin-bottom:8px;cursor:default"><div class="ab-icon">${a.severite==='danger'?'🔴':'🟡'}</div><div class="ab-body"><div class="ab-titre" style="color:${a.severite==='danger'?'var(--rouge)':'var(--orange)'}">${a.message}</div></div></div>`).join('') +
+      `</div>`;
+  } else {
+    alEl.innerHTML = '';
+  }
+
+  // Graphique évolution moyenne carburant 14j
+  const dates14 = Array.from({length:14},(_,i)=>{
+    const d = new Date(); d.setDate(d.getDate()-(13-i));
+    return d.toISOString().split('T')[0];
+  });
+  const carbData = dates14.map(d=>{
+    const dsSaisies = saisies30.filter(s=>s.date===d && s.niveau_carburant!=null);
+    if(!dsSaisies.length) return null;
+    return Math.round(dsSaisies.reduce((a,s)=>a+s.niveau_carburant,0)/dsSaisies.length);
+  });
+  const valides = carbData.filter(v=>v!==null);
+  let trendTxt = 'Pas assez de données pour dégager une tendance.';
+  if(valides.length>=2){
+    const delta = valides[valides.length-1]-valides[0];
+    trendTxt = delta>=0 ? `Niveau stable ou en hausse sur la période (+${delta} pts).` : `Baisse de ${Math.abs(delta)} pts sur la période — surveiller les pleins.`;
+  }
+  document.getElementById('op-chart-insight').textContent = trendTxt;
+  setTimeout(()=>{
+    if(chartInstance) chartInstance.destroy();
+    const ctx = document.getElementById('op-chart');
+    if(!ctx) return;
+    chartInstance = new Chart(ctx.getContext('2d'),{
+      type:'line',
+      data:{ labels:dates14.map(fmtDateShort), datasets:[{
+        data:carbData, borderColor:'#8B1A2E', backgroundColor:'rgba(139,26,46,0.06)',
+        borderWidth:1.5, tension:0.3, fill:true, spanGaps:true, pointRadius:3, pointBackgroundColor:'#8B1A2E'
+      }]},
+      options:{ responsive:true, plugins:{legend:{display:false}},
+        scales:{ x:{grid:{color:'#EDE3D4'},ticks:{color:'#7A6855',font:{size:10}}},
+                 y:{grid:{color:'#EDE3D4'},ticks:{color:'#7A6855',font:{size:10},callback:v=>v+'%'},min:0,max:100} } }
+    });
+  },50);
+}
+
+// ════════════════════════════════════════
+// ONGLET TECHNIQUE
+// ════════════════════════════════════════
+function renderTechnique(client, groupes, saisies30, pannesOuvertes, pannesResolues, coutCarburantAnnee, coutMaintenanceAnnee){
+
+  // État des groupes (heures, vidange)
+  document.getElementById('tech-groupes').innerHTML = groupes.map(g=>{
+    const heuresTotal = g.heures_total || 0;
+    const seuil = g.seuil_vidange_heures || 250;
+    const pct = Math.min(100, Math.round((heuresTotal/seuil)*100));
+    const barColor = pct>=100?'var(--rouge)':pct>=80?'var(--orange)':'var(--vert)';
+    const pillClass = pct>=100?'pill-danger':pct>=80?'pill-warn':'pill-ok';
+    const pillTxt = pct>=100?'Vidange requise':pct>=80?'Vidange bientôt':'OK';
+    return `<div class="groupe-detail">
+      <div class="gd-header">
+        <div><div class="gd-nom">${g.nom} ${g.reference?'· '+g.reference:''}</div><div class="gd-saisie">${g.marque||''} ${g.puissance_kva||''}kVA · Réservoir ${fmtNum(g.capacite_reservoir_litres||0)}L</div></div>
+        <div class="pill ${pillClass}">${pillTxt}</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Heures totales</div><div class="gd-stat-val">${fmtNum(heuresTotal)}h</div></div>
+          <div><div class="gd-stat-label">Seuil vidange</div><div class="gd-stat-val">${fmtNum(seuil)}h</div></div>
+          <div><div class="gd-stat-label">Progression</div><div class="gd-stat-val" style="color:${barColor}">${pct}%</div></div>
+          <div><div class="gd-stat-label">Conso théorique</div><div class="gd-stat-val">${g.conso_theorique_lh||'—'} L/h</div></div>
+        </div>
+        <div class="gd-bar"><div class="gd-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Coûts
+  document.getElementById('tech-couts').innerHTML = `
+    <div class="cout-card">
+      <div class="cout-label">⛽ Carburant — ${new Date().getFullYear()}</div>
+      <div class="cout-val">${coutCarburantAnnee>0?fmtNum(coutCarburantAnnee):'—'}</div>
+      <div class="cout-sub">FCFA</div>
+    </div>
+    <div class="cout-card maint">
+      <div class="cout-label">🔧 Maintenance — ${new Date().getFullYear()}</div>
+      <div class="cout-val" style="color:${coutMaintenanceAnnee>0?'var(--orange)':'var(--vert)'}">${fmtNum(coutMaintenanceAnnee)}</div>
+      <div class="cout-sub">FCFA de réparations</div>
+    </div>
+  `;
+
+  // Pannes ouvertes
+  const groupeMap = Object.fromEntries(groupes.map(g=>[g.id,g.nom]));
+  const elOuv = document.getElementById('tech-pannes-ouvertes');
+  if(pannesOuvertes.length){
+    elOuv.innerHTML = `<table class="data"><thead><tr><th>Date</th><th>Groupe</th><th>Problème</th></tr></thead><tbody>` +
+      pannesOuvertes.map(p=>`<tr><td>${fmtDate(p.date_panne)}</td><td>${groupeMap[p.groupe_id]||'—'}</td><td>${p.description||panneLabels[p.type]||p.type}</td></tr>`).join('') +
+      `</tbody></table>`;
+  } else {
+    elOuv.innerHTML = `<div class="empty">Aucune panne en cours ✅</div>`;
+  }
+
+  // Pannes résolues
+  const elRes = document.getElementById('tech-pannes-resolues');
+  if(pannesResolues.length){
+    elRes.innerHTML = `<table class="data"><thead><tr><th>Date</th><th>Groupe</th><th>Problème</th><th>Résolution</th><th>Intervenant</th><th>Coût</th></tr></thead><tbody>` +
+      pannesResolues.map(p=>`<tr>
+        <td>${fmtDate(p.date_resolution||p.date_panne)}</td>
+        <td>${groupeMap[p.groupe_id]||'—'}</td>
+        <td>${p.description||panneLabels[p.type]||p.type}</td>
+        <td>${p.resolution_note||'—'}</td>
+        <td>${p.intervenant||'—'}</td>
+        <td>${p.cout_reparation?fmtNum(p.cout_reparation)+' FCFA':'—'}</td>
+      </tr>`).join('') +
+      `</tbody></table>`;
+  } else {
+    elRes.innerHTML = `<div class="empty">Aucune panne résolue enregistrée</div>`;
+  }
+
+  // Historique saisies (30 dernières)
+  const elSai = document.getElementById('tech-saisies');
+  const saisiesTriees = [...saisies30].sort((a,b)=> (b.date+((b.created_at||'').slice(11))).localeCompare(a.date+((a.created_at||'').slice(11)))).slice(0,30);
+  if(saisiesTriees.length){
+    elSai.innerHTML = `<table class="data"><thead><tr><th>Date</th><th>Groupe</th><th>Carburant</th><th>Heures</th><th>Huile</th><th>Opérateur</th></tr></thead><tbody>` +
+      saisiesTriees.map(s=>`<tr>
+        <td>${fmtDate(s.date)}</td>
+        <td>${groupeMap[s.groupe_id]||'—'}</td>
+        <td style="color:${carbColor(s.niveau_carburant)}">${s.niveau_carburant!=null?s.niveau_carburant+'%':'—'}</td>
+        <td>${s.heures_marche!=null?s.heures_marche+'h':'—'}</td>
+        <td>${s.niveau_huile||'—'}</td>
+        <td>${s.operateur||'—'}</td>
+      </tr>`).join('') +
+      `</tbody></table>`;
+  } else {
+    elSai.innerHTML = `<div class="empty">Aucune saisie enregistrée sur les 30 derniers jours</div>`;
+  }
+}
+
+loadAll();
+</script>
+</body>
+</html>
