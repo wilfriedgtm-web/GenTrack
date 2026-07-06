@@ -199,9 +199,13 @@ table.data tr:hover td{background:var(--surface2)}
     <div class="section-sub">Coût, intervenant, résolution</div>
     <div class="table-card" id="tech-pannes-resolues"></div>
 
-    <div class="section-title">Historique des saisies</div>
-    <div class="section-sub">30 dernières saisies</div>
+    <div class="section-title">Historique des saisies moteur</div>
+    <div class="section-sub">30 dernières saisies groupes</div>
     <div class="table-card" id="tech-saisies"></div>
+
+    <div class="section-title">Historique des relevés cuve</div>
+    <div class="section-sub">30 derniers relevés cuve commune</div>
+    <div class="table-card" id="tech-saisies-cuve"></div>
   </div>
 
 </div>
@@ -256,75 +260,81 @@ async function loadAll() {
 
   const clients = await api('clients', `&nom=ilike.*${NOM_CLIENT_LIKE}*&order=nom`);
   if(!clients.length){
-    document.querySelector('.container').innerHTML = '<div class="empty">Client Azalaï Dakar introuvable. Vérifiez que le nom dans la table clients contient "Dakar".</div>';
+    document.querySelector('.container').innerHTML = '<div class="empty">Client Azalaï Dakar introuvable.</div>';
     return;
   }
   const client = clients[0];
 
-  const [groupes, saisiesJour, saisies30, saisiesAnnee, alertes, pannesOuvertes, pannesResolues] = await Promise.all([
+  const [groupes, saisiesJour, saisies30, alertes, pannesOuvertes, pannesResolues, cuves] = await Promise.all([
     api('groupes', `&client_id=eq.${client.id}&actif=eq.true&order=nom`),
     api('saisies', `&client_id=eq.${client.id}&date=eq.${today}&order=created_at.desc`),
     api('saisies', `&client_id=eq.${client.id}&date=gte.${dateDebut30}&order=date.desc,created_at.desc`),
-    api('saisies', `&client_id=eq.${client.id}&date=gte.${dateDebutAnnee}`),
     api('alertes', `&client_id=eq.${client.id}&resolue=eq.false`),
     api('pannes', `&client_id=eq.${client.id}&resolue=eq.false&order=date_panne.desc`),
     api('pannes', `&client_id=eq.${client.id}&resolue=eq.true&order=date_resolution.desc&limit=20`),
+    api('cuves', `&client_id=eq.${client.id}&actif=eq.true`),
   ]);
 
+  const cuve = cuves.length ? cuves[0] : null;
+
+  // Saisies cuve
+  let saisiesCuve30 = [], saisieCuveJour = null;
+  if(cuve) {
+    saisiesCuve30 = await api('saisies_cuve', `&cuve_id=eq.${cuve.id}&date=gte.${dateDebut30}&order=date.desc,created_at.desc`);
+    saisieCuveJour = saisiesCuve30.find(s=>s.date===today) || null;
+  }
+
   const prixLitre = client.prix_litre_fcfa || 695;
-  const coutCarburantAnnee = Math.round(saisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0) * prixLitre);
+  // Coûts depuis saisies_cuve (litres ajoutés)
+  const saisiesCuveAnnee = cuve ? await api('saisies_cuve', `&cuve_id=eq.${cuve.id}&date=gte.${dateDebutAnnee}`) : [];
+  const coutCarburantAnnee = Math.round(saisiesCuveAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0) * prixLitre);
   const coutMaintenanceAnnee = pannesResolues
     .filter(p=>p.date_resolution >= dateDebutAnnee)
     .reduce((a,p)=>a+(p.cout_reparation||0),0);
 
-  renderOperations(client, groupes, saisiesJour, saisies30, alertes, pannesOuvertes, coutCarburantAnnee, coutMaintenanceAnnee, prixLitre);
-  renderTechnique(client, groupes, saisies30, pannesOuvertes, pannesResolues, coutCarburantAnnee, coutMaintenanceAnnee);
+  renderOperations(client, groupes, saisiesJour, saisiesCuve30, alertes, pannesOuvertes, coutCarburantAnnee, coutMaintenanceAnnee, prixLitre, cuve, saisieCuveJour);
+  renderTechnique(client, groupes, saisies30, saisiesCuve30, pannesOuvertes, pannesResolues, coutCarburantAnnee, coutMaintenanceAnnee);
 }
 
 // ════════════════════════════════════════
 // ONGLET OPÉRATIONS
 // ════════════════════════════════════════
-function renderOperations(client, groupes, saisiesJour, saisies30, alertes, pannesOuvertes, coutCarburantAnnee, coutMaintenanceAnnee, prixLitre){
+function renderOperations(client, groupes, saisiesJour, saisiesCuve30, alertes, pannesOuvertes, coutCarburantAnnee, coutMaintenanceAnnee, prixLitre, cuve, saisieCuveJour){
 
-  // Bannière si urgence
-  const urgents = groupes.map(g=>{
-    const s = saisiesJour.filter(x=>x.groupe_id===g.id)[0];
-    const j = calcAuto(g,s);
-    return {groupe:g.nom, jours:j};
-  }).filter(u=>u.jours!==null && u.jours<2);
+  // Calcul cuve
+  const consoJour = (groupes[0]?.conso_theorique_lh || 65) * 8;
+  const niveauCuve = saisieCuveJour?.niveau_litres;
+  const capCuve = cuve?.capacite_litres || 8102;
+  const pctCuve = niveauCuve!=null ? Math.round(niveauCuve/capCuve*100) : null;
+  const autoJours = niveauCuve!=null && consoJour>0 ? Math.round((niveauCuve/consoJour)*10)/10 : null;
+
+  // Bannière urgence
   const bannerEl = document.getElementById('op-banner-wrap');
-  const totalUrgences = urgents.length + pannesOuvertes.length;
+  const totalUrgences = (autoJours!==null && autoJours<2 ? 1 : 0) + pannesOuvertes.length;
   if(totalUrgences>0){
     const subs = [];
-    if(urgents.length) subs.push(urgents.map(u=>`${u.groupe} critique (${u.jours}j)`).join(' · '));
+    if(autoJours!==null && autoJours<2) subs.push(`Cuve critique (${autoJours}j d'autonomie)`);
     if(pannesOuvertes.length) subs.push(`${pannesOuvertes.length} panne${pannesOuvertes.length>1?'s':''} en cours`);
     bannerEl.innerHTML = `<div class="action-banner"><div class="ab-icon">🚨</div><div class="ab-body"><div class="ab-titre">${totalUrgences} action${totalUrgences>1?'s':''} requise${totalUrgences>1?'s':''}</div><div class="ab-sub">${subs.join(' · ')}</div></div></div>`;
   } else {
     bannerEl.innerHTML = '';
   }
 
-  // Métriques business : coût carburant 30j + autonomie la plus basse
-  const litres30 = saisies30.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
+  // Métriques
+  const litres30 = saisiesCuve30.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
   const cout30 = Math.round(litres30 * prixLitre);
-  let minAuto = null, minGroupe = null;
-  groupes.forEach(g=>{
-    const s = saisiesJour.filter(x=>x.groupe_id===g.id)[0];
-    const j = calcAuto(g,s);
-    if(j!==null && (minAuto===null || j<minAuto)){ minAuto=j; minGroupe=g; }
-  });
-  const status = (minAuto!==null && minAuto<2) || pannesOuvertes.length>0 ? 'danger' : (minAuto!==null && minAuto<5) ? 'warn' : 'normal';
+  const statusCuve = pctCuve==null?'normal':pctCuve<30?'danger':pctCuve<50?'warn':'normal';
   document.getElementById('op-metrics').innerHTML = `
     <div class="bm normal">
       <div class="bm-label">Coût carburant — 30 jours</div>
-      <div class="bm-val" style="color:var(--texte)">${cout30>0?fmtNum(cout30):'—'}</div>
+      <div class="bm-val">${cout30>0?fmtNum(cout30):'—'}</div>
       <div class="bm-sub">FCFA · ${fmtNum(litres30)}L ajoutés</div>
     </div>
-    <div class="bm ${status}">
-      <div class="bm-label" style="color:${status==='danger'?'var(--rouge)':status==='warn'?'var(--orange)':'var(--texte2)'}">Autonomie la plus basse</div>
-      <div class="bm-val" style="color:${status==='danger'?'var(--rouge)':status==='warn'?'var(--orange)':'var(--vert)'}">${minAuto!==null?minAuto+' jours':'—'}</div>
-      <div class="bm-sub" style="color:${status==='danger'?'var(--rouge)':status==='warn'?'var(--orange)':'var(--texte2)'}">${minGroupe?.nom||'—'}</div>
-    </div>
-  `;
+    <div class="bm ${statusCuve}">
+      <div class="bm-label" style="color:${statusCuve==='danger'?'var(--rouge)':statusCuve==='warn'?'var(--orange)':'var(--texte2)'}">Autonomie cuve</div>
+      <div class="bm-val" style="color:${statusCuve==='danger'?'var(--rouge)':statusCuve==='warn'?'var(--orange)':'var(--vert)'}">${autoJours!==null?autoJours+' jours':'—'}</div>
+      <div class="bm-sub">${niveauCuve!=null?niveauCuve+'L / '+capCuve+'L ('+pctCuve+'%)':'Pas de relevé'}</div>
+    </div>`;
 
   // Coûts annuels
   document.getElementById('op-couts').innerHTML = `
@@ -340,28 +350,49 @@ function renderOperations(client, groupes, saisiesJour, saisies30, alertes, pann
     </div>
   `;
 
-  // Cartes groupes
-  document.getElementById('op-groupes').innerHTML = groupes.map(g=>{
-    const s = saisiesJour.filter(x=>x.groupe_id===g.id)[0];
-    const j = calcAuto(g,s);
-    const litresG = s?.niveau_carburant;
-    const capG = g.capacite_reservoir_litres || 500;
-    const pctG = litresG!=null ? Math.round(litresG/capG*100) : null;
-    return `<div class="groupe-detail">
-      <div class="gd-header">
-        <div><div class="gd-nom">${g.nom} ${g.reference?'· '+g.reference:''}</div><div class="gd-saisie">${g.marque||''} ${g.puissance_kva||''}kVA</div></div>
-        <div class="pill ${!s?'pill-warn':pctG<30?'pill-danger':pctG<50?'pill-warn':'pill-ok'}">${!s?'Pas de saisie':litresG+'L / '+capG+'L ('+pctG+'%)'}</div>
+  // Carte cuve + cartes groupes (moteur uniquement)
+  const heureCuve = saisieCuveJour?.created_at ? new Date(saisieCuveJour.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dakar'}) : null;
+  const cuveHtml = cuve ? `
+    <div class="groupe-detail" style="border-top:3px solid var(--or);margin-bottom:10px">
+      <div class="gd-header" style="background:var(--or-pale)">
+        <div>
+          <div class="gd-nom">🛢️ Cuve commune</div>
+          <div class="gd-saisie">${cuve.nom} · Capacité ${fmtNum(capCuve)}L${heureCuve?' · Relevé à '+heureCuve:''}</div>
+        </div>
+        <div class="pill ${!saisieCuveJour?'pill-warn':pctCuve<30?'pill-danger':pctCuve<50?'pill-warn':'pill-ok'}">${!saisieCuveJour?'Pas de relevé':niveauCuve+'L / '+capCuve+'L ('+pctCuve+'%)'}</div>
       </div>
       <div class="gd-body">
         <div class="gd-stats">
-          <div><div class="gd-stat-label">Carburant</div><div class="gd-stat-val" style="color:${pctG!=null?carbColor(pctG):'var(--texte2)'}">${litresG!=null?litresG+'L / '+capG+'L':'—'}</div></div>
-          <div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:${j!==null?autoColor(j):'var(--texte2)'}">${j!==null?j+'j':'—'}</div></div>
-          <div><div class="gd-stat-label">Heures marche</div><div class="gd-stat-val">${s?.heures_marche||'—'}${s?.heures_marche?'h':''}</div></div>
-          <div><div class="gd-stat-label">Huile</div><div class="gd-stat-val">${s?.niveau_huile||'—'}</div></div>
+          <div><div class="gd-stat-label">Niveau actuel</div><div class="gd-stat-val" style="color:${pctCuve!=null?carbColor(pctCuve):'var(--texte2)'}">${niveauCuve!=null?niveauCuve+'L':'—'}</div></div>
+          <div><div class="gd-stat-label">Capacité totale</div><div class="gd-stat-val">${fmtNum(capCuve)}L</div></div>
+          <div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:${autoJours!==null?autoColor(autoJours):'var(--texte2)'}">${autoJours!==null?autoJours+'j':'—'}</div></div>
+          <div><div class="gd-stat-label">Taux</div><div class="gd-stat-val">${pctCuve!=null?pctCuve+'%':'—'}</div></div>
+        </div>
+        ${pctCuve!=null?`<div class="gd-bar"><div class="gd-bar-fill" style="width:${pctCuve}%;background:${carbColor(pctCuve)}"></div></div>`:''}
+      </div>
+    </div>` : '';
+
+  const groupesHtml = groupes.map(g=>{
+    const s = saisiesJour.filter(x=>x.groupe_id===g.id)[0];
+    const heureSaisie = s?.created_at ? new Date(s.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dakar'}) : null;
+    const pctVidange = g.heures_total && g.seuil_vidange_heures ? Math.round(g.heures_total/g.seuil_vidange_heures*100) : null;
+    return `<div class="groupe-detail">
+      <div class="gd-header">
+        <div><div class="gd-nom">⚙️ ${g.nom} ${g.reference?'· '+g.reference:''}</div><div class="gd-saisie">${g.marque||''} ${g.puissance_kva||''}kVA${heureSaisie?' · Saisi à '+heureSaisie:''}</div></div>
+        <div class="pill ${!s?'pill-warn':'pill-ok'}">${!s?'Pas de saisie moteur':'Saisi ✓'}</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Compteur moteur</div><div class="gd-stat-val">${s?.heures_marche!=null?s.heures_marche+'h':'—'}</div></div>
+          <div><div class="gd-stat-label">Seuil vidange</div><div class="gd-stat-val" style="color:${pctVidange>=100?'var(--rouge)':pctVidange>=80?'var(--orange)':'var(--vert)'}">${pctVidange!=null?pctVidange+'%':'—'}</div></div>
+          <div><div class="gd-stat-label">Huile</div><div class="gd-stat-val" style="color:${s?.niveau_huile==='critique'?'var(--rouge)':s?.niveau_huile==='bas'?'var(--orange)':'var(--vert)'}">${s?.niveau_huile||'—'}</div></div>
+          <div><div class="gd-stat-label">Opérateur</div><div class="gd-stat-val">${s?.operateur||'—'}</div></div>
         </div>
       </div>
     </div>`;
   }).join('');
+
+  document.getElementById('op-groupes').innerHTML = cuveHtml + groupesHtml;
 
   // Alertes
   const alEl = document.getElementById('op-alertes');
@@ -373,23 +404,21 @@ function renderOperations(client, groupes, saisiesJour, saisies30, alertes, pann
     alEl.innerHTML = '';
   }
 
-  // Graphique évolution moyenne carburant 14j — converti en % par groupe
-  const groupeCapMapAz = Object.fromEntries(groupes.map(g=>[g.id, g.capacite_reservoir_litres||500]));
+  // Graphique 14j depuis saisies_cuve
   const dates14 = Array.from({length:14},(_,i)=>{
     const d = new Date(); d.setDate(d.getDate()-(13-i));
     return d.toISOString().split('T')[0];
   });
   const carbData = dates14.map(d=>{
-    const dsSaisies = saisies30.filter(s=>s.date===d && s.niveau_carburant!=null);
-    if(!dsSaisies.length) return null;
-    const pcts = dsSaisies.map(s=>Math.round(s.niveau_carburant/(groupeCapMapAz[s.groupe_id]||500)*100));
-    return Math.round(pcts.reduce((a,b)=>a+b)/pcts.length);
+    const sc = saisiesCuve30.find(s=>s.date===d);
+    if(!sc || sc.niveau_litres==null) return null;
+    return Math.round(sc.niveau_litres/capCuve*100);
   });
   const valides = carbData.filter(v=>v!==null);
-  let trendTxt = 'Pas assez de données pour dégager une tendance.';
+  let trendTxt = 'Pas assez de données.';
   if(valides.length>=2){
     const delta = valides[valides.length-1]-valides[0];
-    trendTxt = delta>=0 ? `Niveau stable ou en hausse sur la période (+${delta} pts).` : `Baisse de ${Math.abs(delta)} pts sur la période — surveiller les pleins.`;
+    trendTxt = delta>=0 ? `Niveau stable ou en hausse (+${delta} pts).` : `Baisse de ${Math.abs(delta)} pts — surveiller les pleins.`;
   }
   document.getElementById('op-chart-insight').textContent = trendTxt;
   setTimeout(()=>{
@@ -412,9 +441,9 @@ function renderOperations(client, groupes, saisiesJour, saisies30, alertes, pann
 // ════════════════════════════════════════
 // ONGLET TECHNIQUE
 // ════════════════════════════════════════
-function renderTechnique(client, groupes, saisies30, pannesOuvertes, pannesResolues, coutCarburantAnnee, coutMaintenanceAnnee){
+function renderTechnique(client, groupes, saisies30, saisiesCuve30, pannesOuvertes, pannesResolues, coutCarburantAnnee, coutMaintenanceAnnee){
 
-  // Map capacités par groupe_id pour l'historique saisies
+  // Map capacités par groupe_id
   const groupeMap2 = Object.fromEntries(groupes.map(g=>[g.id, g.capacite_reservoir_litres||500]));
 
   // État des groupes (heures, vidange)
@@ -489,25 +518,40 @@ function renderTechnique(client, groupes, saisies30, pannesOuvertes, pannesResol
     elRes.innerHTML = `<div class="empty">Aucune panne résolue enregistrée</div>`;
   }
 
-  // Historique saisies (30 dernières)
+  // Historique saisies moteur (30 dernières — sans les saisies carburant null)
   const elSai = document.getElementById('tech-saisies');
-  const saisiesTriees = [...saisies30].sort((a,b)=> (b.date+((b.created_at||'').slice(11))).localeCompare(a.date+((a.created_at||'').slice(11)))).slice(0,30);
-  if(saisiesTriees.length){
-    elSai.innerHTML = `<table class="data"><thead><tr><th>Date</th><th>Groupe</th><th>Carburant</th><th>Heures</th><th>Huile</th><th>Opérateur</th></tr></thead><tbody>` +
-      saisiesTriees.map(s=>{
-        const capS = groupeMap2[s.groupe_id] || 500;
-        const pctHist = s.niveau_carburant!=null ? Math.round(s.niveau_carburant/capS*100) : null;
-        return `<tr>
+  const saisiesMoteur = [...saisies30].filter(s=>s.heures_marche!=null||s.niveau_huile!=null).sort((a,b)=> (b.date+((b.created_at||'').slice(11))).localeCompare(a.date+((a.created_at||'').slice(11)))).slice(0,30);
+  if(saisiesMoteur.length){
+    elSai.innerHTML = `<table class="data"><thead><tr><th>Date</th><th>Groupe</th><th>Compteur moteur</th><th>Huile</th><th>Opérateur</th></tr></thead><tbody>` +
+      saisiesMoteur.map(s=>`<tr>
         <td>${fmtDate(s.date)}</td>
         <td>${groupeMap[s.groupe_id]||'—'}</td>
-        <td style="color:${pctHist!=null?carbColor(pctHist):'var(--texte2)'}">${s.niveau_carburant!=null?s.niveau_carburant+'L / '+capS+'L ('+pctHist+'%)':'—'}</td>
         <td>${s.heures_marche!=null?s.heures_marche+'h':'—'}</td>
-        <td>${s.niveau_huile||'—'}</td>
+        <td style="color:${s.niveau_huile==='critique'?'var(--rouge)':s.niveau_huile==='bas'?'var(--orange)':'var(--vert)'}">${s.niveau_huile||'—'}</td>
+        <td>${s.operateur||'—'}</td>
+      </tr>`).join('') +
+      `</tbody></table>`;
+  } else {
+    elSai.innerHTML = `<div class="empty">Aucune saisie moteur sur les 30 derniers jours</div>`;
+  }
+
+  // Historique relevés cuve
+  const elCuve = document.getElementById('tech-saisies-cuve');
+  const cuveTriees = [...saisiesCuve30].sort((a,b)=> (b.date+((b.created_at||'').slice(11))).localeCompare(a.date+((a.created_at||'').slice(11)))).slice(0,30);
+  if(cuveTriees.length){
+    elCuve.innerHTML = `<table class="data"><thead><tr><th>Date</th><th>Niveau</th><th>Litres ajoutés</th><th>Opérateur</th></tr></thead><tbody>` +
+      cuveTriees.map(s=>{
+        const capC = 8102; // capacité cuve Azalaï
+        const pctC = s.niveau_litres!=null ? Math.round(s.niveau_litres/capC*100) : null;
+        return `<tr>
+        <td>${fmtDate(s.date)}</td>
+        <td style="color:${pctC!=null?carbColor(pctC):'var(--texte2)'}">${s.niveau_litres!=null?s.niveau_litres+'L / '+capC+'L ('+pctC+'%)':'—'}</td>
+        <td class="${s.litres_ajoutes>0?'pill-ok':''}">${s.litres_ajoutes>0?'+'+s.litres_ajoutes+'L':'—'}</td>
         <td>${s.operateur||'—'}</td>
       </tr>`;}).join('') +
       `</tbody></table>`;
   } else {
-    elSai.innerHTML = `<div class="empty">Aucune saisie enregistrée sur les 30 derniers jours</div>`;
+    elCuve.innerHTML = `<div class="empty">Aucun relevé cuve sur les 30 derniers jours</div>`;
   }
 }
 

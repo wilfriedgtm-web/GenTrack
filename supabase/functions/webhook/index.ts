@@ -1,5 +1,5 @@
 // supabase/functions/webhook/index.ts
-// GenTrack WhatsApp Bot v2 — Flux saisie unifié avec contexte veille
+// GenTrack WhatsApp Bot v3 — Architecture cuve commune
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -64,61 +64,92 @@ async function setSession(phone: string, state: string, data: any = {}) {
   });
 }
 
-// ── CONTEXTE VEILLE ──
+// ── CUVE DU CLIENT ──
+async function getCuve(clientId: string) {
+  const cuves = await db('cuves', { query: `&client_id=eq.${clientId}&actif=eq.true&limit=1` });
+  return Array.isArray(cuves) ? cuves[0] || null : null;
+}
+
+async function getDerniereSaiseCuve(cuveId: string) {
+  const rows = await db('saisies_cuve', {
+    query: `&cuve_id=eq.${cuveId}&order=date.desc,created_at.desc&limit=1`
+  });
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+async function cuveDejaHier(cuveId: string): Promise<boolean> {
+  const today = new Date().toISOString().split('T')[0];
+  const rows = await db('saisies_cuve', {
+    query: `&cuve_id=eq.${cuveId}&date=eq.${today}&limit=1`
+  });
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+// ── CONTEXTE VEILLE (moteur uniquement) ──
 function buildContexteVeille(derniereSaisie: any): string {
   if (!derniereSaisie || !derniereSaisie.derniere_date) {
-    return `📋 _Aucune saisie précédente enregistrée._`;
+    return `📋 _Aucune saisie moteur précédente._`;
   }
   const jours = derniereSaisie.jours_retard || 0;
   const quand = jours === 0 ? 'aujourd\'hui' : jours === 1 ? 'hier' : `il y a ${jours} jours`;
   const retardMsg = jours >= 2 ? `\n⚠️ _Saisie manquante depuis ${jours} jours_` : '';
-  const carb = derniereSaisie.niveau_carburant != null ? `⛽ ${derniereSaisie.niveau_carburant}L` : '⛽ —';
   const heures = derniereSaisie.heures_marche != null ? `🕐 ${derniereSaisie.heures_marche}h moteur` : '🕐 —';
   const huile = derniereSaisie.niveau_huile ? `🛢️ ${derniereSaisie.niveau_huile}` : '🛢️ —';
   const heure = derniereSaisie.heure_saisie ? ` à ${derniereSaisie.heure_saisie}` : '';
-  return `📋 *Dernière saisie — ${quand}${heure}*\n${carb} · ${heures} · ${huile}${retardMsg}`;
+  return `📋 *Dernière saisie moteur — ${quand}${heure}*\n${heures} · ${huile}${retardMsg}`;
 }
 
 // ── RAPPORT PATRON ──
 async function sendRapportPatron(phone: string, client: any) {
-  const groupesRaw = await db('groupes', { query: `&client_id=eq.${client.id}&actif=eq.true` });
-  const groupes = Array.isArray(groupesRaw) ? groupesRaw : [];
-  const alertesRaw = await db('alertes', { query: `&client_id=eq.${client.id}&resolue=eq.false` });
-  const alertes = Array.isArray(alertesRaw) ? alertesRaw : [];
   const today = new Date().toISOString().split('T')[0];
-  const saisiesRaw = await db('saisies', { query: `&client_id=eq.${client.id}&date=eq.${today}&order=created_at.desc` });
+  const [groupesRaw, alertesRaw, saisiesRaw, cuveRaw] = await Promise.all([
+    db('groupes', { query: `&client_id=eq.${client.id}&actif=eq.true` }),
+    db('alertes', { query: `&client_id=eq.${client.id}&resolue=eq.false` }),
+    db('saisies', { query: `&client_id=eq.${client.id}&date=eq.${today}&order=created_at.desc` }),
+    db('cuves', { query: `&client_id=eq.${client.id}&actif=eq.true&limit=1` })
+  ]);
+  const groupes = Array.isArray(groupesRaw) ? groupesRaw : [];
+  const alertes = Array.isArray(alertesRaw) ? alertesRaw : [];
   const saisies = Array.isArray(saisiesRaw) ? saisiesRaw : [];
+  const cuve = Array.isArray(cuveRaw) ? cuveRaw[0] : null;
 
   const date = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   let msg = `📊 *Rapport GenTrack*\n*${client.nom}* — ${date}\n\n`;
 
+  // Cuve commune en premier
+  if (cuve) {
+    const derniereCuveSaisie = await getDerniereSaiseCuve(cuve.id);
+    const niveauCuve = derniereCuveSaisie?.niveau_litres;
+    const pctCuve = niveauCuve != null ? Math.round(niveauCuve / cuve.capacite_litres * 100) : null;
+    const consoJour = (groupes[0]?.conso_theorique_lh || 65) * 8;
+    const autoJours = niveauCuve != null && consoJour > 0 ? Math.round((niveauCuve / consoJour) * 10) / 10 : null;
+    const cuveEmoji = pctCuve == null ? '❓' : pctCuve < 30 ? '🔴' : pctCuve < 50 ? '🟡' : '🟢';
+    const heureCuve = derniereCuveSaisie?.created_at
+      ? new Date(derniereCuveSaisie.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Dakar' })
+      : null;
+    msg += `🛢️ *Cuve commune*\n`;
+    msg += `   ${cuveEmoji} ${niveauCuve != null ? niveauCuve + 'L / ' + cuve.capacite_litres + 'L (' + pctCuve + '%)' : 'Pas de relevé aujourd\'hui'}\n`;
+    if (autoJours != null) msg += `   ⏱️ Autonomie : *${autoJours} jour${autoJours > 1 ? 's' : ''}*\n`;
+    if (heureCuve) msg += `   🕗 Relevé à ${heureCuve}\n`;
+    if (derniereCuveSaisie?.litres_ajoutes > 0) msg += `   💧 +${derniereCuveSaisie.litres_ajoutes}L ajoutés\n`;
+    msg += '\n';
+  }
+
+  // Groupes — moteur uniquement
   for (const g of groupes) {
-    const saisie = saisies.filter((s: any) => s.groupe_id === g.id)[0];
-    const litresSaisie = saisie?.niveau_carburant; // maintenant en litres
-    const capaciteG = g.capacite_reservoir_litres || 500;
-    const pctCarb = litresSaisie != null ? Math.round(litresSaisie / capaciteG * 100) : null;
-    const emoji = !saisie ? '❓' : pctCarb < 30 ? '🔴' : pctCarb < 50 ? '🟡' : '🟢';
+    const saisie = saisies.find((s: any) => s.groupe_id === g.id);
+    const emoji = !saisie ? '❓' : '⚙️';
     msg += `${emoji} *${g.nom}* — ${g.marque || ''} ${g.puissance_kva || ''}kVA\n`;
     if (saisie) {
-      msg += `   ⛽ ${litresSaisie != null ? litresSaisie + 'L / ' + capaciteG + 'L' : '—'} carburant${pctCarb != null ? ' (' + pctCarb + '%)' : ''}\n`;
-      // Calcul autonomie intelligente
-      if (litresSaisie != null) {
-        const consoH = g.conso_theorique_lh || 65;
-        const consoJour = consoH * 8;
-        const joursAuto = consoJour > 0 ? Math.round((litresSaisie / consoJour) * 10) / 10 : null;
-        const autoEmoji = joursAuto !== null ? (joursAuto < 2 ? '🔴' : joursAuto < 5 ? '🟡' : '🟢') : '';
-        if (joursAuto !== null) {
-          msg += `   ${autoEmoji} Autonomie : *${joursAuto} jour${joursAuto > 1 ? 's' : ''}*\n`;
-        }
-      }
       msg += `   🕐 Compteur moteur : ${saisie.heures_marche || 0}h\n`;
       msg += `   🛢️ Huile : ${saisie.niveau_huile || 'normal'}\n`;
-      if (saisie.litres_ajoutes > 0) msg += `   💧 +${saisie.litres_ajoutes}L ajoutés\n`;
       if (saisie.operateur) msg += `   👤 ${saisie.operateur}\n`;
-      const heureSaisie = saisie.created_at ? new Date(saisie.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Dakar' }) : null;
+      const heureSaisie = saisie.created_at
+        ? new Date(saisie.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Dakar' })
+        : null;
       if (heureSaisie) msg += `   🕗 Saisie à ${heureSaisie}\n`;
     } else {
-      msg += `   ❓ Pas de saisie aujourd'hui\n`;
+      msg += `   ❓ Pas de saisie moteur aujourd'hui\n`;
     }
     msg += '\n';
   }
@@ -135,43 +166,38 @@ async function sendRapportPatron(phone: string, client: any) {
 // ── MENU AIDE ──
 function buildMenu(isGardien: boolean, isPatron: boolean) {
   let msg = `🔧 *GenTrack — Commandes*\n\n`;
-  if (isGardien) msg += `*Gardien :*\n• *saisie* — Rapport quotidien\n• *plein* — Enregistrer un ravitaillement\n• *panne* — Signaler une urgence\n• *resolu* — Clôturer une panne\n• *aide* — Ce menu\n\n`;
-  if (isPatron) msg += `*Responsable :*\n• *rapport* — Bilan des groupes\n• *plein* — Enregistrer un ravitaillement\n• *aide* — Ce menu\n\n`;
+  if (isGardien) msg += `*Technicien :*\n• *saisie* — Relevé quotidien\n• *plein* — Ravitaillement cuve\n• *panne* — Signaler une urgence\n• *resolu* — Clôturer une panne\n• *aide* — Ce menu\n\n`;
+  if (isPatron) msg += `*Responsable :*\n• *rapport* — Bilan des groupes\n• *plein* — Ravitaillement cuve\n• *aide* — Ce menu\n\n`;
   if (!isGardien && !isPatron) msg += `Numéro non reconnu.`;
   return msg;
 }
 
-// ── ENREGISTREMENT SAISIE ──
+// ── ENREGISTREMENT SAISIE MOTEUR ──
 async function enregistrerSaisie(phone: string, data: any, client: any) {
-  // Enregistrer la saisie
+  // Enregistrer saisie moteur (sans carburant)
   await db('saisies', {
     method: 'POST',
     body: {
       client_id: data.client_id,
       groupe_id: data.groupe_id,
       date: new Date().toISOString().split('T')[0],
-      niveau_carburant: data.niveau_carburant, // en litres
-      litres_ajoutes: data.litres_ajoutes || 0,
-      heures_marche: data.heures_marche, // compteur moteur total
+      heures_marche: data.heures_marche,
       niveau_huile: data.niveau_huile,
-      operateur: data.operateur
+      operateur: data.operateur,
+      niveau_carburant: null,
+      litres_ajoutes: 0
     }
   });
 
-  // Mettre à jour heures_total du groupe avec le nouveau compteur
+  // Mettre à jour heures_total du groupe
   await db('groupes', {
     method: 'PATCH',
     query: `&id=eq.${data.groupe_id}`,
     body: { heures_total: data.heures_marche }
   });
 
-  // Alertes automatiques
+  // Alertes moteur
   const alertes: any[] = [];
-  const capaciteGroupe = data.capacite_reservoir || 500;
-  const pctCarburant = Math.round(data.niveau_carburant / capaciteGroupe * 100);
-  if (pctCarburant < 30 && !data.litres_ajoutes) {
-    alertes.push({ type: 'carburant_bas', severite: 'danger', message: `Carburant critique — ${data.niveau_carburant}L (${pctCarburant}%) — ${data.groupe_nom}` });
-  }
   if (data.niveau_huile === 'critique') {
     alertes.push({ type: 'huile_critique', severite: 'danger', message: `Huile critique — ${data.groupe_nom} — Changement immédiat` });
   } else if (data.niveau_huile === 'bas') {
@@ -184,40 +210,24 @@ async function enregistrerSaisie(phone: string, data: any, client: any) {
       body: { resolue: true }
     });
   }
-  const compteurActuel = data.heures_marche;
-  const pctVidange = Math.round((compteurActuel / (data.seuil_vidange || 250)) * 100);
+  const pctVidange = Math.round((data.heures_marche / (data.seuil_vidange || 250)) * 100);
   if (pctVidange >= 100) {
-    alertes.push({ type: 'vidange_requise', severite: 'danger', message: `Vidange requise — ${data.groupe_nom} — ${compteurActuel}h au compteur` });
+    alertes.push({ type: 'vidange_requise', severite: 'danger', message: `Vidange requise — ${data.groupe_nom} — ${data.heures_marche}h` });
   } else if (pctVidange >= 80) {
-    alertes.push({ type: 'vidange_imminente', severite: 'warning', message: `Vidange bientôt — ${data.groupe_nom} — ${pctVidange}% du seuil` });
-  }
-  if (data.litres_ajoutes > 0) {
-    await db('alertes', {
-      method: 'PATCH',
-      query: `&groupe_id=eq.${data.groupe_id}&type_alerte=eq.plein_manque&resolue=eq.false`,
-      body: { resolue: true }
-    });
+    alertes.push({ type: 'vidange_imminente', severite: 'warning', message: `Vidange bientôt — ${data.groupe_nom} — ${pctVidange}%` });
   }
   for (const alerte of alertes) {
-    await db('alertes', {
-      method: 'POST',
-      body: { client_id: data.client_id, groupe_id: data.groupe_id, ...alerte }
-    });
+    await db('alertes', { method: 'POST', body: { client_id: data.client_id, groupe_id: data.groupe_id, ...alerte } });
   }
 
   // Confirmation gardien
   const huileIcon = data.niveau_huile === 'critique' ? '🚨' : data.niveau_huile === 'bas' ? '⚠️' : '✅';
-  const capG = data.capacite_reservoir || 500;
-  const pctC = Math.round(data.niveau_carburant / capG * 100);
-  const carbIcon = pctC < 30 ? '🔴' : pctC < 50 ? '🟡' : '🟢';
   const confirmation =
-    `✅ *Saisie enregistrée !*\n\n` +
+    `✅ *Relevé moteur enregistré !*\n\n` +
     `📟 *${data.groupe_nom}*\n` +
-    `${carbIcon} ${data.niveau_carburant}L / ${capG}L (${pctC}%) carburant\n` +
     `🕐 Compteur : ${data.heures_marche}h (+${data.heures_du_jour || '?'}h aujourd'hui)\n` +
     `${huileIcon} Huile : ${data.niveau_huile}\n` +
     `👤 ${data.operateur}\n` +
-    `${data.litres_ajoutes > 0 ? `💧 +${data.litres_ajoutes}L ajoutés\n` : ''}` +
     `\n_Rapport envoyé au responsable 📲_`;
   await sendWA(phone, confirmation);
 
@@ -228,126 +238,118 @@ async function enregistrerSaisie(phone: string, data: any, client: any) {
   }
 }
 
+// ── ENREGISTREMENT SAISIE CUVE ──
+async function enregistrerSaisieCuve(cuveId: string, clientId: string, niveauLitres: number, litresAjoutes: number, operateur: string) {
+  await db('saisies_cuve', {
+    method: 'POST',
+    body: {
+      cuve_id: cuveId,
+      client_id: clientId,
+      niveau_litres: niveauLitres,
+      litres_ajoutes: litresAjoutes,
+      operateur,
+      date: new Date().toISOString().split('T')[0]
+    }
+  });
+}
+
 // ── FLUX PLEIN / RAVITAILLEMENT ──
 async function demarrerPlein(phone: string, client: any) {
-  const groupesRaw = await db('groupes', { query: `&client_id=eq.${client.id}&actif=eq.true` });
-  const groupes = Array.isArray(groupesRaw) ? groupesRaw : [];
-  if (!groupes.length) return sendWA(phone, `Aucun groupe configuré. Contactez votre administrateur.`);
-
-  if (groupes.length === 1) {
-    const g = groupes[0];
-    await setSession(phone, 'plein_litres', {
-      client_id: client.id, client_nom: client.nom,
-      groupe_id: g.id, groupe_nom: g.nom,
-      capacite_reservoir: g.capacite_reservoir_litres || 500
-    });
-    return sendWA(phone, `⛽ *Ravitaillement — ${client.nom}*\n\n📟 *${g.nom}*\n\nCombien de litres ont été ajoutés ?\n_(Ex: 500)_`);
-  }
-
-  // Plusieurs groupes
-  const liste = groupes.map((g: any, i: number) => `*${i + 1}* — ${g.nom} (${g.marque} ${g.puissance_kva}kVA)`).join('\n');
-  await setSession(phone, 'plein_groupe', {
+  const cuve = await getCuve(client.id);
+  if (!cuve) return sendWA(phone, `Aucune cuve configurée pour ${client.nom}. Contactez votre administrateur.`);
+  const derniere = await getDerniereSaiseCuve(cuve.id);
+  const niveauPrec = derniere?.niveau_litres;
+  const niveauTxt = niveauPrec != null ? ` _(dernier niveau connu : ${niveauPrec}L)_` : '';
+  await setSession(phone, 'plein_litres', {
     client_id: client.id, client_nom: client.nom,
-    groupes: groupes.map((g: any) => ({ id: g.id, nom: g.nom, marque: g.marque, kva: g.puissance_kva, capacite: g.capacite_reservoir_litres || 500 }))
+    cuve_id: cuve.id, cuve_nom: cuve.nom,
+    cuve_capacite: cuve.capacite_litres
   });
-  return sendWA(phone, `⛽ *Ravitaillement — ${client.nom}*\n\nQuel groupe a été ravitaillé ?\n\n${liste}\n\nRépondez avec le numéro.`);
+  return sendWA(phone, `⛽ *Ravitaillement — ${client.nom}*\n\n🛢️ *${cuve.nom}* (${cuve.capacite_litres}L)${niveauTxt}\n\nCombien de litres ont été ajoutés ?\n_(Ex: 500)_`);
 }
 
 async function gererFluxPlein(phone: string, bodyText: string, msg: string, client: any, session: any) {
   const state = session?.state || '';
   const sessionData = session?.data ? JSON.parse(session.data) : {};
 
-  // Choix groupe
-  if (state === 'plein_groupe') {
-    const idx = parseInt(msg) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= sessionData.groupes?.length) {
-      return sendWA(phone, `Répondez avec un numéro entre 1 et ${sessionData.groupes?.length}`);
-    }
-    const g = sessionData.groupes[idx];
-    await setSession(phone, 'plein_litres', { ...sessionData, groupe_id: g.id, groupe_nom: g.nom, capacite_reservoir: g.capacite });
-    return sendWA(phone, `⛽ *${g.nom}*\n\nCombien de litres ont été ajoutés ?\n_(Ex: 500)_`);
-  }
-
-  // Litres ajoutés
   if (state === 'plein_litres') {
     const litres = parseFloat(bodyText.trim().replace(',', '.'));
     if (isNaN(litres) || litres <= 0) {
-      return sendWA(phone, `❌ Quantité invalide. Entrez un nombre en litres.\n_(Ex: 500)_`);
+      return sendWA(phone, `❌ Quantité invalide. Entrez un nombre de litres.\n_(Ex: 500)_`);
     }
+    const exNiveau = Math.round(sessionData.cuve_capacite * 0.8);
     await setSession(phone, 'plein_niveau', { ...sessionData, litres_ajoutes: litres });
-    const exNiveau = Math.round(sessionData.capacite_reservoir * 0.8) || 400;
-    return sendWA(phone, `✅ *${litres} litres* ajoutés.\n\n⛽ Quel niveau indique l'écran Dover maintenant ?\n_(Lisez le chiffre sur l'écran après le plein, en litres. Ex: ${exNiveau})_`);
+    return sendWA(phone, `✅ *${litres} litres* ajoutés.\n\n🛢️ Quel niveau indique l'écran Dover maintenant ?\n_(Lisez le chiffre sur l'écran après le plein, en litres. Ex: ${exNiveau})_`);
   }
 
-  // Niveau après plein
   if (state === 'plein_niveau') {
     const niveau = parseInt(bodyText.trim().replace(/\s/g, ''));
-    const capacite = sessionData.capacite_reservoir || 500;
-    const exNiveau2 = Math.round(capacite * 0.8);
+    const capacite = sessionData.cuve_capacite || 500;
+    const exNiveau = Math.round(capacite * 0.8);
     if (isNaN(niveau) || niveau < 0 || niveau > capacite * 1.05) {
-      return sendWA(phone, `❌ Niveau invalide. Entrez le volume affiché sur l'écran Dover entre 0 et ${capacite} litres.\n_(Ex: ${exNiveau2})_`);
+      return sendWA(phone, `❌ Niveau invalide. Entrez le volume entre 0 et ${capacite} litres.\n_(Ex: ${exNiveau})_`);
     }
-    await setSession(phone, 'plein_operateur', { ...sessionData, niveau_carburant: niveau });
+    await setSession(phone, 'plein_operateur', { ...sessionData, niveau_litres: niveau });
     return sendWA(phone, `✅ Niveau noté : *${niveau} litres*\n\n👤 Votre prénom ?`);
   }
 
-  // Opérateur
   if (state === 'plein_operateur') {
     const operateur = bodyText.trim();
     const data = { ...sessionData, operateur };
 
-    // Enregistrer dans saisies
-    await db('saisies', {
-      method: 'POST',
-      body: {
-        client_id: data.client_id,
-        groupe_id: data.groupe_id,
-        date: new Date().toISOString().split('T')[0],
-        niveau_carburant: data.niveau_carburant,
-        litres_ajoutes: data.litres_ajoutes,
-        heures_marche: null,
-        niveau_huile: null,
-        operateur: data.operateur
-      }
-    });
+    await enregistrerSaisieCuve(data.cuve_id, data.client_id, data.niveau_litres, data.litres_ajoutes, operateur);
 
     await setSession(phone, 'idle', {});
 
-    // Notification à tous les techniciens + patron
+    // Alerte carburant bas si nécessaire
+    const pct = Math.round(data.niveau_litres / (data.cuve_capacite || 500) * 100);
+    if (pct < 30) {
+      await db('alertes', {
+        method: 'POST',
+        body: { client_id: data.client_id, type: 'carburant_bas', severite: 'danger', message: `Carburant critique — ${data.niveau_litres}L (${pct}%) — ${data.cuve_nom}` }
+      });
+    } else {
+      await db('alertes', {
+        method: 'PATCH',
+        query: `&client_id=eq.${data.client_id}&type=eq.carburant_bas&resolue=eq.false`,
+        body: { resolue: true }
+      });
+    }
+
+    // Notification équipe
     const dateStr = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'Africa/Dakar' });
-    const pct = Math.round(data.niveau_carburant / (data.capacite_reservoir || 500) * 100);
-    const capR = data.capacite_reservoir || 500;
     const notifMsg =
       `⛽ *Ravitaillement effectué*\n*${data.client_nom}*\n\n` +
-      `📟 ${data.groupe_nom}\n` +
+      `🛢️ ${data.cuve_nom}\n` +
       `💧 *${data.litres_ajoutes}L* ajoutés\n` +
-      `📊 Niveau actuel : *${data.niveau_carburant}L / ${capR}L* (${pct}%)\n` +
+      `📊 Niveau : *${data.niveau_litres}L / ${data.cuve_capacite}L* (${pct}%)\n` +
       `📅 ${dateStr}\n` +
-      `👤 ${data.operateur}\n\n` +
+      `👤 ${operateur}\n\n` +
       `_Enregistré via GenTrack_`;
 
-    // Techniciens (table gardiens)
     const gardiensRaw = await db('gardiens', { query: `&client_id=eq.${data.client_id}&actif=eq.true` });
     const gardiens = Array.isArray(gardiensRaw) ? gardiensRaw : [];
     for (const g of gardiens) {
       if (g.whatsapp && g.whatsapp !== phone) await sendWA(g.whatsapp, notifMsg);
     }
-    // Patron
     const clientFull = await db('clients', { query: `&id=eq.${data.client_id}` });
     if (Array.isArray(clientFull) && clientFull[0]?.whatsapp_patron && clientFull[0].whatsapp_patron !== phone) {
       await sendWA(clientFull[0].whatsapp_patron, notifMsg);
     }
+    if (clientFull[0]?.whatsapp_gardien && clientFull[0].whatsapp_gardien !== phone) {
+      await sendWA(clientFull[0].whatsapp_gardien, notifMsg);
+    }
 
     return sendWA(phone,
       `✅ *Ravitaillement enregistré !*\n\n` +
-      `📟 ${data.groupe_nom}\n` +
+      `🛢️ ${data.cuve_nom}\n` +
       `💧 ${data.litres_ajoutes}L ajoutés\n` +
-      `📊 Niveau : ${data.niveau_carburant}L / ${capR}L (${pct}%)\n` +
+      `📊 Niveau : ${data.niveau_litres}L / ${data.cuve_capacite}L (${pct}%)\n` +
       `\n_Équipe notifiée 📲_`
     );
   }
 
-  return sendWA(phone, `Tapez *plein* pour recommencer ou *aide* pour les commandes.`);
+  return sendWA(phone, `Tapez *plein* pour recommencer.`);
 }
 
 // ═══════════════════════════════════════════════
@@ -359,8 +361,6 @@ async function handleMessage(from: string, bodyText: string) {
   console.log(`=== From: ${phone} | Body: ${bodyText}`);
 
   // ── Identifier le client ──
-  // Nouveau système : table `gardiens` (multi-techniciens par client, ex: Azalaï Dakar)
-  // Ancien système (fallback) : colonne `clients.whatsapp_gardien` (démos /azalai)
   const [gardienRowsRaw, legacyGardienRaw, patronsRaw] = await Promise.all([
     db('gardiens', { query: `&whatsapp=eq.${encodeURIComponent(phone)}&actif=eq.true` }),
     db('clients', { query: `&whatsapp_gardien=eq.${encodeURIComponent(phone)}&actif=eq.true` }),
@@ -372,16 +372,13 @@ async function handleMessage(from: string, bodyText: string) {
 
   let clients: any[] = [];
   if (gardienRows.length > 0) {
-    // Le numéro appartient à un technicien enregistré dans `gardiens`
     const gardien = gardienRows[0];
     const clientRaw = await db('clients', { query: `&id=eq.${gardien.client_id}&actif=eq.true` });
     const clientArr = Array.isArray(clientRaw) ? clientRaw : [];
     if (clientArr.length > 0) {
-      // On attache le nom du technicien pour pré-remplir plus tard si besoin
       clients = [{ ...clientArr[0], gardien_nom: gardien.nom }];
     }
   } else if (legacyGardienClients.length > 0) {
-    // Client encore sur l'ancien système (ex: démos /azalai)
     clients = legacyGardienClients;
   }
 
@@ -402,12 +399,11 @@ async function handleMessage(from: string, bodyText: string) {
     if (msg === 'plein' || msg === 'ravitaillement') {
       return demarrerPlein(phone, client);
     }
-    // Flux plein en cours pour le patron
     const sessionPatron = await getSession(phone);
     if (sessionPatron?.state?.startsWith('plein_')) {
       return gererFluxPlein(phone, bodyText, msg, client, sessionPatron);
     }
-    return sendWA(phone, `Tapez *rapport* pour recevoir le bilan de vos groupes.\nTapez *plein* pour enregistrer un ravitaillement.\nTapez *aide* pour la liste des commandes.`);
+    return sendWA(phone, `Tapez *rapport* pour le bilan.\nTapez *plein* pour un ravitaillement.\nTapez *aide* pour les commandes.`);
   }
 
   // ── FLUX GARDIEN ──
@@ -417,15 +413,11 @@ async function handleMessage(from: string, bodyText: string) {
     const state = session?.state || 'idle';
     const sessionData = session?.data ? JSON.parse(session.data) : {};
 
-    // Commande RESOLU
+    // Commandes prioritaires (interrompent toute session en cours)
     if (msg === 'resolu' || msg === 'résolu') {
       const groupesRaw = await db('groupes', { query: `&client_id=eq.${client.id}&actif=eq.true` });
       const groupes = Array.isArray(groupesRaw) ? groupesRaw : [];
-      const groupeIds = groupes.map((g: any) => g.id);
-      // Chercher les pannes ouvertes de ce client
-      const pannesRaw = await db('pannes', {
-        query: `&client_id=eq.${client.id}&resolue=eq.false&order=date_panne.desc`
-      });
+      const pannesRaw = await db('pannes', { query: `&client_id=eq.${client.id}&resolue=eq.false&order=date_panne.desc` });
       const pannesOuvertes = Array.isArray(pannesRaw) ? pannesRaw : [];
       if (!pannesOuvertes.length) {
         return sendWA(phone, `✅ Aucune panne ouverte pour ${client.nom}.\n\nTapez *panne* pour en signaler une nouvelle.`);
@@ -436,14 +428,37 @@ async function handleMessage(from: string, bodyText: string) {
         `*${i + 1}* — ${groupeMap[p.groupe_id]||'—'} · ${panneLabels[p.type]||p.type}`
       ).join('\n');
       await setSession(phone, 'resolu_choix', {
-        client_id: client.id,
-        client_nom: client.nom,
+        client_id: client.id, client_nom: client.nom,
         pannes: pannesOuvertes.map((p: any) => ({ id: p.id, groupe: groupeMap[p.groupe_id]||'—', type: panneLabels[p.type]||p.type }))
       });
       return sendWA(phone, `✅ *Clôturer une panne*\n*${client.nom}*\n\nQuelle panne est résolue ?\n\n${liste}\n\nRépondez avec le numéro.`);
     }
 
-    // Flux résolution — choix panne
+    if (msg === 'panne' || msg === 'urgence') {
+      const groupesRaw = await db('groupes', { query: `&client_id=eq.${client.id}&actif=eq.true` });
+      const groupes = Array.isArray(groupesRaw) ? groupesRaw : [];
+      await setSession(phone, 'panne_groupe', {
+        client_id: client.id, client_nom: client.nom,
+        groupes: groupes.map((g: any) => ({ id: g.id, nom: g.nom, marque: g.marque, kva: g.puissance_kva }))
+      });
+      const liste = groupes.map((g: any, i: number) => `*${i + 1}* — ${g.nom} (${g.marque} ${g.puissance_kva}kVA)`).join('\n');
+      return sendWA(phone, `🚨 *SIGNALEMENT DE PANNE*\n*${client.nom}*\n\nQuel groupe est en panne ?\n\n${liste}\n\nRépondez avec le numéro.`);
+    }
+
+    if (msg === 'plein' || msg === 'ravitaillement') {
+      return demarrerPlein(phone, client);
+    }
+
+    if (msg === 'rapport') {
+      return sendRapportPatron(phone, client);
+    }
+
+    // Flux plein en cours
+    if (state?.startsWith('plein_')) {
+      return gererFluxPlein(phone, bodyText, msg, client, session);
+    }
+
+    // ── Flux résolution ──
     if (state === 'resolu_choix') {
       const idx = parseInt(msg) - 1;
       if (isNaN(idx) || idx < 0 || idx >= sessionData.pannes?.length) {
@@ -451,27 +466,21 @@ async function handleMessage(from: string, bodyText: string) {
       }
       const panne = sessionData.pannes[idx];
       await setSession(phone, 'resolu_note', { ...sessionData, panne_id: panne.id, panne_label: panne.groupe+' · '+panne.type });
-      return sendWA(phone,
-        `✅ *${panne.groupe} · ${panne.type}*\n\nComment a été résolue la panne ?\n_(Ex: Démarreur remplacé, ou tapez - pour passer)_`
-      );
+      return sendWA(phone, `✅ *${panne.groupe} · ${panne.type}*\n\nComment a été résolue la panne ?\n_(Ex: Démarreur remplacé, ou tapez - pour passer)_`);
     }
 
-    // Flux résolution — note
     if (state === 'resolu_note') {
       const note = bodyText.trim() === '-' ? null : bodyText.trim();
       await setSession(phone, 'resolu_cout', { ...sessionData, resolution_note: note });
-      return sendWA(phone,
-        `${note ? '✅ *'+note+'*\n\n' : ''}Un technicien est-il intervenu ?\n\n*1* — Oui\n*2* — Non`
-      );
+      return sendWA(phone, `${note ? '✅ *'+note+'*\n\n' : ''}Un technicien est-il intervenu ?\n\n*1* — Oui\n*2* — Non`);
     }
 
-    // Flux résolution — technicien
     if (state === 'resolu_cout') {
       if (msg === '1') {
         await setSession(phone, 'resolu_technicien', sessionData);
         return sendWA(phone, `Nom du technicien / prestataire ?\n_(Ex: Mamadou Diallo, ou tapez - pour passer)_`);
       } else if (msg === '2') {
-        await setSession(phone, 'resolu_final', { ...sessionData, intervenant: null, cout: 0, piece: null });
+        await setSession(phone, 'resolu_final', { ...sessionData, intervenant: null });
         return sendWA(phone, `Coût de la réparation en FCFA ?\n_(Ex: 85000, ou tapez 0 si aucun coût)_`);
       }
       return sendWA(phone, `Répondez *1* (oui) ou *2* (non)`);
@@ -483,283 +492,29 @@ async function handleMessage(from: string, bodyText: string) {
       return sendWA(phone, `Coût de la réparation en FCFA ?\n_(Ex: 85000, ou tapez 0 si aucun coût)_`);
     }
 
-    // Flux résolution — final
     if (state === 'resolu_final') {
       const cout = parseInt(msg.replace(/\s/g,''))||0;
       const data = { ...sessionData, cout };
-      // Marquer la panne résolue
       await db('pannes', {
-        method: 'PATCH',
-        query: `&id=eq.${data.panne_id}`,
-        body: {
-          resolue: true,
-          date_resolution: new Date().toISOString(),
-          resolu_par: data.operateur||'Gardien',
-          resolu_via: 'WhatsApp',
-          resolution_note: data.resolution_note||null,
-          intervenant: data.intervenant||null,
-          cout_reparation: data.cout,
-        }
+        method: 'PATCH', query: `&id=eq.${data.panne_id}`,
+        body: { resolue: true, date_resolution: new Date().toISOString(), resolu_par: data.operateur||'Technicien', resolu_via: 'WhatsApp', resolution_note: data.resolution_note||null, intervenant: data.intervenant||null, cout_reparation: data.cout }
       });
-      // Résoudre l'alerte associée
-      await db('alertes', {
-        method: 'PATCH',
-        query: `&client_id=eq.${data.client_id}&type=eq.panne&resolue=eq.false`,
-        body: { resolue: true }
-      });
+      await db('alertes', { method: 'PATCH', query: `&client_id=eq.${data.client_id}&type=eq.panne&resolue=eq.false`, body: { resolue: true } });
       await setSession(phone, 'idle', {});
-
-      // Notifier le patron
       const clientFull = await db('clients', { query: `&id=eq.${data.client_id}` });
       if (Array.isArray(clientFull) && clientFull[0]?.whatsapp_patron) {
-        const patronPhone = clientFull[0].whatsapp_patron.replace('whatsapp:', '');
-        const msg_patron =
-          `✅ *Panne résolue*\n*${data.client_nom}*\n\n` +
-          `📟 ${data.panne_label}\n` +
-          `📅 ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dakar'})}\n` +
+        await sendWA(clientFull[0].whatsapp_patron.replace('whatsapp:', ''),
+          `✅ *Panne résolue*\n*${data.client_nom}*\n\n📟 ${data.panne_label}\n` +
           `${data.resolution_note?'🔧 '+data.resolution_note+'\n':''}` +
           `${data.intervenant?'👷 '+data.intervenant+'\n':''}` +
           `${data.cout>0?'💰 '+data.cout.toLocaleString('fr-FR')+' FCFA\n':''}` +
-          `\n_Signalé résolu par le gardien via WhatsApp_`;
-        await sendWA(patronPhone, msg_patron);
-      }
-
-      return sendWA(phone,
-        `✅ *Panne clôturée !*\n\n${data.panne_label}\n` +
-        `${data.resolution_note?'🔧 '+data.resolution_note+'\n':''}` +
-        `${data.cout>0?'💰 '+data.cout.toLocaleString('fr-FR')+' FCFA\n':''}` +
-        `\n_Le responsable a été notifié. 📲_`
-      );
-    }
-
-    // Commande PANNE — priorité absolue
-    if (msg === 'panne' || msg === 'urgence') {
-      const groupesRaw = await db('groupes', { query: `&client_id=eq.${client.id}&actif=eq.true` });
-      const groupes = Array.isArray(groupesRaw) ? groupesRaw : [];
-      await setSession(phone, 'panne_groupe', {
-        client_id: client.id,
-        client_nom: client.nom,
-        groupes: groupes.map((g: any) => ({ id: g.id, nom: g.nom, marque: g.marque, kva: g.puissance_kva }))
-      });
-      const liste = groupes.map((g: any, i: number) => `*${i + 1}* — ${g.nom} (${g.marque} ${g.puissance_kva}kVA)`).join('\n');
-      return sendWA(phone, `🚨 *SIGNALEMENT DE PANNE*\n*${client.nom}*\n\nQuel groupe est en panne ?\n\n${liste}\n\nRépondez avec le numéro.`);
-    }
-
-    // Commande RAPPORT patron depuis gardien
-    if (msg === 'rapport') {
-      return sendRapportPatron(phone, client);
-    }
-
-    // Commande PLEIN / RAVITAILLEMENT
-    if (msg === 'plein' || msg === 'ravitaillement') {
-      return demarrerPlein(phone, client);
-    }
-
-    // Flux plein en cours
-    if (state?.startsWith('plein_')) {
-      return gererFluxPlein(phone, bodyText, msg, client, session);
-    }
-
-    // ════════════════════════════════════════
-    // FLUX SAISIE UNIFIÉ
-    // ════════════════════════════════════════
-
-    // Démarrage saisie
-    if (state === 'idle' || msg === 'saisie' || msg === 'bonjour') {
-      const groupesRaw = await db('groupes', { query: `&client_id=eq.${client.id}&actif=eq.true` });
-      const groupes = Array.isArray(groupesRaw) ? groupesRaw : [];
-      if (!groupes.length) {
-        return sendWA(phone, `Aucun groupe configuré pour ${client.nom}. Contactez votre administrateur.`);
-      }
-      if (groupes.length === 1) {
-        // Un seul groupe — sélection automatique + affichage contexte
-        const g = groupes[0];
-        const [dernieresRaw, autoRaw] = await Promise.all([
-          db('v_derniere_saisie', { query: `&groupe_id=eq.${g.id}` }),
-          db('v_autonomie_groupes', { query: `&groupe_id=eq.${g.id}` })
-        ]);
-        const derniere = Array.isArray(dernieresRaw) ? dernieresRaw[0] : null;
-        const autoData = Array.isArray(autoRaw) ? autoRaw[0] : null;
-        const contexte = buildContexteVeille(derniere);
-        await setSession(phone, 'saisie_carburant', {
-          client_id: client.id,
-          client_nom: client.nom,
-          groupe_id: g.id,
-          groupe_nom: g.nom,
-          heures_total: g.heures_total || 0,
-          seuil_vidange: g.seuil_vidange_heures || 250,
-          prix_litre: client.prix_litre_fcfa || 695,
-          capacite_reservoir: g.capacite_reservoir_litres || 500,
-          conso_theorique: g.conso_theorique_lh || 1.8,
-          conso_jour: autoData?.conso_jour_estimee || null
-        });
-        return sendWA(phone,
-          `Bonjour 👋 *${client.nom}*\n\n` +
-          `📟 *${g.nom}* — ${g.marque || ''} ${g.puissance_kva || ''}kVA\n\n` +
-          `${contexte}\n\n` +
-          `⛽ Quel est le niveau carburant ce matin ? _(en litres, ex: ${Math.round((g.capacite_reservoir_litres||500)*0.8)})_`
+          `\n_Résolu par le technicien via WhatsApp_`
         );
       }
-      // Plusieurs groupes — choix
-      await setSession(phone, 'saisie_choix_groupe', {
-        client_id: client.id,
-        client_nom: client.nom,
-        groupes: groupes.map((g: any) => ({
-          id: g.id, nom: g.nom, marque: g.marque, kva: g.puissance_kva,
-          heures_total: g.heures_total || 0, seuil_vidange: g.seuil_vidange_heures || 250
-        }))
-      });
-      const liste = groupes.map((g: any, i: number) =>
-        `*${i + 1}* — ${g.nom} (${g.marque} ${g.puissance_kva}kVA)`
-      ).join('\n');
-      return sendWA(phone, `Bonjour 👋 *${client.nom}*\n\nQuel groupe a tourné aujourd'hui ?\n\n${liste}\n\nRépondez avec le numéro.`);
+      return sendWA(phone, `✅ *Panne clôturée !*\n\n${data.panne_label}\n${data.resolution_note?'🔧 '+data.resolution_note+'\n':''}${data.cout>0?'💰 '+data.cout.toLocaleString('fr-FR')+' FCFA\n':''}\n_Le responsable a été notifié. 📲_`);
     }
 
-    // Choix groupe (si plusieurs)
-    if (state === 'saisie_choix_groupe') {
-      const idx = parseInt(msg) - 1;
-      if (isNaN(idx) || idx < 0 || idx >= sessionData.groupes?.length) {
-        return sendWA(phone, `Répondez avec un numéro entre 1 et ${sessionData.groupes?.length}`);
-      }
-      const g = sessionData.groupes[idx];
-      const [dernieresRaw2, autoRaw2] = await Promise.all([
-        db('v_derniere_saisie', { query: `&groupe_id=eq.${g.id}` }),
-        db('v_autonomie_groupes', { query: `&groupe_id=eq.${g.id}` })
-      ]);
-      const derniere = Array.isArray(dernieresRaw2) ? dernieresRaw2[0] : null;
-      const autoData2 = Array.isArray(autoRaw2) ? autoRaw2[0] : null;
-      const contexte = buildContexteVeille(derniere);
-      await setSession(phone, 'saisie_carburant', {
-        client_id: sessionData.client_id,
-        client_nom: sessionData.client_nom,
-        groupe_id: g.id,
-        groupe_nom: g.nom,
-        heures_total: g.heures_total || 0,
-        seuil_vidange: g.seuil_vidange || 250,
-        prix_litre: 695,
-        capacite_reservoir: g.capacite_reservoir_litres || 500,
-        conso_theorique: g.conso_theorique_lh || 1.8,
-        conso_jour: autoData2?.conso_jour_estimee || null
-      });
-      return sendWA(phone,
-        `📟 *${g.nom}* — ${g.marque || ''} ${g.kva || ''}kVA\n\n` +
-        `${contexte}\n\n` +
-        `⛽ Niveau carburant ce matin ? _(en litres, ex: ${Math.round((g.capacite_reservoir_litres||500)*0.8)})_`
-      );
-    }
-
-    // Étape carburant (en litres)
-    if (state === 'saisie_carburant') {
-      const litres = parseInt(msg.replace(/\s/g, ''));
-      const capacite = sessionData.capacite_reservoir || 500;
-      if (isNaN(litres) || litres < 0 || litres > capacite * 1.05) {
-        return sendWA(phone, `❌ Entrez un volume entre 0 et ${capacite} litres.\nEx: *${Math.round(capacite*0.8)}*`);
-      }
-      // Calculer autonomie et % pour info
-      const consoJour = sessionData.conso_jour || (sessionData.conso_theorique || 65) * 8;
-      const pct = Math.round(litres / capacite * 100);
-      const joursAuto = consoJour > 0 ? Math.round((litres / consoJour) * 10) / 10 : null;
-      const autoMsg = joursAuto !== null
-        ? `\n⏱️ Autonomie estimée : *${joursAuto} jour${joursAuto > 1 ? 's' : ''}*`
-        : '';
-      const autoEmoji = joursAuto !== null ? (joursAuto < 2 ? '🔴' : joursAuto < 5 ? '🟡' : '🟢') : '';
-
-      // Seuil alerte à 30%
-      if (pct < 30 || (joursAuto !== null && joursAuto < 2)) {
-        await setSession(phone, 'saisie_plein_question', { ...sessionData, niveau_carburant: litres, litres_restants: litres, jours_autonomie: joursAuto });
-        return sendWA(phone,
-          `⚠️ Carburant à *${litres}L* (${pct}%) — niveau critique.${autoMsg}\n\n` +
-          `Avez-vous fait un plein récemment ?\n\n*1* — Oui, j'ai fait le plein\n*2* — Non, pas encore`
-        );
-      }
-      await setSession(phone, 'saisie_heures', { ...sessionData, niveau_carburant: litres, litres_ajoutes: 0 });
-      const dernierCompteur = sessionData.heures_total || 0;
-      return sendWA(phone, `${autoEmoji} Carburant : *${litres}L* (${pct}%)${autoMsg}\n\n🕐 Relevé du compteur moteur ce matin ?\n_(Dernier relevé connu : ${dernierCompteur}h)_`);
-    }
-
-    // Question plein (si carburant bas)
-    if (state === 'saisie_plein_question') {
-      if (msg === '1') {
-        await setSession(phone, 'saisie_plein_litres', sessionData);
-        return sendWA(phone, `⛽ Combien de litres avez-vous ajouté ?\n_(Ex: 150)_`);
-      } else if (msg === '2') {
-        // Pas de plein → alerte patron + continuer saisie
-        await setSession(phone, 'saisie_heures', { ...sessionData, litres_ajoutes: 0 });
-        const dernierCompteurBas = sessionData.heures_total || 0;
-        return sendWA(phone,
-          `⚠️ _Alerte carburant bas envoyée au responsable._\n\n` +
-          `🕐 Relevé du compteur moteur ce matin ?\n_(Dernier relevé connu : ${dernierCompteurBas}h)_`
-        );
-      }
-      return sendWA(phone, `Répondez *1* (oui, plein fait) ou *2* (non, pas encore).`);
-    }
-
-    // Litres ajoutés (si plein fait)
-    if (state === 'saisie_plein_litres') {
-      const litres = parseFloat(bodyText.trim().replace(',', '.'));
-      if (isNaN(litres) || litres <= 0) {
-        return sendWA(phone, `❌ Quantité invalide. Entrez un nombre en litres.\n_(Ex: 150)_`);
-      }
-      await setSession(phone, 'saisie_heures', { ...sessionData, litres_ajoutes: litres });
-      const dernierCompteurPlein = sessionData.heures_total || 0;
-      return sendWA(phone,
-        `✅ Plein enregistré : *${litres} litres*\n\n` +
-        `🕐 Relevé du compteur moteur ce matin ?\n_(Dernier relevé connu : ${dernierCompteurPlein}h)_`
-      );
-    }
-
-    // Étape heures moteur (compteur total)
-    if (state === 'saisie_heures') {
-      const compteur = parseFloat(msg.replace(',', '.'));
-      const heuresPrecedentes = sessionData.heures_total || 0;
-      if (isNaN(compteur) || compteur < heuresPrecedentes) {
-        return sendWA(phone, `❌ Relevé invalide. Le compteur doit être supérieur à ${heuresPrecedentes}h.\n_(Ex: ${(heuresPrecedentes + 8).toFixed(1)})_`);
-      }
-      // Heures du jour = différence avec le compteur précédent
-      const heuresDuJour = Math.round((compteur - heuresPrecedentes) * 10) / 10;
-      // Vérifier seuil vidange sur le compteur actuel
-      const seuil = sessionData.seuil_vidange || 250;
-      const pctVidange = Math.round((compteur / seuil) * 100);
-      let vidangeMsg = '';
-      if (pctVidange >= 100) {
-        vidangeMsg = `\n\n🔧 *Vidange requise !* Compteur : ${compteur}h/${seuil}h — Contactez le technicien.`;
-      } else if (pctVidange >= 80) {
-        vidangeMsg = `\n\n🔧 Vidange bientôt : ${compteur}h/${seuil}h (${pctVidange}%).`;
-      }
-      // On stocke le compteur ET les heures du jour
-      await setSession(phone, 'saisie_huile', { ...sessionData, heures_marche: compteur, heures_du_jour: heuresDuJour, vidange_msg: vidangeMsg });
-      return sendWA(phone,
-        `✅ Compteur : *${compteur}h* (+${heuresDuJour}h aujourd'hui).${vidangeMsg}\n\n` +
-        `🛢️ Niveau d'huile ?\n\n*1* — Normal ✅\n*2* — Bas ⚠️\n*3* — Critique 🚨`
-      );
-    }
-
-    // Étape huile
-    if (state === 'saisie_huile') {
-      const huileMap: any = { '1': 'normal', '2': 'bas', '3': 'critique' };
-      const huile = huileMap[msg.trim()];
-      if (!huile) {
-        return sendWA(phone, `❌ Répondez avec *1* (Normal), *2* (Bas) ou *3* (Critique)`);
-      }
-      const huileAlerte = huile === 'critique'
-        ? '\n\n🚨 _Huile critique — changement immédiat requis !_'
-        : huile === 'bas' ? '\n\n⚠️ _Huile basse — vérifiez avant le prochain démarrage._' : '';
-      // Plus de question prénom — nom gardien connu via table gardiens
-      const operateur = client.gardien_nom || 'Technicien';
-      const dataFinal = { ...sessionData, niveau_huile: huile, operateur };
-      await setSession(phone, 'idle', {});
-      return enregistrerSaisie(phone, dataFinal, client);
-    }
-
-    // saisie_final — fallback au cas où la session persiste
-    if (state === 'saisie_final') {
-      await setSession(phone, 'idle', {});
-      return enregistrerSaisie(phone, sessionData, client);
-    }
-
-    // ════════════════════════════════════════
-    // FLUX PANNE
-    // ════════════════════════════════════════
+    // ── FLUX PANNE ──
     if (state === 'panne_groupe') {
       const idx = parseInt(msg) - 1;
       if (isNaN(idx) || idx < 0 || idx >= sessionData.groupes?.length) {
@@ -767,40 +522,149 @@ async function handleMessage(from: string, bodyText: string) {
       }
       const groupe = sessionData.groupes[idx];
       await setSession(phone, 'panne_type', { ...sessionData, groupe_id: groupe.id, groupe_nom: groupe.nom });
-      return sendWA(phone,
-        `🚨 *${groupe.nom}* en panne\n\nType de problème ?\n\n` +
-        `*1* — Ne démarre pas\n*2* — Arrêt inopiné\n*3* — Bruit anormal\n*4* — Surchauffe\n*5* — Autre\n\nRépondez avec le numéro.`
-      );
+      return sendWA(phone, `🚨 *${groupe.nom}* en panne\n\nType de problème ?\n\n*1* — Ne démarre pas\n*2* — Arrêt inopiné\n*3* — Bruit anormal\n*4* — Surchauffe\n*5* — Autre\n\nRépondez avec le numéro.`);
     }
 
     if (state === 'panne_type') {
-      const panneLabels: any = { '1': 'Ne démarre pas', '2': 'Arrêt inopiné', '3': 'Bruit anormal', '4': 'Surchauffe', '5': 'Autre' };
-      const panneTypes: any = { '1': 'ne_demarre_pas', '2': 'arret_inopin', '3': 'bruit_anormal', '4': 'surchauffe', '5': 'autre' };
+      const panneLabels: any = { '1':'Ne démarre pas','2':'Arrêt inopiné','3':'Bruit anormal','4':'Surchauffe','5':'Autre' };
+      const panneTypes: any = { '1':'ne_demarre_pas','2':'arret_inopin','3':'bruit_anormal','4':'surchauffe','5':'autre' };
       const panneType = panneTypes[msg.trim()];
       if (!panneType) return sendWA(phone, `Répondez avec un numéro entre 1 et 5`);
       const panneLabel = panneLabels[msg.trim()];
-
-      await db('pannes', {
-        method: 'POST',
-        body: { client_id: sessionData.client_id, groupe_id: sessionData.groupe_id, type: panneType, description: panneLabel, date_panne: new Date().toISOString() }
-      });
-      await db('alertes', {
-        method: 'POST',
-        body: { client_id: sessionData.client_id, groupe_id: sessionData.groupe_id, type: 'panne', severite: 'danger', message: `PANNE — ${sessionData.groupe_nom} — ${panneLabel}` }
-      });
+      await db('pannes', { method: 'POST', body: { client_id: sessionData.client_id, groupe_id: sessionData.groupe_id, type: panneType, description: panneLabel, date_panne: new Date().toISOString() } });
+      await db('alertes', { method: 'POST', body: { client_id: sessionData.client_id, groupe_id: sessionData.groupe_id, type: 'panne', severite: 'danger', message: `PANNE — ${sessionData.groupe_nom} — ${panneLabel}` } });
       await setSession(phone, 'idle', {});
-
       const clientFull = await db('clients', { query: `&id=eq.${sessionData.client_id}` });
       if (Array.isArray(clientFull) && clientFull[0]?.whatsapp_patron) {
-        await sendWA(clientFull[0].whatsapp_patron.replace('whatsapp:', ''),
-          `🚨 *PANNE SIGNALÉE*\n*${sessionData.client_nom}*\n\nGroupe : ${sessionData.groupe_nom}\nProblème : ${panneLabel}\n\nIntervention requise immédiatement.`
-        );
+        await sendWA(clientFull[0].whatsapp_patron.replace('whatsapp:', ''), `🚨 *PANNE SIGNALÉE*\n*${sessionData.client_nom}*\n\nGroupe : ${sessionData.groupe_nom}\nProblème : ${panneLabel}\n\nIntervention requise immédiatement.`);
       }
       return sendWA(phone, `🚨 *Panne signalée !*\n\n${sessionData.groupe_nom} — ${panneLabel}\n\nLe responsable a été alerté immédiatement. 📲`);
     }
 
-    // Message non reconnu en cours de session
-    return sendWA(phone, `Tapez *saisie* pour le rapport quotidien ou *panne* pour signaler une urgence.\nTapez *aide* pour la liste des commandes.`);
+    // ── FLUX SAISIE MOTEUR ──
+    if (state === 'idle' || msg === 'saisie' || msg === 'bonjour') {
+      const groupesRaw = await db('groupes', { query: `&client_id=eq.${client.id}&actif=eq.true` });
+      const groupes = Array.isArray(groupesRaw) ? groupesRaw : [];
+      if (!groupes.length) return sendWA(phone, `Aucun groupe configuré. Contactez votre administrateur.`);
+
+      // Toujours proposer le choix du groupe
+      const liste = groupes.map((g: any, i: number) => `*${i + 1}* — ${g.nom} (${g.marque} ${g.puissance_kva}kVA)`).join('\n');
+      await setSession(phone, 'saisie_choix_groupe', {
+        client_id: client.id, client_nom: client.nom,
+        groupes: groupes.map((g: any) => ({
+          id: g.id, nom: g.nom, marque: g.marque, kva: g.puissance_kva,
+          heures_total: g.heures_total || 0, seuil_vidange: g.seuil_vidange_heures || 250,
+          cuve_id: g.cuve_id
+        }))
+      });
+      return sendWA(phone, `Bonjour 👋 *${client.nom}*\n\nQuel groupe a tourné aujourd'hui ?\n\n${liste}\n\nRépondez avec le numéro.`);
+    }
+
+    if (state === 'saisie_choix_groupe') {
+      const idx = parseInt(msg) - 1;
+      if (isNaN(idx) || idx < 0 || idx >= sessionData.groupes?.length) {
+        return sendWA(phone, `Répondez avec un numéro entre 1 et ${sessionData.groupes?.length}`);
+      }
+      const g = sessionData.groupes[idx];
+      const dernieresRaw = await db('v_derniere_saisie', { query: `&groupe_id=eq.${g.id}` });
+      const derniere = Array.isArray(dernieresRaw) ? dernieresRaw[0] : null;
+      const contexte = buildContexteVeille(derniere);
+      await setSession(phone, 'saisie_heures', {
+        client_id: sessionData.client_id, client_nom: sessionData.client_nom,
+        groupe_id: g.id, groupe_nom: g.nom,
+        heures_total: g.heures_total || 0, seuil_vidange: g.seuil_vidange || 250,
+        cuve_id: g.cuve_id
+      });
+      return sendWA(phone,
+        `📟 *${g.nom}* — ${g.marque || ''} ${g.kva || ''}kVA\n\n` +
+        `${contexte}\n\n` +
+        `🕐 Relevé du compteur moteur ce matin ?\n_(Dernier relevé connu : ${g.heures_total || 0}h)_`
+      );
+    }
+
+    // Étape compteur moteur
+    if (state === 'saisie_heures') {
+      const compteur = parseFloat(msg.replace(',', '.'));
+      const heuresPrecedentes = sessionData.heures_total || 0;
+      if (isNaN(compteur) || compteur < heuresPrecedentes) {
+        return sendWA(phone, `❌ Relevé invalide. Le compteur doit être supérieur à ${heuresPrecedentes}h.\n_(Ex: ${(heuresPrecedentes + 8).toFixed(1)})_`);
+      }
+      const heuresDuJour = Math.round((compteur - heuresPrecedentes) * 10) / 10;
+      const seuil = sessionData.seuil_vidange || 250;
+      const pctVidange = Math.round((compteur / seuil) * 100);
+      let vidangeMsg = '';
+      if (pctVidange >= 100) {
+        vidangeMsg = `\n\n🔧 *Vidange requise !* Compteur : ${compteur}h/${seuil}h`;
+      } else if (pctVidange >= 80) {
+        vidangeMsg = `\n\n🔧 Vidange bientôt : ${compteur}h/${seuil}h (${pctVidange}%)`;
+      }
+      await setSession(phone, 'saisie_huile', { ...sessionData, heures_marche: compteur, heures_du_jour: heuresDuJour });
+      return sendWA(phone, `✅ Compteur : *${compteur}h* (+${heuresDuJour}h aujourd'hui).${vidangeMsg}\n\n🛢️ Niveau d'huile ?\n\n*1* — Normal ✅\n*2* — Bas ⚠️\n*3* — Critique 🚨`);
+    }
+
+    // Étape huile → enregistrement moteur puis cuve si pas encore saisie
+    if (state === 'saisie_huile') {
+      const huileMap: any = { '1': 'normal', '2': 'bas', '3': 'critique' };
+      const huile = huileMap[msg.trim()];
+      if (!huile) return sendWA(phone, `❌ Répondez avec *1* (Normal), *2* (Bas) ou *3* (Critique)`);
+      const huileAlerte = huile === 'critique' ? '\n\n🚨 _Huile critique — changement immédiat !_' : huile === 'bas' ? '\n\n⚠️ _Huile basse — vérifiez avant le prochain démarrage._' : '';
+      const operateur = client.gardien_nom || 'Technicien';
+      const dataFinal = { ...sessionData, niveau_huile: huile, operateur };
+
+      // Vérifier si la cuve a déjà été saisie aujourd'hui
+      const cuveDejaFaite = sessionData.cuve_id ? await cuveDejaHier(sessionData.cuve_id) : true;
+
+      if (cuveDejaFaite || !sessionData.cuve_id) {
+        // Cuve déjà saisie ou pas de cuve — enregistrer directement
+        await setSession(phone, 'idle', {});
+        return enregistrerSaisie(phone, dataFinal, client);
+      } else {
+        // Cuve pas encore saisie → demander le niveau
+        await setSession(phone, 'saisie_cuve', dataFinal);
+        const cuveRaw = await db('cuves', { query: `&id=eq.${sessionData.cuve_id}` });
+        const cuve = Array.isArray(cuveRaw) ? cuveRaw[0] : null;
+        const derniereCuve = cuve ? await getDerniereSaiseCuve(cuve.id) : null;
+        const niveauPrec = derniereCuve?.niveau_litres;
+        const exNiveau = cuve ? Math.round(cuve.capacite_litres * 0.8) : 400;
+        return sendWA(phone,
+          `${huile === 'normal' ? '✅' : huile === 'bas' ? '⚠️' : '🚨'} Huile : *${huile.toUpperCase()}*${huileAlerte}\n\n` +
+          `🛢️ *Niveau de la cuve commune ce matin ?*\n` +
+          `${niveauPrec != null ? `_(Dernier relevé connu : ${niveauPrec}L)_\n` : ''}` +
+          `_(en litres, ex: ${exNiveau})_`
+        );
+      }
+    }
+
+    // Étape cuve (si pas encore saisie aujourd'hui)
+    if (state === 'saisie_cuve') {
+      const cuveRaw = await db('cuves', { query: `&id=eq.${sessionData.cuve_id}` });
+      const cuve = Array.isArray(cuveRaw) ? cuveRaw[0] : null;
+      const capaciteCuve = cuve?.capacite_litres || 500;
+      const niveauCuve = parseInt(msg.replace(/\s/g, ''));
+      if (isNaN(niveauCuve) || niveauCuve < 0 || niveauCuve > capaciteCuve * 1.05) {
+        return sendWA(phone, `❌ Entrez un volume entre 0 et ${capaciteCuve} litres.\nEx: *${Math.round(capaciteCuve * 0.8)}*`);
+      }
+      // Alerte carburant bas
+      const pctCuve = Math.round(niveauCuve / capaciteCuve * 100);
+      if (pctCuve < 30) {
+        await db('alertes', { method: 'POST', body: { client_id: sessionData.client_id, type: 'carburant_bas', severite: 'danger', message: `Carburant critique — ${niveauCuve}L (${pctCuve}%) — Cuve commune` } });
+      } else {
+        await db('alertes', { method: 'PATCH', query: `&client_id=eq.${sessionData.client_id}&type=eq.carburant_bas&resolue=eq.false`, body: { resolue: true } });
+      }
+      // Enregistrer saisie cuve
+      await enregistrerSaisieCuve(sessionData.cuve_id, sessionData.client_id, niveauCuve, 0, sessionData.operateur);
+      await setSession(phone, 'idle', {});
+      // Enregistrer saisie moteur
+      return enregistrerSaisie(phone, sessionData, client);
+    }
+
+    // Fallback
+    if (state === 'saisie_final') {
+      await setSession(phone, 'idle', {});
+      return enregistrerSaisie(phone, sessionData, client);
+    }
+
+    return sendWA(phone, `Tapez *saisie* pour le relevé quotidien ou *panne* pour signaler une urgence.\nTapez *aide* pour les commandes.`);
   }
 
   // ── FLUX PROSPECT ──
@@ -821,33 +685,25 @@ async function handleMessage(from: string, bodyText: string) {
     const label = pays[msg.trim()];
     if (!label) return sendWA(phone, `Répondez avec *1*, *2*, *3* ou *4* 👇`);
     await setSession(phone, 'prospect_done', { ...sessionData2, pays: label });
-    await sendWA('+33658150628',
-      `🔔 *Nouveau prospect GenTrack*\n\n📱 ${phone}\n📟 ${sessionData2.groupes}\n🌍 ${label}\n\n_Répondez rapidement !_`
-    );
-    return sendWA(phone,
-      `🎉 Parfait !\n\nUn conseiller GenTrack vous contactera dans les 24h.\n\n_Tapez *aide* pour voir toutes les fonctionnalités._`
-    );
+    await sendWA('+33658150628', `🔔 *Nouveau prospect GenTrack*\n\n📱 ${phone}\n📟 ${sessionData2.groupes}\n🌍 ${label}\n\n_Répondez rapidement !_`);
+    return sendWA(phone, `🎉 Parfait !\n\nUn conseiller GenTrack vous contactera dans les 24h.\n\n_Tapez *aide* pour voir toutes les fonctionnalités._`);
   }
 
   // Premier contact prospect
   await setSession(phone, 'prospect_groupes', {});
-  return sendWA(phone,
-    `👋 *Bienvenue sur GenTrack !*\n\nGérez vos groupes électrogènes directement par WhatsApp.\n\n✅ Saisie quotidienne\n✅ Alertes carburant automatiques\n✅ Rapport hebdomadaire\n\nVous gérez combien de groupes ?\n\n*1* — 1 groupe\n*2* — 2 à 5 groupes\n*3* — Plus de 5 groupes`
-  );
+  return sendWA(phone, `👋 *Bienvenue sur GenTrack !*\n\nGérez vos groupes électrogènes directement par WhatsApp.\n\n✅ Saisie quotidienne\n✅ Alertes carburant automatiques\n✅ Rapport hebdomadaire\n\nVous gérez combien de groupes ?\n\n*1* — 1 groupe\n*2* — 2 à 5 groupes\n*3* — Plus de 5 groupes`);
 }
 
 // ── HANDLER HTTP ──
 serve(async (req) => {
-  if (req.method === 'GET') return new Response('GenTrack WhatsApp Bot v2 ✅', { status: 200 });
+  if (req.method === 'GET') return new Response('GenTrack WhatsApp Bot v3 ✅', { status: 200 });
   try {
     const text = await req.text();
     const params = new URLSearchParams(text);
     const from = params.get('From') || '';
     const body = params.get('Body') || '';
     console.log(`Webhook — From: ${from} | Body: ${body}`);
-    if (!from || !body) {
-      return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
-    }
+    if (!from || !body) return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
     handleMessage(from, body).catch(e => console.error('handleMessage error:', e));
     return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
   } catch (err) {
