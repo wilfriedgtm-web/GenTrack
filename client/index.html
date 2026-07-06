@@ -316,6 +316,9 @@ async function init() {
         </div>
         ${carb!=null?`<div class="gc-bar"><div class="gc-bar-fill" style="width:${carb}%;background:${carbColor(carb)}"></div></div>`:''}
         ${actionHtml}
+        <div style="margin-top:10px">
+          <button onclick="ouvrirRavitaillement('${clientId}','${g.id}','${g.nom}')" style="background:rgba(201,169,110,0.12);color:#8B6914;border:1px solid rgba(201,169,110,0.4);border-radius:5px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600">⛽ Ravitaillement</button>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -542,5 +545,67 @@ async function saveResolution() {
 
 init();
 </script>
+<!-- MODAL RAVITAILLEMENT -->
+<div id="modal-ravitaillement" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:10px;padding:24px;width:320px;max-width:90vw">
+    <div style="font-weight:700;font-size:16px;color:#2C1810;margin-bottom:4px">⛽ Ravitaillement</div>
+    <div id="modal-rav-groupe" style="font-size:12px;color:#7A6855;margin-bottom:16px"></div>
+    <input id="modal-rav-litres" type="number" min="1" placeholder="Litres ajoutés (ex: 500)"
+      style="width:100%;border:1px solid #DDD0BC;border-radius:6px;padding:10px 12px;font-size:14px;margin-bottom:10px;outline:none">
+    <input id="modal-rav-valide_par" type="text" placeholder="Votre prénom"
+      style="width:100%;border:1px solid #DDD0BC;border-radius:6px;padding:10px 12px;font-size:14px;margin-bottom:16px;outline:none">
+    <div style="display:flex;gap:8px">
+      <button onclick="fermerRavitaillement()" style="flex:1;padding:10px;border:1px solid #DDD0BC;border-radius:6px;background:white;cursor:pointer;font-size:13px">Annuler</button>
+      <button onclick="confirmerRavitaillement()" style="flex:1;padding:10px;background:#8B1A2E;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">Enregistrer</button>
+    </div>
+    <div id="modal-rav-status" style="font-size:12px;margin-top:10px;text-align:center"></div>
+  </div>
+</div>
+
+<script>
+let _ravClientId = '', _ravGroupeId = '';
+
+function ouvrirRavitaillement(clientId, groupeId, groupeNom) {
+  _ravClientId = clientId;
+  _ravGroupeId = groupeId;
+  document.getElementById('modal-rav-groupe').textContent = groupeNom;
+  document.getElementById('modal-rav-litres').value = '';
+  document.getElementById('modal-rav-valide_par').value = '';
+  document.getElementById('modal-rav-status').textContent = '';
+  document.getElementById('modal-ravitaillement').style.display = 'flex';
+}
+
+function fermerRavitaillement() {
+  document.getElementById('modal-ravitaillement').style.display = 'none';
+}
+
+async function confirmerRavitaillement() {
+  const litres = parseFloat(document.getElementById('modal-rav-litres').value);
+  const validePar = document.getElementById('modal-rav-valide_par').value.trim();
+  const statusEl = document.getElementById('modal-rav-status');
+  if (!litres || litres <= 0) { statusEl.textContent = '❌ Entrez un nombre de litres valide'; statusEl.style.color = '#C0392B'; return; }
+  if (!validePar) { statusEl.textContent = '❌ Entrez votre prénom'; statusEl.style.color = '#C0392B'; return; }
+  statusEl.textContent = 'Envoi en cours...'; statusEl.style.color = '#7A6855';
+  try {
+    const res = await fetch(`${SUPA_URL}/functions/v1/notify-ravitaillement`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPA_KEY}` },
+      body: JSON.stringify({ client_id: _ravClientId, groupe_id: _ravGroupeId, litres, valide_par: validePar })
+    });
+    const data = await res.json();
+    if (data.success) {
+      statusEl.textContent = `✅ ${data.message}`;
+      statusEl.style.color = '#2D7A4F';
+      setTimeout(fermerRavitaillement, 1500);
+    } else {
+      statusEl.textContent = '❌ Erreur : ' + (data.error || 'inconnue');
+      statusEl.style.color = '#C0392B';
+    }
+  } catch(e) {
+    statusEl.textContent = '❌ Erreur réseau'; statusEl.style.color = '#C0392B';
+  }
+}
+</script>
+
 </body>
 </html>
