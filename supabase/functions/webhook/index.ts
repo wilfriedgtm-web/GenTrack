@@ -135,8 +135,8 @@ async function sendRapportPatron(phone: string, client: any) {
 // ── MENU AIDE ──
 function buildMenu(isGardien: boolean, isPatron: boolean) {
   let msg = `🔧 *GenTrack — Commandes*\n\n`;
-  if (isGardien) msg += `*Gardien :*\n• *saisie* — Rapport quotidien\n• *panne* — Signaler une urgence\n• *resolu* — Clôturer une panne\n• *aide* — Ce menu\n\n`;
-  if (isPatron) msg += `*Patron :*\n• *rapport* — Bilan des groupes\n• *aide* — Ce menu\n\n`;
+  if (isGardien) msg += `*Gardien :*\n• *saisie* — Rapport quotidien\n• *plein* — Enregistrer un ravitaillement\n• *panne* — Signaler une urgence\n• *resolu* — Clôturer une panne\n• *aide* — Ce menu\n\n`;
+  if (isPatron) msg += `*Responsable :*\n• *rapport* — Bilan des groupes\n• *plein* — Enregistrer un ravitaillement\n• *aide* — Ce menu\n\n`;
   if (!isGardien && !isPatron) msg += `Numéro non reconnu.`;
   return msg;
 }
@@ -228,6 +228,125 @@ async function enregistrerSaisie(phone: string, data: any, client: any) {
   }
 }
 
+// ── FLUX PLEIN / RAVITAILLEMENT ──
+async function demarrerPlein(phone: string, client: any) {
+  const groupesRaw = await db('groupes', { query: `&client_id=eq.${client.id}&actif=eq.true` });
+  const groupes = Array.isArray(groupesRaw) ? groupesRaw : [];
+  if (!groupes.length) return sendWA(phone, `Aucun groupe configuré. Contactez votre administrateur.`);
+
+  if (groupes.length === 1) {
+    const g = groupes[0];
+    await setSession(phone, 'plein_litres', {
+      client_id: client.id, client_nom: client.nom,
+      groupe_id: g.id, groupe_nom: g.nom,
+      capacite_reservoir: g.capacite_reservoir_litres || 500
+    });
+    return sendWA(phone, `⛽ *Ravitaillement — ${client.nom}*\n\n📟 *${g.nom}*\n\nCombien de litres ont été ajoutés ?\n_(Ex: 500)_`);
+  }
+
+  // Plusieurs groupes
+  const liste = groupes.map((g: any, i: number) => `*${i + 1}* — ${g.nom} (${g.marque} ${g.puissance_kva}kVA)`).join('\n');
+  await setSession(phone, 'plein_groupe', {
+    client_id: client.id, client_nom: client.nom,
+    groupes: groupes.map((g: any) => ({ id: g.id, nom: g.nom, marque: g.marque, kva: g.puissance_kva, capacite: g.capacite_reservoir_litres || 500 }))
+  });
+  return sendWA(phone, `⛽ *Ravitaillement — ${client.nom}*\n\nQuel groupe a été ravitaillé ?\n\n${liste}\n\nRépondez avec le numéro.`);
+}
+
+async function gererFluxPlein(phone: string, bodyText: string, msg: string, client: any, session: any) {
+  const state = session?.state || '';
+  const sessionData = session?.data ? JSON.parse(session.data) : {};
+
+  // Choix groupe
+  if (state === 'plein_groupe') {
+    const idx = parseInt(msg) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= sessionData.groupes?.length) {
+      return sendWA(phone, `Répondez avec un numéro entre 1 et ${sessionData.groupes?.length}`);
+    }
+    const g = sessionData.groupes[idx];
+    await setSession(phone, 'plein_litres', { ...sessionData, groupe_id: g.id, groupe_nom: g.nom, capacite_reservoir: g.capacite });
+    return sendWA(phone, `⛽ *${g.nom}*\n\nCombien de litres ont été ajoutés ?\n_(Ex: 500)_`);
+  }
+
+  // Litres ajoutés
+  if (state === 'plein_litres') {
+    const litres = parseFloat(bodyText.trim().replace(',', '.'));
+    if (isNaN(litres) || litres <= 0) {
+      return sendWA(phone, `❌ Quantité invalide. Entrez un nombre en litres.\n_(Ex: 500)_`);
+    }
+    await setSession(phone, 'plein_niveau', { ...sessionData, litres_ajoutes: litres });
+    return sendWA(phone, `✅ *${litres} litres* ajoutés.\n\n⛽ Quel est le niveau actuel de la cuve après le plein ?\n_(en litres, ex: 8000)_`);
+  }
+
+  // Niveau après plein
+  if (state === 'plein_niveau') {
+    const niveau = parseInt(bodyText.trim().replace(/\s/g, ''));
+    const capacite = sessionData.capacite_reservoir || 500;
+    if (isNaN(niveau) || niveau < 0 || niveau > capacite * 1.05) {
+      return sendWA(phone, `❌ Niveau invalide. Entrez un volume entre 0 et ${capacite} litres.\n_(Ex: 8000)_`);
+    }
+    await setSession(phone, 'plein_operateur', { ...sessionData, niveau_carburant: niveau });
+    return sendWA(phone, `✅ Niveau : *${niveau} litres*\n\n👤 Votre prénom ?`);
+  }
+
+  // Opérateur
+  if (state === 'plein_operateur') {
+    const operateur = bodyText.trim();
+    const data = { ...sessionData, operateur };
+
+    // Enregistrer dans saisies
+    await db('saisies', {
+      method: 'POST',
+      body: {
+        client_id: data.client_id,
+        groupe_id: data.groupe_id,
+        date: new Date().toISOString().split('T')[0],
+        niveau_carburant: data.niveau_carburant,
+        litres_ajoutes: data.litres_ajoutes,
+        heures_marche: null,
+        niveau_huile: null,
+        operateur: data.operateur
+      }
+    });
+
+    await setSession(phone, 'idle', {});
+
+    // Notification à tous les techniciens + patron
+    const dateStr = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'Africa/Dakar' });
+    const pct = Math.round(data.niveau_carburant / (data.capacite_reservoir || 500) * 100);
+    const notifMsg =
+      `⛽ *Ravitaillement effectué*\n*${data.client_nom}*\n\n` +
+      `📟 ${data.groupe_nom}\n` +
+      `💧 *${data.litres_ajoutes}L* ajoutés\n` +
+      `📊 Niveau actuel : *${data.niveau_carburant}L* (${pct}%)\n` +
+      `📅 ${dateStr}\n` +
+      `👤 ${data.operateur}\n\n` +
+      `_Enregistré via GenTrack_`;
+
+    // Techniciens (table gardiens)
+    const gardiensRaw = await db('gardiens', { query: `&client_id=eq.${data.client_id}&actif=eq.true` });
+    const gardiens = Array.isArray(gardiensRaw) ? gardiensRaw : [];
+    for (const g of gardiens) {
+      if (g.whatsapp && g.whatsapp !== phone) await sendWA(g.whatsapp, notifMsg);
+    }
+    // Patron
+    const clientFull = await db('clients', { query: `&id=eq.${data.client_id}` });
+    if (Array.isArray(clientFull) && clientFull[0]?.whatsapp_patron && clientFull[0].whatsapp_patron !== phone) {
+      await sendWA(clientFull[0].whatsapp_patron, notifMsg);
+    }
+
+    return sendWA(phone,
+      `✅ *Ravitaillement enregistré !*\n\n` +
+      `📟 ${data.groupe_nom}\n` +
+      `💧 ${data.litres_ajoutes}L ajoutés\n` +
+      `📊 Niveau : ${data.niveau_carburant}L (${pct}%)\n` +
+      `\n_Équipe notifiée 📲_`
+    );
+  }
+
+  return sendWA(phone, `Tapez *plein* pour recommencer ou *aide* pour les commandes.`);
+}
+
 // ═══════════════════════════════════════════════
 // ── BOT PRINCIPAL ──
 // ═══════════════════════════════════════════════
@@ -277,7 +396,15 @@ async function handleMessage(from: string, bodyText: string) {
     if (msg === 'rapport' || msg === 'status' || msg === 'bonjour') {
       return sendRapportPatron(phone, client);
     }
-    return sendWA(phone, `Tapez *rapport* pour recevoir le bilan de vos groupes.\nTapez *aide* pour la liste des commandes.`);
+    if (msg === 'plein' || msg === 'ravitaillement') {
+      return demarrerPlein(phone, client);
+    }
+    // Flux plein en cours pour le patron
+    const sessionPatron = await getSession(phone);
+    if (sessionPatron?.state?.startsWith('plein_')) {
+      return gererFluxPlein(phone, bodyText, msg, client, sessionPatron);
+    }
+    return sendWA(phone, `Tapez *rapport* pour recevoir le bilan de vos groupes.\nTapez *plein* pour enregistrer un ravitaillement.\nTapez *aide* pour la liste des commandes.`);
   }
 
   // ── FLUX GARDIEN ──
@@ -420,6 +547,16 @@ async function handleMessage(from: string, bodyText: string) {
       return sendRapportPatron(phone, client);
     }
 
+    // Commande PLEIN / RAVITAILLEMENT
+    if (msg === 'plein' || msg === 'ravitaillement') {
+      return demarrerPlein(phone, client);
+    }
+
+    // Flux plein en cours
+    if (state?.startsWith('plein_')) {
+      return gererFluxPlein(phone, bodyText, msg, client, session);
+    }
+
     // ════════════════════════════════════════
     // FLUX SAISIE UNIFIÉ
     // ════════════════════════════════════════
@@ -472,7 +609,7 @@ async function handleMessage(from: string, bodyText: string) {
       const liste = groupes.map((g: any, i: number) =>
         `*${i + 1}* — ${g.nom} (${g.marque} ${g.puissance_kva}kVA)`
       ).join('\n');
-      return sendWA(phone, `Bonjour 👋 *${client.nom}*\n\nPour quel groupe ?\n\n${liste}\n\nRépondez avec le numéro.`);
+      return sendWA(phone, `Bonjour 👋 *${client.nom}*\n\nQuel groupe a tourné aujourd'hui ?\n\n${liste}\n\nRépondez avec le numéro.`);
     }
 
     // Choix groupe (si plusieurs)
@@ -533,7 +670,8 @@ async function handleMessage(from: string, bodyText: string) {
         );
       }
       await setSession(phone, 'saisie_heures', { ...sessionData, niveau_carburant: litres, litres_ajoutes: 0 });
-      return sendWA(phone, `${autoEmoji} Carburant : *${litres}L* (${pct}%)${autoMsg}\n\n🕐 Relevé du compteur moteur ce matin ?\n_(Ex: 79.7)_`);
+      const dernierCompteur = sessionData.heures_total || 0;
+      return sendWA(phone, `${autoEmoji} Carburant : *${litres}L* (${pct}%)${autoMsg}\n\n🕐 Relevé du compteur moteur ce matin ?\n_(Dernier relevé connu : ${dernierCompteur}h)_`);
     }
 
     // Question plein (si carburant bas)
@@ -544,9 +682,10 @@ async function handleMessage(from: string, bodyText: string) {
       } else if (msg === '2') {
         // Pas de plein → alerte patron + continuer saisie
         await setSession(phone, 'saisie_heures', { ...sessionData, litres_ajoutes: 0 });
+        const dernierCompteurBas = sessionData.heures_total || 0;
         return sendWA(phone,
           `⚠️ _Alerte carburant bas envoyée au responsable._\n\n` +
-          `🕐 Relevé du compteur moteur ce matin ?\n_(Ex: 79.7)_`
+          `🕐 Relevé du compteur moteur ce matin ?\n_(Dernier relevé connu : ${dernierCompteurBas}h)_`
         );
       }
       return sendWA(phone, `Répondez *1* (oui, plein fait) ou *2* (non, pas encore).`);
@@ -559,9 +698,10 @@ async function handleMessage(from: string, bodyText: string) {
         return sendWA(phone, `❌ Quantité invalide. Entrez un nombre en litres.\n_(Ex: 150)_`);
       }
       await setSession(phone, 'saisie_heures', { ...sessionData, litres_ajoutes: litres });
+      const dernierCompteurPlein = sessionData.heures_total || 0;
       return sendWA(phone,
         `✅ Plein enregistré : *${litres} litres*\n\n` +
-        `🕐 Relevé du compteur moteur ce matin ?\n_(Ex: 79.7)_`
+        `🕐 Relevé du compteur moteur ce matin ?\n_(Dernier relevé connu : ${dernierCompteurPlein}h)_`
       );
     }
 
