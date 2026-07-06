@@ -275,18 +275,20 @@ async function gererFluxPlein(phone: string, bodyText: string, msg: string, clie
       return sendWA(phone, `❌ Quantité invalide. Entrez un nombre en litres.\n_(Ex: 500)_`);
     }
     await setSession(phone, 'plein_niveau', { ...sessionData, litres_ajoutes: litres });
-    return sendWA(phone, `✅ *${litres} litres* ajoutés.\n\n⛽ Quel est le niveau actuel de la cuve après le plein ?\n_(en litres, ex: 8000)_`);
+    const exNiveau = Math.round(sessionData.capacite_reservoir * 0.8) || 400;
+    return sendWA(phone, `✅ *${litres} litres* ajoutés.\n\n⛽ Quel niveau indique l'écran Dover maintenant ?\n_(Lisez le chiffre sur l'écran après le plein, en litres. Ex: ${exNiveau})_`);
   }
 
   // Niveau après plein
   if (state === 'plein_niveau') {
     const niveau = parseInt(bodyText.trim().replace(/\s/g, ''));
     const capacite = sessionData.capacite_reservoir || 500;
+    const exNiveau2 = Math.round(capacite * 0.8);
     if (isNaN(niveau) || niveau < 0 || niveau > capacite * 1.05) {
-      return sendWA(phone, `❌ Niveau invalide. Entrez un volume entre 0 et ${capacite} litres.\n_(Ex: 8000)_`);
+      return sendWA(phone, `❌ Niveau invalide. Entrez le volume affiché sur l'écran Dover entre 0 et ${capacite} litres.\n_(Ex: ${exNiveau2})_`);
     }
     await setSession(phone, 'plein_operateur', { ...sessionData, niveau_carburant: niveau });
-    return sendWA(phone, `✅ Niveau : *${niveau} litres*\n\n👤 Votre prénom ?`);
+    return sendWA(phone, `✅ Niveau noté : *${niveau} litres*\n\n👤 Votre prénom ?`);
   }
 
   // Opérateur
@@ -595,7 +597,7 @@ async function handleMessage(from: string, bodyText: string) {
           `Bonjour 👋 *${client.nom}*\n\n` +
           `📟 *${g.nom}* — ${g.marque || ''} ${g.puissance_kva || ''}kVA\n\n` +
           `${contexte}\n\n` +
-          `⛽ Quel est le niveau carburant ce matin ? _(en litres, ex: 6500)_`
+          `⛽ Quel est le niveau carburant ce matin ? _(en litres, ex: ${Math.round((g.capacite_reservoir_litres||500)*0.8)})_`
         );
       }
       // Plusieurs groupes — choix
@@ -642,7 +644,7 @@ async function handleMessage(from: string, bodyText: string) {
       return sendWA(phone,
         `📟 *${g.nom}* — ${g.marque || ''} ${g.kva || ''}kVA\n\n` +
         `${contexte}\n\n` +
-        `⛽ Niveau carburant ce matin ? _(en litres, ex: 6500)_`
+        `⛽ Niveau carburant ce matin ? _(en litres, ex: ${Math.round((g.capacite_reservoir_litres||500)*0.8)})_`
       );
     }
 
@@ -651,7 +653,7 @@ async function handleMessage(from: string, bodyText: string) {
       const litres = parseInt(msg.replace(/\s/g, ''));
       const capacite = sessionData.capacite_reservoir || 500;
       if (isNaN(litres) || litres < 0 || litres > capacite * 1.05) {
-        return sendWA(phone, `❌ Entrez un volume en litres entre 0 et ${capacite}.\nEx: *6500*`);
+        return sendWA(phone, `❌ Entrez un volume entre 0 et ${capacite} litres.\nEx: *${Math.round(capacite*0.8)}*`);
       }
       // Calculer autonomie et % pour info
       const consoJour = sessionData.conso_jour || (sessionData.conso_theorique || 65) * 8;
