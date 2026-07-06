@@ -517,8 +517,33 @@ async function init() {
       </div>
 
       <div style="margin-top:20px">
-        <div class="section-label">Historique des saisies — 30 jours</div>
+        <div class="section-label">Historique des saisies moteur — 30 jours</div>
         <div style="background:white;border-radius:8px;border:1px solid var(--bordure);overflow:hidden">${saisiesHtml}</div>
+
+        ${cuve && saisiesCuve30.length ? `
+        <div class="section-label" style="margin-top:16px">Relevés cuve — 30 jours</div>
+        <div style="background:white;border-radius:8px;border:1px solid var(--bordure);overflow:hidden">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead><tr style="background:#F5F5F5">
+              <th style="text-align:left;padding:9px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6B6B6B;border-bottom:1px solid #EBEBEB;font-weight:600">Date</th>
+              <th style="text-align:left;padding:9px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6B6B6B;border-bottom:1px solid #EBEBEB;font-weight:600">Niveau</th>
+              <th style="text-align:left;padding:9px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6B6B6B;border-bottom:1px solid #EBEBEB;font-weight:600">Ravitaillement</th>
+              <th style="text-align:left;padding:9px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6B6B6B;border-bottom:1px solid #EBEBEB;font-weight:600">Opérateur</th>
+            </tr></thead>
+            <tbody>
+              ${[...saisiesCuve30].sort((a,b)=>b.date.localeCompare(a.date)).map(s=>{
+                const pctS = s.niveau_litres!=null ? Math.round(s.niveau_litres/cuve.capacite_litres*100) : null;
+                const couleur = pctS!=null ? carbColor(pctS) : '#6B6B6B';
+                return `<tr style="border-bottom:1px solid #F5F5F5">
+                  <td style="padding:9px 14px;color:#1A1A1A">${fmtDate(s.date)}</td>
+                  <td style="padding:9px 14px;color:${couleur};font-weight:500">${s.niveau_litres!=null?s.niveau_litres+'L / '+cuve.capacite_litres+'L ('+pctS+'%)':'—'}</td>
+                  <td style="padding:9px 14px;color:${s.litres_ajoutes>0?'#2D7A4F':'#6B6B6B'};font-weight:${s.litres_ajoutes>0?'600':'400'}">${s.litres_ajoutes>0?'⛽ +'+s.litres_ajoutes+'L':'—'}</td>
+                  <td style="padding:9px 14px;color:#6B6B6B">${s.operateur||'—'}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>` : ''}
       </div>
     </div>
 
