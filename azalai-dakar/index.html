@@ -446,8 +446,37 @@ function renderTechnique(client, groupes, saisies30, saisiesCuve30, pannesOuvert
   // Map capacités par groupe_id
   const groupeMap2 = Object.fromEntries(groupes.map(g=>[g.id, g.capacite_reservoir_litres||500]));
 
-  // État des groupes (heures, vidange)
-  document.getElementById('tech-groupes').innerHTML = groupes.map(g=>{
+  // Carte cuve dans Technique aussi
+  const derniereCuve = saisiesCuve30.length ? saisiesCuve30[0] : null;
+  const niveauCuveTech = derniereCuve?.niveau_litres;
+  const capCuveTech = 8102;
+  const pctCuveTech = niveauCuveTech!=null ? Math.round(niveauCuveTech/capCuveTech*100) : null;
+  const consoJourTech = (groupes[0]?.conso_theorique_lh || 65) * 8;
+  const autoJoursTech = niveauCuveTech!=null ? Math.round((niveauCuveTech/consoJourTech)*10)/10 : null;
+  const heureCuveTech = derniereCuve?.created_at ? new Date(derniereCuve.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dakar'}) : null;
+  const dateCuveTech = derniereCuve?.date ? fmtDate(derniereCuve.date) : null;
+
+  const cuveCardTech = `<div class="groupe-detail" style="border-top:3px solid var(--or);margin-bottom:16px">
+    <div class="gd-header" style="background:var(--or-pale)">
+      <div>
+        <div class="gd-nom">🛢️ Cuve commune</div>
+        <div class="gd-saisie">Capacité ${fmtNum(capCuveTech)}L${dateCuveTech?' · Dernier relevé : '+dateCuveTech+(heureCuveTech?' à '+heureCuveTech:''):''}</div>
+      </div>
+      <div class="pill ${!derniereCuve?'pill-warn':pctCuveTech<30?'pill-danger':pctCuveTech<50?'pill-warn':'pill-ok'}">${!derniereCuve?'Pas de relevé':niveauCuveTech+'L / '+capCuveTech+'L ('+pctCuveTech+'%)'}</div>
+    </div>
+    <div class="gd-body">
+      <div class="gd-stats">
+        <div><div class="gd-stat-label">Niveau actuel</div><div class="gd-stat-val" style="color:${pctCuveTech!=null?carbColor(pctCuveTech):'var(--texte2)'}">${niveauCuveTech!=null?niveauCuveTech+'L':'—'}</div></div>
+        <div><div class="gd-stat-label">Capacité</div><div class="gd-stat-val">${fmtNum(capCuveTech)}L</div></div>
+        <div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:${autoJoursTech!=null?autoColor(autoJoursTech):'var(--texte2)'}">${autoJoursTech!=null?autoJoursTech+'j':'—'}</div></div>
+        <div><div class="gd-stat-label">Taux</div><div class="gd-stat-val">${pctCuveTech!=null?pctCuveTech+'%':'—'}</div></div>
+      </div>
+      ${pctCuveTech!=null?`<div class="gd-bar"><div class="gd-bar-fill" style="width:${pctCuveTech}%;background:${carbColor(pctCuveTech)}"></div></div>`:''}
+    </div>
+  </div>`;
+
+  // Injecter la carte cuve avant les groupes dans tech-groupes
+  const groupesMoteurHtml = groupes.map(g=>{
     const heuresTotal = g.heures_total || 0;
     const seuil = g.seuil_vidange_heures || 250;
     const pct = Math.min(100, Math.round((heuresTotal/seuil)*100));
@@ -470,6 +499,8 @@ function renderTechnique(client, groupes, saisies30, saisiesCuve30, pannesOuvert
       </div>
     </div>`;
   }).join('');
+
+  document.getElementById('tech-groupes').innerHTML = cuveCardTech + groupesMoteurHtml;
 
   // Coûts
   document.getElementById('tech-couts').innerHTML = `

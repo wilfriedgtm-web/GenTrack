@@ -193,7 +193,7 @@ async function init() {
   const dateDebut14 = new Date(Date.now()-14*86400000).toISOString().split('T')[0];
 
   const dateDebutAnnee = new Date(new Date().getFullYear(),0,1).toISOString();
-  const [clients,groupes,saisiesJ,saisies30,alertes,pannes,maints,pannesAnnee,saisiesAnnee] = await Promise.all([
+  const [clients,groupes,saisiesJ,saisies30,alertes,pannes,maints,pannesAnnee,saisiesAnnee,cuves] = await Promise.all([
     api('clients',`&id=eq.${clientId}`),
     api('groupes',`&client_id=eq.${clientId}&actif=eq.true`),
     api('saisies',`&client_id=eq.${clientId}&order=created_at.desc&limit=20`),
@@ -203,12 +203,21 @@ async function init() {
     api('maintenances',`&client_id=eq.${clientId}&order=date_intervention.desc&limit=6`),
     api('pannes',`&client_id=eq.${clientId}&date_panne=gte.${dateDebutAnnee}`),
     api('saisies',`&client_id=eq.${clientId}&date=gte.${new Date().getFullYear()+'-01-01'}`),
+    api('cuves',`&client_id=eq.${clientId}&actif=eq.true`),
   ]);
 
   const client = clients[0];
   if(!client){
     document.getElementById('app').innerHTML=`<div class="error-page"><h1>Client introuvable</h1><p>Ce lien n'est plus valide. Contactez votre gestionnaire GenTrack.</p></div>`;
     return;
+  }
+
+  const cuve = cuves.length ? cuves[0] : null;
+  let saisiesCuve30 = [], saisieCuveJour = null;
+  if(cuve){
+    saisiesCuve30 = await api('saisies_cuve',`&cuve_id=eq.${cuve.id}&date=gte.${dateDebut30}&order=date.desc,created_at.desc`);
+    const today = new Date().toISOString().split('T')[0];
+    saisieCuveJour = saisiesCuve30.find(s=>s.date===today) || saisiesCuve30[0] || null;
   }
 
   document.title = `${client.nom} — GenTrack`;
@@ -432,6 +441,30 @@ async function init() {
       </div>
 
       <div class="section-label">Groupes électrogènes — statut du jour</div>
+      ${cuve ? `<div class="groupe-card" style="border-top:3px solid #C9A96E;margin-bottom:10px">
+        <div class="gc-header" style="background:#F5EFE6">
+          <div>
+            <div class="gc-nom">🛢️ Cuve commune — ${fmtNum(cuve.capacite_litres)}L</div>
+            <div class="gc-sub">${saisieCuveJour?'Relevé du '+fmtDate(saisieCuveJour.date)+(saisieCuveJour.operateur?' · '+saisieCuveJour.operateur:''):'Aucun relevé enregistré'}</div>
+          </div>
+          ${(()=>{
+            const niv = saisieCuveJour?.niveau_litres;
+            const cap = cuve.capacite_litres;
+            const pct = niv!=null?Math.round(niv/cap*100):null;
+            const st = pct==null?'warn':pct<30?'danger':pct<50?'warn':'ok';
+            return `<span class="pill pill-${st}">${niv!=null?niv+'L / '+cap+'L ('+pct+'%)':'Pas de relevé'}</span>`;
+          })()}
+        </div>
+        <div class="gc-body">
+          <div class="gc-stats">
+            <div><div class="gc-stat-label">Niveau actuel</div><div class="gc-stat-val" style="color:${(()=>{const n=saisieCuveJour?.niveau_litres;const p=n!=null?Math.round(n/cuve.capacite_litres*100):null;return p!=null?carbColor(p):'var(--texte2)'})()}">${saisieCuveJour?.niveau_litres!=null?saisieCuveJour.niveau_litres+'L':'—'}</div></div>
+            <div><div class="gc-stat-label">Capacité</div><div class="gc-stat-val">${fmtNum(cuve.capacite_litres)}L</div></div>
+            <div><div class="gc-stat-label">Autonomie</div><div class="gc-stat-val" style="color:${(()=>{const n=saisieCuveJour?.niveau_litres;const j=n!=null?Math.round((n/((groupes[0]?.conso_theorique_lh||65)*8))*10)/10:null;return j!=null?autoColor(j):'var(--texte2)'})()}">${(()=>{const n=saisieCuveJour?.niveau_litres;return n!=null?Math.round((n/((groupes[0]?.conso_theorique_lh||65)*8))*10)/10+'j':'—'})()}</div></div>
+            <div><div class="gc-stat-label">Taux</div><div class="gc-stat-val">${saisieCuveJour?.niveau_litres!=null?Math.round(saisieCuveJour.niveau_litres/cuve.capacite_litres*100)+'%':'—'}</div></div>
+          </div>
+          ${saisieCuveJour?.niveau_litres!=null?`<div class="gc-bar"><div class="gc-bar-fill" style="width:${Math.round(saisieCuveJour.niveau_litres/cuve.capacite_litres*100)}%;background:${carbColor(Math.round(saisieCuveJour.niveau_litres/cuve.capacite_litres*100))}"></div></div>`:''}
+        </div>
+      </div>` : ''}
       ${groupesHtml||'<div class="empty">Aucun groupe configuré</div>'}
 
       <div class="chart-card" style="margin-top:20px">
