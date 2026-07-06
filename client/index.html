@@ -343,23 +343,38 @@ async function init() {
     </div>`;
   }).join('');
 
-  // Graphique 14 jours
-  const saisies14 = saisies30.filter(s=>s.date>=dateDebut14);
-  // Pour le graphique on convertit les litres en % par groupe
-  const groupeCapMap = Object.fromEntries(groupes.map(g=>[g.id, g.capacite_reservoir_litres||500]));
-  const byDate = {};
-  saisies14.forEach(s=>{
-    if(!byDate[s.date])byDate[s.date]=[];
-    if(s.niveau_carburant!=null){
-      const cap = groupeCapMap[s.groupe_id] || 500;
-      byDate[s.date].push(Math.round(s.niveau_carburant/cap*100));
-    }
-  });
-  const dates14 = Object.keys(byDate).sort();
-  const carbData = dates14.map(d=>byDate[d].length?Math.round(byDate[d].reduce((a,b)=>a+b)/byDate[d].length):null);
-  const trend = carbData.length>=2&&carbData[carbData.length-1]!==null&&carbData[0]!==null
-    ? Math.round(carbData[carbData.length-1]-carbData[0]):null;
-  const trendTxt = trend!==null?(trend<0?`Baisse de ${Math.abs(trend)} points en 14 jours`:`Stable sur 14 jours`):'Données insuffisantes';
+  // Graphique 14 jours — depuis saisies_cuve si le client a une cuve, sinon depuis saisies
+  let dates14, carbData, trendTxt;
+  if(cuve && saisiesCuve30.length) {
+    // Depuis saisies_cuve — niveau en % de la capacité cuve
+    const allDates14 = Array.from({length:14},(_,i)=>{
+      const d = new Date(); d.setDate(d.getDate()-(13-i));
+      return d.toISOString().split('T')[0];
+    });
+    dates14 = allDates14;
+    carbData = allDates14.map(d=>{
+      const sc = saisiesCuve30.find(s=>s.date===d);
+      if(!sc || sc.niveau_litres==null) return null;
+      return Math.round(sc.niveau_litres/cuve.capacite_litres*100);
+    });
+  } else {
+    // Depuis saisies moteur (ancienne architecture)
+    const saisies14 = saisies30.filter(s=>s.date>=dateDebut14);
+    const groupeCapMap = Object.fromEntries(groupes.map(g=>[g.id, g.capacite_reservoir_litres||500]));
+    const byDate = {};
+    saisies14.forEach(s=>{
+      if(!byDate[s.date])byDate[s.date]=[];
+      if(s.niveau_carburant!=null){
+        const cap = groupeCapMap[s.groupe_id] || 500;
+        byDate[s.date].push(Math.round(s.niveau_carburant/cap*100));
+      }
+    });
+    dates14 = Object.keys(byDate).sort();
+    carbData = dates14.map(d=>byDate[d].length?Math.round(byDate[d].reduce((a,b)=>a+b)/byDate[d].length):null);
+  }
+  const validesTrend = carbData.filter(v=>v!==null);
+  const trend = validesTrend.length>=2 ? Math.round(validesTrend[validesTrend.length-1]-validesTrend[0]) : null;
+  trendTxt = trend!==null?(trend<0?`Baisse de ${Math.abs(trend)} points en 14 jours`:`Stable sur 14 jours`):'Données insuffisantes';
 
   // Pannes HTML
   const pannesHtml = pannes.length
