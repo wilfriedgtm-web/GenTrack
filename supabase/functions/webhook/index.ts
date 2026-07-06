@@ -100,7 +100,7 @@ async function sendRapportPatron(phone: string, client: any) {
     const emoji = !saisie ? '❓' : pctCarb < 30 ? '🔴' : pctCarb < 50 ? '🟡' : '🟢';
     msg += `${emoji} *${g.nom}* — ${g.marque || ''} ${g.puissance_kva || ''}kVA\n`;
     if (saisie) {
-      msg += `   ⛽ ${litresSaisie != null ? litresSaisie + 'L' : '—'} carburant${pctCarb != null ? ' (' + pctCarb + '%)' : ''}\n`;
+      msg += `   ⛽ ${litresSaisie != null ? litresSaisie + 'L / ' + capaciteG + 'L' : '—'} carburant${pctCarb != null ? ' (' + pctCarb + '%)' : ''}\n`;
       // Calcul autonomie intelligente
       if (litresSaisie != null) {
         const consoH = g.conso_theorique_lh || 65;
@@ -213,7 +213,7 @@ async function enregistrerSaisie(phone: string, data: any, client: any) {
   const confirmation =
     `✅ *Saisie enregistrée !*\n\n` +
     `📟 *${data.groupe_nom}*\n` +
-    `${carbIcon} ${data.niveau_carburant}L (${pctC}%) carburant\n` +
+    `${carbIcon} ${data.niveau_carburant}L / ${capG}L (${pctC}%) carburant\n` +
     `🕐 Compteur : ${data.heures_marche}h (+${data.heures_du_jour || '?'}h aujourd'hui)\n` +
     `${huileIcon} Huile : ${data.niveau_huile}\n` +
     `👤 ${data.operateur}\n` +
@@ -314,11 +314,12 @@ async function gererFluxPlein(phone: string, bodyText: string, msg: string, clie
     // Notification à tous les techniciens + patron
     const dateStr = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'Africa/Dakar' });
     const pct = Math.round(data.niveau_carburant / (data.capacite_reservoir || 500) * 100);
+    const capR = data.capacite_reservoir || 500;
     const notifMsg =
       `⛽ *Ravitaillement effectué*\n*${data.client_nom}*\n\n` +
       `📟 ${data.groupe_nom}\n` +
       `💧 *${data.litres_ajoutes}L* ajoutés\n` +
-      `📊 Niveau actuel : *${data.niveau_carburant}L* (${pct}%)\n` +
+      `📊 Niveau actuel : *${data.niveau_carburant}L / ${capR}L* (${pct}%)\n` +
       `📅 ${dateStr}\n` +
       `👤 ${data.operateur}\n\n` +
       `_Enregistré via GenTrack_`;
@@ -339,7 +340,7 @@ async function gererFluxPlein(phone: string, bodyText: string, msg: string, clie
       `✅ *Ravitaillement enregistré !*\n\n` +
       `📟 ${data.groupe_nom}\n` +
       `💧 ${data.litres_ajoutes}L ajoutés\n` +
-      `📊 Niveau : ${data.niveau_carburant}L (${pct}%)\n` +
+      `📊 Niveau : ${data.niveau_carburant}L / ${capR}L (${pct}%)\n` +
       `\n_Équipe notifiée 📲_`
     );
   }

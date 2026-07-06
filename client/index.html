@@ -175,8 +175,8 @@ function carbColor(n){return n<25?'var(--rouge)':n<50?'var(--orange)':'var(--ver
 function autoColor(j){return j<2?'var(--rouge)':j<5?'var(--orange)':'var(--vert)';}
 function calcAuto(g,s){
   if(!s||s.niveau_carburant==null)return null;
-  const L=(g.capacite_reservoir_litres||500)*s.niveau_carburant/100;
-  const cJ=(g.conso_theorique_lh||1.8)*8;
+  const L=s.niveau_carburant; // maintenant en litres directement
+  const cJ=(g.conso_theorique_lh||65)*8;
   return Math.round((L/cJ)*10)/10;
 }
 
@@ -263,13 +263,15 @@ async function init() {
     const saisiesGroupe2 = saisiesJ.filter(x=>x.groupe_id===g.id);
     const s = saisiesGroupe2[0] || null;
     const sIsToday = s && s.date === today;
-    const carb = s?.niveau_carburant;
+    const litresCarb = s?.niveau_carburant;
+    const capGr = g.capacite_reservoir_litres || 500;
+    const carb = litresCarb != null ? Math.round(litresCarb / capGr * 100) : null;
     const j = calcAuto(g,s);
     const huile = s?.niveau_huile||'—';
     const huileColor = huile==='critique'?'var(--rouge)':huile==='bas'?'var(--orange)':'var(--vert)';
-    const status = pannesEnCours.some(p=>p.groupe_id===g.id)||carb<25?'danger':carb<50||j<5?'warn':'ok';
+    const status = pannesEnCours.some(p=>p.groupe_id===g.id)||carb<30?'danger':carb<50||j<5?'warn':'ok';
     const heureSaisie = s?.created_at?new Date(s.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dakar'}):null;
-    const cmdL = g.capacite_reservoir_litres&&carb!=null?Math.round(g.capacite_reservoir_litres*(1-carb/100)):null;
+    const cmdL = litresCarb!=null?Math.round(capGr - litresCarb):null;
     const cmdCout = cmdL?Math.round(cmdL*(client.prix_litre_fcfa||695)):null;
 
     let actionHtml = '';
@@ -293,7 +295,7 @@ async function init() {
             return '⚠️ Dernière saisie il y a '+joursRetard+' jours'+(s.operateur?' · '+s.operateur:'');
           })()}</div>
         </div>
-        <span class="pill ${status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok'}">${carb!=null?carb+'%':'—'}</span>
+        <span class="pill ${status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok'}">${litresCarb!=null?litresCarb+'L / '+capGr+'L ('+carb+'%)':'—'}</span>
       </div>
       <div class="gc-body">
         <div class="gc-stats">
@@ -322,10 +324,15 @@ async function init() {
 
   // Graphique 14 jours
   const saisies14 = saisies30.filter(s=>s.date>=dateDebut14);
+  // Pour le graphique on convertit les litres en % par groupe
+  const groupeCapMap = Object.fromEntries(groupes.map(g=>[g.id, g.capacite_reservoir_litres||500]));
   const byDate = {};
   saisies14.forEach(s=>{
     if(!byDate[s.date])byDate[s.date]=[];
-    if(s.niveau_carburant!=null)byDate[s.date].push(s.niveau_carburant);
+    if(s.niveau_carburant!=null){
+      const cap = groupeCapMap[s.groupe_id] || 500;
+      byDate[s.date].push(Math.round(s.niveau_carburant/cap*100));
+    }
   });
   const dates14 = Object.keys(byDate).sort();
   const carbData = dates14.map(d=>byDate[d].length?Math.round(byDate[d].reduce((a,b)=>a+b)/byDate[d].length):null);
@@ -374,11 +381,13 @@ async function init() {
         <thead><tr><th>Date</th><th>Groupe</th><th>Carburant</th><th>Autonomie</th><th>Heures</th><th>Huile</th><th>Litres +</th><th>Opérateur</th></tr></thead>
         <tbody>${saisiesRecentes.map(s=>{
           const g = groupes.find(x=>x.id===s.groupe_id);
+          const capGHist = g?.capacite_reservoir_litres || 500;
+          const pctHist = s.niveau_carburant!=null ? Math.round(s.niveau_carburant/capGHist*100) : null;
           const j = calcAuto(g,s);
           return`<tr>
             <td>${fmtDate(s.date)}</td>
             <td style="font-weight:500">${g?.nom||'—'}</td>
-            <td class="${s.niveau_carburant!=null?(s.niveau_carburant<25?'td-danger':s.niveau_carburant<50?'td-warn':'td-ok'):''}">${s.niveau_carburant!=null?s.niveau_carburant+'%':'—'}</td>
+            <td class="${pctHist!=null?(pctHist<30?'td-danger':pctHist<50?'td-warn':'td-ok'):''}">${s.niveau_carburant!=null?s.niveau_carburant+'L / '+capGHist+'L ('+pctHist+'%)':'—'}</td>
             <td class="${j!==null?(j<2?'td-danger':j<5?'td-warn':'td-ok'):''}">${j!==null?j+'j':'—'}</td>
             <td>${s.heures_marche||0}h</td>
             <td class="${s.niveau_huile==='critique'?'td-danger':s.niveau_huile==='bas'?'td-warn':'td-ok'}">${s.niveau_huile||'—'}</td>

@@ -237,10 +237,9 @@ function switchTab(name){
 
 function calcAuto(groupe, saisie) {
   if(!saisie||saisie.niveau_carburant==null) return null;
-  const cap = groupe.capacite_reservoir_litres||500;
-  const cH  = groupe.conso_theorique_lh||1.8;
+  const cH  = groupe.conso_theorique_lh||65;
   const cJ  = cH * 8;
-  const L   = cap * saisie.niveau_carburant / 100;
+  const L   = saisie.niveau_carburant; // maintenant en litres directement
   return Math.round((L/cJ)*10)/10;
 }
 
@@ -345,15 +344,17 @@ function renderOperations(client, groupes, saisiesJour, saisies30, alertes, pann
   document.getElementById('op-groupes').innerHTML = groupes.map(g=>{
     const s = saisiesJour.filter(x=>x.groupe_id===g.id)[0];
     const j = calcAuto(g,s);
-    const carb = s?.niveau_carburant;
+    const litresG = s?.niveau_carburant;
+    const capG = g.capacite_reservoir_litres || 500;
+    const pctG = litresG!=null ? Math.round(litresG/capG*100) : null;
     return `<div class="groupe-detail">
       <div class="gd-header">
         <div><div class="gd-nom">${g.nom} ${g.reference?'· '+g.reference:''}</div><div class="gd-saisie">${g.marque||''} ${g.puissance_kva||''}kVA</div></div>
-        <div class="pill ${!s?'pill-warn':carb<25?'pill-danger':carb<50?'pill-warn':'pill-ok'}">${!s?'Pas de saisie':carb+'%'}</div>
+        <div class="pill ${!s?'pill-warn':pctG<30?'pill-danger':pctG<50?'pill-warn':'pill-ok'}">${!s?'Pas de saisie':litresG+'L / '+capG+'L ('+pctG+'%)'}</div>
       </div>
       <div class="gd-body">
         <div class="gd-stats">
-          <div><div class="gd-stat-label">Carburant</div><div class="gd-stat-val" style="color:${s?carbColor(carb):'var(--texte2)'}">${s?carb+'%':'—'}</div></div>
+          <div><div class="gd-stat-label">Carburant</div><div class="gd-stat-val" style="color:${pctG!=null?carbColor(pctG):'var(--texte2)'}">${litresG!=null?litresG+'L / '+capG+'L':'—'}</div></div>
           <div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:${j!==null?autoColor(j):'var(--texte2)'}">${j!==null?j+'j':'—'}</div></div>
           <div><div class="gd-stat-label">Heures marche</div><div class="gd-stat-val">${s?.heures_marche||'—'}${s?.heures_marche?'h':''}</div></div>
           <div><div class="gd-stat-label">Huile</div><div class="gd-stat-val">${s?.niveau_huile||'—'}</div></div>
@@ -372,7 +373,8 @@ function renderOperations(client, groupes, saisiesJour, saisies30, alertes, pann
     alEl.innerHTML = '';
   }
 
-  // Graphique évolution moyenne carburant 14j
+  // Graphique évolution moyenne carburant 14j — converti en % par groupe
+  const groupeCapMapAz = Object.fromEntries(groupes.map(g=>[g.id, g.capacite_reservoir_litres||500]));
   const dates14 = Array.from({length:14},(_,i)=>{
     const d = new Date(); d.setDate(d.getDate()-(13-i));
     return d.toISOString().split('T')[0];
@@ -380,7 +382,8 @@ function renderOperations(client, groupes, saisiesJour, saisies30, alertes, pann
   const carbData = dates14.map(d=>{
     const dsSaisies = saisies30.filter(s=>s.date===d && s.niveau_carburant!=null);
     if(!dsSaisies.length) return null;
-    return Math.round(dsSaisies.reduce((a,s)=>a+s.niveau_carburant,0)/dsSaisies.length);
+    const pcts = dsSaisies.map(s=>Math.round(s.niveau_carburant/(groupeCapMapAz[s.groupe_id]||500)*100));
+    return Math.round(pcts.reduce((a,b)=>a+b)/pcts.length);
   });
   const valides = carbData.filter(v=>v!==null);
   let trendTxt = 'Pas assez de données pour dégager une tendance.';
@@ -410,6 +413,9 @@ function renderOperations(client, groupes, saisiesJour, saisies30, alertes, pann
 // ONGLET TECHNIQUE
 // ════════════════════════════════════════
 function renderTechnique(client, groupes, saisies30, pannesOuvertes, pannesResolues, coutCarburantAnnee, coutMaintenanceAnnee){
+
+  // Map capacités par groupe_id pour l'historique saisies
+  const groupeMap2 = Object.fromEntries(groupes.map(g=>[g.id, g.capacite_reservoir_litres||500]));
 
   // État des groupes (heures, vidange)
   document.getElementById('tech-groupes').innerHTML = groupes.map(g=>{
@@ -488,14 +494,17 @@ function renderTechnique(client, groupes, saisies30, pannesOuvertes, pannesResol
   const saisiesTriees = [...saisies30].sort((a,b)=> (b.date+((b.created_at||'').slice(11))).localeCompare(a.date+((a.created_at||'').slice(11)))).slice(0,30);
   if(saisiesTriees.length){
     elSai.innerHTML = `<table class="data"><thead><tr><th>Date</th><th>Groupe</th><th>Carburant</th><th>Heures</th><th>Huile</th><th>Opérateur</th></tr></thead><tbody>` +
-      saisiesTriees.map(s=>`<tr>
+      saisiesTriees.map(s=>{
+        const capS = groupeMap2[s.groupe_id] || 500;
+        const pctHist = s.niveau_carburant!=null ? Math.round(s.niveau_carburant/capS*100) : null;
+        return `<tr>
         <td>${fmtDate(s.date)}</td>
         <td>${groupeMap[s.groupe_id]||'—'}</td>
-        <td style="color:${carbColor(s.niveau_carburant)}">${s.niveau_carburant!=null?s.niveau_carburant+'%':'—'}</td>
+        <td style="color:${pctHist!=null?carbColor(pctHist):'var(--texte2)'}">${s.niveau_carburant!=null?s.niveau_carburant+'L / '+capS+'L ('+pctHist+'%)':'—'}</td>
         <td>${s.heures_marche!=null?s.heures_marche+'h':'—'}</td>
         <td>${s.niveau_huile||'—'}</td>
         <td>${s.operateur||'—'}</td>
-      </tr>`).join('') +
+      </tr>`;}).join('') +
       `</tbody></table>`;
   } else {
     elSai.innerHTML = `<div class="empty">Aucune saisie enregistrée sur les 30 derniers jours</div>`;

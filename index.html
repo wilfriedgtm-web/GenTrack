@@ -412,13 +412,15 @@ async function openClientDetail(clientId, detailId) {
   const groupesHtml = groupes.map(g=>{
     const s = saisiesJ.filter(x=>x.groupe_id===g.id)[0];
     const j = calcAuto(g,s);
-    const carb = s?.niveau_carburant;
-    const status = pannes.some(p=>p.groupe_id===g.id)||carb<25?'danger':carb<50||j<5?'warn':'ok';
+    const litres = s?.niveau_carburant;
+    const capG = g.capacite_reservoir_litres || 500;
+    const carb = litres != null ? Math.round(litres / capG * 100) : null;
+    const status = pannes.some(p=>p.groupe_id===g.id)||carb<30?'danger':carb<50||j<5?'warn':'ok';
     const heureSaisie = s?.created_at?new Date(s.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dakar'}):null;
     return `<div class="groupe-item gi-${status}">
       <div class="gi-top">
         <div class="gi-nom">${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA</div>
-        <span class="pill ${status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok'}">${carb!=null?carb+'%':'—'}</span>
+        <span class="pill ${status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok'}">${litres!=null?litres+'L / '+capG+'L ('+carb+'%)':'—'}</span>
       </div>
       <div class="gi-stats">
         <div class="gi-stat">⏱️ Autonomie : <span style="color:${j!==null?autoColor(j):'var(--t2)'}">${j!==null?j+'j':'—'}</span></div>
