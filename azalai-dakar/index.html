@@ -454,8 +454,13 @@ function renderTechnique(client, groupes, saisies30, pannesOuvertes, pannesResol
   const groupeMap = Object.fromEntries(groupes.map(g=>[g.id,g.nom]));
   const elOuv = document.getElementById('tech-pannes-ouvertes');
   if(pannesOuvertes.length){
-    elOuv.innerHTML = `<table class="data"><thead><tr><th>Date</th><th>Groupe</th><th>Problème</th></tr></thead><tbody>` +
-      pannesOuvertes.map(p=>`<tr><td>${fmtDate(p.date_panne)}</td><td>${groupeMap[p.groupe_id]||'—'}</td><td>${p.description||panneLabels[p.type]||p.type}</td></tr>`).join('') +
+    elOuv.innerHTML = `<table class="data"><thead><tr><th>Date</th><th>Groupe</th><th>Problème</th><th>Action</th></tr></thead><tbody>` +
+      pannesOuvertes.map(p=>`<tr>
+        <td>${fmtDate(p.date_panne)}</td>
+        <td>${groupeMap[p.groupe_id]||'—'}</td>
+        <td>${p.description||panneLabels[p.type]||p.type}</td>
+        <td><button onclick="resoudrePanne('${p.id}')" style="background:rgba(45,122,79,0.1);color:var(--vert);border:1px solid rgba(45,122,79,0.3);border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600">✅ Résoudre</button></td>
+      </tr>`).join('') +
       `</tbody></table>`;
   } else {
     elOuv.innerHTML = `<div class="empty">Aucune panne en cours ✅</div>`;
@@ -495,6 +500,22 @@ function renderTechnique(client, groupes, saisies30, pannesOuvertes, pannesResol
   } else {
     elSai.innerHTML = `<div class="empty">Aucune saisie enregistrée sur les 30 derniers jours</div>`;
   }
+}
+
+async function resoudrePanne(id) {
+  if(!confirm('Marquer cette panne comme résolue ?')) return;
+  const res = await fetch(`${SUPA_URL}/rest/v1/pannes?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: {'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation'},
+    body: JSON.stringify({
+      resolue: true,
+      date_resolution: new Date().toISOString(),
+      resolu_par: 'Modeste (dashboard)',
+      resolu_via: 'Page Azalaï Dakar'
+    })
+  });
+  if(res.ok) { alert('✅ Panne marquée comme résolue'); loadAll(); }
+  else { alert('Erreur lors de la résolution'); }
 }
 
 loadAll();

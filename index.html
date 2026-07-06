@@ -524,6 +524,18 @@ async function resolveAlerte(id){
   showToast('Alerte résolue ✓');loadAlertes();loadAll();
 }
 
+async function resoudrePanne(id) {
+  if(!confirm('Marquer cette panne comme résolue ?')) return;
+  await api('pannes',`&id=eq.${id}`,'*','PATCH',{
+    resolue: true,
+    date_resolution: new Date().toISOString(),
+    resolu_par: 'Admin (dashboard)',
+    resolu_via: 'Dashboard'
+  });
+  await api('alertes',`&type=eq.panne&resolue=eq.false`,'*','PATCH',{resolue:true});
+  showToast('Panne résolue ✓'); loadPannes(); loadAll();
+}
+
 async function loadPannes() {
   const el = document.getElementById('pannes-list');
   const [pannes,clients,groupes] = await Promise.all([
@@ -539,8 +551,12 @@ async function loadPannes() {
       <div class="ai-body">
         <div class="ai-titre">${clientMap[p.client_id]||'—'} · ${groupeMap[p.groupe_id]||'—'}</div>
         <div class="ai-desc">${TYPE_PANNE[p.type]||p.type} · ${p.description||'—'} · ${fmtDate(p.date_panne)}</div>
+        ${p.resolue?`<div style="font-size:11px;color:var(--vert);margin-top:2px">✅ Résolu le ${fmtDate(p.date_resolution)}${p.resolu_par?' · '+p.resolu_par:''}</div>`:''}
       </div>
-      <span class="pill ${p.resolue?'pill-ok':'pill-danger'}">${p.resolue?'Résolue':'En cours'}</span>
+      ${!p.resolue
+        ? `<button onclick="resoudrePanne('${p.id}')" style="background:rgba(22,163,74,0.1);color:#16a34a;border:1px solid rgba(22,163,74,0.3);border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600;flex-shrink:0">✅ Résoudre</button>`
+        : `<span class="pill pill-ok">Résolue</span>`
+      }
     </div>`).join('');
 }
 
