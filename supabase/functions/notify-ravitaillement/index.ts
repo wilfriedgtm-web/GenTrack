@@ -83,13 +83,16 @@ serve(async (req) => {
       });
     }
 
-    // Enregistrer le ravitaillement
-    await db('ravitaillements', '', 'POST', {
+    // Enregistrer dans saisies (source='dashboard') pour que les coûts soient calculés partout
+    await db('saisies', '', 'POST', {
       client_id,
       groupe_id,
-      litres,
       date: new Date().toISOString().split('T')[0],
-      valide_par,
+      litres_ajoutes: litres,
+      niveau_carburant: null,
+      heures_marche: null,
+      niveau_huile: null,
+      operateur: valide_par,
       source: 'dashboard'
     });
 
