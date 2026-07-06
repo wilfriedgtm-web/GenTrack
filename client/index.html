@@ -226,6 +226,16 @@ async function init() {
   const coutCarburantAnnee = Math.round(
     saisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0) * (client.prix_litre_fcfa||695)
   );
+  // Si le client a une cuve, les coûts carburant viennent de saisies_cuve
+  let cuveSaisiesAnnee = [];
+  if(cuve){
+    const dateDebutAnneeStr = new Date().getFullYear()+'-01-01';
+    cuveSaisiesAnnee = await api('saisies_cuve',`&cuve_id=eq.${cuve.id}&date=gte.${dateDebutAnneeStr}`);
+  }
+  const coutCarburantAnneeReel = cuve
+    ? Math.round(cuveSaisiesAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0) * (client.prix_litre_fcfa||695))
+    : coutCarburantAnnee;
+
   const coutReparationsAnnee = pannesAnnee.reduce((a,p)=>a+(p.cout_reparation||0),0);
   const nbReparations = pannesAnnee.length;
   const detailReparations = pannesAnnee
@@ -233,8 +243,10 @@ async function init() {
     .sort((a,b)=>b.cout_reparation-a.cout_reparation)
     .slice(0,3);
 
-  // Calculs 30 jours
-  const litres30 = saisies30.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
+  // Calculs 30 jours — depuis saisies_cuve si cuve existe
+  const litres30 = cuve
+    ? saisiesCuve30.reduce((a,s)=>a+(s.litres_ajoutes||0),0)
+    : saisies30.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
   const cout30   = Math.round(litres30*(client.prix_litre_fcfa||695));
   const heures30 = saisies30.reduce((a,s)=>a+(s.heures_marche||0),0);
   const joursAvec = new Set(saisies30.map(s=>s.date)).size;
@@ -482,7 +494,7 @@ async function init() {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;margin-bottom:16px">
         <div style="background:white;border-radius:8px;border:1px solid var(--bordure);padding:16px 18px">
           <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--texte2);font-weight:500;margin-bottom:8px">⛽ Carburant — ${new Date().getFullYear()}</div>
-          <div style="font-size:26px;font-weight:600;color:var(--texte);letter-spacing:-0.5px">${coutCarburantAnnee>0?fmtNum(coutCarburantAnnee):'—'}</div>
+          <div style="font-size:26px;font-weight:600;color:var(--texte);letter-spacing:-0.5px">${coutCarburantAnneeReel>0?fmtNum(coutCarburantAnneeReel):'—'}</div>
           <div style="font-size:12px;color:var(--texte2);margin-top:4px">FCFA · coût d'exploitation</div>
         </div>
         <div style="background:white;border-radius:8px;border:1px solid var(--bordure);padding:16px 18px;border-top:3px solid ${coutReparationsAnnee>0?'var(--orange)':'var(--vert)'}">
