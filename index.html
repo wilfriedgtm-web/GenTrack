@@ -146,6 +146,8 @@ body{background:var(--noir);color:var(--t);font-family:'Inter',sans-serif;displa
     <div class="kpi"><div class="kpi-label">Saisies ce matin</div><div class="kpi-val vert" id="kpi-saisies">—</div><div class="kpi-sub" id="kpi-saisies-sub">—</div></div>
   </div>
 
+  <div class="card" id="mrr-detail" style="margin-bottom:16px"></div>
+
   <div class="card">
     <div class="card-head">
       <div class="card-title">Santé des clients</div>
@@ -279,6 +281,62 @@ const TYPE_MAINT = {vidange:'Vidange huile',filtre_air:'Filtre air',filtre_carb:
 const TYPE_PANNE = {ne_demarre_pas:'Ne démarre pas',arret_inopin:'Arrêt inopiné',bruit_anormal:'Bruit anormal',surchauffe:'Surchauffe',fuite:'Fuite',autre:'Autre'};
 
 let selectedClientId = null;
+let _lastClients = [];
+
+function calcMRR(clients) {
+  return clients.reduce((a,c) => a + (c.prix_mensuel || PLANS[c.plan] || 20000), 0);
+}
+
+async function savePrixMensuel(clientId, valeur) {
+  await api('clients', `&id=eq.${clientId}`, '*', 'PATCH', { prix_mensuel: valeur });
+  showToast('Montant mis à jour ✓');
+  loadAll();
+}
+
+function startEditMRR(clientId, currentVal) {
+  const cell = document.getElementById(`mrr-cell-${clientId}`);
+  cell.innerHTML = `<input type="number" value="${currentVal}" step="1000"
+    style="width:90px;background:var(--s2);border:1px solid var(--or);border-radius:5px;padding:3px 7px;color:var(--t);font-size:13px;font-family:'Space Grotesk',sans-serif;text-align:right"
+    onkeydown="if(event.key==='Enter'){savePrixMensuel('${clientId}',parseInt(this.value)||0);event.preventDefault()}
+               if(event.key==='Escape'){loadAll()}"
+    onblur="loadAll()"
+    id="mrr-input-${clientId}"
+  >`;
+  const inp = document.getElementById(`mrr-input-${clientId}`);
+  inp.focus(); inp.select();
+}
+
+function renderMRRDetail(clients) {
+  const total = calcMRR(clients);
+  const el = document.getElementById('mrr-detail');
+  if(!el) return;
+  el.innerHTML = `
+    <div class="card-head" style="display:flex;justify-content:space-between;align-items:center">
+      <div class="card-title">💰 MRR par client</div>
+      <div style="font-size:12px;color:var(--or);font-weight:600;font-family:'Space Grotesk',sans-serif">${fmtNum(total)} FCFA / mois</div>
+    </div>
+    ${clients.map(c => {
+      const val = c.prix_mensuel || PLANS[c.plan] || 20000;
+      const pct = total > 0 ? Math.round(val / total * 100) : 0;
+      return `<div style="display:grid;grid-template-columns:1fr 110px 36px;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--b)">
+        <div>
+          <div style="font-size:13px;font-weight:600;font-family:'Space Grotesk',sans-serif;color:var(--t)">${c.nom}</div>
+          <div style="height:3px;background:var(--b);border-radius:2px;overflow:hidden;margin-top:6px">
+            <div style="width:${pct}%;height:100%;background:var(--or);border-radius:2px"></div>
+          </div>
+        </div>
+        <div id="mrr-cell-${c.id}" style="text-align:right;font-size:13px;font-weight:600;font-family:'Space Grotesk',sans-serif;color:var(--t)">${fmtNum(val)}</div>
+        <div style="text-align:right">
+          <button onclick="startEditMRR('${c.id}',${val})" style="background:none;border:1px solid var(--b);border-radius:5px;color:var(--t2);font-size:11px;cursor:pointer;padding:3px 7px" onmouseover="this.style.borderColor='var(--or)';this.style.color='var(--or)'" onmouseout="this.style.borderColor='var(--b)';this.style.color='var(--t2)'">✏️</button>
+        </div>
+      </div>`;
+    }).join('')}
+    <div style="display:grid;grid-template-columns:1fr 110px 36px;gap:10px;padding:10px 16px;background:var(--s2)">
+      <div style="font-size:12px;color:var(--t2);font-weight:500">Total MRR</div>
+      <div style="text-align:right;font-size:14px;font-weight:700;font-family:'Space Grotesk',sans-serif;color:var(--or)">${fmtNum(total)}</div>
+      <div></div>
+    </div>`;
+}
 
 async function api(table, q='', select='*', method='GET', body=null) {
   const res = await fetch(`${SUPA_URL}/rest/v1/${table}?select=${select}${q}`, {
@@ -340,10 +398,12 @@ async function loadAll() {
     api('pannes','&resolue=eq.false'),
   ]);
 
-  const mrr = clients.reduce((a,c)=>a+(PLANS[c.plan]||20000),0);
+  _lastClients = clients;
+  const mrr = calcMRR(clients);
   document.getElementById('kpi-clients').textContent = clients.length;
   document.getElementById('kpi-clients-sub').textContent = `${clients.length} établissement${clients.length>1?'s':''}`;
   document.getElementById('kpi-mrr').textContent = fmtNum(mrr);
+  renderMRRDetail(clients);
   document.getElementById('kpi-alertes').textContent = alertes.length;
   document.getElementById('kpi-saisies').textContent = saisies.length;
   document.getElementById('kpi-saisies-sub').textContent = `sur ${groupes.length} groupe${groupes.length>1?'s':''}`;
