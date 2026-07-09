@@ -315,14 +315,14 @@ async function loadAll() {
     .filter(p=>p.date_resolution >= dateDebutAnnee)
     .reduce((a,p)=>a+(p.cout_reparation||0),0);
 
-  renderOperations(client, groupes, saisiesJour, saisiesCuve30, alertes, pannesOuvertes, coutCarburantAnnee, coutMaintenanceAnnee, prixLitre, cuve, saisieCuveJour);
+  renderOperations(client, groupes, saisiesJour, saisiesCuve30, alertes, pannesOuvertes, coutCarburantAnnee, coutMaintenanceAnnee, prixLitre, cuve, saisieCuveJour, today);
   renderTechnique(client, groupes, saisies30, saisiesCuve30, pannesOuvertes, pannesResolues, coutCarburantAnnee, coutMaintenanceAnnee);
 }
 
 // ════════════════════════════════════════
 // ONGLET OPÉRATIONS
 // ════════════════════════════════════════
-function renderOperations(client, groupes, saisiesJour, saisiesCuve30, alertes, pannesOuvertes, coutCarburantAnnee, coutMaintenanceAnnee, prixLitre, cuve, saisieCuveJour){
+function renderOperations(client, groupes, saisiesJour, saisiesCuve30, alertes, pannesOuvertes, coutCarburantAnnee, coutMaintenanceAnnee, prixLitre, cuve, saisieCuveJour, today){
 
   // Calcul cuve
   const consoJour = (groupes[0]?.conso_theorique_lh || 65) * 8;
