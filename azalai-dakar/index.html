@@ -279,9 +279,9 @@ async function loadAll() {
   }
   const client = clients[0];
 
-  const [groupes, saisiesJour, saisies30, alertes, pannesOuvertes, pannesResolues, cuves] = await Promise.all([
+  const [groupes, saisiesRecentes, saisies30, alertes, pannesOuvertes, pannesResolues, cuves] = await Promise.all([
     api('groupes', `&client_id=eq.${client.id}&actif=eq.true&order=nom`),
-    api('saisies', `&client_id=eq.${client.id}&date=eq.${today}&order=created_at.desc`),
+    api('saisies', `&client_id=eq.${client.id}&date=gte.${dateDebut30}&order=date.desc,created_at.desc&limit=50`),
     api('saisies', `&client_id=eq.${client.id}&date=gte.${dateDebut30}&order=date.desc,created_at.desc`),
     api('alertes', `&client_id=eq.${client.id}&resolue=eq.false`),
     api('pannes', `&client_id=eq.${client.id}&resolue=eq.false&order=date_panne.desc`),
@@ -289,13 +289,22 @@ async function loadAll() {
     api('cuves', `&client_id=eq.${client.id}&actif=eq.true`),
   ]);
 
+  // Dernière saisie moteur connue par groupe (pas forcément aujourd'hui)
+  const derniereSaisieParGroupe = {};
+  saisiesRecentes.forEach(s=>{
+    if(s.heures_marche!=null || s.niveau_huile!=null) {
+      if(!derniereSaisieParGroupe[s.groupe_id]) derniereSaisieParGroupe[s.groupe_id] = s;
+    }
+  });
+  const saisiesJour = Object.values(derniereSaisieParGroupe);
+
   const cuve = cuves.length ? cuves[0] : null;
 
-  // Saisies cuve
+  // Saisies cuve — prendre la plus récente disponible (pas forcément aujourd'hui)
   let saisiesCuve30 = [], saisieCuveJour = null;
   if(cuve) {
     saisiesCuve30 = await api('saisies_cuve', `&cuve_id=eq.${cuve.id}&date=gte.${dateDebut30}&order=date.desc,created_at.desc`);
-    saisieCuveJour = saisiesCuve30.find(s=>s.date===today) || null;
+    saisieCuveJour = saisiesCuve30[0] || null; // dernière connue, pas forcément aujourd'hui
   }
 
   const prixLitre = client.prix_litre_fcfa || 695;
@@ -366,12 +375,15 @@ function renderOperations(client, groupes, saisiesJour, saisiesCuve30, alertes, 
 
   // Carte cuve + cartes groupes (moteur uniquement)
   const heureCuve = saisieCuveJour?.created_at ? new Date(saisieCuveJour.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dakar'}) : null;
+  const joursRetardCuve = saisieCuveJour?.date ? Math.round((new Date(today)-new Date(saisieCuveJour.date))/86400000) : null;
+  const retardCuveLabel = joursRetardCuve===0 ? `Relevé aujourd'hui à ${heureCuve}` : joursRetardCuve===1 ? `Relevé hier à ${heureCuve}` : joursRetardCuve>1 ? `Relevé il y a ${joursRetardCuve} jours` : '';
+  const retardCuveColor = joursRetardCuve===0 ? 'var(--texte2)' : joursRetardCuve===1 ? 'var(--orange)' : 'var(--rouge)';
   const cuveHtml = cuve ? `
     <div class="groupe-detail" style="border-top:3px solid var(--or);margin-bottom:10px">
       <div class="gd-header" style="background:var(--or-pale)">
         <div>
           <div class="gd-nom">🛢️ Cuve commune</div>
-          <div class="gd-saisie">${cuve.nom} · Capacité ${fmtNum(capCuve)}L${heureCuve?' · Relevé à '+heureCuve:''}</div>
+          <div class="gd-saisie" style="color:${retardCuveColor}">${cuve.nom} · Capacité ${fmtNum(capCuve)}L${retardCuveLabel?' · '+retardCuveLabel:''}</div>
         </div>
         <div class="pill ${!saisieCuveJour?'pill-warn':pctCuve<30?'pill-danger':pctCuve<50?'pill-warn':'pill-ok'}">${!saisieCuveJour?'Pas de relevé':niveauCuve+'L / '+capCuve+'L ('+pctCuve+'%)'}</div>
       </div>
@@ -390,10 +402,16 @@ function renderOperations(client, groupes, saisiesJour, saisiesCuve30, alertes, 
     const s = saisiesJour.filter(x=>x.groupe_id===g.id)[0];
     const heureSaisie = s?.created_at ? new Date(s.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dakar'}) : null;
     const pctVidange = g.heures_total && g.seuil_vidange_heures ? Math.round(g.heures_total/g.seuil_vidange_heures*100) : null;
+    // Indicateur de retard
+    const joursRetard = s?.date ? Math.round((new Date(today)-new Date(s.date))/86400000) : null;
+    const retardLabel = joursRetard===0 ? `Saisi aujourd'hui à ${heureSaisie}` : joursRetard===1 ? `Saisi hier à ${heureSaisie}` : joursRetard>1 ? `Saisi il y a ${joursRetard} jours` : 'Aucune saisie';
+    const retardColor = joursRetard===0 ? 'var(--texte2)' : joursRetard===1 ? 'var(--orange)' : 'var(--rouge)';
+    const pillClass = !s ? 'pill-warn' : joursRetard===0 ? 'pill-ok' : joursRetard===1 ? 'pill-warn' : 'pill-danger';
+    const pillTxt = !s ? 'Aucune saisie' : joursRetard===0 ? 'Saisi ✓' : joursRetard===1 ? 'Hier' : `J-${joursRetard}`;
     return `<div class="groupe-detail">
       <div class="gd-header">
-        <div><div class="gd-nom">⚙️ ${g.nom} ${g.reference?'· '+g.reference:''}</div><div class="gd-saisie">${g.marque||''} ${g.puissance_kva||''}kVA${heureSaisie?' · Saisi à '+heureSaisie:''}</div></div>
-        <div class="pill ${!s?'pill-warn':'pill-ok'}">${!s?'Pas de saisie moteur':'Saisi ✓'}</div>
+        <div><div class="gd-nom">⚙️ ${g.nom} ${g.reference?'· '+g.reference:''}</div><div class="gd-saisie" style="color:${retardColor}">${g.marque||''} ${g.puissance_kva||''}kVA${s?' · '+retardLabel:''}</div></div>
+        <div class="pill ${pillClass}">${pillTxt}</div>
       </div>
       <div class="gd-body">
         <div class="gd-stats">
