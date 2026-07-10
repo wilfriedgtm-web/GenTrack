@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack — Dashboard Admin</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500&display=swap');
+:root{--noir:#0A0A0A;--s:#141414;--s2:#1C1C1C;--s3:#242424;--b:#2A2A2A;--or:#C8922A;--or-p:rgba(200,146,42,0.1);--vert:#22C55E;--vp:rgba(34,197,94,0.1);--rouge:#EF4444;--rp:rgba(239,68,68,0.1);--orange:#F97316;--op:rgba(249,115,22,0.1);--bleu:#3B82F6;--bp:rgba(59,130,246,0.1);--t:#F0F0F0;--t2:#808080;--t3:#404040}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--noir);color:var(--t);font-family:'Inter',sans-serif;display:flex;min-height:100vh}
+.sb{width:200px;flex-shrink:0;background:var(--s);border-right:1px solid var(--b);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.sb-logo{padding:20px 16px 16px;border-bottom:1px solid var(--b);font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700}
+.sb-logo em{color:var(--or);font-style:normal}
+.sb-logo-sub{font-size:10px;color:var(--t2);font-weight:400;margin-top:2px;font-family:'Inter',sans-serif}
+.sb-nav{padding:10px 8px;flex:1}
+.sb-sec{font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--t3);padding:12px 10px 5px;font-weight:600}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--t2);margin-bottom:2px;transition:background 0.15s;text-decoration:none}
+.sb-item:hover{background:var(--s2);color:var(--t)}
+.sb-item.active{background:var(--or-p);color:var(--or)}
+.sb-item-icon{font-size:14px;width:18px;text-align:center}
+.sb-badge{margin-left:auto;background:var(--rouge);color:white;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px}
+.sb-bottom{padding:12px 8px;border-top:1px solid var(--b)}
+.sb-user{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px}
+.sb-av{width:28px;height:28px;border-radius:50%;background:var(--or-p);border:1.5px solid var(--or);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--or);flex-shrink:0;font-family:'Space Grotesk',sans-serif}
+.sb-un{font-size:12px;font-weight:500}.sb-ur{font-size:10px;color:var(--t2)}
+.main{flex:1;overflow-y:auto}
+.view{display:none;padding:28px 28px 48px}.view.active{display:block}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px}
+.topbar-date{font-size:11px;color:var(--t2);margin-bottom:4px}
+.topbar-title{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:-0.5px}
+.btn{border-radius:8px;padding:8px 14px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;border:none;transition:opacity 0.2s}
+.btn:active{opacity:0.8}
+.btn-or{background:var(--or);color:var(--noir)}
+.btn-ghost{background:var(--s);color:var(--t2);border:1px solid var(--b) !important;font-family:'Inter',sans-serif;font-weight:400}
+.btn-ghost:hover{border-color:var(--or) !important;color:var(--t)}
+.btn-icon{background:var(--s2);color:var(--t2);border:1px solid var(--b) !important;padding:6px 10px;font-size:13px}
+.btn-icon:hover{color:var(--or);border-color:var(--or) !important}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.kpi{background:var(--s);border-radius:10px;padding:14px 16px;border:1px solid var(--b)}
+.kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--t2);font-weight:600;margin-bottom:8px}
+.kpi-val{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;letter-spacing:-0.5px}
+.kpi-sub{font-size:11px;color:var(--t2);margin-top:3px}
+.or{color:var(--or)}.vert{color:var(--vert)}.rouge{color:var(--rouge)}.orange{color:var(--orange)}.bleu{color:var(--bleu)}
+.card{background:var(--s);border-radius:10px;border:1px solid var(--b);overflow:hidden;margin-bottom:16px}
+.card-head{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--b);background:var(--s2)}
+.card-title{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600}
+.card-sub{font-size:11px;color:var(--t2)}
+.pill{padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700}
+.pill-ok{background:var(--vp);color:var(--vert)}
+.pill-warn{background:var(--op);color:var(--orange)}
+.pill-danger{background:var(--rp);color:var(--rouge)}
+.pill-gray{background:var(--s3);color:var(--t2)}
+.client-row{display:grid;grid-template-columns:2fr 70px 60px 80px 90px;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--b);cursor:pointer;transition:background 0.15s}
+.client-row:hover{background:var(--s2)}.client-row:last-child{border-bottom:none}
+.client-row.hd{background:var(--s2);cursor:default}.client-row.hd:hover{background:var(--s2)}
+.cr-nom{font-size:13px;font-weight:600;font-family:'Space Grotesk',sans-serif;color:var(--t)}
+.cr-sub{font-size:11px;color:var(--t2);margin-top:1px}
+.cr-val{font-size:13px;font-weight:500}
+.cr-actions{display:flex;gap:6px}
+.col-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--t2);font-weight:600}
+.detail-panel{display:none;background:var(--s);border-radius:10px;border:1px solid var(--b);margin-bottom:16px;overflow:hidden;animation:su 0.2s ease}
+.detail-panel.open{display:block}
+@keyframes su{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.dp-head{padding:14px 16px;background:var(--s2);border-bottom:1px solid var(--b);display:flex;justify-content:space-between;align-items:center}
+.dp-nom{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700}
+.dp-sub{font-size:11px;color:var(--t2);margin-top:2px}
+.dp-close{background:none;border:none;color:var(--t2);font-size:18px;cursor:pointer}
+.dp-body{padding:16px}
+.dp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.dp-kpi{background:var(--s2);border-radius:8px;padding:11px 13px}
+.dp-kpi-val{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;margin-bottom:2px}
+.dp-kpi-label{font-size:11px;color:var(--t2)}
+.groupe-item{background:var(--s2);border-radius:8px;padding:11px 13px;margin-bottom:8px;border-left:3px solid var(--b)}
+.gi-ok{border-left-color:var(--vert)}.gi-warn{border-left-color:var(--orange)}.gi-danger{border-left-color:var(--rouge)}
+.gi-top{display:flex;justify-content:space-between;margin-bottom:8px}
+.gi-nom{font-size:13px;font-weight:600}
+.gi-stats{display:flex;gap:12px;flex-wrap:wrap}
+.gi-stat{font-size:11px;color:var(--t2)}.gi-stat span{color:var(--t);font-weight:500}
+.gi-bar{height:3px;background:var(--b);border-radius:2px;overflow:hidden;margin-top:8px}
+.gi-bar-fill{height:100%;border-radius:2px}
+.alerte-item{padding:11px 16px;display:flex;gap:10px;align-items:flex-start;border-bottom:1px solid var(--b)}
+.alerte-item:last-child{border-bottom:none}
+.ai-dot{width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.ai-body{flex:1}.ai-titre{font-size:12px;font-weight:600}.ai-desc{font-size:11px;color:var(--t2);margin-top:1px}
+.ai-time{font-size:10px;color:var(--t2);white-space:nowrap}
+.lien-box{background:var(--s2);border-radius:8px;padding:10px 13px;display:flex;align-items:center;gap:10px;margin-bottom:8px;border:1px solid var(--b)}
+.lien-url{font-size:12px;color:var(--bleu);font-family:monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lien-label{font-size:10px;color:var(--t2);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.8px;font-weight:600}
+.toast{position:fixed;bottom:24px;right:24px;padding:10px 18px;border-radius:8px;font-size:12px;font-weight:600;z-index:30;opacity:0;transition:opacity 0.25s;pointer-events:none}
+.toast.show{opacity:1}.toast.ok{background:var(--vert);color:white}.toast.err{background:var(--rouge);color:white}
+.loading{display:flex;align-items:center;justify-content:center;padding:32px;color:var(--t2);font-size:13px;gap:8px}
+.spinner{width:14px;height:14px;border:2px solid var(--b);border-top-color:var(--or);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{padding:32px;text-align:center;color:var(--t2);font-size:13px}
+.section-label{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--t2);font-weight:600;margin-bottom:8px;margin-top:4px}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:20;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--s);border-radius:14px;width:100%;max-width:500px;border:1px solid var(--b);overflow:hidden}
+.modal-head{padding:16px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--b);background:var(--s2)}
+.modal-nom{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700}
+.modal-close{background:none;border:none;color:var(--t2);font-size:18px;cursor:pointer}
+.modal-body{padding:18px}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field label{font-size:11px;color:var(--t2);font-weight:500;letter-spacing:0.5px;text-transform:uppercase}
+.field input,.field select{background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Inter',sans-serif;outline:none;width:100%}
+.field input:focus,.field select:focus{border-color:var(--or)}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:800px){.sb{display:none}.kpi-row{grid-template-columns:repeat(2,1fr)}.view{padding:16px}.client-row{grid-template-columns:2fr 80px 80px}}
+</style>
+</head>
+<body>
+
+<div class="sb">
+  <div class="sb-logo">Gen<em>Track</em><div class="sb-logo-sub">Admin</div></div>
+  <div class="sb-nav">
+    <div class="sb-sec">Principal</div>
+    <div class="sb-item active" onclick="goTo('accueil')"><div class="sb-item-icon">🏠</div>Vue opérateur</div>
+    <div class="sb-item" onclick="goTo('clients')"><div class="sb-item-icon">🏨</div>Clients<div class="sb-badge" id="badge-alertes">—</div></div>
+    <div class="sb-item" onclick="goTo('alertes')"><div class="sb-item-icon">🔔</div>Alertes</div>
+    <div class="sb-sec">Données</div>
+    <div class="sb-item" onclick="goTo('pannes')"><div class="sb-item-icon">🚨</div>Pannes</div>
+    <div class="sb-item" onclick="goTo('maintenance')"><div class="sb-item-icon">🔧</div>Maintenance</div>
+  </div>
+  <div class="sb-bottom">
+    <div class="sb-user"><div class="sb-av">GT</div><div><div class="sb-un">GenTrack</div><div class="sb-ur">Admin</div></div></div>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- VUE OPÉRATEUR -->
+<div class="view active" id="view-accueil">
+  <div class="topbar">
+    <div><div class="topbar-date" id="accueil-date">—</div><div class="topbar-title">Vue opérateur</div></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost" onclick="loadAll()">🔄</button>
+      <button class="btn btn-or" onclick="openAddClient()">+ Nouveau client</button>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-label">Clients actifs</div><div class="kpi-val or" id="kpi-clients">—</div><div class="kpi-sub" id="kpi-clients-sub">—</div></div>
+    <div class="kpi"><div class="kpi-label">MRR</div><div class="kpi-val or" id="kpi-mrr">—</div><div class="kpi-sub">FCFA / mois</div></div>
+    <div class="kpi"><div class="kpi-label">Alertes actives</div><div class="kpi-val rouge" id="kpi-alertes">—</div><div class="kpi-sub">Non résolues</div></div>
+    <div class="kpi"><div class="kpi-label">Saisies ce matin</div><div class="kpi-val vert" id="kpi-saisies">—</div><div class="kpi-sub" id="kpi-saisies-sub">—</div></div>
+  </div>
+
+  <div class="card" id="mrr-detail" style="margin-bottom:16px"></div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title">Santé des clients</div>
+      <div class="card-sub">Taux de saisie · Alertes · Statut</div>
+    </div>
+    <div class="client-row hd">
+      <div class="col-label">Client</div>
+      <div class="col-label">Saisies</div>
+      <div class="col-label">Alertes</div>
+      <div class="col-label">Statut</div>
+      <div class="col-label">Lien client</div>
+    </div>
+    <div id="clients-sante"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
+  </div>
+
+  <div id="detail-panel-accueil" class="detail-panel"></div>
+
+  <div class="card">
+    <div class="card-head"><div class="card-title">🔔 Alertes récentes</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('alertes')">Voir tout →</button></div>
+    <div id="alertes-accueil"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+<!-- CLIENTS -->
+<div class="view" id="view-clients">
+  <div class="topbar">
+    <div><div class="topbar-date">Tous les établissements</div><div class="topbar-title">Clients</div></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost" onclick="loadClients()">🔄</button>
+      <button class="btn btn-or" onclick="openAddClient()">+ Nouveau client</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><div class="card-title">Liste complète</div></div>
+    <div class="client-row hd">
+      <div class="col-label">Client</div>
+      <div class="col-label">Saisies</div>
+      <div class="col-label">Alertes</div>
+      <div class="col-label">Statut</div>
+      <div class="col-label">Lien client</div>
+    </div>
+    <div id="clients-list"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
+  </div>
+</div>
+
+<!-- ALERTES -->
+<div class="view" id="view-alertes">
+  <div class="topbar">
+    <div><div class="topbar-date">Temps réel</div><div class="topbar-title">Alertes</div></div>
+    <div><button class="btn btn-ghost" onclick="loadAlertes()">🔄</button></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><div class="card-title">Alertes non résolues</div></div>
+    <div id="alertes-list"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+<!-- PANNES -->
+<div class="view" id="view-pannes">
+  <div class="topbar">
+    <div><div class="topbar-date">Suivi des incidents</div><div class="topbar-title">Pannes</div></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><div class="card-title">Historique des pannes</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="loadPannes()">🔄</button></div>
+    <div id="pannes-list"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+<!-- MAINTENANCE -->
+<div class="view" id="view-maintenance">
+  <div class="topbar">
+    <div><div class="topbar-date">Interventions</div><div class="topbar-title">Maintenance</div></div>
+    <div><button class="btn btn-or" onclick="openMaintenance()">+ Enregistrer</button></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><div class="card-title">Historique des interventions</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="loadMaintenance()">🔄</button></div>
+    <div id="maint-list"><div class="loading"><div class="spinner"></div></div></div>
+  </div>
+</div>
+
+</div>
+
+<!-- MODAL NOUVEAU CLIENT -->
+<div class="modal-overlay" id="modal-add" onclick="closeModal('modal-add',event)">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-nom">Nouveau client</div><button class="modal-close" onclick="closeModalDirect('modal-add')">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Nom de l'établissement</label><input id="add-nom" placeholder="Ex: Hôtel Ivoire"></div>
+      <div class="field-row">
+        <div class="field"><label>Type</label><select id="add-type"><option value="hotel">Hôtel</option><option value="residence">Résidence</option><option value="autre">Autre</option></select></div>
+        <div class="field"><label>Plan</label><select id="add-plan"><option value="starter">Starter — 10 000</option><option value="business" selected>Business — 20 000</option><option value="pro">Pro — 50 000</option></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Ville</label><input id="add-ville" placeholder="Ex: Dakar" value="Dakar"></div>
+        <div class="field"><label>Groupe hôtelier</label><input id="add-groupe" placeholder="Ex: Azalai (optionnel)"></div>
+      </div>
+      <div class="field"><label>WhatsApp Patron</label><input id="add-patron" placeholder="+221771234567"></div>
+      <div class="field"><label>WhatsApp Gardien</label><input id="add-gardien" placeholder="+221771234568"></div>
+      <div class="field"><label>Prix litre FCFA</label><input id="add-prix" type="number" placeholder="695" value="695"></div>
+      <button class="btn btn-or" style="width:100%;justify-content:center;padding:13px;margin-top:4px" onclick="saveClient()">✅ Créer le client</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MAINTENANCE -->
+<div class="modal-overlay" id="modal-maint" onclick="closeModal('modal-maint',event)">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-nom">Nouvelle intervention</div><button class="modal-close" onclick="closeModalDirect('modal-maint')">✕</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Client</label><select id="m-client" onchange="loadGroupesFor('m-client','m-groupe')"><option value="">Choisir...</option></select></div>
+      <div class="field"><label>Groupe</label><select id="m-groupe"><option value="">Choisir un client</option></select></div>
+      <div class="field"><label>Type</label><select id="m-type"><option value="vidange">Vidange huile</option><option value="filtre_air">Filtre à air</option><option value="filtre_carb">Filtre carburant</option><option value="filtre_huile">Filtre huile</option><option value="autre">Autre</option></select></div>
+      <div class="field-row">
+        <div class="field"><label>Technicien</label><input id="m-tech" placeholder="Nom"></div>
+        <div class="field"><label>Coût (FCFA)</label><input id="m-cout" type="number" placeholder="45000"></div>
+      </div>
+      <div class="field"><label>Notes</label><input id="m-notes" placeholder="Détails..."></div>
+      <button class="btn btn-or" style="width:100%;justify-content:center;padding:13px;margin-top:4px" onclick="saveMaintenance()">✅ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPA_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+const BASE_URL = 'https://gen-track.vercel.app';
+const PLANS = {starter:10000,business:20000,pro:50000};
+const TYPE_MAINT = {vidange:'Vidange huile',filtre_air:'Filtre air',filtre_carb:'Filtre carburant',filtre_huile:'Filtre huile',autre:'Autre'};
+const TYPE_PANNE = {ne_demarre_pas:'Ne démarre pas',arret_inopin:'Arrêt inopiné',bruit_anormal:'Bruit anormal',surchauffe:'Surchauffe',fuite:'Fuite',autre:'Autre'};
+
+let selectedClientId = null;
+let _lastClients = [];
+
+function calcMRR(clients) {
+  return clients.reduce((a,c) => a + (c.prix_mensuel || PLANS[c.plan] || 20000), 0);
+}
+
+async function savePrixMensuel(clientId, valeur) {
+  await api('clients', `&id=eq.${clientId}`, '*', 'PATCH', { prix_mensuel: valeur });
+  showToast('Montant mis à jour ✓');
+  loadAll();
+}
+
+function startEditMRR(clientId, currentVal) {
+  const cell = document.getElementById(`mrr-cell-${clientId}`);
+  cell.innerHTML = `<input type="number" value="${currentVal}" step="1000"
+    style="width:90px;background:var(--s2);border:1px solid var(--or);border-radius:5px;padding:3px 7px;color:var(--t);font-size:13px;font-family:'Space Grotesk',sans-serif;text-align:right"
+    onkeydown="if(event.key==='Enter'){savePrixMensuel('${clientId}',parseInt(this.value)||0);event.preventDefault()}
+               if(event.key==='Escape'){loadAll()}"
+    onblur="loadAll()"
+    id="mrr-input-${clientId}"
+  >`;
+  const inp = document.getElementById(`mrr-input-${clientId}`);
+  inp.focus(); inp.select();
+}
+
+function renderMRRDetail(clients) {
+  const total = calcMRR(clients);
+  const el = document.getElementById('mrr-detail');
+  if(!el) return;
+  el.innerHTML = `
+    <div class="card-head" style="display:flex;justify-content:space-between;align-items:center">
+      <div class="card-title">💰 MRR par client</div>
+      <div style="font-size:12px;color:var(--or);font-weight:600;font-family:'Space Grotesk',sans-serif">${fmtNum(total)} FCFA / mois</div>
+    </div>
+    ${clients.map(c => {
+      const val = c.prix_mensuel || PLANS[c.plan] || 20000;
+      const pct = total > 0 ? Math.round(val / total * 100) : 0;
+      return `<div style="display:grid;grid-template-columns:1fr 110px 36px;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--b)">
+        <div>
+          <div style="font-size:13px;font-weight:600;font-family:'Space Grotesk',sans-serif;color:var(--t)">${c.nom}</div>
+          <div style="height:3px;background:var(--b);border-radius:2px;overflow:hidden;margin-top:6px">
+            <div style="width:${pct}%;height:100%;background:var(--or);border-radius:2px"></div>
+          </div>
+        </div>
+        <div id="mrr-cell-${c.id}" style="text-align:right;font-size:13px;font-weight:600;font-family:'Space Grotesk',sans-serif;color:var(--t)">${fmtNum(val)}</div>
+        <div style="text-align:right">
+          <button onclick="startEditMRR('${c.id}',${val})" style="background:none;border:1px solid var(--b);border-radius:5px;color:var(--t2);font-size:11px;cursor:pointer;padding:3px 7px" onmouseover="this.style.borderColor='var(--or)';this.style.color='var(--or)'" onmouseout="this.style.borderColor='var(--b)';this.style.color='var(--t2)'">✏️</button>
+        </div>
+      </div>`;
+    }).join('')}
+    <div style="display:grid;grid-template-columns:1fr 110px 36px;gap:10px;padding:10px 16px;background:var(--s2)">
+      <div style="font-size:12px;color:var(--t2);font-weight:500">Total MRR</div>
+      <div style="text-align:right;font-size:14px;font-weight:700;font-family:'Space Grotesk',sans-serif;color:var(--or)">${fmtNum(total)}</div>
+      <div></div>
+    </div>`;
+}
+
+async function api(table, q='', select='*', method='GET', body=null) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?select=${select}${q}`, {
+    method,
+    headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json','Prefer':method==='POST'?'return=representation':''},
+    body:body?JSON.stringify(body):undefined
+  });
+  if(res.status===204)return[];
+  return res.json();
+}
+
+function fmtNum(n){return Math.round(n).toLocaleString('fr-FR');}
+function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function carbColor(n){return n<25?'var(--rouge)':n<50?'var(--orange)':'var(--vert)';}
+function autoColor(j){return j<2?'var(--rouge)':j<5?'var(--orange)':'var(--vert)';}
+function calcAuto(g, s) {
+  if(!s||s.niveau_carburant==null)return null;
+  const L = (g.capacite_reservoir_litres||500)*s.niveau_carburant/100;
+  const cJ = (g.conso_theorique_lh||1.8)*8;
+  return Math.round((L/cJ)*10)/10;
+}
+function statusClient(hSJ, hG, hA, hP) {
+  if(hP.length>0||hA.some(a=>a.severite==='danger'))return'danger';
+  if(hA.length>0||hSJ.some(s=>s.niveau_carburant<50))return'warn';
+  if(hSJ.length===0&&hG.length>0)return'warn';
+  return'ok';
+}
+function clientLien(c) {
+  if(c.nom==='Azalaï Dakar') return `${BASE_URL}/azalai-dakar`;
+  if(c.nom==='Noom Dakar Sea Plaza' || c.nom==='Noom Abidjan Plateau') return `${BASE_URL}/noom-mangalis`;
+  return `${BASE_URL}/client?id=${c.id}`;
+}
+
+function goTo(v) {
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.sb-item').forEach(x=>x.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.getElementById('nav-'+v)?.classList.add('active');
+  document.querySelector('.main').scrollTop=0;
+  const loaders={clients:loadClients,alertes:loadAlertes,pannes:loadPannes,maintenance:loadMaintenance};
+  if(loaders[v])loaders[v]();
+}
+
+function showToast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),2500);}
+function openAddClient(){document.getElementById('modal-add').classList.add('open');}
+function openMaintenance(){loadClientSelect('m-client');document.getElementById('modal-maint').classList.add('open');}
+function closeModal(id,e){if(e.target===document.getElementById(id))closeModalDirect(id);}
+function closeModalDirect(id){document.getElementById(id).classList.remove('open');}
+
+async function loadAll() {
+  const now = new Date();
+  document.getElementById('accueil-date').textContent = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+' · '+now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const today = now.toISOString().split('T')[0];
+
+  const [clients,groupes,saisies,alertes,pannes] = await Promise.all([
+    api('clients','&actif=eq.true&order=nom'),
+    api('groupes','&actif=eq.true'),
+    api('saisies',`&date=eq.${today}&order=created_at.desc`),
+    api('alertes','&resolue=eq.false&order=created_at.desc'),
+    api('pannes','&resolue=eq.false'),
+  ]);
+
+  _lastClients = clients;
+  const mrr = calcMRR(clients);
+  document.getElementById('kpi-clients').textContent = clients.length;
+  document.getElementById('kpi-clients-sub').textContent = `${clients.length} établissement${clients.length>1?'s':''}`;
+  document.getElementById('kpi-mrr').textContent = fmtNum(mrr);
+  renderMRRDetail(clients);
+  document.getElementById('kpi-alertes').textContent = alertes.length;
+  document.getElementById('kpi-saisies').textContent = saisies.length;
+  document.getElementById('kpi-saisies-sub').textContent = `sur ${groupes.length} groupe${groupes.length>1?'s':''}`;
+  document.getElementById('badge-alertes').textContent = alertes.length||0;
+
+  renderClientsSante('clients-sante', clients, groupes, saisies, alertes, pannes, 'detail-panel-accueil');
+  renderAlertesAccueil(alertes, clients, groupes);
+}
+
+function renderClientsSante(elId, clients, groupes, saisies, alertes, pannes, detailId) {
+  const el = document.getElementById(elId);
+  if(!clients.length){el.innerHTML='<div class="empty">Aucun client</div>';return;}
+  el.innerHTML = clients.map(c=>{
+    const hG  = groupes.filter(g=>g.client_id===c.id);
+    const hSJ = saisies.filter(s=>s.client_id===c.id);
+    const hA  = alertes.filter(a=>a.client_id===c.id);
+    const hP  = pannes.filter(p=>p.client_id===c.id);
+    const status = statusClient(hSJ,hG,hA,hP);
+    const lien = clientLien(c);
+    const pillClass = status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok';
+    const statusLabel = status==='danger'?'Critique':status==='warn'?'Attention':'Normal';
+    const tauxColor = hSJ.length===hG.length?'var(--vert)':hSJ.length>0?'var(--orange)':'var(--rouge)';
+    return `<div class="client-row" onclick="openClientDetail('${c.id}','${detailId}')">
+      <div>
+        <div class="cr-nom">${c.nom}</div>
+        <div class="cr-sub">${c.ville||'—'} · ${hG.length} groupe${hG.length>1?'s':''} · ${c.plan||'business'}</div>
+      </div>
+      <div class="cr-val" style="color:${tauxColor}">${hSJ.length}/${hG.length}</div>
+      <div class="cr-val ${hA.length>0?'rouge':''}">${hA.length||'—'}</div>
+      <div><span class="pill ${pillClass}">${statusLabel}</span></div>
+      <div class="cr-actions" onclick="event.stopPropagation()">
+        <button class="btn btn-icon" title="Copier le lien" onclick="copyLien('${lien}')">📋</button>
+        <button class="btn btn-icon" title="Ouvrir" onclick="window.open('${lien}','_blank')">↗</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function openClientDetail(clientId, detailId) {
+  const panel = document.getElementById(detailId);
+  if(selectedClientId===clientId&&panel.classList.contains('open')){
+    panel.classList.remove('open');selectedClientId=null;return;
+  }
+  selectedClientId = clientId;
+  panel.classList.add('open');
+  panel.innerHTML = '<div class="loading"><div class="spinner"></div>Chargement...</div>';
+  panel.scrollIntoView({behavior:'smooth',block:'start'});
+
+  const today = new Date().toISOString().split('T')[0];
+  const dateDebut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
+  const [client,groupes,saisiesJ,saisies30,alertes,pannes,maints] = await Promise.all([
+    api('clients',`&id=eq.${clientId}`).then(r=>r[0]),
+    api('groupes',`&client_id=eq.${clientId}&actif=eq.true`),
+    api('saisies',`&client_id=eq.${clientId}&date=eq.${today}&order=created_at.desc`),
+    api('saisies',`&client_id=eq.${clientId}&date=gte.${dateDebut30}`),
+    api('alertes',`&client_id=eq.${clientId}&resolue=eq.false`),
+    api('pannes',`&client_id=eq.${clientId}&resolue=eq.false`),
+    api('maintenances',`&client_id=eq.${clientId}&order=created_at.desc&limit=3`),
+  ]);
+
+  const litres30 = saisies30.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
+  const cout30   = Math.round(litres30*(client.prix_litre_fcfa||695));
+  const heures30 = saisies30.reduce((a,s)=>a+(s.heures_marche||0),0);
+  const lien = clientLien(client);
+
+  const groupesHtml = groupes.map(g=>{
+    const s = saisiesJ.filter(x=>x.groupe_id===g.id)[0];
+    const j = calcAuto(g,s);
+    const litres = s?.niveau_carburant;
+    const capG = g.capacite_reservoir_litres || 500;
+    const carb = litres != null ? Math.round(litres / capG * 100) : null;
+    const status = pannes.some(p=>p.groupe_id===g.id)||carb<30?'danger':carb<50||j<5?'warn':'ok';
+    const heureSaisie = s?.created_at?new Date(s.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dakar'}):null;
+    return `<div class="groupe-item gi-${status}">
+      <div class="gi-top">
+        <div class="gi-nom">${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA</div>
+        <span class="pill ${status==='danger'?'pill-danger':status==='warn'?'pill-warn':'pill-ok'}">${litres!=null?litres+'L / '+capG+'L ('+carb+'%)':'—'}</span>
+      </div>
+      <div class="gi-stats">
+        <div class="gi-stat">⏱️ Autonomie : <span style="color:${j!==null?autoColor(j):'var(--t2)'}">${j!==null?j+'j':'—'}</span></div>
+        <div class="gi-stat">🕐 <span>${s?.heures_marche!=null?s.heures_marche+'h':'—'}</span></div>
+        <div class="gi-stat">🛢️ <span>${s?.niveau_huile||'—'}</span></div>
+        ${heureSaisie?`<div class="gi-stat">🕗 <span>${heureSaisie}</span></div>`:''}
+        ${s?.operateur?`<div class="gi-stat">👤 <span>${s.operateur}</span></div>`:''}
+      </div>
+      ${carb!=null?`<div class="gi-bar"><div class="gi-bar-fill" style="width:${carb}%;background:${carbColor(carb)}"></div></div>`:''}
+    </div>`;
+  }).join('');
+
+  const alertesHtml = alertes.length
+    ? alertes.map(a=>`<div style="padding:8px 0;border-bottom:1px solid var(--b);font-size:12px;color:${a.severite==='danger'?'var(--rouge)':'var(--orange)'}">• ${a.message}</div>`).join('')
+    : `<div style="font-size:12px;color:var(--vert)">✅ Aucune alerte active</div>`;
+
+  panel.innerHTML = `
+    <div class="dp-head">
+      <div>
+        <div class="dp-nom">${client.nom}</div>
+        <div class="dp-sub">${client.ville||'—'} · Plan ${client.plan||'business'} · ${fmtNum(PLANS[client.plan]||20000)} FCFA/mois</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="copyLien('${lien}')">📋 Copier lien client</button>
+        <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px" onclick="window.open('${lien}','_blank')">↗ Ouvrir</button>
+        <button class="dp-close" onclick="document.getElementById('${detailId}').classList.remove('open');selectedClientId=null">✕</button>
+      </div>
+    </div>
+    <div class="dp-body">
+      <div class="dp-grid">
+        <div class="dp-kpi"><div class="dp-kpi-val or">${cout30>0?fmtNum(cout30):'—'}</div><div class="dp-kpi-label">FCFA carburant / 30j</div></div>
+        <div class="dp-kpi"><div class="dp-kpi-val">${Math.round(heures30)}h</div><div class="dp-kpi-label">Heures de marche / 30j</div></div>
+        <div class="dp-kpi"><div class="dp-kpi-val ${pannes.length>0?'rouge':alertes.length>0?'orange':'vert'}">${pannes.length>0?pannes.length+' panne'+(pannes.length>1?'s':''):alertes.length>0?alertes.length+' alerte'+(alertes.length>1?'s':''):'✓ OK'}</div><div class="dp-kpi-label">Incidents actifs</div></div>
+      </div>
+      <div class="section-label">Lien client partageable</div>
+      <div class="lien-box">
+        <div style="flex:1"><div class="lien-label">${client.groupe_hotelier?'Page groupe':'Page client'}</div><div class="lien-url">${lien}</div></div>
+        <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px;flex-shrink:0" onclick="copyLien('${lien}')">Copier</button>
+      </div>
+      <div class="section-label" style="margin-top:12px">Groupes — aujourd'hui</div>
+      ${groupesHtml||'<div class="empty">Aucun groupe</div>'}
+      <div class="section-label" style="margin-top:12px">Alertes actives</div>
+      <div>${alertesHtml}</div>
+      ${maints.length?`<div class="section-label" style="margin-top:12px">Dernières maintenances</div>${maints.map(m=>`<div style="padding:8px 0;border-bottom:1px solid var(--b);font-size:12px;color:var(--t2)">${TYPE_MAINT[m.type]||m.type}${m.technicien?' · '+m.technicien:''} · ${fmtDate(m.date_intervention)}${m.cout>0?' · '+fmtNum(m.cout)+' FCFA':''}</div>`).join('')}`:''}
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b);display:flex;gap:8px">
+        <button class="btn btn-ghost" style="font-size:12px" onclick="showToast('WhatsApp patron : ${client.whatsapp_patron||'—'}')">📱 ${client.whatsapp_patron||'Patron'}</button>
+        <button class="btn btn-ghost" style="font-size:12px;color:var(--rouge)" onclick="deleteClient('${client.id}','${client.nom}')">🗑️ Supprimer</button>
+      </div>
+    </div>`;
+}
+
+function copyLien(url) {
+  navigator.clipboard.writeText(url).then(()=>showToast('Lien copié ✓')).catch(()=>showToast('Erreur copie','err'));
+}
+
+function renderAlertesAccueil(alertes, clients, groupes) {
+  const el = document.getElementById('alertes-accueil');
+  const clientMap = Object.fromEntries(clients.map(c=>[c.id,c.nom]));
+  const groupeMap = Object.fromEntries(groupes.map(g=>[g.id,g.nom]));
+  if(!alertes.length){el.innerHTML='<div class="empty">✅ Aucune alerte active</div>';return;}
+  el.innerHTML = alertes.slice(0,5).map(a=>`
+    <div class="alerte-item">
+      <div class="ai-dot" style="background:${a.severite==='danger'?'var(--rouge)':'var(--orange)'}"></div>
+      <div class="ai-body"><div class="ai-titre">${a.message}</div><div class="ai-desc">${clientMap[a.client_id]||'—'}${a.groupe_id?' · '+groupeMap[a.groupe_id]:''}</div></div>
+      <div class="ai-time">${a.severite==='danger'?'🚨':'⚠️'}</div>
+    </div>`).join('');
+}
+
+async function loadClients() {
+  const today = new Date().toISOString().split('T')[0];
+  const [clients,groupes,saisies,alertes,pannes] = await Promise.all([
+    api('clients','&order=nom'),
+    api('groupes','&actif=eq.true'),
+    api('saisies',`&date=eq.${today}`),
+    api('alertes','&resolue=eq.false'),
+    api('pannes','&resolue=eq.false'),
+  ]);
+  renderClientsSante('clients-list',clients,groupes,saisies,alertes,pannes,'detail-panel-accueil');
+}
+
+async function loadAlertes() {
+  const el = document.getElementById('alertes-list');
+  const [alertes,clients,groupes] = await Promise.all([
+    api('alertes','&resolue=eq.false&order=created_at.desc'),
+    api('clients',''),api('groupes',''),
+  ]);
+  const clientMap = Object.fromEntries(clients.map(c=>[c.id,c.nom]));
+  const groupeMap = Object.fromEntries(groupes.map(g=>[g.id,g.nom]));
+  if(!alertes.length){el.innerHTML='<div class="empty">✅ Aucune alerte active</div>';return;}
+  el.innerHTML = alertes.map(a=>`
+    <div class="alerte-item">
+      <div class="ai-dot" style="background:${a.severite==='danger'?'var(--rouge)':'var(--orange)'}"></div>
+      <div class="ai-body">
+        <div class="ai-titre">${a.message}</div>
+        <div class="ai-desc">${clientMap[a.client_id]||'—'}${a.groupe_id?' · '+groupeMap[a.groupe_id]:''} · ${fmtDate(a.created_at)}</div>
+      </div>
+      <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;flex-shrink:0" onclick="resolveAlerte('${a.id}')">✅ Résoudre</button>
+    </div>`).join('');
+}
+
+async function resolveAlerte(id){
+  await api('alertes',`&id=eq.${id}`,'*','PATCH',{resolue:true});
+  showToast('Alerte résolue ✓');loadAlertes();loadAll();
+}
+
+async function resoudrePanne(id) {
+  if(!confirm('Marquer cette panne comme résolue ?')) return;
+  await api('pannes',`&id=eq.${id}`,'*','PATCH',{
+    resolue: true,
+    date_resolution: new Date().toISOString(),
+    resolu_par: 'Admin (dashboard)',
+    resolu_via: 'Dashboard'
+  });
+  await api('alertes',`&type=eq.panne&resolue=eq.false`,'*','PATCH',{resolue:true});
+  showToast('Panne résolue ✓'); loadPannes(); loadAll();
+}
+
+async function loadPannes() {
+  const el = document.getElementById('pannes-list');
+  const [pannes,clients,groupes] = await Promise.all([
+    api('pannes','&order=created_at.desc&limit=30'),
+    api('clients',''),api('groupes',''),
+  ]);
+  const clientMap = Object.fromEntries(clients.map(c=>[c.id,c.nom]));
+  const groupeMap = Object.fromEntries(groupes.map(g=>[g.id,g.nom]));
+  if(!pannes.length){el.innerHTML='<div class="empty">✅ Aucune panne enregistrée</div>';return;}
+  el.innerHTML = pannes.map(p=>`
+    <div class="alerte-item">
+      <div class="ai-dot" style="background:${p.resolue?'var(--vert)':'var(--rouge)'}"></div>
+      <div class="ai-body">
+        <div class="ai-titre">${clientMap[p.client_id]||'—'} · ${groupeMap[p.groupe_id]||'—'}</div>
+        <div class="ai-desc">${TYPE_PANNE[p.type]||p.type} · ${p.description||'—'} · ${fmtDate(p.date_panne)}</div>
+        ${p.resolue?`<div style="font-size:11px;color:var(--vert);margin-top:2px">✅ Résolu le ${fmtDate(p.date_resolution)}${p.resolu_par?' · '+p.resolu_par:''}</div>`:''}
+      </div>
+      ${!p.resolue
+        ? `<button onclick="resoudrePanne('${p.id}')" style="background:rgba(22,163,74,0.1);color:#16a34a;border:1px solid rgba(22,163,74,0.3);border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600;flex-shrink:0">✅ Résoudre</button>`
+        : `<span class="pill pill-ok">Résolue</span>`
+      }
+    </div>`).join('');
+}
+
+async function loadMaintenance() {
+  const el = document.getElementById('maint-list');
+  const [maints,clients,groupes] = await Promise.all([
+    api('maintenances','&order=created_at.desc&limit=30'),
+    api('clients',''),api('groupes',''),
+  ]);
+  const clientMap = Object.fromEntries(clients.map(c=>[c.id,c.nom]));
+  const groupeMap = Object.fromEntries(groupes.map(g=>[g.id,g.nom]));
+  if(!maints.length){el.innerHTML='<div class="empty">Aucune intervention</div>';return;}
+  el.innerHTML = maints.map(m=>`
+    <div class="alerte-item">
+      <div class="ai-dot" style="background:var(--bleu)"></div>
+      <div class="ai-body">
+        <div class="ai-titre">${clientMap[m.client_id]||'—'} · ${groupeMap[m.groupe_id]||'—'}</div>
+        <div class="ai-desc">${TYPE_MAINT[m.type]||m.type}${m.technicien?' · '+m.technicien:''} · ${fmtDate(m.date_intervention)}</div>
+      </div>
+      <div class="ai-time or">${m.cout>0?fmtNum(m.cout)+' FCFA':'—'}</div>
+    </div>`).join('');
+}
+
+async function saveClient() {
+  const nom = document.getElementById('add-nom').value.trim();
+  if(!nom){showToast('Nom requis','err');return;}
+  try {
+    await api('clients','','*','POST',{
+      nom, type:document.getElementById('add-type').value,
+      ville:document.getElementById('add-ville').value||'Dakar',
+      groupe_hotelier:document.getElementById('add-groupe').value||null,
+      whatsapp_patron:document.getElementById('add-patron').value,
+      whatsapp_gardien:document.getElementById('add-gardien').value,
+      plan:document.getElementById('add-plan').value,
+      prix_litre_fcfa:parseInt(document.getElementById('add-prix').value)||695,
+      prix_mensuel:PLANS[document.getElementById('add-plan').value]||20000,
+      actif:true
+    });
+    closeModalDirect('modal-add');showToast(`${nom} ajouté ✓`);loadAll();
+  } catch(e){showToast('Erreur','err');}
+}
+
+async function deleteClient(id,nom) {
+  if(!confirm(`Supprimer ${nom} ?`))return;
+  await api('clients',`&id=eq.${id}`,'*','DELETE');
+  document.getElementById('detail-panel-accueil').classList.remove('open');
+  showToast(`${nom} supprimé`,'err');loadAll();
+}
+
+async function loadClientSelect(selectId) {
+  const sel = document.getElementById(selectId);
+  const clients = await api('clients','&actif=eq.true&order=nom');
+  sel.innerHTML='<option value="">Choisir...</option>'+clients.map(c=>`<option value="${c.id}">${c.nom}</option>`).join('');
+}
+
+async function loadGroupesFor(cId, gId) {
+  const clientId = document.getElementById(cId).value;
+  const sel = document.getElementById(gId);
+  if(!clientId){sel.innerHTML='<option>Choisir un client</option>';return;}
+  const groupes = await api('groupes',`&client_id=eq.${clientId}&actif=eq.true`);
+  sel.innerHTML = groupes.map(g=>`<option value="${g.id}">${g.nom}</option>`).join('');
+}
+
+async function saveMaintenance() {
+  const clientId = document.getElementById('m-client').value;
+  const groupeId = document.getElementById('m-groupe').value;
+  if(!clientId||!groupeId){showToast('Client et groupe requis','err');return;}
+  await api('maintenances','','*','POST',{
+    client_id:clientId, groupe_id:groupeId,
+    type:document.getElementById('m-type').value,
+    technicien:document.getElementById('m-tech').value,
+    cout:parseInt(document.getElementById('m-cout').value)||0,
+    notes:document.getElementById('m-notes').value,
+    date_intervention:new Date().toISOString().split('T')[0]
+  });
+  closeModalDirect('modal-maint');showToast('Maintenance enregistrée ✓');loadMaintenance();
+}
+
+loadAll();
+</script>
+</body>
+</html>
