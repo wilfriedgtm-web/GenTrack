@@ -422,9 +422,9 @@ function renderOp(key, d){
     '<div><div class="gd-nom">🛢️ Cuve commune</div><div class="gd-saisie" style="color:'+rcC+'">'+cuve.nom+' · Capacité '+fmtNum(capCuve)+'L'+(rlC?' · '+rlC:'')+'</div></div>'+
     '<div class="pill '+(pctCuve==null?'pill-warn':pctCuve<30?'pill-danger':pctCuve<50?'pill-warn':'pill-ok')+'">'+(pctCuve!=null?niveauCuve+'L / '+capCuve+'L ('+pctCuve+'%)':'Pas de relevé')+'</div>'+
     '</div><div class="gd-body"><div class="gd-stats">'+
-    '<div><div class="gd-stat-label">Niveau actuel</div><div class="gd-stat-val" style="color:'+(pctCuve!=null?carbColor(pctCuve):'var(--texte2)')+'>'+(niveauCuve!=null?niveauCuve+'L':'—')+'</div></div>'+
+    '<div><div class="gd-stat-label">Niveau actuel</div><div class="gd-stat-val" style="color:'+(pctCuve!=null?carbColor(pctCuve):'var(--texte2)')+'">'+(niveauCuve!=null?niveauCuve+'L':'—')+'</div></div>'+
     '<div><div class="gd-stat-label">Capacité totale</div><div class="gd-stat-val">'+fmtNum(capCuve)+'L</div></div>'+
-    '<div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:'+(autoJours!=null?autoColor(autoJours):'var(--texte2)')+'>'+(autoJours!=null?autoJours+'j':'—')+'</div></div>'+
+    '<div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:'+(autoJours!=null?autoColor(autoJours):'var(--texte2)')+'">'+(autoJours!=null?autoJours+'j':'—')+'</div></div>'+
     '<div><div class="gd-stat-label">Taux</div><div class="gd-stat-val">'+(pctCuve!=null?pctCuve+'%':'—')+'</div></div>'+
     '</div>'+(pctCuve!=null?'<div class="gd-bar"><div class="gd-bar-fill" style="width:'+pctCuve+'%;background:'+carbColor(pctCuve)+'"></div></div>':'')+'</div></div>' : '';
 
@@ -446,8 +446,8 @@ function renderOp(key, d){
       '<div class="pill '+(iP?'pill-danger':pC)+'">'+(iP?'🔴 PANNE':pT)+'</div></div>'+
       '<div class="gd-body"><div class="gd-stats">'+
       '<div><div class="gd-stat-label">Compteur moteur</div><div class="gd-stat-val">'+(s?.heures_marche!=null?s.heures_marche+'h':'—')+'</div></div>'+
-      '<div><div class="gd-stat-label">Seuil vidange</div><div class="gd-stat-val" style="color:'+(pV>=100?'var(--rouge)':pV>=80?'var(--orange)':'var(--vert)')+'>'+(pV!=null?pV+'%':'—')+'</div></div>'+
-      '<div><div class="gd-stat-label">Huile</div><div class="gd-stat-val" style="color:'+(s?.niveau_huile==='critique'?'var(--rouge)':s?.niveau_huile==='bas'?'var(--orange)':'var(--vert)')+'>'+(s?.niveau_huile||'—')+'</div></div>'+
+      '<div><div class="gd-stat-label">Seuil vidange</div><div class="gd-stat-val" style="color:'+(pV>=100?'var(--rouge)':pV>=80?'var(--orange)':'var(--vert)')+'">'+(pV!=null?pV+'%':'—')+'</div></div>'+
+      '<div><div class="gd-stat-label">Huile</div><div class="gd-stat-val" style="color:'+(s?.niveau_huile==='critique'?'var(--rouge)':s?.niveau_huile==='bas'?'var(--orange)':'var(--vert)')+'">'+(s?.niveau_huile||'—')+'</div></div>'+
       '<div><div class="gd-stat-label">Opérateur</div><div class="gd-stat-val">'+(s?.operateur||'—')+'</div></div>'+
       '</div></div></div>';
   }).join('');
@@ -496,9 +496,9 @@ function renderTech(key, d){
     '<div><div class="gd-nom">🛢️ Cuve commune</div><div class="gd-saisie">Capacité '+fmtNum(capCuve)+'L'+(derCuve?.date?' · Dernier relevé : '+fmtDate(derCuve.date)+(hC?' à '+hC:''):'')+' </div></div>'+
     '<div class="pill '+(pC==null?'pill-warn':pC<30?'pill-danger':pC<50?'pill-warn':'pill-ok')+'">'+(pC!=null?nC+'L / '+capCuve+'L ('+pC+'%)':'Pas de relevé')+'</div>'+
     '</div><div class="gd-body"><div class="gd-stats">'+
-    '<div><div class="gd-stat-label">Niveau actuel</div><div class="gd-stat-val" style="color:'+(pC!=null?carbColor(pC):'var(--texte2)')+'>'+(nC!=null?nC+'L':'—')+'</div></div>'+
+    '<div><div class="gd-stat-label">Niveau actuel</div><div class="gd-stat-val" style="color:'+(pC!=null?carbColor(pC):'var(--texte2)')+'">'+(nC!=null?nC+'L':'—')+'</div></div>'+
     '<div><div class="gd-stat-label">Capacité</div><div class="gd-stat-val">'+fmtNum(capCuve)+'L</div></div>'+
-    '<div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:'+(autoJ!=null?autoColor(autoJ):'var(--texte2)')+'>'+(autoJ!=null?autoJ+'j':'—')+'</div></div>'+
+    '<div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:'+(autoJ!=null?autoColor(autoJ):'var(--texte2)')+'">'+(autoJ!=null?autoJ+'j':'—')+'</div></div>'+
     '<div><div class="gd-stat-label">Taux</div><div class="gd-stat-val">'+(pC!=null?pC+'%':'—')+'</div></div>'+
     '</div>'+(pC!=null?'<div class="gd-bar"><div class="gd-bar-fill" style="width:'+pC+'%;background:'+carbColor(pC)+'"></div></div>':'')+'</div></div>' : '';
 
@@ -558,7 +558,7 @@ function renderTech(key, d){
   const sM = [...saisies30].filter(s=>s.heures_marche!=null||s.niveau_huile!=null).sort((a,b)=>(b.date+(b.created_at||'').slice(11)).localeCompare(a.date+(a.created_at||'').slice(11))).slice(0,30);
   document.getElementById(key+'-tech-saisies').innerHTML = sM.length ?
     '<table class="data"><thead><tr><th>Date</th><th>Groupe</th><th>Compteur moteur</th><th>Huile</th><th>Opérateur</th></tr></thead><tbody>'+
-    sM.map(s=>'<tr><td>'+fmtDate(s.date)+'</td><td>'+(gMap[s.groupe_id]||'—')+'</td><td>'+(s.heures_marche!=null?s.heures_marche+'h':'—')+'</td><td style="color:'+(s.niveau_huile==='critique'?'var(--rouge)':s.niveau_huile==='bas'?'var(--orange)':'var(--vert)')+'>"'+(s.niveau_huile||'—')+'</td><td>'+(s.operateur||'—')+'</td></tr>').join('')+
+    sM.map(s=>'<tr><td>'+fmtDate(s.date)+'</td><td>'+(gMap[s.groupe_id]||'—')+'</td><td>'+(s.heures_marche!=null?s.heures_marche+'h':'—')+'</td><td style="color:'+(s.niveau_huile==='critique'?'var(--rouge)':s.niveau_huile==='bas'?'var(--orange)':'var(--vert)')+'">'+(s.niveau_huile||'—')+'</td><td>'+(s.operateur||'—')+'</td></tr>').join('')+
     '</tbody></table>' :
     '<div class="empty">Aucune saisie moteur sur 30 jours</div>';
 
