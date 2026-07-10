@@ -405,7 +405,7 @@ function renderOp(key, d){
   const statusCuve = pctCuve==null?'normal':pctCuve<30?'danger':pctCuve<50?'warn':'normal';
   document.getElementById(key+'-op-metrics').innerHTML=
     '<div class="bm normal"><div class="bm-label">Coût carburant — 30 jours</div><div class="bm-val">'+(cout30>0?fmtNum(cout30):'—')+'</div><div class="bm-sub">FCFA · Prix litre : '+px+' FCFA</div></div>'+
-    '<div class="bm '+statusCuve+'"><div class="bm-label" style="color:'+(statusCuve==='danger'?'var(--rouge)':statusCuve==='warn'?'var(--orange)':'var(--texte2)')+'">Autonomie cuve</div><div class="bm-val" style="color:'+(statusCuve==='danger'?'var(--rouge)':statusCuve==='warn'?'var(--orange)':'var(--vert)')+'>'+(autoJours!==null?autoJours+' jours':'—')+'</div><div class="bm-sub">'+(niveauCuve!=null?niveauCuve+'L / '+capCuve+'L ('+pctCuve+'%)':'Pas de relevé')+'</div></div>';
+    '<div class="bm '+statusCuve+'"><div class="bm-label" style="color:'+(statusCuve==='danger'?'var(--rouge)':statusCuve==='warn'?'var(--orange)':'var(--texte2)')+'">Autonomie cuve</div><div class="bm-val" style="color:'+(statusCuve==='danger'?'var(--rouge)':statusCuve==='warn'?'var(--orange)':'var(--vert)')+'">'+(autoJours!==null?autoJours+' jours':'—')+'</div><div class="bm-sub">'+(niveauCuve!=null?niveauCuve+'L / '+capCuve+'L ('+pctCuve+'%)':'Pas de relevé')+'</div></div>';
 
   document.getElementById(key+'-op-couts').innerHTML=
     '<div class="cout-card"><div class="cout-label">⛽ Carburant — '+now.getFullYear()+'</div><div class="cout-val">'+(coutA>0?fmtNum(coutA):'—')+'</div><div class="cout-sub">FCFA</div></div>'+
