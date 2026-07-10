@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mangalis — Pilote GenTrack Multi-Sites</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+:root{
+  --bx:#623489;--bx-pale:rgba(98,52,137,0.08);--bx-mid:rgba(98,52,137,0.15);
+  --or:#C9A96E;--or-pale:rgba(201,169,110,0.12);
+  --surface:#FDFBFF;--surface2:#F5F0FA;--surface3:#EDE4F5;
+  --bordure:#DDD0EE;--texte:#1E1028;--texte2:#7A6890;--texte3:#B5A0C8;
+  --vert:#2D7A4F;--vert-pale:rgba(45,122,79,0.08);
+  --rouge:#C0392B;--rouge-pale:rgba(192,57,43,0.08);--rouge-bordure:rgba(192,57,43,0.3);
+  --orange:#D4761E;--orange-pale:rgba(212,118,30,0.08);--orange-bordure:rgba(212,118,30,0.3);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--surface);color:var(--texte);font-family:'Inter',sans-serif;min-height:100vh}
+
+.header{background:var(--bx);color:white}
+.header-top{display:flex;justify-content:space-between;align-items:center;padding:20px 36px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.logo{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;letter-spacing:3px;text-transform:uppercase}
+.logo span{color:var(--or);font-weight:400}
+.logo-sub{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-top:2px}
+.header-date{font-size:11px;color:rgba(255,255,255,0.5);text-align:right}
+.header-title{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--or);margin-top:3px;text-align:right}
+
+/* NAV SITES */
+.site-nav{background:rgba(0,0,0,0.2);padding:0 36px;display:flex;gap:0}
+.site-btn{padding:12px 20px;font-size:12px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:rgba(255,255,255,0.5);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s}
+.site-btn:hover{color:rgba(255,255,255,0.8)}
+.site-btn.active{color:white;border-bottom-color:var(--or)}
+
+.container{max-width:960px;margin:0 auto;padding:32px 36px 60px}
+
+/* ONGLETS */
+.tabs{display:flex;gap:4px;margin-bottom:28px;border-bottom:1px solid var(--bordure)}
+.tab{padding:11px 20px;font-size:12px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--texte2);cursor:pointer;border-bottom:2px solid transparent;transition:color 0.15s,border-color 0.15s}
+.tab:hover{color:var(--texte)}
+.tab.active{color:var(--bx);border-bottom-color:var(--bx)}
+.tab-panel{display:none}
+.tab-panel.active{display:block;animation:fadeIn 0.2s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* BANNIERE */
+.action-banner{border-radius:6px;padding:14px 18px;display:flex;align-items:center;gap:14px;margin-bottom:28px}
+.action-banner.danger{background:var(--rouge-pale);border:1px solid var(--rouge-bordure)}
+.action-banner.warn{background:var(--orange-pale);border:1px solid var(--orange-bordure)}
+.ab-icon{font-size:20px;flex-shrink:0}
+.ab-body{flex:1}
+.ab-titre{font-size:13px;font-weight:600}
+.ab-titre.rouge{color:var(--rouge)}
+.ab-titre.orange{color:var(--orange)}
+.ab-sub{font-size:12px;color:var(--texte2);margin-top:2px}
+
+/* SECTION */
+.section-title{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--texte);margin-bottom:4px}
+.section-sub{font-size:11px;color:var(--texte2);letter-spacing:0.5px;margin-bottom:16px}
+
+/* MÉTRIQUES */
+.biz-metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.bm{border-radius:6px;border:1px solid var(--bordure);padding:16px 18px}
+.bm.normal{background:var(--surface2)}
+.bm.danger{background:var(--rouge-pale);border-color:var(--rouge-bordure)}
+.bm.warn{background:var(--orange-pale);border-color:var(--orange-bordure)}
+.bm-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--texte2);margin-bottom:8px;font-weight:600}
+.bm-val{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:600;line-height:1;letter-spacing:-0.5px}
+.bm-sub{font-size:11px;color:var(--texte2);margin-top:5px}
+
+/* COÛTS */
+.couts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.cout-card{background:white;border-radius:6px;border:1px solid var(--bordure);padding:14px 16px}
+.cout-card.maint{border-top:3px solid var(--orange)}
+.cout-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--texte2);font-weight:500;margin-bottom:8px}
+.cout-val{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;color:var(--texte)}
+.cout-sub{font-size:11px;color:var(--texte2);margin-top:4px}
+
+/* GROUPES */
+.groupe-detail{border:1px solid var(--bordure);border-radius:6px;overflow:hidden;margin-bottom:10px;background:white}
+.gd-header{padding:12px 14px;border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:center;background:var(--surface2)}
+.gd-nom{font-size:13px;font-weight:600}
+.gd-saisie{font-size:11px;color:var(--texte2);margin-top:2px}
+.gd-body{padding:12px 14px}
+.gd-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.gd-stat-label{font-size:11px;color:var(--texte2)}
+.gd-stat-val{font-size:14px;font-weight:600;margin-top:2px}
+.gd-bar{height:4px;background:var(--bordure);border-radius:2px;overflow:hidden}
+.gd-bar-fill{height:100%;border-radius:2px}
+
+/* PANNE */
+.panne-card{background:var(--rouge-pale);border:1px solid var(--rouge-bordure);border-radius:6px;padding:14px 16px;margin-bottom:10px}
+.panne-titre{font-size:13px;font-weight:600;color:var(--rouge)}
+.panne-detail{font-size:12px;color:var(--texte2);margin-top:4px}
+
+/* GRAPHIQUE */
+.chart-card{border:1px solid var(--bordure);border-radius:6px;overflow:hidden;margin-bottom:18px;background:white}
+.chart-head{padding:12px 16px;border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:center;background:var(--surface2)}
+.chart-head-title{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600}
+.chart-body{padding:16px}
+.chart-insight{margin-top:10px;padding-top:10px;border-top:1px solid var(--bordure);font-size:12px}
+
+/* TABLE */
+.table-card{border:1px solid var(--bordure);border-radius:6px;overflow:hidden;margin-bottom:22px;background:white}
+.table-head{padding:12px 16px;border-bottom:1px solid var(--bordure);background:var(--surface2)}
+.table-head-title{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600}
+.table-head-sub{font-size:11px;color:var(--texte2);margin-top:2px}
+table.data{width:100%;border-collapse:collapse;font-size:12px}
+table.data th{text-align:left;padding:9px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--texte2);border-bottom:1px solid var(--bordure);background:var(--surface2);font-weight:600}
+table.data td{padding:9px 14px;border-bottom:1px solid var(--surface3);color:var(--texte)}
+table.data tr:last-child td{border-bottom:none}
+table.data tr:hover td{background:var(--surface2)}
+
+.pill{padding:3px 10px;border-radius:2px;font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;display:inline-block}
+.pill-ok{background:var(--vert-pale);color:var(--vert)}
+.pill-warn{background:var(--orange-pale);color:var(--orange)}
+.pill-danger{background:var(--rouge-pale);color:var(--rouge)}
+
+/* VUE GROUPE MANGALIS */
+.mangalis-overview{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px}
+.hotel-card{border:1px solid var(--bordure);border-radius:8px;overflow:hidden;background:white;cursor:pointer;transition:box-shadow 0.15s}
+.hotel-card:hover{box-shadow:0 4px 16px rgba(98,52,137,0.12)}
+.hotel-card-head{background:var(--bx);color:white;padding:14px 16px}
+.hotel-card-nom{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600;letter-spacing:1px}
+.hotel-card-ville{font-size:11px;color:rgba(255,255,255,0.55);margin-top:2px}
+.hotel-card-body{padding:14px 16px}
+.hotel-stat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12px}
+.hotel-stat-label{color:var(--texte2)}
+.hotel-stat-val{font-weight:600}
+.hotel-alert{margin-top:10px;padding:8px 10px;border-radius:4px;font-size:11px;font-weight:600}
+.hotel-alert.danger{background:var(--rouge-pale);color:var(--rouge);border:1px solid var(--rouge-bordure)}
+.hotel-alert.warn{background:var(--orange-pale);color:var(--orange);border:1px solid var(--orange-bordure)}
+.hotel-alert.ok{background:var(--vert-pale);color:var(--vert)}
+
+.divider{height:1px;background:var(--bordure);margin:28px 0;position:relative}
+.divider::after{content:'◆';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--surface);padding:0 12px;color:var(--or);font-size:9px}
+
+.breadcrumb{font-size:11px;color:var(--texte2);margin-bottom:20px;display:flex;align-items:center;gap:6px}
+.breadcrumb a{color:var(--bx);cursor:pointer;font-weight:600}
+.breadcrumb a:hover{text-decoration:underline}
+
+.footer{background:var(--bx);color:rgba(255,255,255,0.4);text-align:center;padding:18px;font-size:11px;letter-spacing:1px;margin-top:40px}
+.footer strong{color:var(--or)}
+
+@media(max-width:700px){
+  .container{padding:20px}
+  .biz-metrics{grid-template-columns:1fr}.couts-grid{grid-template-columns:1fr}
+  .gd-stats{grid-template-columns:repeat(2,1fr)}
+  .header-top{padding:16px 20px}
+  .site-nav{padding:0 20px}
+  .mangalis-overview{grid-template-columns:1fr}
+  .tabs{overflow-x:auto}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="logo">Mangalis <span>Hotels</span></div>
+      <div class="logo-sub">Pilote GenTrack · Multi-sites</div>
+    </div>
+    <div>
+      <div class="header-date" id="header-date">—</div>
+      <div class="header-title">Groupes électrogènes</div>
+    </div>
+  </div>
+  <div class="site-nav">
+    <div class="site-btn active" id="nav-groupe" onclick="showVue('groupe')">Vue Groupe</div>
+    <div class="site-btn" id="nav-dakar" onclick="showVue('dakar')">Noom Dakar Sea Plaza</div>
+    <div class="site-btn" id="nav-abidjan" onclick="showVue('abidjan')">Noom Abidjan Plateau</div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ═══════ VUE GROUPE ═══════ -->
+<div id="vue-groupe">
+  <div class="section-title" style="margin-bottom:4px">Tableau de bord Groupe</div>
+  <div class="section-sub" style="margin-bottom:20px">2 hôtels · Groupe Mangalis</div>
+
+  <div class="action-banner danger" style="margin-bottom:16px">
+    <div class="ab-icon">🔴</div>
+    <div class="ab-body">
+      <div class="ab-titre rouge">1 panne active — Noom Abidjan Plateau</div>
+      <div class="ab-sub">Groupe secours SDMO 250 kVA · Surchauffe depuis 2h · Intervention prestataire en cours · Alerte envoyée à 08h32</div>
+    </div>
+  </div>
+  <div class="action-banner warn" style="margin-bottom:20px">
+    <div class="ab-icon">🟡</div>
+    <div class="ab-body">
+      <div class="ab-titre orange">Ravitaillement requis — Noom Dakar Sea Plaza</div>
+      <div class="ab-sub">Groupe principal Cummins 500 kVA · Carburant à 18% · Autonomie 2 jours</div>
+    </div>
+  </div>
+
+  <div class="mangalis-overview">
+    <!-- Dakar -->
+    <div class="hotel-card" onclick="showVue('dakar')">
+      <div class="hotel-card-head">
+        <div class="hotel-card-nom">NOOM DAKAR SEA PLAZA</div>
+        <div class="hotel-card-ville">Dakar · Sénégal · 234 chambres</div>
+      </div>
+      <div class="hotel-card-body">
+        <div class="hotel-stat-row">
+          <span class="hotel-stat-label">⚙️ Groupe principal</span>
+          <span class="hotel-stat-val">Cummins 500 kVA</span>
+        </div>
+        <div class="hotel-stat-row">
+          <span class="hotel-stat-label">⛽ Carburant principal</span>
+          <span class="hotel-stat-val" style="color:var(--orange)">18% 🟡</span>
+        </div>
+        <div class="hotel-stat-row">
+          <span class="hotel-stat-label">⏱ Autonomie</span>
+          <span class="hotel-stat-val" style="color:var(--orange)">2 jours</span>
+        </div>
+        <div class="hotel-stat-row">
+          <span class="hotel-stat-label">Groupe secours</span>
+          <span class="hotel-stat-val">Cummins 300 kVA — 74% 🟢</span>
+        </div>
+        <div class="hotel-stat-row">
+          <span class="hotel-stat-label">Coût 30j</span>
+          <span class="hotel-stat-val">1 240 000 FCFA</span>
+        </div>
+        <div class="hotel-stat-row">
+          <span class="hotel-stat-label">Dernière saisie</span>
+          <span class="hotel-stat-val" style="color:var(--vert)">Lassana · 06h14</span>
+        </div>
+        <div class="hotel-alert warn">🟡 Alerte ravitaillement — 2 jours d'autonomie</div>
+      </div>
+    </div>
+
+    <!-- Abidjan -->
+    <div class="hotel-card" onclick="showVue('abidjan')">
+      <div class="hotel-card-head">
+        <div class="hotel-card-nom">NOOM ABIDJAN PLATEAU</div>
+        <div class="hotel-card-ville">Abidjan · Côte d'Ivoire · 179 chambres</div>
+      </div>
+      <div class="hotel-card-body">
+        <div class="hotel-stat-row">
+          <span class="hotel-stat-label">⚙️ Groupe principal</span>
+          <span class="hotel-stat-val">SDMO 400 kVA</span>
+        </div>
+        <div class="hotel-stat-row">
+          <span class="hotel-stat-label">⛽ Carburant principal</span>
+          <span class="hotel-stat-val" style="color:var(--vert)">65% 🟢</span>
+        </div>
+        <div class="hotel-stat-row">
+          <span class="hotel-stat-label">⏱ Autonomie</span>
+          <span class="hotel-stat-val" style="color:var(--vert)">9 jours</span>
+        </div>
+        <div class="hotel-stat-row">
+          <span class="hotel-stat-label">Groupe secours</span>
+          <span class="hotel-stat-val" style="color:var(--rouge)">SDMO 250 kVA — 🔴 PANNE</span>
+        </div>
+        <div class="hotel-stat-row">
+          <span class="hotel-stat-label">Coût 30j</span>
+          <span class="hotel-stat-val">980 000 FCFA</span>
+        </div>
+        <div class="hotel-stat-row">
+          <span class="hotel-stat-label">Dernière saisie</span>
+          <span class="hotel-stat-val" style="color:var(--vert)">Kouamé · 07h02</span>
+        </div>
+        <div class="hotel-alert danger">🔴 Panne active — Surchauffe groupe secours</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Synthèse groupe -->
+  <div class="section-title">Synthèse Groupe Mangalis</div>
+  <div class="section-sub">Consolidation des 2 sites</div>
+  <div class="biz-metrics">
+    <div class="bm normal">
+      <div class="bm-label">Coût carburant — 30 jours (groupe)</div>
+      <div class="bm-val">2 220 000</div>
+      <div class="bm-sub">FCFA · Dakar 1 240 000 + Abidjan 980 000</div>
+    </div>
+    <div class="bm warn">
+      <div class="bm-label" style="color:var(--orange)">Alertes actives</div>
+      <div class="bm-val" style="color:var(--orange)">2</div>
+      <div class="bm-sub">1 panne · 1 alerte ravitaillement</div>
+    </div>
+  </div>
+  <div class="couts-grid">
+    <div class="cout-card">
+      <div class="cout-label">🏨 Groupes électrogènes</div>
+      <div class="cout-val">4</div>
+      <div class="cout-sub">2 principaux · 2 secours</div>
+    </div>
+    <div class="cout-card maint">
+      <div class="cout-label">⚡ Puissance totale installée</div>
+      <div class="cout-val" style="color:var(--bx)">1 450 kVA</div>
+      <div class="cout-sub">500 + 300 + 400 + 250 kVA</div>
+    </div>
+  </div>
+
+  <!-- Tableau récap -->
+  <div class="table-card">
+    <div class="table-head">
+      <div class="table-head-title">État des groupes — Vue groupe</div>
+      <div class="table-head-sub">Données du matin</div>
+    </div>
+    <table class="data">
+      <thead><tr><th>Site</th><th>Groupe</th><th>Carburant</th><th>Autonomie</th><th>Heures</th><th>Statut</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Dakar</td>
+          <td>Cummins 500 kVA (Principal)</td>
+          <td style="color:var(--orange)">18%</td>
+          <td style="color:var(--orange)">2 jours</td>
+          <td>847h</td>
+          <td><span class="pill pill-warn">Ravitaillement</span></td>
+        </tr>
+        <tr>
+          <td>Dakar</td>
+          <td>Cummins 300 kVA (Secours)</td>
+          <td style="color:var(--vert)">74%</td>
+          <td style="color:var(--vert)">12 jours</td>
+          <td>412h</td>
+          <td><span class="pill pill-ok">Normal</span></td>
+        </tr>
+        <tr>
+          <td>Abidjan</td>
+          <td>SDMO 400 kVA (Principal)</td>
+          <td style="color:var(--vert)">65%</td>
+          <td style="color:var(--vert)">9 jours</td>
+          <td>623h</td>
+          <td><span class="pill pill-ok">Normal</span></td>
+        </tr>
+        <tr>
+          <td>Abidjan</td>
+          <td>SDMO 250 kVA (Secours)</td>
+          <td style="color:var(--vert)">81%</td>
+          <td>—</td>
+          <td>—</td>
+          <td><span class="pill pill-danger">🔴 Panne surchauffe</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════ VUE DAKAR ═══════ -->
+<div id="vue-dakar" style="display:none">
+  <div class="breadcrumb"><a onclick="showVue('groupe')">← Vue Groupe</a> <span>/ Noom Hotel Dakar Sea Plaza</span></div>
+
+  <div class="tabs">
+    <div class="tab active" data-site="dakar" data-tab="operations" onclick="switchTab('dakar','operations')">Opérations</div>
+    <div class="tab" data-site="dakar" data-tab="technique" onclick="switchTab('dakar','technique')">Technique</div>
+  </div>
+
+  <!-- Opérations Dakar -->
+  <div class="tab-panel active" id="dakar-panel-operations">
+    <div class="action-banner warn">
+      <div class="ab-icon">🟡</div>
+      <div class="ab-body">
+        <div class="ab-titre orange">Alerte ravitaillement — Action requise</div>
+        <div class="ab-sub">Groupe principal Cummins 500 kVA · 18% · Autonomie 2 jours · Ravitaillement à planifier d'urgence</div>
+      </div>
+    </div>
+
+    <div class="section-title">Vue d'ensemble</div>
+    <div class="section-sub" id="dakar-date">Données du jour · Dernière saisie 06h14 par Lassana</div>
+    <div class="biz-metrics">
+      <div class="bm normal">
+        <div class="bm-label">Coût carburant — 30 jours</div>
+        <div class="bm-val">1 240 000</div>
+        <div class="bm-sub">FCFA · Prix litre Dakar : 775 FCFA</div>
+      </div>
+      <div class="bm warn">
+        <div class="bm-label" style="color:var(--orange)">Autonomie groupe principal</div>
+        <div class="bm-val" style="color:var(--orange)">2 jours</div>
+        <div class="bm-sub">18% · Ravitaillement requis</div>
+      </div>
+    </div>
+    <div class="couts-grid">
+      <div class="cout-card">
+        <div class="cout-label">⛽ Carburant — 2025</div>
+        <div class="cout-val">8 680 000</div>
+        <div class="cout-sub">FCFA estimé sur l'année</div>
+      </div>
+      <div class="cout-card maint">
+        <div class="cout-label">🔧 Maintenance — 2025</div>
+        <div class="cout-val" style="color:var(--vert)">0</div>
+        <div class="cout-sub">FCFA de réparations</div>
+      </div>
+    </div>
+
+    <div style="font-size:11px;color:var(--texte2);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:10px">Cuve &amp; Groupes</div>
+
+    <!-- Cuve commune Dakar -->
+    <div class="groupe-detail" style="border-top:3px solid var(--or);margin-bottom:10px">
+      <div class="gd-header" style="background:var(--or-pale)">
+        <div>
+          <div class="gd-nom">🛢️ Cuve commune</div>
+          <div class="gd-saisie">Capacité 6 000L · Relevé aujourd'hui à 06h14 par Lassana</div>
+        </div>
+        <div class="pill pill-warn">1 080L / 6 000L (18%)</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Niveau actuel</div><div class="gd-stat-val" style="color:var(--orange)">1 080L</div></div>
+          <div><div class="gd-stat-label">Capacité totale</div><div class="gd-stat-val">6 000L</div></div>
+          <div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:var(--orange)">2 jours</div></div>
+          <div><div class="gd-stat-label">Taux</div><div class="gd-stat-val" style="color:var(--orange)">18%</div></div>
+        </div>
+        <div class="gd-bar"><div class="gd-bar-fill" style="width:18%;background:var(--orange)"></div></div>
+      </div>
+    </div>
+
+    <!-- Groupe principal Dakar -->
+    <div class="groupe-detail" style="border-top:3px solid var(--orange)">
+      <div class="gd-header" style="background:var(--orange-pale)">
+        <div>
+          <div class="gd-nom">⚙️ Groupe Principal · Cummins 500 kVA</div>
+          <div class="gd-saisie" style="color:var(--orange)">Saisi aujourd'hui à 06h14 par Lassana</div>
+        </div>
+        <div class="pill pill-warn">🟡 Alerte ravitaillement</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Carburant</div><div class="gd-stat-val" style="color:var(--orange)">18%</div></div>
+          <div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:var(--orange)">2 jours</div></div>
+          <div><div class="gd-stat-label">Heures totales</div><div class="gd-stat-val">847h</div></div>
+          <div><div class="gd-stat-label">Prochain vidange</div><div class="gd-stat-val" style="color:var(--vert)">dans 153h</div></div>
+        </div>
+        <div class="gd-stats" style="margin-bottom:0">
+          <div><div class="gd-stat-label">Niveau huile</div><div class="gd-stat-val" style="color:var(--vert)">Normal</div></div>
+          <div><div class="gd-stat-label">Opérateur</div><div class="gd-stat-val">Lassana</div></div>
+        </div>
+        <div style="margin-top:10px"><div class="gd-bar"><div class="gd-bar-fill" style="width:18%;background:var(--orange)"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Groupe secours Dakar -->
+    <div class="groupe-detail" style="margin-top:10px">
+      <div class="gd-header">
+        <div>
+          <div class="gd-nom">⚙️ Groupe Secours · Cummins 300 kVA</div>
+          <div class="gd-saisie" style="color:var(--texte2)">Saisi aujourd'hui à 06h14 par Lassana</div>
+        </div>
+        <div class="pill pill-ok">Saisi ✓</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Carburant</div><div class="gd-stat-val" style="color:var(--vert)">74%</div></div>
+          <div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:var(--vert)">12 jours</div></div>
+          <div><div class="gd-stat-label">Heures totales</div><div class="gd-stat-val">412h</div></div>
+          <div><div class="gd-stat-label">Niveau huile</div><div class="gd-stat-val" style="color:var(--vert)">Normal</div></div>
+        </div>
+        <div style="margin-top:0"><div class="gd-bar"><div class="gd-bar-fill" style="width:74%;background:var(--vert)"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Graphique 14j Dakar -->
+    <div class="chart-card" style="margin-top:16px">
+      <div class="chart-head">
+        <div class="chart-head-title">Évolution carburant — 14 jours</div>
+        <div style="font-size:11px;color:var(--texte2)">Groupe principal</div>
+      </div>
+      <div class="chart-body">
+        <canvas id="chart-dakar" height="130"></canvas>
+        <div class="chart-insight" style="color:var(--texte2)">Baisse continue sur 14 jours — Ravitaillement urgent recommandé.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Technique Dakar -->
+  <div class="tab-panel" id="dakar-panel-technique">
+    <div class="section-title">État des groupes</div>
+    <div class="section-sub">Heures de marche, vidange, pannes</div>
+
+    <!-- Cuve commune Technique Dakar -->
+    <div class="groupe-detail" style="border-top:3px solid var(--or);margin-bottom:16px">
+      <div class="gd-header" style="background:var(--or-pale)">
+        <div>
+          <div class="gd-nom">🛢️ Cuve commune</div>
+          <div class="gd-saisie">Capacité 6 000L · Dernier relevé : aujourd'hui à 06h14</div>
+        </div>
+        <div class="pill pill-warn">1 080L / 6 000L (18%)</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Niveau actuel</div><div class="gd-stat-val" style="color:var(--orange)">1 080L</div></div>
+          <div><div class="gd-stat-label">Capacité</div><div class="gd-stat-val">6 000L</div></div>
+          <div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:var(--orange)">2 jours</div></div>
+          <div><div class="gd-stat-label">Taux</div><div class="gd-stat-val" style="color:var(--orange)">18%</div></div>
+        </div>
+        <div class="gd-bar"><div class="gd-bar-fill" style="width:18%;background:var(--orange)"></div></div>
+      </div>
+    </div>
+
+    <div class="groupe-detail">
+      <div class="gd-header">
+        <div><div class="gd-nom">Cummins 500 kVA (Principal)</div><div class="gd-saisie">Réservoir 1 500L · Dernier vidange à 694h</div></div>
+        <div class="pill pill-ok">Vidange OK</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Heures totales</div><div class="gd-stat-val">847h</div></div>
+          <div><div class="gd-stat-label">Seuil vidange</div><div class="gd-stat-val">1 000h</div></div>
+          <div><div class="gd-stat-label">Progression</div><div class="gd-stat-val" style="color:var(--vert)">85%</div></div>
+          <div><div class="gd-stat-label">Conso théorique</div><div class="gd-stat-val">90 L/h</div></div>
+        </div>
+        <div class="gd-bar"><div class="gd-bar-fill" style="width:85%;background:var(--vert)"></div></div>
+      </div>
+    </div>
+
+    <div class="groupe-detail" style="margin-top:10px">
+      <div class="gd-header">
+        <div><div class="gd-nom">Cummins 300 kVA (Secours)</div><div class="gd-saisie">Réservoir 800L</div></div>
+        <div class="pill pill-ok">Vidange OK</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Heures totales</div><div class="gd-stat-val">412h</div></div>
+          <div><div class="gd-stat-label">Seuil vidange</div><div class="gd-stat-val">500h</div></div>
+          <div><div class="gd-stat-label">Progression</div><div class="gd-stat-val" style="color:var(--vert)">82%</div></div>
+          <div><div class="gd-stat-label">Conso théorique</div><div class="gd-stat-val">55 L/h</div></div>
+        </div>
+        <div class="gd-bar"><div class="gd-bar-fill" style="width:82%;background:var(--vert)"></div></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-title">Pannes en cours</div>
+    <div class="section-sub">Interventions requises</div>
+    <div style="padding:20px;text-align:center;color:var(--vert);font-size:13px;font-weight:600;background:var(--vert-pale);border:1px solid rgba(45,122,79,0.2);border-radius:6px">✅ Aucune panne en cours</div>
+
+    <div class="section-title" style="margin-top:24px">Évolution cuve — 14 jours</div>
+    <div class="section-sub">Niveau en % de la capacité totale (6 000L)</div>
+    <div class="chart-card">
+      <div class="chart-head">
+        <div class="chart-head-title">Cuve commune — 6 000L</div>
+        <div style="font-size:11px;color:var(--texte2)" id="dakar-tech-chart-insight">Baisse continue — Ravitaillement urgent.</div>
+      </div>
+      <div class="chart-body">
+        <canvas id="chart-dakar-tech" height="130"></canvas>
+      </div>
+    </div>
+
+    <div class="section-title">Historique des saisies</div>
+    <div class="section-sub">30 dernières saisies</div>
+    <div class="table-card">
+      <table class="data">
+        <thead><tr><th>Date</th><th>Groupe</th><th>Compteur moteur</th><th>Huile</th><th>Opérateur</th></tr></thead>
+        <tbody id="dakar-saisies-hist"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ VUE ABIDJAN ═══════ -->
+<div id="vue-abidjan" style="display:none">
+  <div class="breadcrumb"><a onclick="showVue('groupe')">← Vue Groupe</a> <span>/ Noom Hotel Abidjan Plateau</span></div>
+
+  <div class="tabs">
+    <div class="tab active" data-site="abidjan" data-tab="operations" onclick="switchTab('abidjan','operations')">Opérations</div>
+    <div class="tab" data-site="abidjan" data-tab="technique" onclick="switchTab('abidjan','technique')">Technique</div>
+  </div>
+
+  <!-- Opérations Abidjan -->
+  <div class="tab-panel active" id="abidjan-panel-operations">
+    <div class="action-banner danger">
+      <div class="ab-icon">🚨</div>
+      <div class="ab-body">
+        <div class="ab-titre rouge">Panne active — Intervention en cours</div>
+        <div class="ab-sub">Groupe secours SDMO 250 kVA · Surchauffe depuis 2h · Alerte envoyée à 08h32 · Prestataire contacté</div>
+      </div>
+    </div>
+
+    <div class="section-title">Vue d'ensemble</div>
+    <div class="section-sub">Données du jour · Dernière saisie 07h02 par Kouamé</div>
+    <div class="biz-metrics">
+      <div class="bm normal">
+        <div class="bm-label">Coût carburant — 30 jours</div>
+        <div class="bm-val">980 000</div>
+        <div class="bm-sub">FCFA · Prix litre Abidjan : 820 FCFA</div>
+      </div>
+      <div class="bm danger">
+        <div class="bm-label" style="color:var(--rouge)">Panne active</div>
+        <div class="bm-val" style="color:var(--rouge)">1</div>
+        <div class="bm-sub">Groupe secours hors service</div>
+      </div>
+    </div>
+    <div class="couts-grid">
+      <div class="cout-card">
+        <div class="cout-label">⛽ Carburant — 2025</div>
+        <div class="cout-val">6 860 000</div>
+        <div class="cout-sub">FCFA estimé sur l'année</div>
+      </div>
+      <div class="cout-card maint">
+        <div class="cout-label">🔧 Maintenance — 2025</div>
+        <div class="cout-val" style="color:var(--orange)">En cours</div>
+        <div class="cout-sub">Réparation en cours d'évaluation</div>
+      </div>
+    </div>
+
+    <div style="font-size:11px;color:var(--texte2);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-bottom:10px">Cuve &amp; Groupes</div>
+
+    <!-- Cuve commune Abidjan -->
+    <div class="groupe-detail" style="border-top:3px solid var(--or);margin-bottom:10px">
+      <div class="gd-header" style="background:var(--or-pale)">
+        <div>
+          <div class="gd-nom">🛢️ Cuve commune</div>
+          <div class="gd-saisie">Capacité 5 000L · Relevé aujourd'hui à 07h02 par Kouamé</div>
+        </div>
+        <div class="pill pill-ok">3 250L / 5 000L (65%)</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Niveau actuel</div><div class="gd-stat-val" style="color:var(--vert)">3 250L</div></div>
+          <div><div class="gd-stat-label">Capacité totale</div><div class="gd-stat-val">5 000L</div></div>
+          <div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:var(--vert)">9 jours</div></div>
+          <div><div class="gd-stat-label">Taux</div><div class="gd-stat-val" style="color:var(--vert)">65%</div></div>
+        </div>
+        <div class="gd-bar"><div class="gd-bar-fill" style="width:65%;background:var(--vert)"></div></div>
+      </div>
+    </div>
+
+    <!-- Groupe principal Abidjan -->
+    <div class="groupe-detail">
+      <div class="gd-header">
+        <div>
+          <div class="gd-nom">⚙️ Groupe Principal · SDMO 400 kVA</div>
+          <div class="gd-saisie" style="color:var(--texte2)">Saisi aujourd'hui à 07h02 par Kouamé</div>
+        </div>
+        <div class="pill pill-ok">Saisi ✓</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Carburant</div><div class="gd-stat-val" style="color:var(--vert)">65%</div></div>
+          <div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:var(--vert)">9 jours</div></div>
+          <div><div class="gd-stat-label">Heures totales</div><div class="gd-stat-val">623h</div></div>
+          <div><div class="gd-stat-label">Niveau huile</div><div class="gd-stat-val" style="color:var(--vert)">Normal</div></div>
+        </div>
+        <div><div class="gd-bar"><div class="gd-bar-fill" style="width:65%;background:var(--vert)"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Groupe secours Abidjan — EN PANNE -->
+    <div class="groupe-detail" style="margin-top:10px;border-top:3px solid var(--rouge)">
+      <div class="gd-header" style="background:var(--rouge-pale)">
+        <div>
+          <div class="gd-nom">⚙️ Groupe Secours · SDMO 250 kVA</div>
+          <div class="gd-saisie" style="color:var(--rouge)">🔴 Panne surchauffe depuis 2h · Alerte 08h32 · Prestataire en route</div>
+        </div>
+        <div class="pill pill-danger">🔴 PANNE</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Carburant</div><div class="gd-stat-val" style="color:var(--vert)">81%</div></div>
+          <div><div class="gd-stat-label">Type de panne</div><div class="gd-stat-val" style="color:var(--rouge)">Surchauffe</div></div>
+          <div><div class="gd-stat-label">Durée panne</div><div class="gd-stat-val" style="color:var(--rouge)">2h</div></div>
+          <div><div class="gd-stat-label">Statut</div><div class="gd-stat-val" style="color:var(--orange)">Intervention</div></div>
+        </div>
+        <div style="background:var(--rouge-pale);border:1px solid var(--rouge-bordure);border-radius:4px;padding:8px 10px;font-size:11px;color:var(--rouge);font-weight:600;margin-top:4px">
+          ⚠️ Groupe secours indisponible · Groupe principal seul en service
+        </div>
+      </div>
+    </div>
+
+    <!-- Graphique 14j Abidjan -->
+    <div class="chart-card" style="margin-top:16px">
+      <div class="chart-head">
+        <div class="chart-head-title">Évolution carburant — 14 jours</div>
+        <div style="font-size:11px;color:var(--texte2)">Groupe principal</div>
+      </div>
+      <div class="chart-body">
+        <canvas id="chart-abidjan" height="130"></canvas>
+        <div class="chart-insight" style="color:var(--texte2)">Niveau stable autour de 60-70%. Consommation régulière, prochain ravitaillement dans ~5 jours.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Technique Abidjan -->
+  <div class="tab-panel" id="abidjan-panel-technique">
+    <div class="section-title">État des groupes</div>
+    <div class="section-sub">Heures de marche, vidange, pannes</div>
+
+    <!-- Cuve commune Technique Abidjan -->
+    <div class="groupe-detail" style="border-top:3px solid var(--or);margin-bottom:16px">
+      <div class="gd-header" style="background:var(--or-pale)">
+        <div>
+          <div class="gd-nom">🛢️ Cuve commune</div>
+          <div class="gd-saisie">Capacité 5 000L · Dernier relevé : aujourd'hui à 07h02</div>
+        </div>
+        <div class="pill pill-ok">3 250L / 5 000L (65%)</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Niveau actuel</div><div class="gd-stat-val" style="color:var(--vert)">3 250L</div></div>
+          <div><div class="gd-stat-label">Capacité</div><div class="gd-stat-val">5 000L</div></div>
+          <div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:var(--vert)">9 jours</div></div>
+          <div><div class="gd-stat-label">Taux</div><div class="gd-stat-val" style="color:var(--vert)">65%</div></div>
+        </div>
+        <div class="gd-bar"><div class="gd-bar-fill" style="width:65%;background:var(--vert)"></div></div>
+      </div>
+    </div>
+
+    <div class="groupe-detail">
+      <div class="gd-header">
+        <div><div class="gd-nom">SDMO 400 kVA (Principal)</div><div class="gd-saisie">Réservoir 1 200L</div></div>
+        <div class="pill pill-ok">Vidange OK</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Heures totales</div><div class="gd-stat-val">623h</div></div>
+          <div><div class="gd-stat-label">Seuil vidange</div><div class="gd-stat-val">750h</div></div>
+          <div><div class="gd-stat-label">Progression</div><div class="gd-stat-val" style="color:var(--vert)">83%</div></div>
+          <div><div class="gd-stat-label">Conso théorique</div><div class="gd-stat-val">72 L/h</div></div>
+        </div>
+        <div class="gd-bar"><div class="gd-bar-fill" style="width:83%;background:var(--vert)"></div></div>
+      </div>
+    </div>
+
+    <div class="groupe-detail" style="margin-top:10px;border-top:3px solid var(--rouge)">
+      <div class="gd-header" style="background:var(--rouge-pale)">
+        <div><div class="gd-nom">SDMO 250 kVA (Secours)</div><div class="gd-saisie" style="color:var(--rouge)">🔴 Panne active · Hors service</div></div>
+        <div class="pill pill-danger">Hors service</div>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Heures totales</div><div class="gd-stat-val">—</div></div>
+          <div><div class="gd-stat-label">Type panne</div><div class="gd-stat-val" style="color:var(--rouge)">Surchauffe</div></div>
+          <div><div class="gd-stat-label">Depuis</div><div class="gd-stat-val" style="color:var(--rouge)">08h32</div></div>
+          <div><div class="gd-stat-label">Conso théorique</div><div class="gd-stat-val">45 L/h</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-title">Pannes en cours</div>
+    <div class="section-sub">Interventions requises</div>
+    <div class="table-card">
+      <table class="data">
+        <thead><tr><th>Date</th><th>Groupe</th><th>Problème</th><th>Statut</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Aujourd'hui 08h32</td>
+            <td>SDMO 250 kVA (Secours)</td>
+            <td style="color:var(--rouge)">Surchauffe — Arrêt automatique</td>
+            <td><span class="pill pill-warn">Prestataire en route</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-title" style="margin-top:24px">Évolution cuve — 14 jours</div>
+    <div class="section-sub">Niveau en % de la capacité totale (5 000L)</div>
+    <div class="chart-card">
+      <div class="chart-head">
+        <div class="chart-head-title">Cuve commune — 5 000L</div>
+        <div style="font-size:11px;color:var(--texte2)" id="abidjan-tech-chart-insight">Niveau stable. Prochain ravitaillement dans ~5 jours.</div>
+      </div>
+      <div class="chart-body">
+        <canvas id="chart-abidjan-tech" height="130"></canvas>
+      </div>
+    </div>
+
+    <div class="section-title">Historique des saisies</div>
+    <div class="section-sub">30 dernières saisies</div>
+    <div class="table-card">
+      <table class="data">
+        <thead><tr><th>Date</th><th>Groupe</th><th>Compteur moteur</th><th>Huile</th><th>Opérateur</th></tr></thead>
+        <tbody id="abidjan-saisies-hist"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<div class="footer">Powered by <strong>GenTrack</strong> · Pilote Mangalis Hotels · Noom Dakar & Abidjan</div>
+
+<script>
+// ── DATE HEADER ──
+const now = new Date();
+document.getElementById('header-date').textContent = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+// ── NAVIGATION VUES ──
+function showVue(vue){
+  ['groupe','dakar','abidjan'].forEach(v=>{
+    document.getElementById('vue-'+v).style.display = (v===vue)?'block':'none';
+    document.getElementById('nav-'+v).classList.toggle('active', v===vue);
+  });
+  if(vue==='dakar') renderChartDakar();
+  if(vue==='abidjan') renderChartAbidjan();
+}
+
+function switchTab(site, tab){
+  document.querySelectorAll(`[data-site="${site}"].tab`).forEach(t=>t.classList.toggle('active', t.dataset.tab===tab));
+  ['operations','technique'].forEach(p=>{
+    const el = document.getElementById(site+'-panel-'+p);
+    if(el) el.classList.toggle('active', p===tab);
+  });
+  if(tab==='technique' && site==='dakar') renderChartDakarTech();
+  if(tab==='technique' && site==='abidjan') renderChartAbidjanTech();
+}
+
+function renderChartDakarTech(){
+  setTimeout(()=>{
+    if(chartDakarTechInst) chartDakarTechInst.destroy();
+    const ctx = document.getElementById('chart-dakar-tech');
+    if(!ctx) return;
+    chartDakarTechInst = new Chart(ctx.getContext('2d'),{
+      type:'line',
+      data:{ labels:shortDates(14), datasets:[{
+        data: makeGradientData(72, 18, 14, 3),
+        borderColor:'#C9A96E', backgroundColor:'rgba(201,169,110,0.1)',
+        borderWidth:1.5, tension:0.3, fill:true, spanGaps:true, pointRadius:3, pointBackgroundColor:'#C9A96E'
+      }]},
+      options: makeChartOpts('#C9A96E')
+    });
+  },50);
+}
+
+function renderChartAbidjanTech(){
+  setTimeout(()=>{
+    if(chartAbidjanTechInst) chartAbidjanTechInst.destroy();
+    const ctx = document.getElementById('chart-abidjan-tech');
+    if(!ctx) return;
+    chartAbidjanTechInst = new Chart(ctx.getContext('2d'),{
+      type:'line',
+      data:{ labels:shortDates(14), datasets:[{
+        data: makeGradientData(78, 65, 14, 4),
+        borderColor:'#C9A96E', backgroundColor:'rgba(201,169,110,0.1)',
+        borderWidth:1.5, tension:0.3, fill:true, spanGaps:true, pointRadius:3, pointBackgroundColor:'#C9A96E'
+      }]},
+      options: makeChartOpts('#C9A96E')
+    });
+  },50);
+}
+
+// ── DONNÉES HISTORIQUES SIMULÉES ──
+function genHistory30(base, variation, label, label2){
+  const rows = [];
+  for(let i=29;i>=0;i--){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const dateStr = d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const h = Math.round(base + (Math.random()-0.5)*variation);
+    const huile = Math.random()>0.95 ? 'bas' : 'normal';
+    const op = Math.random()>0.5 ? label : label2;
+    rows.push(`<tr>
+      <td>${dateStr}</td>
+      <td>${i%2===0?'Cummins 500 kVA':'SDMO 400 kVA'}</td>
+      <td>${h}h</td>
+      <td style="color:${huile==='bas'?'var(--orange)':'var(--vert)'}">${huile}</td>
+      <td>${op}</td>
+    </tr>`);
+  }
+  return rows.join('');
+}
+
+document.getElementById('dakar-saisies-hist').innerHTML = genHistory30(820, 10, 'Lassana', 'Amadou');
+document.getElementById('abidjan-saisies-hist').innerHTML = genHistory30(610, 12, 'Kouamé', 'Serge');
+
+// ── GRAPHIQUES ──
+function makeGradientData(start, end, len, noise){
+  return Array.from({length:len},(_,i)=>{
+    const v = start + (end-start)*(i/(len-1));
+    return Math.max(5, Math.min(100, Math.round(v + (Math.random()-0.5)*noise)));
+  });
+}
+
+function shortDates(n){
+  return Array.from({length:n},(_,i)=>{
+    const d = new Date(); d.setDate(d.getDate()-(n-1-i));
+    return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
+  });
+}
+
+let chartDakarInst = null, chartAbidjanInst = null;
+let chartDakarTechInst = null, chartAbidjanTechInst = null;
+
+function makeChartOpts(color){
+  return { responsive:true, plugins:{legend:{display:false}},
+    scales:{ x:{grid:{color:'#EDE4F5'},ticks:{color:'#7A6890',font:{size:10}}},
+             y:{grid:{color:'#EDE4F5'},ticks:{color:'#7A6890',font:{size:10},callback:v=>v+'%'},min:0,max:100} } };
+}
+
+function renderChartDakar(){
+  setTimeout(()=>{
+    if(chartDakarInst) chartDakarInst.destroy();
+    const ctx = document.getElementById('chart-dakar');
+    if(!ctx) return;
+    chartDakarInst = new Chart(ctx.getContext('2d'),{
+      type:'line',
+      data:{ labels:shortDates(14), datasets:[{
+        data: makeGradientData(72, 18, 14, 3),
+        borderColor:'#623489', backgroundColor:'rgba(98,52,137,0.07)',
+        borderWidth:1.5, tension:0.3, fill:true, spanGaps:true, pointRadius:3, pointBackgroundColor:'#623489'
+      }]},
+      options:{ responsive:true, plugins:{legend:{display:false}},
+        scales:{ x:{grid:{color:'#EDE4F5'},ticks:{color:'#7A6890',font:{size:10}}},
+                 y:{grid:{color:'#EDE4F5'},ticks:{color:'#7A6890',font:{size:10},callback:v=>v+'%'},min:0,max:100} } }
+    });
+  },50);
+}
+
+function renderChartAbidjan(){
+  setTimeout(()=>{
+    if(chartAbidjanInst) chartAbidjanInst.destroy();
+    const ctx = document.getElementById('chart-abidjan');
+    if(!ctx) return;
+    chartAbidjanInst = new Chart(ctx.getContext('2d'),{
+      type:'line',
+      data:{ labels:shortDates(14), datasets:[{
+        data: makeGradientData(78, 65, 14, 4),
+        borderColor:'#623489', backgroundColor:'rgba(98,52,137,0.07)',
+        borderWidth:1.5, tension:0.3, fill:true, spanGaps:true, pointRadius:3, pointBackgroundColor:'#623489'
+      }]},
+      options:{ responsive:true, plugins:{legend:{display:false}},
+        scales:{ x:{grid:{color:'#EDE4F5'},ticks:{color:'#7A6890',font:{size:10}}},
+                 y:{grid:{color:'#EDE4F5'},ticks:{color:'#7A6890',font:{size:10},callback:v=>v+'%'},min:0,max:100} } }
+    });
+  },50);
+}
+</script>
+</body>
+</html>
