@@ -1003,13 +1003,17 @@ async function wizSave() {
       }
       const cuve = wizState.cuves[si];
       if(cuve) {
-        await api('cuves','','*','POST',{
+        const cuveRes = await api('cuves','','*','POST',{
           client_id: client.id,
           site_id: siteId,
           capacite_litres: parseInt(cuve.capacite)||500,
           seuil_alerte_litres: parseInt(cuve.seuil_alerte)||150,
           actif: true
         });
+        const cuveCreee = Array.isArray(cuveRes)?cuveRes[0]:cuveRes;
+        if(cuveCreee?.id && siteId) {
+          await api('groupes',`&site_id=eq.${siteId}`,'*','PATCH',{cuve_id: cuveCreee.id});
+        }
       }
     }
 
