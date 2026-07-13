@@ -107,6 +107,30 @@ body{background:var(--noir);color:var(--t);font-family:'Inter',sans-serif;displa
 .field input:focus,.field select:focus{border-color:var(--or)}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media(max-width:800px){.sb{display:none}.kpi-row{grid-template-columns:repeat(2,1fr)}.view{padding:16px}.client-row{grid-template-columns:2fr 80px 80px}}
+
+/* ── WIZARD ── */
+.wz-step{width:24px;height:4px;border-radius:2px;background:var(--b);transition:background 0.2s}
+.wz-step.active{background:var(--or)}
+.wz-step.done{background:var(--vert)}
+.wz-panel{display:none}
+.wz-panel.active{display:block;animation:su 0.2s ease}
+.wz-label{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--t2);font-weight:600;margin-bottom:14px}
+.wz-site-block{background:var(--s2);border-radius:8px;padding:12px 14px;margin-bottom:10px;border:1px solid var(--b)}
+.wz-site-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.wz-site-nom{font-size:13px;font-weight:600;font-family:'Space Grotesk',sans-serif;color:var(--or)}
+.wz-groupe-block{background:var(--s2);border-radius:8px;padding:12px 14px;margin-bottom:8px;border-left:3px solid var(--or);border:1px solid var(--b);border-left:3px solid var(--or)}
+.wz-contact-section{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--b)}
+.wz-contact-section:last-child{border-bottom:none}
+.wz-contact-title{font-size:12px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.wz-contact-row{display:grid;grid-template-columns:1fr 1fr 28px;gap:6px;align-items:center;margin-bottom:6px}
+.wz-contact-row input{background:var(--s2);border:1px solid var(--b);border-radius:6px;padding:8px 10px;color:var(--t);font-size:12px;font-family:'Inter',sans-serif;outline:none;width:100%}
+.wz-contact-row input:focus{border-color:var(--or)}
+.wz-rm{background:none;border:none;color:var(--t2);cursor:pointer;font-size:16px;padding:0;line-height:1}
+.wz-rm:hover{color:var(--rouge)}
+.wz-equip-site{margin-bottom:20px}
+.wz-equip-site-title{font-size:12px;font-weight:700;font-family:'Space Grotesk',sans-serif;color:var(--or);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--b)}
+.wz-groupe-row{background:var(--s2);border-radius:6px;padding:10px 12px;margin-bottom:6px;border:1px solid var(--b)}
+.wz-cuve-row{background:var(--s2);border-radius:6px;padding:10px 12px;margin-bottom:6px;border:1px solid var(--b)}
 </style>
 </head>
 <body>
@@ -230,24 +254,118 @@ body{background:var(--noir);color:var(--t);font-family:'Inter',sans-serif;displa
 
 </div>
 
-<!-- MODAL NOUVEAU CLIENT -->
+<!-- WIZARD NOUVEAU CLIENT -->
 <div class="modal-overlay" id="modal-add" onclick="closeModal('modal-add',event)">
-  <div class="modal">
-    <div class="modal-head"><div class="modal-nom">Nouveau client</div><button class="modal-close" onclick="closeModalDirect('modal-add')">✕</button></div>
-    <div class="modal-body">
-      <div class="field"><label>Nom de l'établissement</label><input id="add-nom" placeholder="Ex: Hôtel Ivoire"></div>
-      <div class="field-row">
-        <div class="field"><label>Type</label><select id="add-type"><option value="hotel">Hôtel</option><option value="residence">Résidence</option><option value="autre">Autre</option></select></div>
-        <div class="field"><label>Plan</label><select id="add-plan"><option value="starter">Starter — 10 000</option><option value="business" selected>Business — 20 000</option><option value="pro">Pro — 50 000</option></select></div>
+  <div class="modal" style="max-width:580px;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-head" style="flex-shrink:0">
+      <div>
+        <div class="modal-nom" id="wizard-title">Nouveau client</div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <div class="wz-step active" id="wz-dot-1"></div>
+          <div class="wz-step" id="wz-dot-2"></div>
+          <div class="wz-step" id="wz-dot-3"></div>
+          <div class="wz-step" id="wz-dot-4"></div>
+        </div>
       </div>
-      <div class="field-row">
-        <div class="field"><label>Ville</label><input id="add-ville" placeholder="Ex: Dakar" value="Dakar"></div>
-        <div class="field"><label>Groupe hôtelier</label><input id="add-groupe" placeholder="Ex: Azalai (optionnel)"></div>
+      <button class="modal-close" onclick="closeModalDirect('modal-add')">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;flex:1">
+
+      <!-- ÉTAPE 1 — IDENTITÉ -->
+      <div class="wz-panel active" id="wz-1">
+        <div class="wz-label">Étape 1 — Identité</div>
+        <div class="field"><label>Nom du groupe ou de l'hôtel</label><input id="w-nom" placeholder="Ex: Groupe Azalaï, Hôtel Ivoire…"></div>
+        <div class="field-row">
+          <div class="field"><label>Type de client</label>
+            <select id="w-type" onchange="wizToggleGroupe()">
+              <option value="hotel_solo">Hôtel solo</option>
+              <option value="groupe_hotelier">Groupe hôtelier</option>
+            </select>
+          </div>
+          <div class="field"><label>Plan</label>
+            <select id="w-plan">
+              <option value="starter">Starter — 10 000</option>
+              <option value="business" selected>Business — 20 000</option>
+              <option value="pro">Pro — 50 000</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Ville principale</label><input id="w-ville" placeholder="Ex: Dakar" value="Dakar"></div>
+          <div class="field"><label>Pays</label>
+            <select id="w-pays">
+              <option value="Sénégal">Sénégal</option>
+              <option value="Côte d'Ivoire">Côte d'Ivoire</option>
+              <option value="Cameroun">Cameroun</option>
+              <option value="Mali">Mali</option>
+              <option value="Autre">Autre</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Couleur de marque</label><input id="w-couleur" type="color" value="#8B1A2E" style="height:40px;padding:4px 8px;cursor:pointer"></div>
+          <div class="field"><label>Prix litre FCFA</label><input id="w-prix" type="number" placeholder="695" value="695"></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px">
+          <button class="btn btn-or" onclick="wizNext(1)">Suivant →</button>
+        </div>
       </div>
-      <div class="field"><label>WhatsApp Patron</label><input id="add-patron" placeholder="+221771234567"></div>
-      <div class="field"><label>WhatsApp Gardien</label><input id="add-gardien" placeholder="+221771234568"></div>
-      <div class="field"><label>Prix litre FCFA</label><input id="add-prix" type="number" placeholder="695" value="695"></div>
-      <button class="btn btn-or" style="width:100%;justify-content:center;padding:13px;margin-top:4px" onclick="saveClient()">✅ Créer le client</button>
+
+      <!-- ÉTAPE 2 — SITES -->
+      <div class="wz-panel" id="wz-2">
+        <div class="wz-label" id="wz-2-label">Étape 2 — Sites</div>
+        <div id="wz-sites-list"></div>
+        <button class="btn btn-ghost" style="margin-top:6px;font-size:12px" onclick="wizAddSite()">+ Ajouter un hôtel</button>
+        <div style="display:flex;justify-content:space-between;margin-top:16px">
+          <button class="btn btn-ghost" onclick="wizGo(1)">← Retour</button>
+          <button class="btn btn-or" onclick="wizNext(2)">Suivant →</button>
+        </div>
+      </div>
+
+      <!-- ÉTAPE 3 — ÉQUIPEMENTS -->
+      <div class="wz-panel" id="wz-3">
+        <div class="wz-label">Étape 3 — Équipements</div>
+        <div id="wz-equip-list"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:16px">
+          <button class="btn btn-ghost" onclick="wizGo(2)">← Retour</button>
+          <button class="btn btn-or" onclick="wizNext(3)">Suivant →</button>
+        </div>
+      </div>
+
+      <!-- ÉTAPE 4 — CONTACTS -->
+      <div class="wz-panel" id="wz-4">
+        <div class="wz-label">Étape 4 — Contacts</div>
+
+        <div class="wz-contact-section">
+          <div class="wz-contact-title">Directeur des opérations <span style="color:var(--t2);font-weight:400">(optionnel)</span></div>
+          <div id="wz-dir-ops"></div>
+          <button class="btn btn-ghost" style="font-size:11px;margin-top:4px" onclick="wizAddContact('dir_ops')">+ Ajouter</button>
+        </div>
+
+        <div class="wz-contact-section">
+          <div class="wz-contact-title">Directeur technique <span style="color:var(--t2);font-weight:400">(optionnel)</span></div>
+          <div id="wz-dir-tech"></div>
+          <button class="btn btn-ghost" style="font-size:11px;margin-top:4px" onclick="wizAddContact('dir_tech')">+ Ajouter</button>
+        </div>
+
+        <div class="wz-contact-section">
+          <div class="wz-contact-title">Responsable technique <span style="color:var(--orange);font-size:10px">● Reçoit les rapports WA</span></div>
+          <div id="wz-resp-tech"></div>
+          <button class="btn btn-ghost" style="font-size:11px;margin-top:4px" onclick="wizAddContact('resp_tech')">+ Ajouter</button>
+        </div>
+
+        <div class="wz-contact-section">
+          <div class="wz-contact-title">Techniciens terrain <span style="color:var(--vert);font-size:10px">● Saisie quotidienne WA</span></div>
+          <div id="wz-techniciens"></div>
+          <button class="btn btn-ghost" style="font-size:11px;margin-top:4px" onclick="wizAddContact('technicien')">+ Ajouter un technicien</button>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;margin-top:16px">
+          <button class="btn btn-ghost" onclick="wizGo(3)">← Retour</button>
+          <button class="btn btn-or" onclick="wizSave()" id="wz-save-btn">✅ Créer le client</button>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -381,7 +499,7 @@ function goTo(v) {
 }
 
 function showToast(msg,type='ok'){const t=document.getElementById('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.classList.remove('show'),2500);}
-function openAddClient(){document.getElementById('modal-add').classList.add('open');}
+function openAddClient(){wizReset();document.getElementById('modal-add').classList.add('open');}
 function openMaintenance(){loadClientSelect('m-client');document.getElementById('modal-maint').classList.add('open');}
 function closeModal(id,e){if(e.target===document.getElementById(id))closeModalDirect(id);}
 function closeModalDirect(id){document.getElementById(id).classList.remove('open');}
@@ -643,23 +761,283 @@ async function loadMaintenance() {
     </div>`).join('');
 }
 
-async function saveClient() {
-  const nom = document.getElementById('add-nom').value.trim();
-  if(!nom){showToast('Nom requis','err');return;}
+// ── WIZARD STATE ──
+let wizState = {
+  step: 1,
+  sites: [],      // [{id, nom, ville}]
+  groupes: {},    // {siteIndex: [{nom, marque, kva, heures, seuil}]}
+  cuves: {},      // {siteIndex: {capacite, seuil_alerte}}
+  contacts: {dir_ops:[], dir_tech:[], resp_tech:[], technicien:[]}
+};
+
+function wizReset() {
+  wizState = {step:1, sites:[], groupes:{}, cuves:{}, contacts:{dir_ops:[],dir_tech:[],resp_tech:[],technicien:[]}};
+  wizGo(1);
+  document.getElementById('w-nom').value='';
+  document.getElementById('w-type').value='hotel_solo';
+  document.getElementById('w-plan').value='business';
+  document.getElementById('w-ville').value='Dakar';
+  document.getElementById('w-pays').value='Sénégal';
+  document.getElementById('w-couleur').value='#8B1A2E';
+  document.getElementById('w-prix').value='695';
+  wizToggleGroupe();
+}
+
+function wizGo(step) {
+  wizState.step = step;
+  document.querySelectorAll('.wz-panel').forEach((p,i)=>{
+    p.classList.toggle('active', i+1===step);
+  });
+  document.querySelectorAll('.wz-step').forEach((d,i)=>{
+    d.classList.remove('active','done');
+    if(i+1===step) d.classList.add('active');
+    else if(i+1<step) d.classList.add('done');
+  });
+  const titles = ['Nouveau client — Identité','Nouveau client — Sites','Nouveau client — Équipements','Nouveau client — Contacts'];
+  document.getElementById('wizard-title').textContent = titles[step-1];
+}
+
+function wizToggleGroupe() {
+  const isGroupe = document.getElementById('w-type').value === 'groupe_hotelier';
+  document.getElementById('wz-2-label').textContent = isGroupe ? 'Étape 2 — Hôtels du groupe' : 'Étape 2 — Votre hôtel';
+}
+
+function wizNext(from) {
+  if(from===1) {
+    const nom = document.getElementById('w-nom').value.trim();
+    if(!nom){showToast('Nom requis','err');return;}
+    const isGroupe = document.getElementById('w-type').value === 'groupe_hotelier';
+    if(isGroupe) {
+      if(!wizState.sites.length) wizAddSite();
+    } else {
+      // hotel solo — un seul site = le client lui-même
+      if(!wizState.sites.length) {
+        wizState.sites = [{nom: nom, ville: document.getElementById('w-ville').value||'Dakar'}];
+      }
+      wizRenderSites();
+    }
+    wizGo(2);
+  } else if(from===2) {
+    const isGroupe = document.getElementById('w-type').value === 'groupe_hotelier';
+    if(isGroupe && !wizState.sites.length){showToast('Ajoutez au moins un hôtel','err');return;}
+    wizRenderEquip();
+    wizGo(3);
+  } else if(from===3) {
+    wizRenderContacts();
+    wizGo(4);
+  }
+}
+
+// ── SITES ──
+function wizRenderSites() {
+  const el = document.getElementById('wz-sites-list');
+  const isGroupe = document.getElementById('w-type').value === 'groupe_hotelier';
+  el.innerHTML = wizState.sites.map((s,i)=>`
+    <div class="wz-site-block">
+      <div class="wz-site-head">
+        <div class="wz-site-nom">🏨 ${s.nom||'Hôtel '+(i+1)}</div>
+        ${isGroupe?`<button class="wz-rm" onclick="wizRemoveSite(${i})">✕</button>`:''}
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Nom de l'hôtel</label><input value="${s.nom||''}" placeholder="Ex: Azalaï Dakar" oninput="wizState.sites[${i}].nom=this.value;this.closest('.wz-site-block').querySelector('.wz-site-nom').textContent='🏨 '+(this.value||'Hôtel ${i+1}')"></div>
+        <div class="field"><label>Ville</label><input value="${s.ville||''}" placeholder="Dakar" oninput="wizState.sites[${i}].ville=this.value"></div>
+      </div>
+    </div>`).join('');
+}
+
+function wizAddSite() {
+  wizState.sites.push({nom:'', ville:''});
+  wizRenderSites();
+}
+
+function wizRemoveSite(i) {
+  wizState.sites.splice(i,1);
+  delete wizState.groupes[i];
+  delete wizState.cuves[i];
+  wizRenderSites();
+}
+
+// ── ÉQUIPEMENTS ──
+function wizRenderEquip() {
+  const el = document.getElementById('wz-equip-list');
+  el.innerHTML = wizState.sites.map((s,si)=>{
+    const gs = wizState.groupes[si]||[];
+    const cuve = wizState.cuves[si]||null;
+    const groupesHtml = gs.map((g,gi)=>`
+      <div class="wz-groupe-row">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:600">⚙️ Groupe ${gi+1}</div>
+          <button class="wz-rm" onclick="wizRemoveGroupe(${si},${gi})">✕</button>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Nom</label><input value="${g.nom||''}" placeholder="GE Principal" oninput="wizState.groupes[${si}][${gi}].nom=this.value"></div>
+          <div class="field"><label>Marque</label><input value="${g.marque||''}" placeholder="Caterpillar" oninput="wizState.groupes[${si}][${gi}].marque=this.value"></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Puissance (kVA)</label><input type="number" value="${g.kva||''}" placeholder="500" oninput="wizState.groupes[${si}][${gi}].kva=this.value"></div>
+          <div class="field"><label>Heures actuelles</label><input type="number" value="${g.heures||0}" placeholder="0" oninput="wizState.groupes[${si}][${gi}].heures=this.value"></div>
+        </div>
+        <div class="field"><label>Seuil vidange (heures)</label><input type="number" value="${g.seuil||250}" placeholder="250" oninput="wizState.groupes[${si}][${gi}].seuil=this.value"></div>
+      </div>`).join('');
+    const cuveHtml = cuve ? `
+      <div class="wz-cuve-row">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-size:12px;font-weight:600">🛢️ Cuve commune</div>
+          <button class="wz-rm" onclick="wizRemoveCuve(${si})">✕</button>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Capacité (litres)</label><input type="number" value="${cuve.capacite||500}" oninput="wizState.cuves[${si}].capacite=this.value"></div>
+          <div class="field"><label>Alerte sous (litres)</label><input type="number" value="${cuve.seuil_alerte||150}" oninput="wizState.cuves[${si}].seuil_alerte=this.value"></div>
+        </div>
+      </div>` : '';
+    return `<div class="wz-equip-site">
+      <div class="wz-equip-site-title">🏨 ${s.nom||'Hôtel '+(si+1)}</div>
+      ${groupesHtml}
+      <button class="btn btn-ghost" style="font-size:11px;margin-bottom:8px" onclick="wizAddGroupe(${si})">+ Ajouter un groupe électrogène</button>
+      ${cuveHtml}
+      ${!cuve?`<button class="btn btn-ghost" style="font-size:11px" onclick="wizAddCuve(${si})">+ Ajouter une cuve commune</button>`:''}
+    </div>`;
+  }).join('');
+}
+
+function wizAddGroupe(si) {
+  if(!wizState.groupes[si]) wizState.groupes[si]=[];
+  wizState.groupes[si].push({nom:'',marque:'',kva:'',heures:0,seuil:250});
+  wizRenderEquip();
+}
+
+function wizRemoveGroupe(si,gi) {
+  wizState.groupes[si].splice(gi,1);
+  wizRenderEquip();
+}
+
+function wizAddCuve(si) {
+  wizState.cuves[si] = {capacite:500, seuil_alerte:150};
+  wizRenderEquip();
+}
+
+function wizRemoveCuve(si) {
+  delete wizState.cuves[si];
+  wizRenderEquip();
+}
+
+// ── CONTACTS ──
+function wizRenderContacts() {
+  const roles = {dir_ops:'wz-dir-ops', dir_tech:'wz-dir-tech', resp_tech:'wz-resp-tech', technicien:'wz-techniciens'};
+  Object.entries(roles).forEach(([role, elId])=>{
+    const el = document.getElementById(elId);
+    const contacts = wizState.contacts[role]||[];
+    el.innerHTML = contacts.map((c,i)=>`
+      <div class="wz-contact-row">
+        <input value="${c.nom||''}" placeholder="Nom" oninput="wizState.contacts['${role}'][${i}].nom=this.value">
+        <input value="${c.wa||''}" placeholder="+221 7X XXX XXX" oninput="wizState.contacts['${role}'][${i}].wa=this.value">
+        <button class="wz-rm" onclick="wizRemoveContact('${role}',${i})">✕</button>
+      </div>`).join('');
+  });
+}
+
+function wizAddContact(role) {
+  wizState.contacts[role].push({nom:'',wa:''});
+  wizRenderContacts();
+}
+
+function wizRemoveContact(role, i) {
+  wizState.contacts[role].splice(i,1);
+  wizRenderContacts();
+}
+
+// ── SAVE FINAL ──
+async function wizSave() {
+  const btn = document.getElementById('wz-save-btn');
+  btn.disabled=true; btn.textContent='⏳ Création en cours…';
   try {
-    await api('clients','','*','POST',{
-      nom, type:document.getElementById('add-type').value,
-      ville:document.getElementById('add-ville').value||'Dakar',
-      groupe_hotelier:document.getElementById('add-groupe').value||null,
-      whatsapp_patron:document.getElementById('add-patron').value,
-      whatsapp_gardien:document.getElementById('add-gardien').value,
-      plan:document.getElementById('add-plan').value,
-      prix_litre_fcfa:parseInt(document.getElementById('add-prix').value)||695,
-      prix_mensuel:PLANS[document.getElementById('add-plan').value]||20000,
-      actif:true
+    const nom    = document.getElementById('w-nom').value.trim();
+    const type   = document.getElementById('w-type').value;
+    const plan   = document.getElementById('w-plan').value;
+    const ville  = document.getElementById('w-ville').value||'Dakar';
+    const pays   = document.getElementById('w-pays').value||'Sénégal';
+    const couleur= document.getElementById('w-couleur').value;
+    const prix   = parseInt(document.getElementById('w-prix').value)||695;
+
+    // 1. Créer le client
+    const clients = await api('clients','','*','POST',{
+      nom, type, ville, pays,
+      couleur_marque: couleur,
+      groupe_hotelier: type==='groupe_hotelier',
+      plan,
+      prix_litre_fcfa: prix,
+      prix_mensuel: PLANS[plan]||20000,
+      actif: true
     });
-    closeModalDirect('modal-add');showToast(`${nom} ajouté ✓`);loadAll();
-  } catch(e){showToast('Erreur','err');}
+    const client = Array.isArray(clients)?clients[0]:clients;
+    if(!client?.id) throw new Error('Client non créé');
+
+    // 2. Créer les sites
+    const siteIds = [];
+    for(const s of wizState.sites) {
+      const res = await api('sites','','*','POST',{
+        client_id: client.id,
+        nom: s.nom||nom,
+        ville: s.ville||ville,
+        pays,
+        actif: true
+      });
+      const site = Array.isArray(res)?res[0]:res;
+      siteIds.push(site?.id||null);
+    }
+
+    // 3. Créer les groupes et cuves par site
+    for(let si=0; si<wizState.sites.length; si++) {
+      const siteId = siteIds[si];
+      const gs = wizState.groupes[si]||[];
+      for(const g of gs) {
+        if(!g.nom) continue;
+        await api('groupes','','*','POST',{
+          client_id: client.id,
+          site_id: siteId,
+          nom: g.nom,
+          marque: g.marque||'',
+          puissance_kva: parseInt(g.kva)||0,
+          heures_total: parseFloat(g.heures)||0,
+          seuil_vidange_heures: parseInt(g.seuil)||250,
+          actif: true
+        });
+      }
+      const cuve = wizState.cuves[si];
+      if(cuve) {
+        await api('cuves','','*','POST',{
+          client_id: client.id,
+          site_id: siteId,
+          capacite_litres: parseInt(cuve.capacite)||500,
+          seuil_alerte_litres: parseInt(cuve.seuil_alerte)||150,
+          actif: true
+        });
+      }
+    }
+
+    // 4. Créer les contacts
+    for(const [role, contacts] of Object.entries(wizState.contacts)) {
+      for(const c of contacts) {
+        if(!c.nom && !c.wa) continue;
+        await api('contacts','','*','POST',{
+          client_id: client.id,
+          nom: c.nom||'',
+          role,
+          whatsapp: c.wa||null,
+          actif: true
+        });
+      }
+    }
+
+    closeModalDirect('modal-add');
+    showToast(`${nom} créé ✓`);
+    wizReset();
+    loadAll();
+  } catch(e) {
+    console.error(e);
+    showToast('Erreur lors de la création','err');
+    btn.disabled=false; btn.textContent='✅ Créer le client';
+  }
 }
 
 async function deleteClient(id,nom) {
