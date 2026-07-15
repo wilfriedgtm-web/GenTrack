@@ -116,6 +116,7 @@ async function sendRapportPatron(phone: string, client: any) {
   const date = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   let msg = `📊 *Rapport GenTrack*\n*${client.nom}* — ${date}\n\n`;
 
+  // Cuve commune en premier
   if (cuve) {
     const derniereCuveSaisie = await getDerniereSaiseCuve(cuve.id);
     const niveauCuve = derniereCuveSaisie?.niveau_litres;
@@ -134,6 +135,7 @@ async function sendRapportPatron(phone: string, client: any) {
     msg += '\n';
   }
 
+  // Groupes — moteur uniquement
   for (const g of groupes) {
     const saisie = saisies.find((s: any) => s.groupe_id === g.id);
     const emoji = !saisie ? '❓' : '⚙️';
@@ -164,7 +166,7 @@ async function sendRapportPatron(phone: string, client: any) {
 // ── MENU AIDE ──
 function buildMenu(isGardien: boolean, isPatron: boolean) {
   let msg = `🔧 *GenTrack — Commandes*\n\n`;
-  if (isGardien) msg += `*Technicien :*\n• *saisie* — Relevé quotidien\n• *plein* — Ravitaillement cuve\n• *panne* — Signaler une urgence\n• *resolu* — Clôturer une panne\n• *vidange* — Déclarer une vidange effectuée\n• *aide* — Ce menu\n\n`;
+  if (isGardien) msg += `*Technicien :*\n• *saisie* — Relevé quotidien\n• *plein* — Ravitaillement cuve\n• *panne* — Signaler une urgence\n• *resolu* — Clôturer une panne\n• *aide* — Ce menu\n\n`;
   if (isPatron) msg += `*Responsable :*\n• *rapport* — Bilan des groupes\n• *plein* — Ravitaillement cuve\n• *aide* — Ce menu\n\n`;
   if (!isGardien && !isPatron) msg += `Numéro non reconnu.`;
   return msg;
@@ -172,6 +174,7 @@ function buildMenu(isGardien: boolean, isPatron: boolean) {
 
 // ── ENREGISTREMENT SAISIE MOTEUR ──
 async function enregistrerSaisie(phone: string, data: any, client: any) {
+  // Enregistrer saisie moteur (sans carburant)
   await db('saisies', {
     method: 'POST',
     body: {
@@ -186,12 +189,14 @@ async function enregistrerSaisie(phone: string, data: any, client: any) {
     }
   });
 
+  // Mettre à jour heures_total du groupe
   await db('groupes', {
     method: 'PATCH',
     query: `&id=eq.${data.groupe_id}`,
     body: { heures_total: data.heures_marche }
   });
 
+  // Alertes moteur
   const alertes: any[] = [];
   if (data.niveau_huile === 'critique') {
     alertes.push({ type: 'huile_critique', severite: 'danger', message: `Huile critique — ${data.groupe_nom} — Changement immédiat` });
@@ -215,6 +220,7 @@ async function enregistrerSaisie(phone: string, data: any, client: any) {
     await db('alertes', { method: 'POST', body: { client_id: data.client_id, groupe_id: data.groupe_id, ...alerte } });
   }
 
+  // Confirmation gardien
   const huileIcon = data.niveau_huile === 'critique' ? '🚨' : data.niveau_huile === 'bas' ? '⚠️' : '✅';
   const confirmation =
     `✅ *Relevé moteur enregistré !*\n\n` +
@@ -225,55 +231,10 @@ async function enregistrerSaisie(phone: string, data: any, client: any) {
     `\n_Rapport envoyé au responsable 📲_`;
   await sendWA(phone, confirmation);
 
+  // Rapport patron
   const clientFull = await db('clients', { query: `&id=eq.${data.client_id}` });
   if (Array.isArray(clientFull) && clientFull[0]?.whatsapp_patron) {
     await sendRapportPatron(clientFull[0].whatsapp_patron.replace('whatsapp:', ''), clientFull[0]);
-  }
-}
-
-// ── ENREGISTREMENT VIDANGE ──
-async function enregistrerVidange(phone: string, data: any, client: any) {
-  await db('vidanges', {
-    method: 'POST',
-    body: {
-      groupe_id: data.groupe_id,
-      client_id: data.client_id,
-      date: new Date().toISOString().split('T')[0],
-      heures_au_moment: data.heures_total,
-      intervenant: data.intervenant || 'Technicien'
-    }
-  });
-
-  await db('groupes', {
-    method: 'PATCH',
-    query: `&id=eq.${data.groupe_id}`,
-    body: { heures_total: 0 }
-  });
-
-  await db('alertes', {
-    method: 'PATCH',
-    query: `&groupe_id=eq.${data.groupe_id}&type=in.(vidange_requise,vidange_imminente)&resolue=eq.false`,
-    body: { resolue: true }
-  });
-
-  await sendWA(phone,
-    `✅ *Vidange enregistrée !*\n\n` +
-    `📟 *${data.groupe_nom}*\n` +
-    `🕐 Compteur remis à zéro (était : ${data.heures_total}h)\n` +
-    `👤 ${data.intervenant || 'Technicien'}\n\n` +
-    `_Historique mis à jour. Prochain seuil : ${data.seuil_vidange}h_ 📲`
-  );
-
-  const clientFull = await db('clients', { query: `&id=eq.${data.client_id}` });
-  if (Array.isArray(clientFull) && clientFull[0]?.whatsapp_patron) {
-    await sendWA(
-      clientFull[0].whatsapp_patron.replace('whatsapp:', ''),
-      `🔧 *Vidange effectuée*\n*${data.client_nom}*\n\n` +
-      `📟 ${data.groupe_nom}\n` +
-      `🕐 Compteur réinitialisé (était : ${data.heures_total}h)\n` +
-      `👤 ${data.intervenant || 'Technicien'}\n\n` +
-      `_Prochain seuil : ${data.seuil_vidange}h_`
-    );
   }
 }
 
@@ -302,9 +263,7 @@ async function demarrerPlein(phone: string, client: any) {
   await setSession(phone, 'plein_litres', {
     client_id: client.id, client_nom: client.nom,
     cuve_id: cuve.id, cuve_nom: cuve.nom,
-    cuve_capacite: cuve.capacite_litres,
-    // ✅ MODIF 1 — on stocke le niveau précédent pour la vérification de cohérence
-    niveau_precedent: niveauPrec ?? null
+    cuve_capacite: cuve.capacite_litres
   });
   return sendWA(phone, `⛽ *Ravitaillement — ${client.nom}*\n\n🛢️ *${cuve.nom}* (${cuve.capacite_litres}L)${niveauTxt}\n\nCombien de litres ont été ajoutés ?\n_(Ex: 500)_`);
 }
@@ -318,112 +277,20 @@ async function gererFluxPlein(phone: string, bodyText: string, msg: string, clie
     if (isNaN(litres) || litres <= 0) {
       return sendWA(phone, `❌ Quantité invalide. Entrez un nombre de litres.\n_(Ex: 500)_`);
     }
-    const capacite = sessionData.cuve_capacite || 500;
-    const exNiveau = Math.round(capacite * 0.8);
-    const niveauPrecedent = sessionData.niveau_precedent;
-
-    // ✅ MODIF 4 — vérification dès les litres ajoutés si on a un niveau précédent
-    if (niveauPrecedent != null) {
-      const totalCalcule = niveauPrecedent + litres;
-      const margeAcceptable = Math.round(capacite * 0.05); // 5% de la capacité
-
-      if (totalCalcule > capacite + margeAcceptable) {
-        // Dépassement de capacité détecté dès cette étape — on demande confirmation
-        await setSession(phone, 'plein_confirm_litres', { ...sessionData, litres_ajoutes: litres });
-        return sendWA(phone,
-          `⚠️ *Vérification requise*\n\n` +
-          `Niveau actuel : *${niveauPrecedent}L*\n` +
-          `Litres saisis : *${litres}L*\n` +
-          `Total calculé : *${totalCalcule}L*\n` +
-          `Capacité cuve : *${capacite}L*\n\n` +
-          `Le total dépasse la capacité de la cuve.\n` +
-          `Vous confirmez les *${litres}L* ajoutés ?\n\n` +
-          `*1* — Oui, je confirme\n*2* — Non, je re-saisis`
-        );
-      }
-    }
-
+    const exNiveau = Math.round(sessionData.cuve_capacite * 0.8);
     await setSession(phone, 'plein_niveau', { ...sessionData, litres_ajoutes: litres });
     return sendWA(phone, `✅ *${litres} litres* ajoutés.\n\n🛢️ Quel niveau indique l'écran Dover maintenant ?\n_(Lisez le chiffre sur l'écran après le plein, en litres. Ex: ${exNiveau})_`);
   }
 
-  // ✅ MODIF 5 — confirmation des litres ajoutés suspects
-  if (state === 'plein_confirm_litres') {
-    if (msg.trim() === '1') {
-      // Technicien confirme → on continue vers la question Dover
-      const capacite = sessionData.cuve_capacite || 500;
-      const exNiveau = Math.round(capacite * 0.8);
-      await setSession(phone, 'plein_niveau', { ...sessionData });
-      return sendWA(phone, `✅ *${sessionData.litres_ajoutes} litres* confirmés.\n\n🛢️ Quel niveau indique l'écran Dover maintenant ?\n_(en litres, Ex: ${exNiveau})_`);
-    } else if (msg.trim() === '2') {
-      // Technicien re-saisit les litres
-      await setSession(phone, 'plein_litres', { ...sessionData, litres_ajoutes: undefined });
-      return sendWA(phone, `🔄 *Re-saisie*\n\nCombien de litres ont été ajoutés ?\n_(Ex: 200)_`);
-    }
-    return sendWA(phone, `Répondez *1* pour confirmer ou *2* pour re-saisir.`);
-  }
-
-  // ✅ MODIF 2 — étape plein_niveau avec double vérification
   if (state === 'plein_niveau') {
     const niveau = parseInt(bodyText.trim().replace(/\s/g, ''));
     const capacite = sessionData.cuve_capacite || 500;
     const exNiveau = Math.round(capacite * 0.8);
-
-    // Validation basique
-    if (isNaN(niveau) || niveau < 0) {
-      return sendWA(phone, `❌ Niveau invalide. Entrez le volume en litres.\n_(Ex: ${exNiveau})_`);
+    if (isNaN(niveau) || niveau < 0 || niveau > capacite * 1.05) {
+      return sendWA(phone, `❌ Niveau invalide. Entrez le volume entre 0 et ${capacite} litres.\n_(Ex: ${exNiveau})_`);
     }
-
-    // CAS 1 — Blocage dur : niveau dépasse la capacité physique de la cuve
-    if (niveau > capacite) {
-      return sendWA(phone,
-        `❌ *Niveau impossible*\n\n` +
-        `Vous avez saisi *${niveau}L* mais la cuve ne peut contenir que *${capacite}L*.\n\n` +
-        `Vérifiez la lecture sur l'écran Dover et ressaisissez.\n_(Ex: ${exNiveau})_`
-      );
-    }
-
-    // CAS 2 — Vérification de cohérence si on a un niveau précédent
-    const niveauPrecedent = sessionData.niveau_precedent;
-    if (niveauPrecedent != null) {
-      const niveauAttendu = niveauPrecedent + sessionData.litres_ajoutes;
-      const margeAcceptable = Math.round(capacite * 0.05); // 5% de la capacité
-      const ecart = Math.abs(niveau - niveauAttendu);
-
-      if (ecart > margeAcceptable) {
-        // Sauvegarder le niveau saisi et passer en état confirmation
-        await setSession(phone, 'plein_confirmation', { ...sessionData, niveau_litres: niveau, niveau_attendu: Math.min(niveauAttendu, capacite) });
-        return sendWA(phone,
-          `⚠️ *Vérification requise*\n\n` +
-          `Niveau avant plein : *${niveauPrecedent}L*\n` +
-          `Litres ajoutés : *${sessionData.litres_ajoutes}L*\n` +
-          `Niveau attendu : *~${Math.min(niveauAttendu, capacite)}L*\n` +
-          `Niveau que vous avez saisi : *${niveau}L*\n\n` +
-          `L'écart est de *${ecart}L*. C'est correct ?\n\n` +
-          `*1* — Oui, je confirme\n*2* — Non, je re-saisis`
-        );
-      }
-    }
-
-    // CAS 3 — Tout est cohérent, on continue normalement
     await setSession(phone, 'plein_operateur', { ...sessionData, niveau_litres: niveau });
     return sendWA(phone, `✅ Niveau noté : *${niveau} litres*\n\n👤 Votre prénom ?`);
-  }
-
-  // ✅ MODIF 3 — nouvel état : gestion de la confirmation technicien
-  if (state === 'plein_confirmation') {
-    if (msg.trim() === '1') {
-      // Technicien confirme malgré l'écart → on avance
-      await setSession(phone, 'plein_operateur', { ...sessionData });
-      return sendWA(phone, `✅ Niveau confirmé : *${sessionData.niveau_litres} litres*\n\n👤 Votre prénom ?`);
-    } else if (msg.trim() === '2') {
-      // Technicien veut re-saisir → retour à la question Dover
-      const capacite = sessionData.cuve_capacite || 500;
-      const exNiveau = Math.round(capacite * 0.8);
-      await setSession(phone, 'plein_niveau', { ...sessionData, niveau_litres: undefined });
-      return sendWA(phone, `🔄 *Re-saisie*\n\n🛢️ Quel niveau indique l'écran Dover ?\n_(en litres, Ex: ${exNiveau})_`);
-    }
-    return sendWA(phone, `Répondez *1* pour confirmer ou *2* pour re-saisir.`);
   }
 
   if (state === 'plein_operateur') {
@@ -434,6 +301,7 @@ async function gererFluxPlein(phone: string, bodyText: string, msg: string, clie
 
     await setSession(phone, 'idle', {});
 
+    // Alerte carburant bas si nécessaire
     const pct = Math.round(data.niveau_litres / (data.cuve_capacite || 500) * 100);
     if (pct < 30) {
       await db('alertes', {
@@ -448,6 +316,7 @@ async function gererFluxPlein(phone: string, bodyText: string, msg: string, clie
       });
     }
 
+    // Notification équipe
     const dateStr = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'Africa/Dakar' });
     const notifMsg =
       `⛽ *Ravitaillement effectué*\n*${data.client_nom}*\n\n` +
@@ -491,18 +360,15 @@ async function handleMessage(from: string, bodyText: string) {
   const msg = bodyText.trim().toLowerCase();
   console.log(`=== From: ${phone} | Body: ${bodyText}`);
 
-  const [gardienRowsRaw, legacyGardienRaw, patronsRaw, contactsRaw, respTechRaw] = await Promise.all([
+  // ── Identifier le client ──
+  const [gardienRowsRaw, legacyGardienRaw, patronsRaw] = await Promise.all([
     db('gardiens', { query: `&whatsapp=eq.${encodeURIComponent(phone)}&actif=eq.true` }),
     db('clients', { query: `&whatsapp_gardien=eq.${encodeURIComponent(phone)}&actif=eq.true` }),
-    db('clients', { query: `&whatsapp_patron=eq.${encodeURIComponent(phone)}&actif=eq.true` }),
-    db('contacts', { query: `&whatsapp=eq.${encodeURIComponent(phone)}&role=eq.technicien&actif=eq.true` }),
-    db('contacts', { query: `&whatsapp=eq.${encodeURIComponent(phone)}&role=eq.resp_tech&actif=eq.true` })
+    db('clients', { query: `&whatsapp_patron=eq.${encodeURIComponent(phone)}&actif=eq.true` })
   ]);
   const gardienRows = Array.isArray(gardienRowsRaw) ? gardienRowsRaw : [];
   const legacyGardienClients = Array.isArray(legacyGardienRaw) ? legacyGardienRaw : [];
   const clientsPatron = Array.isArray(patronsRaw) ? patronsRaw : [];
-  const contactsTech = Array.isArray(contactsRaw) ? contactsRaw : [];
-  const contactsResp = Array.isArray(respTechRaw) ? respTechRaw : [];
 
   let clients: any[] = [];
   if (gardienRows.length > 0) {
@@ -512,32 +378,14 @@ async function handleMessage(from: string, bodyText: string) {
     if (clientArr.length > 0) {
       clients = [{ ...clientArr[0], gardien_nom: gardien.nom }];
     }
-  } else if (contactsTech.length > 0) {
-    // Nouveau système — technicien enregistré via wizard
-    const contact = contactsTech[0];
-    const clientRaw = await db('clients', { query: `&id=eq.${contact.client_id}&actif=eq.true` });
-    const clientArr = Array.isArray(clientRaw) ? clientRaw : [];
-    if (clientArr.length > 0) {
-      clients = [{ ...clientArr[0], gardien_nom: contact.nom }];
-    }
   } else if (legacyGardienClients.length > 0) {
     clients = legacyGardienClients;
-  }
-
-  // Responsable technique — reçoit les rapports comme un patron
-  const isRespTech = contactsResp.length > 0;
-  if (isRespTech && !clients.length) {
-    const contact = contactsResp[0];
-    const clientRaw = await db('clients', { query: `&id=eq.${contact.client_id}&actif=eq.true` });
-    const clientArr = Array.isArray(clientRaw) ? clientRaw : [];
-    if (clientArr.length > 0 && !clientsPatron.length) {
-      clientsPatron.push(clientArr[0]);
-    }
   }
 
   const isGardien = clients.length > 0;
   const isPatron = clientsPatron.length > 0;
 
+  // ── Commandes globales ──
   if (msg === 'aide' || msg === 'help') {
     return sendWA(phone, buildMenu(isGardien, isPatron));
   }
@@ -565,6 +413,7 @@ async function handleMessage(from: string, bodyText: string) {
     const state = session?.state || 'idle';
     const sessionData = session?.data ? JSON.parse(session.data) : {};
 
+    // Commandes prioritaires (interrompent toute session en cours)
     if (msg === 'resolu' || msg === 'résolu') {
       const groupesRaw = await db('groupes', { query: `&client_id=eq.${client.id}&actif=eq.true` });
       const groupes = Array.isArray(groupesRaw) ? groupesRaw : [];
@@ -604,10 +453,12 @@ async function handleMessage(from: string, bodyText: string) {
       return sendRapportPatron(phone, client);
     }
 
+    // Flux plein en cours
     if (state?.startsWith('plein_')) {
       return gererFluxPlein(phone, bodyText, msg, client, session);
     }
 
+    // ── Flux résolution ──
     if (state === 'resolu_choix') {
       const idx = parseInt(msg) - 1;
       if (isNaN(idx) || idx < 0 || idx >= sessionData.pannes?.length) {
@@ -663,6 +514,7 @@ async function handleMessage(from: string, bodyText: string) {
       return sendWA(phone, `✅ *Panne clôturée !*\n\n${data.panne_label}\n${data.resolution_note?'🔧 '+data.resolution_note+'\n':''}${data.cout>0?'💰 '+data.cout.toLocaleString('fr-FR')+' FCFA\n':''}\n_Le responsable a été notifié. 📲_`);
     }
 
+    // ── FLUX PANNE ──
     if (state === 'panne_groupe') {
       const idx = parseInt(msg) - 1;
       if (isNaN(idx) || idx < 0 || idx >= sessionData.groupes?.length) {
@@ -689,74 +541,13 @@ async function handleMessage(from: string, bodyText: string) {
       return sendWA(phone, `🚨 *Panne signalée !*\n\n${sessionData.groupe_nom} — ${panneLabel}\n\nLe responsable a été alerté immédiatement. 📲`);
     }
 
-    if (msg === 'vidange') {
-      const groupesRaw = await db('groupes', { query: `&client_id=eq.${client.id}&actif=eq.true` });
-      const groupes = Array.isArray(groupesRaw) ? groupesRaw : [];
-      if (!groupes.length) return sendWA(phone, `Aucun groupe configuré.`);
-
-      const liste = groupes.map((g: any, i: number) => {
-        const pct = Math.round((g.heures_total || 0) / (g.seuil_vidange_heures || 250) * 100);
-        const emoji = pct >= 100 ? '🔴' : pct >= 80 ? '🟡' : '🟢';
-        return `*${i + 1}* — ${g.nom} ${emoji} (${g.heures_total || 0}h / ${g.seuil_vidange_heures || 250}h)`;
-      }).join('\n');
-
-      await setSession(phone, 'vidange_groupe', {
-        client_id: client.id, client_nom: client.nom,
-        groupes: groupes.map((g: any) => ({
-          id: g.id, nom: g.nom,
-          heures_total: g.heures_total || 0,
-          seuil_vidange: g.seuil_vidange_heures || 250
-        }))
-      });
-      return sendWA(phone,
-        `🔧 *Déclaration de vidange*\n*${client.nom}*\n\nQuel groupe vient d'être vidangé ?\n\n${liste}\n\nRépondez avec le numéro.`
-      );
-    }
-
-    if (state === 'vidange_groupe') {
-      const idx = parseInt(msg) - 1;
-      if (isNaN(idx) || idx < 0 || idx >= sessionData.groupes?.length) {
-        return sendWA(phone, `Répondez avec un numéro entre 1 et ${sessionData.groupes?.length}`);
-      }
-      const g = sessionData.groupes[idx];
-      await setSession(phone, 'vidange_intervenant', {
-        ...sessionData, groupe_id: g.id, groupe_nom: g.nom,
-        heures_total: g.heures_total, seuil_vidange: g.seuil_vidange
-      });
-      return sendWA(phone,
-        `🔧 *Vidange — ${g.nom}*\n` +
-        `🕐 Compteur actuel : *${g.heures_total}h*\n\n` +
-        `Qui a effectué la vidange ?\n_(Votre prénom ou celui du prestataire. Ex: Mamadou)_`
-      );
-    }
-
-    if (state === 'vidange_intervenant') {
-      const intervenant = bodyText.trim();
-      await setSession(phone, 'vidange_confirm', { ...sessionData, intervenant });
-      return sendWA(phone,
-        `✅ *Récapitulatif*\n\n` +
-        `📟 Groupe : *${sessionData.groupe_nom}*\n` +
-        `🕐 Compteur : *${sessionData.heures_total}h* → remis à 0\n` +
-        `👤 Intervenant : *${intervenant}*\n\n` +
-        `Confirmez-vous la vidange ?\n\n*1* — Oui, confirmer\n*2* — Annuler`
-      );
-    }
-
-    if (state === 'vidange_confirm') {
-      if (msg === '2') {
-        await setSession(phone, 'idle', {});
-        return sendWA(phone, `❌ Vidange annulée.`);
-      }
-      if (msg !== '1') return sendWA(phone, `Répondez *1* pour confirmer ou *2* pour annuler.`);
-      await setSession(phone, 'idle', {});
-      return enregistrerVidange(phone, sessionData, client);
-    }
-
+    // ── FLUX SAISIE MOTEUR ──
     if (state === 'idle' || msg === 'saisie' || msg === 'bonjour') {
       const groupesRaw = await db('groupes', { query: `&client_id=eq.${client.id}&actif=eq.true` });
       const groupes = Array.isArray(groupesRaw) ? groupesRaw : [];
       if (!groupes.length) return sendWA(phone, `Aucun groupe configuré. Contactez votre administrateur.`);
 
+      // Toujours proposer le choix du groupe
       const liste = groupes.map((g: any, i: number) => `*${i + 1}* — ${g.nom} (${g.marque} ${g.puissance_kva}kVA)`).join('\n');
       await setSession(phone, 'saisie_choix_groupe', {
         client_id: client.id, client_nom: client.nom,
@@ -791,6 +582,7 @@ async function handleMessage(from: string, bodyText: string) {
       );
     }
 
+    // Étape compteur moteur
     if (state === 'saisie_heures') {
       const compteur = parseFloat(msg.replace(',', '.'));
       const heuresPrecedentes = sessionData.heures_total || 0;
@@ -810,6 +602,7 @@ async function handleMessage(from: string, bodyText: string) {
       return sendWA(phone, `✅ Compteur : *${compteur}h* (+${heuresDuJour}h aujourd'hui).${vidangeMsg}\n\n🛢️ Niveau d'huile ?\n\n*1* — Normal ✅\n*2* — Bas ⚠️\n*3* — Critique 🚨`);
     }
 
+    // Étape huile → enregistrement moteur puis cuve si pas encore saisie
     if (state === 'saisie_huile') {
       const huileMap: any = { '1': 'normal', '2': 'bas', '3': 'critique' };
       const huile = huileMap[msg.trim()];
@@ -818,12 +611,15 @@ async function handleMessage(from: string, bodyText: string) {
       const operateur = client.gardien_nom || 'Technicien';
       const dataFinal = { ...sessionData, niveau_huile: huile, operateur };
 
+      // Vérifier si la cuve a déjà été saisie aujourd'hui
       const cuveDejaFaite = sessionData.cuve_id ? await cuveDejaHier(sessionData.cuve_id) : true;
 
       if (cuveDejaFaite || !sessionData.cuve_id) {
+        // Cuve déjà saisie ou pas de cuve — enregistrer directement
         await setSession(phone, 'idle', {});
         return enregistrerSaisie(phone, dataFinal, client);
       } else {
+        // Cuve pas encore saisie → demander le niveau
         await setSession(phone, 'saisie_cuve', dataFinal);
         const cuveRaw = await db('cuves', { query: `&id=eq.${sessionData.cuve_id}` });
         const cuve = Array.isArray(cuveRaw) ? cuveRaw[0] : null;
@@ -839,6 +635,7 @@ async function handleMessage(from: string, bodyText: string) {
       }
     }
 
+    // Étape cuve (si pas encore saisie aujourd'hui)
     if (state === 'saisie_cuve') {
       const cuveRaw = await db('cuves', { query: `&id=eq.${sessionData.cuve_id}` });
       const cuve = Array.isArray(cuveRaw) ? cuveRaw[0] : null;
@@ -847,17 +644,21 @@ async function handleMessage(from: string, bodyText: string) {
       if (isNaN(niveauCuve) || niveauCuve < 0 || niveauCuve > capaciteCuve * 1.05) {
         return sendWA(phone, `❌ Entrez un volume entre 0 et ${capaciteCuve} litres.\nEx: *${Math.round(capaciteCuve * 0.8)}*`);
       }
+      // Alerte carburant bas
       const pctCuve = Math.round(niveauCuve / capaciteCuve * 100);
       if (pctCuve < 30) {
         await db('alertes', { method: 'POST', body: { client_id: sessionData.client_id, type: 'carburant_bas', severite: 'danger', message: `Carburant critique — ${niveauCuve}L (${pctCuve}%) — Cuve commune` } });
       } else {
         await db('alertes', { method: 'PATCH', query: `&client_id=eq.${sessionData.client_id}&type=eq.carburant_bas&resolue=eq.false`, body: { resolue: true } });
       }
+      // Enregistrer saisie cuve
       await enregistrerSaisieCuve(sessionData.cuve_id, sessionData.client_id, niveauCuve, 0, sessionData.operateur);
       await setSession(phone, 'idle', {});
+      // Enregistrer saisie moteur
       return enregistrerSaisie(phone, sessionData, client);
     }
 
+    // Fallback
     if (state === 'saisie_final') {
       await setSession(phone, 'idle', {});
       return enregistrerSaisie(phone, sessionData, client);
@@ -888,6 +689,7 @@ async function handleMessage(from: string, bodyText: string) {
     return sendWA(phone, `🎉 Parfait !\n\nUn conseiller GenTrack vous contactera dans les 24h.\n\n_Tapez *aide* pour voir toutes les fonctionnalités._`);
   }
 
+  // Premier contact prospect
   await setSession(phone, 'prospect_groupes', {});
   return sendWA(phone, `👋 *Bienvenue sur GenTrack !*\n\nGérez vos groupes électrogènes directement par WhatsApp.\n\n✅ Saisie quotidienne\n✅ Alertes carburant automatiques\n✅ Rapport hebdomadaire\n\nVous gérez combien de groupes ?\n\n*1* — 1 groupe\n*2* — 2 à 5 groupes\n*3* — Plus de 5 groupes`);
 }
