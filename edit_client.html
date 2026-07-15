@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack — Édition client</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+:root{
+  --bx:#8B1A2E;--bx-pale:rgba(139,26,46,0.08);--bx-mid:rgba(139,26,46,0.15);
+  --or:#C9A96E;--or-pale:rgba(201,169,110,0.12);
+  --surface:#FDFAF5;--surface2:#F5EFE6;--surface3:#EDE3D4;
+  --bordure:#DDD0BC;--texte:#2C1810;--texte2:#7A6855;--texte3:#B5A090;
+  --vert:#2D7A4F;--vert-pale:rgba(45,122,79,0.08);--vert-bord:rgba(45,122,79,0.3);
+  --rouge:#C0392B;--rouge-pale:rgba(192,57,43,0.08);--rouge-bordure:rgba(192,57,43,0.3);
+  --orange:#D4761E;--orange-pale:rgba(212,118,30,0.08);--orange-bordure:rgba(212,118,30,0.3);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--surface);color:var(--texte);font-family:'Inter',sans-serif;min-height:100vh}
+
+/* HEADER */
+.header{background:var(--bx);color:white}
+.header-top{display:flex;justify-content:space-between;align-items:center;padding:20px 36px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.logo{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;letter-spacing:3px;text-transform:uppercase}
+.logo span{color:var(--or);font-weight:400}
+.logo-sub{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-top:2px}
+.header-right{text-align:right;display:flex;align-items:center;gap:16px}
+.btn-retour{background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;letter-spacing:0.3px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:background 0.15s}
+.btn-retour:hover{background:rgba(255,255,255,0.18)}
+.header-badge{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--or);border:1px solid rgba(201,169,110,0.3);border-radius:2px;padding:3px 10px}
+
+.container{max-width:860px;margin:0 auto;padding:32px 36px 80px}
+
+/* SECTIONS */
+.section{margin-bottom:32px}
+.section-header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--bordure)}
+.section-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--texte)}
+.section-sub{font-size:11px;color:var(--texte2);letter-spacing:0.5px;margin-top:2px}
+
+/* BOUTONS */
+.btn{border:none;border-radius:4px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;letter-spacing:0.3px;display:inline-flex;align-items:center;gap:6px;transition:opacity 0.15s}
+.btn:active{opacity:0.75}
+.btn-primary{background:var(--bx);color:white}
+.btn-primary:hover{opacity:0.88}
+.btn-secondary{background:var(--surface2);color:var(--texte2);border:1px solid var(--bordure)}
+.btn-secondary:hover{color:var(--texte);border-color:var(--texte3)}
+.btn-add{background:var(--vert-pale);color:var(--vert);border:1px solid var(--vert-bord)}
+.btn-add:hover{background:rgba(45,122,79,0.14)}
+.btn-danger{background:var(--rouge-pale);color:var(--rouge);border:1px solid var(--rouge-bordure)}
+.btn-danger:hover{background:rgba(192,57,43,0.14)}
+.btn-save-inline{background:var(--vert-pale);color:var(--vert);border:1px solid var(--vert-bord);padding:5px 12px;font-size:11px}
+.btn-sm{padding:5px 10px;font-size:11px}
+
+/* CARD */
+.card{background:white;border:1px solid var(--bordure);border-radius:6px;overflow:hidden;margin-bottom:10px}
+.card-header{background:var(--surface2);padding:11px 14px;border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:center}
+.card-title{font-size:13px;font-weight:600;color:var(--texte)}
+.card-sub{font-size:11px;color:var(--texte2);margin-top:2px}
+.card-body{padding:14px}
+
+/* FORM */
+.form-row{display:grid;gap:12px;margin-bottom:12px}
+.form-row.cols-2{grid-template-columns:1fr 1fr}
+.form-row.cols-3{grid-template-columns:1fr 1fr 1fr}
+.form-row.cols-1{grid-template-columns:1fr}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--texte2)}
+.field input,.field select{background:var(--surface);border:1px solid var(--bordure);border-radius:4px;padding:8px 10px;font-size:13px;color:var(--texte);font-family:'Inter',sans-serif;transition:border-color 0.15s;width:100%}
+.field input:focus,.field select:focus{outline:none;border-color:var(--bx)}
+.field input[type="color"]{padding:4px 6px;height:36px;cursor:pointer}
+.field-hint{font-size:10px;color:var(--texte3);margin-top:2px}
+
+/* INLINE EDIT ROW */
+.edit-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.edit-row input,.edit-row select{flex:1;background:var(--surface);border:1px solid var(--bordure);border-radius:4px;padding:7px 10px;font-size:12px;color:var(--texte);font-family:'Inter',sans-serif}
+.edit-row input:focus,.edit-row select:focus{outline:none;border-color:var(--bx)}
+.edit-row-label{font-size:11px;color:var(--texte2);min-width:80px;flex-shrink:0}
+
+/* CONTACT ROW */
+.contact-card{background:var(--surface2);border:1px solid var(--bordure);border-radius:4px;padding:10px 12px;margin-bottom:8px;display:grid;grid-template-columns:1fr 1fr 160px auto;gap:10px;align-items:center}
+.contact-card input,.contact-card select{background:white;border:1px solid var(--bordure);border-radius:3px;padding:6px 8px;font-size:12px;color:var(--texte);font-family:'Inter',sans-serif;width:100%}
+.contact-card input:focus,.contact-card select:focus{outline:none;border-color:var(--bx)}
+.contact-new{background:var(--or-pale);border:1px dashed rgba(201,169,110,0.5);border-radius:4px;padding:10px 12px;display:grid;grid-template-columns:1fr 1fr 160px auto;gap:10px;align-items:center;margin-bottom:8px}
+.contact-new input,.contact-new select{background:white;border:1px solid var(--bordure);border-radius:3px;padding:6px 8px;font-size:12px;font-family:'Inter',sans-serif}
+.contact-new input:focus,.contact-new select:focus{outline:none;border-color:var(--bx)}
+
+/* BADGES RÔLE */
+.role-badge{font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;padding:2px 8px;border-radius:2px;display:inline-block;white-space:nowrap}
+.role-tech{background:var(--bx-pale);color:var(--bx)}
+.role-resp{background:var(--or-pale);color:#8a5e20}
+
+/* TOAST */
+.toast{position:fixed;bottom:28px;right:28px;background:var(--texte);color:white;padding:12px 18px;border-radius:6px;font-size:13px;font-weight:500;display:none;z-index:100;box-shadow:0 4px 16px rgba(0,0,0,0.2);animation:slideUp 0.2s ease}
+.toast.ok{background:var(--vert)}
+.toast.err{background:var(--rouge)}
+@keyframes slideUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* LOADING */
+.loading{padding:60px;text-align:center;color:var(--texte2);font-size:13px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--bordure);border-top-color:var(--bx);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{padding:20px;text-align:center;color:var(--texte3);font-size:12px;font-style:italic}
+
+.divider{height:1px;background:var(--bordure);margin:28px 0;position:relative}
+.divider::after{content:'◆';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--surface);padding:0 12px;color:var(--or);font-size:9px}
+
+.footer{background:var(--bx);color:rgba(255,255,255,0.4);text-align:center;padding:18px;font-size:11px;letter-spacing:1px;margin-top:40px}
+.footer strong{color:var(--or)}
+
+.save-bar{position:sticky;bottom:0;background:white;border-top:1px solid var(--bordure);padding:14px 36px;display:flex;justify-content:flex-end;gap:10px;box-shadow:0 -4px 16px rgba(0,0,0,0.06);z-index:10}
+
+@media(max-width:700px){
+  .container{padding:20px}
+  .form-row.cols-2,.form-row.cols-3{grid-template-columns:1fr}
+  .header-top{padding:16px 20px}
+  .contact-card,.contact-new{grid-template-columns:1fr 1fr;grid-template-rows:auto auto}
+  .contact-card>button,.contact-new>button{grid-column:1/-1}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="logo" id="header-logo">Gen<span>Track</span></div>
+      <div class="logo-sub" id="header-sub">Édition du compte client</div>
+    </div>
+    <div class="header-right">
+      <a class="btn-retour" id="btn-retour" href="#">← Retour au dashboard</a>
+      <span class="header-badge">Mode Édition</span>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="loading"><span class="spinner"></span>Chargement des données...</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPA_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+
+// ── ÉTAT GLOBAL ──
+let G = { clientId: null, client: null, sites: [], groupes: [], cuves: [], contacts: [] };
+// Nouveaux contacts à ajouter (en attente)
+let newContacts = [];
+
+// ── UTILS ──
+const H = s => ({ headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, ...s });
+
+async function api(table, q = '', select = '*') {
+  const r = await fetch(`${SUPA_URL}/rest/v1/${table}?select=${select}${q}`, {
+    headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` }
+  });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+async function patch(table, id, data) {
+  const r = await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'PATCH',
+    ...H({ body: JSON.stringify(data) })
+  });
+  return r.ok;
+}
+
+async function post(table, data) {
+  const r = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    ...H({ body: JSON.stringify(data) })
+  });
+  if (!r.ok) return null;
+  const d = await r.json();
+  return Array.isArray(d) ? d[0] : d;
+}
+
+async function del(table, id) {
+  const r = await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` }
+  });
+  return r.ok;
+}
+
+function toast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type}`;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 3000);
+}
+
+function val(id) { return document.getElementById(id)?.value?.trim() || ''; }
+
+function applyBrandColor(hex) {
+  if (!hex) return;
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  document.documentElement.style.setProperty('--bx', hex);
+  document.documentElement.style.setProperty('--bx-pale', `rgba(${r},${g},${b},0.08)`);
+  document.documentElement.style.setProperty('--bx-mid', `rgba(${r},${g},${b},0.15)`);
+}
+
+// ── ROUTING ──
+async function init() {
+  const p = new URLSearchParams(window.location.search);
+  const clientId = p.get('id');
+  const token = p.get('token');
+  let resolvedId = clientId;
+
+  if (!resolvedId && token) {
+    const rows = await api('tokens', `&token=eq.${token}&actif=eq.true`);
+    if (rows.length) resolvedId = rows[0].client_id;
+  }
+
+  if (!resolvedId) {
+    document.getElementById('app').innerHTML = `<div class="loading">❌ Identifiant client manquant dans l'URL.</div>`;
+    return;
+  }
+
+  // Lien retour
+  const retour = document.getElementById('btn-retour');
+  retour.href = token ? `client.html?token=${token}` : `client.html?id=${resolvedId}`;
+
+  G.clientId = resolvedId;
+
+  const [clients, sites, groupes, cuves, contacts] = await Promise.all([
+    api('clients', `&id=eq.${resolvedId}`),
+    api('sites', `&client_id=eq.${resolvedId}&order=nom`),
+    api('groupes', `&client_id=eq.${resolvedId}&order=nom`),
+    api('cuves', `&client_id=eq.${resolvedId}&order=nom`),
+    api('contacts', `&client_id=eq.${resolvedId}&order=nom`),
+  ]);
+
+  if (!clients.length) {
+    document.getElementById('app').innerHTML = `<div class="loading">❌ Client introuvable.</div>`;
+    return;
+  }
+
+  G.client = clients[0];
+  G.sites = sites;
+  G.groupes = groupes;
+  G.cuves = cuves;
+  G.contacts = contacts;
+
+  applyBrandColor(G.client.couleur_marque);
+  document.getElementById('header-logo').innerHTML = `${G.client.nom}`;
+  document.title = `GenTrack — Édition · ${G.client.nom}`;
+
+  render();
+}
+
+// ── RENDER ──
+function render() {
+  const c = G.client;
+  const siteOptions = G.sites.map(s => `<option value="${s.id}">${s.nom}</option>`).join('');
+
+  document.getElementById('app').innerHTML = `
+    <div class="container">
+
+      <!-- ═══ INFORMATIONS CLIENT ═══ -->
+      <div class="section">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Informations client</div>
+            <div class="section-sub">Nom, pays, couleur de marque</div>
+          </div>
+          <button class="btn btn-primary" onclick="saveClient()">💾 Enregistrer</button>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <div class="form-row cols-2">
+              <div class="field">
+                <label>Nom du client / hôtel</label>
+                <input type="text" id="c-nom" value="${esc(c.nom||'')}" placeholder="Ex : Hôtel Palm Beach">
+              </div>
+              <div class="field">
+                <label>Pays</label>
+                <input type="text" id="c-pays" value="${esc(c.pays||'')}" placeholder="Ex : Sénégal">
+              </div>
+            </div>
+            <div class="form-row cols-2">
+              <div class="field">
+                <label>Couleur de marque</label>
+                <input type="color" id="c-couleur" value="${c.couleur_marque||'#8B1A2E'}">
+                <div class="field-hint">Utilisée pour le header du dashboard client</div>
+              </div>
+              <div class="field">
+                <label>WhatsApp gardien</label>
+                <input type="text" id="c-wa-gardien" value="${esc(c.whatsapp_gardien||'')}" placeholder="+221 7X XXX XX XX">
+              </div>
+            </div>
+            <div class="form-row cols-2">
+              <div class="field">
+                <label>WhatsApp patron</label>
+                <input type="text" id="c-wa-patron" value="${esc(c.whatsapp_patron||'')}" placeholder="+221 7X XXX XX XX">
+              </div>
+              <div class="field"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- ═══ SITES ═══ -->
+      <div class="section">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Sites</div>
+            <div class="section-sub">Établissements rattachés à ce client</div>
+          </div>
+          <button class="btn btn-add" onclick="showAddSite()">＋ Ajouter un site</button>
+        </div>
+
+        <div id="sites-list">
+          ${G.sites.length ? G.sites.map(s => renderSiteRow(s)).join('') : '<div class="empty">Aucun site enregistré</div>'}
+        </div>
+
+        <!-- Formulaire ajout site (caché) -->
+        <div id="add-site-form" style="display:none">
+          <div class="card" style="border:1px dashed rgba(201,169,110,0.5);background:var(--or-pale)">
+            <div class="card-header" style="background:transparent">
+              <div class="card-title">Nouveau site</div>
+            </div>
+            <div class="card-body">
+              <div class="form-row cols-3">
+                <div class="field">
+                  <label>Nom du site</label>
+                  <input type="text" id="new-site-nom" placeholder="Ex : Hôtel Principal">
+                </div>
+                <div class="field">
+                  <label>Ville</label>
+                  <input type="text" id="new-site-ville" placeholder="Ex : Dakar">
+                </div>
+                <div class="field">
+                  <label>Pays</label>
+                  <input type="text" id="new-site-pays" placeholder="Ex : Sénégal" value="${esc(c.pays||'')}">
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button class="btn btn-secondary" onclick="hideAddSite()">Annuler</button>
+                <button class="btn btn-primary" onclick="addSite()">Créer le site</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- ═══ GROUPES ═══ -->
+      <div class="section">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Groupes électrogènes</div>
+            <div class="section-sub">Nom, marque, puissance, seuil de vidange</div>
+          </div>
+        </div>
+        <div id="groupes-list">
+          ${G.groupes.length ? G.groupes.map(g => renderGroupeRow(g)).join('') : '<div class="empty">Aucun groupe enregistré</div>'}
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- ═══ CUVES ═══ -->
+      <div class="section">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Cuves à carburant</div>
+            <div class="section-sub">Nom et capacité des cuves</div>
+          </div>
+        </div>
+        <div id="cuves-list">
+          ${G.cuves.length ? G.cuves.map(cv => renderCuveRow(cv)).join('') : '<div class="empty">Aucune cuve enregistrée</div>'}
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- ═══ CONTACTS ═══ -->
+      <div class="section">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Contacts</div>
+            <div class="section-sub">Techniciens et responsables techniques</div>
+          </div>
+          <button class="btn btn-add" onclick="addContactRow()">＋ Ajouter un contact</button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 160px 36px;gap:10px;padding:0 0 6px 0;margin-bottom:4px">
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--texte3);font-weight:600">Nom</div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--texte3);font-weight:600">WhatsApp</div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--texte3);font-weight:600">Rôle</div>
+          <div></div>
+        </div>
+
+        <div id="contacts-list">
+          ${G.contacts.length ? G.contacts.map(ct => renderContactRow(ct)).join('') : '<div class="empty" id="contacts-empty">Aucun contact enregistré</div>'}
+        </div>
+        <div id="new-contacts-list"></div>
+      </div>
+
+    </div>
+
+    <div class="footer">Powered by <strong>GenTrack</strong> · Mode Édition</div>
+  `;
+}
+
+// ── HELPERS RENDER ──
+function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+
+function renderSiteRow(s) {
+  return `<div class="card" id="site-row-${s.id}">
+    <div class="card-header">
+      <div>
+        <div class="card-title" id="site-name-display-${s.id}">${esc(s.nom)}</div>
+        <div class="card-sub">${esc(s.ville||'')}${s.pays?' · '+esc(s.pays):''}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary btn-sm" onclick="toggleSiteEdit('${s.id}')">✏️ Modifier</button>
+        ${s.actif ? `<button class="btn btn-danger btn-sm" onclick="toggleSiteActif('${s.id}', false)">Désactiver</button>` : `<button class="btn btn-add btn-sm" onclick="toggleSiteActif('${s.id}', true)">Réactiver</button>`}
+      </div>
+    </div>
+    <div class="card-body" id="site-edit-${s.id}" style="display:none">
+      <div class="form-row cols-3">
+        <div class="field">
+          <label>Nom</label>
+          <input type="text" id="site-nom-${s.id}" value="${esc(s.nom||'')}">
+        </div>
+        <div class="field">
+          <label>Ville</label>
+          <input type="text" id="site-ville-${s.id}" value="${esc(s.ville||'')}">
+        </div>
+        <div class="field">
+          <label>Pays</label>
+          <input type="text" id="site-pays-${s.id}" value="${esc(s.pays||'')}">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-secondary btn-sm" onclick="toggleSiteEdit('${s.id}')">Annuler</button>
+        <button class="btn btn-primary btn-sm" onclick="saveSite('${s.id}')">💾 Enregistrer</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderGroupeRow(g) {
+  const sites = G.sites;
+  const siteNom = sites.find(s => s.id === g.site_id)?.nom || '—';
+  return `<div class="card" id="groupe-row-${g.id}">
+    <div class="card-header">
+      <div>
+        <div class="card-title">${esc(g.nom)} <span style="font-weight:400;color:var(--texte2);font-size:12px">· ${esc(g.marque||'—')} ${g.puissance_kva||''}kVA</span></div>
+        <div class="card-sub">${esc(siteNom)} · Seuil vidange : ${g.seuil_vidange_heures||250}h</div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="toggleGroupeEdit('${g.id}')">✏️ Modifier</button>
+    </div>
+    <div class="card-body" id="groupe-edit-${g.id}" style="display:none">
+      <div class="form-row cols-2">
+        <div class="field">
+          <label>Nom du groupe</label>
+          <input type="text" id="g-nom-${g.id}" value="${esc(g.nom||'')}">
+        </div>
+        <div class="field">
+          <label>Site</label>
+          <select id="g-site-${g.id}">
+            ${G.sites.map(s => `<option value="${s.id}"${s.id===g.site_id?' selected':''}>${esc(s.nom)}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="form-row cols-3">
+        <div class="field">
+          <label>Marque</label>
+          <input type="text" id="g-marque-${g.id}" value="${esc(g.marque||'')}">
+        </div>
+        <div class="field">
+          <label>Puissance (kVA)</label>
+          <input type="number" id="g-puissance-${g.id}" value="${g.puissance_kva||''}">
+        </div>
+        <div class="field">
+          <label>Seuil vidange (h)</label>
+          <input type="number" id="g-seuil-${g.id}" value="${g.seuil_vidange_heures||250}">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-secondary btn-sm" onclick="toggleGroupeEdit('${g.id}')">Annuler</button>
+        <button class="btn btn-primary btn-sm" onclick="saveGroupe('${g.id}')">💾 Enregistrer</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderCuveRow(cv) {
+  const siteNom = G.sites.find(s => s.id === cv.site_id)?.nom || '—';
+  return `<div class="card" id="cuve-row-${cv.id}">
+    <div class="card-header">
+      <div>
+        <div class="card-title">${esc(cv.nom)}</div>
+        <div class="card-sub">${esc(siteNom)} · ${cv.capacite_litres||0} L</div>
+      </div>
+      <button class="btn btn-secondary btn-sm" onclick="toggleCuveEdit('${cv.id}')">✏️ Modifier</button>
+    </div>
+    <div class="card-body" id="cuve-edit-${cv.id}" style="display:none">
+      <div class="form-row cols-2">
+        <div class="field">
+          <label>Nom de la cuve</label>
+          <input type="text" id="cv-nom-${cv.id}" value="${esc(cv.nom||'')}">
+        </div>
+        <div class="field">
+          <label>Capacité (litres)</label>
+          <input type="number" id="cv-cap-${cv.id}" value="${cv.capacite_litres||''}">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-secondary btn-sm" onclick="toggleCuveEdit('${cv.id}')">Annuler</button>
+        <button class="btn btn-primary btn-sm" onclick="saveCuve('${cv.id}')">💾 Enregistrer</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderContactRow(ct) {
+  const roleLabel = ct.role === 'resp_tech' ? 'Resp. technique' : 'Technicien';
+  const roleCls = ct.role === 'resp_tech' ? 'role-resp' : 'role-tech';
+  return `<div class="contact-card" id="contact-row-${ct.id}">
+    <input type="text" id="ct-nom-${ct.id}" value="${esc(ct.nom||'')}" placeholder="Nom">
+    <input type="text" id="ct-wa-${ct.id}" value="${esc(ct.whatsapp||'')}" placeholder="+221 7X XXX XX XX">
+    <select id="ct-role-${ct.id}">
+      <option value="technicien"${ct.role==='technicien'?' selected':''}>Technicien</option>
+      <option value="resp_tech"${ct.role==='resp_tech'?' selected':''}>Resp. technique</option>
+    </select>
+    <div style="display:flex;gap:4px">
+      <button class="btn btn-save-inline btn-sm" onclick="saveContact('${ct.id}')" title="Enregistrer">💾</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteContact('${ct.id}')" title="Supprimer">✕</button>
+    </div>
+  </div>`;
+}
+
+// ── TOGGLE EDIT PANELS ──
+function toggleSiteEdit(id) {
+  const el = document.getElementById(`site-edit-${id}`);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+function toggleGroupeEdit(id) {
+  const el = document.getElementById(`groupe-edit-${id}`);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+function toggleCuveEdit(id) {
+  const el = document.getElementById(`cuve-edit-${id}`);
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// ── SITE ACTIONS ──
+function showAddSite() { document.getElementById('add-site-form').style.display = 'block'; }
+function hideAddSite() { document.getElementById('add-site-form').style.display = 'none'; }
+
+async function addSite() {
+  const nom = val('new-site-nom');
+  if (!nom) { toast('Renseignez le nom du site', 'err'); return; }
+  const data = {
+    client_id: G.clientId,
+    nom,
+    ville: val('new-site-ville') || null,
+    pays: val('new-site-pays') || null,
+    actif: true
+  };
+  const created = await post('sites', data);
+  if (!created) { toast('Erreur lors de la création du site', 'err'); return; }
+  G.sites.push(created);
+  toast(`✅ Site "${nom}" créé`);
+  hideAddSite();
+  // Refresh sites list
+  document.getElementById('sites-list').innerHTML = G.sites.map(s => renderSiteRow(s)).join('');
+}
+
+async function saveSite(id) {
+  const nom = document.getElementById(`site-nom-${id}`)?.value?.trim();
+  if (!nom) { toast('Le nom est requis', 'err'); return; }
+  const data = {
+    nom,
+    ville: document.getElementById(`site-ville-${id}`)?.value?.trim() || null,
+    pays: document.getElementById(`site-pays-${id}`)?.value?.trim() || null,
+  };
+  const ok = await patch('sites', id, data);
+  if (!ok) { toast('Erreur lors de l\'enregistrement', 'err'); return; }
+  const idx = G.sites.findIndex(s => s.id === id);
+  if (idx >= 0) G.sites[idx] = { ...G.sites[idx], ...data };
+  toast(`✅ Site mis à jour`);
+  // Refresh just this card
+  document.getElementById(`site-row-${id}`).outerHTML = renderSiteRow(G.sites.find(s => s.id === id));
+}
+
+async function toggleSiteActif(id, actif) {
+  if (!confirm(actif ? 'Réactiver ce site ?' : 'Désactiver ce site ? Il n\'apparaîtra plus dans le dashboard.')) return;
+  const ok = await patch('sites', id, { actif });
+  if (!ok) { toast('Erreur', 'err'); return; }
+  const idx = G.sites.findIndex(s => s.id === id);
+  if (idx >= 0) G.sites[idx].actif = actif;
+  toast(actif ? '✅ Site réactivé' : '⚠️ Site désactivé');
+  document.getElementById(`site-row-${id}`).outerHTML = renderSiteRow(G.sites[idx]);
+}
+
+// ── GROUPE ACTIONS ──
+async function saveGroupe(id) {
+  const nom = document.getElementById(`g-nom-${id}`)?.value?.trim();
+  if (!nom) { toast('Le nom est requis', 'err'); return; }
+  const data = {
+    nom,
+    site_id: document.getElementById(`g-site-${id}`)?.value || null,
+    marque: document.getElementById(`g-marque-${id}`)?.value?.trim() || null,
+    puissance_kva: parseFloat(document.getElementById(`g-puissance-${id}`)?.value) || null,
+    seuil_vidange_heures: parseInt(document.getElementById(`g-seuil-${id}`)?.value) || 250,
+  };
+  const ok = await patch('groupes', id, data);
+  if (!ok) { toast('Erreur lors de l\'enregistrement', 'err'); return; }
+  const idx = G.groupes.findIndex(g => g.id === id);
+  if (idx >= 0) G.groupes[idx] = { ...G.groupes[idx], ...data };
+  toast('✅ Groupe mis à jour');
+  document.getElementById(`groupe-row-${id}`).outerHTML = renderGroupeRow(G.groupes.find(g => g.id === id));
+}
+
+// ── CUVE ACTIONS ──
+async function saveCuve(id) {
+  const nom = document.getElementById(`cv-nom-${id}`)?.value?.trim();
+  if (!nom) { toast('Le nom est requis', 'err'); return; }
+  const data = {
+    nom,
+    capacite_litres: parseInt(document.getElementById(`cv-cap-${id}`)?.value) || null,
+  };
+  const ok = await patch('cuves', id, data);
+  if (!ok) { toast('Erreur lors de l\'enregistrement', 'err'); return; }
+  const idx = G.cuves.findIndex(cv => cv.id === id);
+  if (idx >= 0) G.cuves[idx] = { ...G.cuves[idx], ...data };
+  toast('✅ Cuve mise à jour');
+  document.getElementById(`cuve-row-${cv.id}`).outerHTML = renderCuveRow(G.cuves.find(cv => cv.id === id));
+}
+
+// ── CLIENT SAVE ──
+async function saveClient() {
+  const nom = val('c-nom');
+  if (!nom) { toast('Le nom du client est requis', 'err'); return; }
+  const data = {
+    nom,
+    pays: val('c-pays') || null,
+    couleur_marque: val('c-couleur') || null,
+    whatsapp_gardien: val('c-wa-gardien') || null,
+    whatsapp_patron: val('c-wa-patron') || null,
+  };
+  const ok = await patch('clients', G.clientId, data);
+  if (!ok) { toast('Erreur lors de l\'enregistrement', 'err'); return; }
+  G.client = { ...G.client, ...data };
+  applyBrandColor(data.couleur_marque);
+  document.getElementById('header-logo').textContent = data.nom;
+  toast('✅ Informations client enregistrées');
+}
+
+// ── CONTACTS ──
+function addContactRow() {
+  const uid = 'new-' + Date.now();
+  const el = document.createElement('div');
+  el.className = 'contact-new';
+  el.id = `contact-new-${uid}`;
+  el.innerHTML = `
+    <input type="text" id="ct-new-nom-${uid}" placeholder="Nom complet">
+    <input type="text" id="ct-new-wa-${uid}" placeholder="+221 7X XXX XX XX">
+    <select id="ct-new-role-${uid}">
+      <option value="technicien">Technicien</option>
+      <option value="resp_tech">Resp. technique</option>
+    </select>
+    <div style="display:flex;gap:4px">
+      <button class="btn btn-add btn-sm" onclick="saveNewContact('${uid}')" title="Créer">✓</button>
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('contact-new-${uid}').remove()" title="Annuler">✕</button>
+    </div>
+  `;
+  // Remove empty placeholder
+  const empty = document.getElementById('contacts-empty');
+  if (empty) empty.remove();
+  document.getElementById('new-contacts-list').appendChild(el);
+}
+
+async function saveNewContact(uid) {
+  const nom = document.getElementById(`ct-new-nom-${uid}`)?.value?.trim();
+  const wa = document.getElementById(`ct-new-wa-${uid}`)?.value?.trim();
+  const role = document.getElementById(`ct-new-role-${uid}`)?.value;
+  if (!nom) { toast('Renseignez le nom du contact', 'err'); return; }
+  const data = { client_id: G.clientId, nom, whatsapp: wa || null, role: role || 'technicien', actif: true };
+  const created = await post('contacts', data);
+  if (!created) { toast('Erreur lors de la création', 'err'); return; }
+  G.contacts.push(created);
+  toast(`✅ Contact "${nom}" ajouté`);
+  // Remove new row, add to contacts-list
+  document.getElementById(`contact-new-${uid}`)?.remove();
+  const list = document.getElementById('contacts-list');
+  const el = document.createElement('div');
+  el.id = `contact-row-${created.id}`;
+  el.innerHTML = renderContactRow(created);
+  list.appendChild(el.firstChild || el);
+  // Rebuild contacts list properly
+  list.innerHTML = G.contacts.map(ct => renderContactRow(ct)).join('');
+}
+
+async function saveContact(id) {
+  const nom = document.getElementById(`ct-nom-${id}`)?.value?.trim();
+  if (!nom) { toast('Le nom est requis', 'err'); return; }
+  const data = {
+    nom,
+    whatsapp: document.getElementById(`ct-wa-${id}`)?.value?.trim() || null,
+    role: document.getElementById(`ct-role-${id}`)?.value || 'technicien',
+  };
+  const ok = await patch('contacts', id, data);
+  if (!ok) { toast('Erreur lors de l\'enregistrement', 'err'); return; }
+  const idx = G.contacts.findIndex(ct => ct.id === id);
+  if (idx >= 0) G.contacts[idx] = { ...G.contacts[idx], ...data };
+  toast(`✅ Contact mis à jour`);
+}
+
+async function deleteContact(id) {
+  const ct = G.contacts.find(c => c.id === id);
+  if (!confirm(`Supprimer le contact "${ct?.nom||id}" ?`)) return;
+  const ok = await del('contacts', id);
+  if (!ok) { toast('Erreur lors de la suppression', 'err'); return; }
+  G.contacts = G.contacts.filter(c => c.id !== id);
+  document.getElementById(`contact-row-${id}`)?.remove();
+  if (!G.contacts.length) {
+    document.getElementById('contacts-list').innerHTML = '<div class="empty" id="contacts-empty">Aucun contact enregistré</div>';
+  }
+  toast('🗑️ Contact supprimé');
+}
+
+init();
+</script>
+</body>
+</html>
