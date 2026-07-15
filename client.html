@@ -224,10 +224,25 @@ async function loadByToken(token) {
   if(tok.expire_at && new Date(tok.expire_at) < new Date()) {
     showError('Lien expiré', 'Ce lien d\'accès a expiré. Contactez votre responsable GenTrack.'); return;
   }
-  if(tok.site_id) {
-    await loadSiteView(tok.client_id, tok.site_id);
+  const role = tok.role || null;
+  const siteIds = tok.site_ids || [];
+
+  // Rôles dashboard avec logique multi-site
+  if(role === 'dir_ops') {
+    // Vue consolidée tous les sites, onglet Opérations uniquement
+    await loadClientView(tok.client_id, {role:'dir_ops'});
+  } else if(role === 'dir_tech') {
+    // Opérations + Technique, sites filtrés si site_ids défini
+    await loadClientView(tok.client_id, {role:'dir_tech', siteIds});
+  } else if(role === 'resp_tech') {
+    // Opérations + Technique, 1 site
+    const siteId = siteIds.length ? siteIds[0] : tok.site_id || null;
+    await loadSiteView(tok.client_id, siteId, {role:'resp_tech'});
+  } else if(tok.site_id) {
+    // Ancien format legacy
+    await loadSiteView(tok.client_id, tok.site_id, {role:'technicien'});
   } else {
-    await loadClientView(tok.client_id);
+    await loadClientView(tok.client_id, {role:null});
   }
 }
 
@@ -236,29 +251,88 @@ async function loadByClientId(clientId) {
 }
 
 // ── VUE CLIENT (groupe ou solo) ──
-async function loadClientView(clientId) {
+async function loadClientView(clientId, access={}) {
   const clients = await api('clients', `&id=eq.${clientId}`);
   if(!clients.length) { showError('Client introuvable', 'Ce client n\'existe pas dans la base GenTrack.'); return; }
   const client = clients[0];
-
   applyBrandColor(client.couleur_marque);
 
-  const sites = await api('sites', `&client_id=eq.${clientId}&actif=eq.true&order=nom`);
+  let sites = await api('sites', `&client_id=eq.${clientId}&actif=eq.true&order=nom`);
 
-  if(client.groupe_hotelier && sites.length > 1) {
+  // Filtrer les sites si dir_tech avec site_ids définis
+  if(access.role === 'dir_tech' && access.siteIds?.length) {
+    sites = sites.filter(s => access.siteIds.includes(s.id));
+  }
+
+  const showTechnique = access.role !== 'dir_ops';
+
+  if((client.groupe_hotelier || sites.length > 1) && access.role === 'dir_ops') {
     await renderGroupeView(client, sites);
+  } else if(sites.length > 1 && access.role === 'dir_tech') {
+    await renderMultiSiteView(client, sites);
   } else {
     const siteId = sites.length ? sites[0].id : null;
-    await renderHotelView(client, siteId, null);
+    await renderHotelView(client, siteId, null, {showTechnique});
   }
 }
 
-async function loadSiteView(clientId, siteId) {
+async function loadSiteView(clientId, siteId, access={}) {
   const clients = await api('clients', `&id=eq.${clientId}`);
   if(!clients.length) { showError('Client introuvable', ''); return; }
   const client = clients[0];
   applyBrandColor(client.couleur_marque);
-  await renderHotelView(client, siteId, null);
+  const showTechnique = access.role !== 'technicien';
+  await renderHotelView(client, siteId, null, {showTechnique});
+}
+
+// ════════════════════════════════════════
+// VUE MULTI-SITE — dir_tech (plusieurs sites filtrés)
+// Réutilise renderHotelView site par site avec navigation
+// ════════════════════════════════════════
+async function renderMultiSiteView(client, sites) {
+  // Pour dir_tech multi-site : on affiche site par site avec nav, Opérations + Technique
+  let activeSiteIdx = 0;
+
+  async function showSite(idx) {
+    activeSiteIdx = idx;
+    const navHtml = sites.map((s,i)=>`
+      <div class="site-btn ${i===idx?'active':''}" onclick="window._msShowSite(${i})">${s.nom}</div>
+    `).join('');
+    document.querySelector('.site-nav').innerHTML = navHtml;
+    const site = sites[idx];
+    // Ré-render le contenu sans recréer le header
+    const mainEl = document.getElementById('ms-main');
+    if(mainEl) mainEl.innerHTML = '<div class="loading"><span class="spinner"></span>Chargement...</div>';
+    await renderHotelView(client, site.id, site.nom, {showTechnique: true, inContainer: 'ms-main'});
+  }
+
+  const dateStr = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <div class="logo">${client.nom}</div>
+          <div class="logo-sub">Directeur technique · ${sites.length} sites</div>
+        </div>
+        <div class="header-right">
+          <div class="header-date">${dateStr}</div>
+          <div class="header-title">Groupes électrogènes</div>
+        </div>
+      </div>
+      <div class="site-nav">${sites.map((s,i)=>`<div class="site-btn ${i===0?'active':''}" onclick="window._msShowSite(${i})">${s.nom}</div>`).join('')}</div>
+    </div>
+    <div id="ms-main"><div class="loading" style="padding:60px"><span class="spinner"></span>Chargement...</div></div>
+    <div class="footer">Powered by <strong>GenTrack</strong> · ${client.nom}</div>`;
+
+  window._msShowSite = async (idx) => {
+    document.querySelectorAll('.site-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
+    const mainEl = document.getElementById('ms-main');
+    mainEl.innerHTML = '<div class="loading" style="padding:60px"><span class="spinner"></span>Chargement...</div>';
+    await renderHotelView(client, sites[idx].id, sites[idx].nom, {showTechnique:true, inContainer:'ms-main'});
+  };
+
+  // Charger le premier site
+  await renderHotelView(client, sites[0].id, sites[0].nom, {showTechnique:true, inContainer:'ms-main'});
 }
 
 // ════════════════════════════════════════
@@ -443,7 +517,8 @@ function buildSiteDetailHtml(client, site, groupes, saisiesJour, alertes, cuve, 
 // ════════════════════════════════════════
 // VUE HÔTEL SOLO
 // ════════════════════════════════════════
-async function renderHotelView(client, siteId, siteName) {
+async function renderHotelView(client, siteId, siteName, opts={}) {
+  const showTechnique = opts.showTechnique !== false;
   const now = new Date();
   const today = now.toISOString().split('T')[0];
   const dateDebut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
@@ -482,7 +557,10 @@ async function renderHotelView(client, siteId, siteName) {
   const nom = siteName || client.nom;
   const dateStr = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
-  document.getElementById('app').innerHTML = `
+  const inContainer = opts.inContainer || null;
+  const rootEl = inContainer ? document.getElementById(inContainer) : document.getElementById('app');
+
+  const headerHtml = inContainer ? '' : `
     <div class="header">
       <div class="header-top">
         <div>
@@ -494,11 +572,14 @@ async function renderHotelView(client, siteId, siteName) {
           <div class="header-title">Groupes électrogènes</div>
         </div>
       </div>
-    </div>
+    </div>`;
+  const footerHtml = inContainer ? '' : `<div class="footer">Powered by <strong>GenTrack</strong> · ${nom}</div>`;
+
+  rootEl.innerHTML = `${headerHtml}
     <div class="container">
       <div class="tabs">
         <div class="tab active" data-tab="operations" onclick="switchTab('operations')">Opérations</div>
-        <div class="tab" data-tab="technique" onclick="switchTab('technique')">Technique</div>
+        ${showTechnique?'<div class="tab" data-tab="technique" onclick="switchTab(\'technique\')">Technique</div>':''}
       </div>
       <div class="tab-panel active" id="panel-operations">
         <div id="op-banner-wrap"></div>
@@ -520,7 +601,7 @@ async function renderHotelView(client, siteId, siteName) {
           </div>
         </div>
       </div>
-      <div class="tab-panel" id="panel-technique">
+      ${showTechnique?`<div class="tab-panel" id="panel-technique">
         <div class="section-title">État des groupes</div>
         <div class="section-sub">Heures de marche, vidange, pannes</div>
         <div id="tech-groupes"></div>
@@ -549,12 +630,12 @@ async function renderHotelView(client, siteId, siteName) {
         <div class="section-title">Historique relevés cuve</div>
         <div class="section-sub">30 derniers relevés</div>
         <div class="table-card" id="tech-saisies-cuve"></div>
-      </div>
+      </div>`:''}
     </div>
-    <div class="footer">Powered by <strong>GenTrack</strong> · ${nom}</div>`;
+    ${footerHtml}`;
 
   renderOperations(client, groupes, saisiesJour, saisiesCuve30, alertes, pannesOuvertes, coutCarburantAnnee, coutMaintenanceAnnee, prixLitre, cuve, saisieCuveJour, today, now);
-  renderTechnique(client, groupes, saisiesRecentes, saisiesCuve30, pannesOuvertes, pannesResolues, coutCarburantAnnee, coutMaintenanceAnnee, cuve, today);
+  if(showTechnique) renderTechnique(client, groupes, saisiesRecentes, saisiesCuve30, pannesOuvertes, pannesResolues, coutCarburantAnnee, coutMaintenanceAnnee, cuve, today);
 }
 
 // ── CUVE HTML (réutilisable) ──

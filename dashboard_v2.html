@@ -371,27 +371,21 @@ body{background:var(--noir);color:var(--t);font-family:'Inter',sans-serif;displa
         <div class="wz-label">Étape 4 — Contacts</div>
 
         <div class="wz-contact-section">
-          <div class="wz-contact-title">Directeur des opérations <span style="color:var(--t2);font-weight:400">(optionnel)</span></div>
-          <div id="wz-dir-ops"></div>
-          <button class="btn btn-ghost" style="font-size:11px;margin-top:4px" onclick="wizAddContact('dir_ops')">+ Ajouter</button>
-        </div>
-
-        <div class="wz-contact-section">
-          <div class="wz-contact-title">Directeur technique <span style="color:var(--t2);font-weight:400">(optionnel)</span></div>
-          <div id="wz-dir-tech"></div>
-          <button class="btn btn-ghost" style="font-size:11px;margin-top:4px" onclick="wizAddContact('dir_tech')">+ Ajouter</button>
-        </div>
-
-        <div class="wz-contact-section">
-          <div class="wz-contact-title">Responsable technique <span style="color:var(--orange);font-size:10px">● Reçoit les rapports WA</span></div>
+          <div class="wz-contact-title">Responsable technique <span style="color:var(--orange);font-size:10px">● Reçoit les rapports WhatsApp</span></div>
+          <div class="wz-label" style="font-size:10px;color:var(--t2);margin-bottom:6px;font-weight:400;text-transform:none;letter-spacing:0">Accès dashboard : Opérations + Technique · 1 site</div>
           <div id="wz-resp-tech"></div>
           <button class="btn btn-ghost" style="font-size:11px;margin-top:4px" onclick="wizAddContact('resp_tech')">+ Ajouter</button>
         </div>
 
         <div class="wz-contact-section">
-          <div class="wz-contact-title">Techniciens terrain <span style="color:var(--vert);font-size:10px">● Saisie quotidienne WA</span></div>
+          <div class="wz-contact-title">Techniciens terrain <span style="color:var(--vert);font-size:10px">● Saisie quotidienne WhatsApp</span></div>
+          <div class="wz-label" style="font-size:10px;color:var(--t2);margin-bottom:6px;font-weight:400;text-transform:none;letter-spacing:0">Pas d'accès dashboard · WhatsApp uniquement</div>
           <div id="wz-techniciens"></div>
           <button class="btn btn-ghost" style="font-size:11px;margin-top:4px" onclick="wizAddContact('technicien')">+ Ajouter un technicien</button>
+        </div>
+
+        <div style="background:var(--s2);border-radius:8px;padding:10px 13px;border:1px solid var(--b);font-size:11px;color:var(--t2);margin-bottom:8px">
+          💡 Les liens dashboard pour <strong style="color:var(--t)">Directeur des opérations</strong> et <strong style="color:var(--t)">Directeur technique</strong> se génèrent depuis la fiche client après création.
         </div>
 
         <div style="display:flex;justify-content:space-between;margin-top:16px">
@@ -418,6 +412,48 @@ body{background:var(--noir);color:var(--t);font-family:'Inter',sans-serif;displa
       </div>
       <div class="field"><label>Notes</label><input id="m-notes" placeholder="Détails..."></div>
       <button class="btn btn-or" style="width:100%;justify-content:center;padding:13px;margin-top:4px" onclick="saveMaintenance()">✅ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL GÉNÉRER LIEN -->
+<div class="modal-overlay" id="modal-token" onclick="closeModal('modal-token',event)">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <div><div class="modal-nom">Générer un lien d'accès</div><div style="font-size:11px;color:var(--t2);margin-top:3px" id="modal-token-sub">—</div></div>
+      <button class="modal-close" onclick="closeModalDirect('modal-token')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Rôle</label>
+        <select id="token-role" onchange="onTokenRoleChange()">
+          <option value="dir_ops">Directeur des opérations — vue consolidée tous les sites</option>
+          <option value="dir_tech">Directeur technique — Opérations + Technique</option>
+          <option value="resp_tech">Responsable technique — Opérations + Technique</option>
+        </select>
+      </div>
+      <div id="token-sites-section" style="display:none">
+        <div class="field">
+          <label>Sites accessibles <span style="color:var(--t2);font-weight:400;text-transform:none">(laisser vide = tous)</span></label>
+          <div id="token-sites-checkboxes" style="display:flex;flex-direction:column;gap:6px;margin-top:4px"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Nom du contact (optionnel)</label>
+        <input id="token-nom" placeholder="Ex : Kofi Mensah">
+      </div>
+      <div class="field">
+        <label>Expiration (optionnel)</label>
+        <input id="token-expire" type="date">
+      </div>
+      <button class="btn btn-or" style="width:100%;justify-content:center;padding:13px;margin-top:4px" onclick="genToken()">🔗 Générer le lien</button>
+      <div id="token-result" style="display:none;margin-top:12px">
+        <div style="background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:10px 13px">
+          <div style="font-size:10px;color:var(--t2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">Lien généré</div>
+          <div id="token-url" style="font-size:12px;color:var(--bleu);font-family:monospace;word-break:break-all;margin-bottom:8px"></div>
+          <button class="btn btn-ghost" style="font-size:12px;padding:5px 10px" onclick="copyLien(document.getElementById('token-url').textContent)">📋 Copier</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -667,12 +703,12 @@ async function openClientDetail(clientId, detailId) {
         <div class="dp-kpi"><div class="dp-kpi-val">${Math.round(heures30)}h</div><div class="dp-kpi-label">Heures de marche / 30j</div></div>
         <div class="dp-kpi"><div class="dp-kpi-val ${pannes.length>0?'rouge':alertes.length>0?'orange':'vert'}">${pannes.length>0?pannes.length+' panne'+(pannes.length>1?'s':''):alertes.length>0?alertes.length+' alerte'+(alertes.length>1?'s':''):'✓ OK'}</div><div class="dp-kpi-label">Incidents actifs</div></div>
       </div>
-      <div class="section-label">Lien client partageable</div>
-      <div class="lien-box">
-        <div style="flex:1"><div class="lien-label">${client.groupe_hotelier?'Page groupe':'Page client'}</div><div class="lien-url">${lien}</div></div>
-        <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px;flex-shrink:0" onclick="copyLien('${lien}')">Copier</button>
+      <div class="section-label">Liens d'accès dashboard</div>
+      <div id="dp-tokens-${client.id}"><div class="loading" style="padding:12px"><div class="spinner"></div>Chargement tokens...</div></div>
+      <div style="margin-bottom:8px">
+        <button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" onclick="openGenToken('${client.id}')">＋ Générer un lien</button>
       </div>
-      <div class="section-label" style="margin-top:12px">Groupes — aujourd'hui</div>
+      <div class="section-label" style="margin-top:4px">Groupes — aujourd'hui</div>
       ${groupesHtml||'<div class="empty">Aucun groupe</div>'}
       <div class="section-label" style="margin-top:12px">Alertes actives</div>
       <div>${alertesHtml}</div>
@@ -682,6 +718,8 @@ async function openClientDetail(clientId, detailId) {
         <button class="btn btn-ghost" style="font-size:12px;color:var(--rouge)" onclick="deleteClient('${client.id}','${client.nom}')">🗑️ Supprimer</button>
       </div>
     </div>`;
+  // Charger les tokens
+  loadDpTokens(client.id, sites);
 }
 
 function copyLien(url) {
@@ -800,11 +838,11 @@ let wizState = {
   sites: [],      // [{id, nom, ville}]
   groupes: {},    // {siteIndex: [{nom, marque, kva, heures, seuil}]}
   cuves: {},      // {siteIndex: {capacite, seuil_alerte}}
-  contacts: {dir_ops:[], dir_tech:[], resp_tech:[], technicien:[]}
+  contacts: {resp_tech:[], technicien:[]}
 };
 
 function wizReset() {
-  wizState = {step:1, sites:[], groupes:{}, cuves:{}, contacts:{dir_ops:[],dir_tech:[],resp_tech:[],technicien:[]}};
+  wizState = {step:1, sites:[], groupes:{}, cuves:{}, contacts:{resp_tech:[],technicien:[]}};
   wizGo(1);
   document.getElementById('w-nom').value='';
   document.getElementById('w-type').value='hotel_solo';
@@ -956,7 +994,7 @@ function wizRemoveCuve(si) {
 
 // ── CONTACTS ──
 function wizRenderContacts() {
-  const roles = {dir_ops:'wz-dir-ops', dir_tech:'wz-dir-tech', resp_tech:'wz-resp-tech', technicien:'wz-techniciens'};
+  const roles = {resp_tech:'wz-resp-tech', technicien:'wz-techniciens'};
   Object.entries(roles).forEach(([role, elId])=>{
     const el = document.getElementById(elId);
     const contacts = wizState.contacts[role]||[];
@@ -1262,22 +1300,10 @@ function renderEditPanel(panel, panelId, detailId) {
       <div class="ep-section">
         <div class="ep-section-head">
           <div class="ep-section-title">Sites (${sites.length})</div>
-          <button class="btn-ep btn-ep-add" onclick="epShowAddSite('${panelId}','${detailId}')">＋ Ajouter</button>
+          <button class="btn-ep btn-ep-add" onclick="epShowAddSiteWiz('${panelId}','${detailId}')">＋ Ajouter un site</button>
         </div>
         <div id="ep-sites-list">${sitesHtml||'<div style="font-size:12px;color:var(--t2);padding:8px 0">Aucun site</div>'}</div>
-        <div id="ep-add-site-form" style="display:none">
-          <div class="ep-card" style="border:1px dashed rgba(200,146,42,0.4);background:rgba(200,146,42,0.05)">
-            <div class="ep-row c3">
-              <div class="ep-field"><label>Nom</label><input id="ep-new-site-nom" placeholder="Hôtel Principal"></div>
-              <div class="ep-field"><label>Ville</label><input id="ep-new-site-ville" placeholder="Dakar"></div>
-              <div class="ep-field"><label>Pays</label><input id="ep-new-site-pays" value="${esc2(client.pays||'')}"></div>
-            </div>
-            <div style="display:flex;gap:6px;justify-content:flex-end">
-              <button class="btn-ep btn-ep-ghost" onclick="document.getElementById('ep-add-site-form').style.display='none'">Annuler</button>
-              <button class="btn-ep btn-ep-add" onclick="epAddSite('${panelId}','${detailId}')">Créer</button>
-            </div>
-          </div>
-        </div>
+        <div id="ep-add-site-form" style="display:none"></div>
       </div>
 
       <!-- GROUPES -->
@@ -1369,32 +1395,7 @@ async function epToggleSite(id, actif) {
     </div>`).join('');
 }
 
-function epShowAddSite(panelId, detailId) {
-  document.getElementById('ep-add-site-form').style.display='block';
-}
 
-async function epAddSite(panelId, detailId) {
-  const nom = document.getElementById('ep-new-site-nom')?.value?.trim();
-  if(!nom){showToast('Nom requis','err');return;}
-  const data = {
-    client_id: _editClientId,
-    nom,
-    ville: document.getElementById('ep-new-site-ville')?.value?.trim()||null,
-    pays: document.getElementById('ep-new-site-pays')?.value?.trim()||null,
-    actif: true
-  };
-  const res = await api('sites','','*','POST',data);
-  const created = Array.isArray(res)?res[0]:res;
-  if(!created?.id){showToast('Erreur création site','err');return;}
-  _editData.sites.push(created);
-  showToast(`Site "${nom}" créé ✓`);
-  document.getElementById('ep-add-site-form').style.display='none';
-  // Re-render sites
-  const panel = document.getElementById(panelId);
-  const detailEl = document.getElementById(detailId);
-  renderEditPanel(panel, panelId, detailId);
-  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
-}
 
 // ── SAVE GROUPE ──
 async function epSaveGroupe(id) {
@@ -1503,6 +1504,289 @@ async function epDeleteContact(id) {
     document.getElementById('ep-contacts-list').innerHTML='<div style="font-size:12px;color:var(--t2);padding:8px 0" id="ep-contacts-empty">Aucun contact</div>';
   }
   showToast('Contact supprimé');
+}
+
+// ══════════════════════════════════════════════
+// TOKENS — LIENS D'ACCÈS PAR RÔLE
+// ══════════════════════════════════════════════
+
+const ROLE_LABEL = {
+  dir_ops: 'Dir. opérations',
+  dir_tech: 'Dir. technique',
+  resp_tech: 'Resp. technique',
+};
+
+let _tokenClientId = null;
+let _tokenSites = [];
+
+async function loadDpTokens(clientId, sites) {
+  const el = document.getElementById(`dp-tokens-${clientId}`);
+  if (!el) return;
+  const tokens = await api('tokens', `&client_id=eq.${clientId}&actif=eq.true&order=created_at.desc`);
+  const dashTokens = tokens.filter(t => ['dir_ops','dir_tech','resp_tech'].includes(t.role));
+  if (!dashTokens.length) {
+    el.innerHTML = `<div style="font-size:12px;color:var(--t2);padding:6px 0">Aucun lien généré.</div>`;
+    return;
+  }
+  el.innerHTML = dashTokens.map(t => {
+    const url = `${BASE_URL}/client.html?token=${t.token}`;
+    const siteLabels = t.site_ids?.length
+      ? t.site_ids.map(sid => sites.find(s=>s.id===sid)?.nom||sid).join(', ')
+      : 'Tous les sites';
+    const expTxt = t.expire_at ? ` · exp. ${fmtDate(t.expire_at)}` : '';
+    return `<div class="lien-box" style="flex-direction:column;align-items:flex-start;gap:6px">
+      <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--t)">${ROLE_LABEL[t.role]||t.role}${t.nom?' · '+t.nom:''}</div>
+          <div style="font-size:10px;color:var(--t2)">${siteLabels}${expTxt}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px" onclick="copyLien('${url}')">📋</button>
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 8px;color:var(--rouge)" onclick="revokeToken('${t.id}','${clientId}')">✕</button>
+        </div>
+      </div>
+      <div class="lien-url" style="font-size:11px">${url}</div>
+    </div>`;
+  }).join('');
+}
+
+function openGenToken(clientId) {
+  _tokenClientId = clientId;
+  _tokenSites = _editData?.sites?.length ? _editData.sites : [];
+  // Récupérer les sites depuis _groupeData ou detail panel
+  if (!_tokenSites.length) {
+    api('sites', `&client_id=eq.${clientId}&actif=eq.true&order=nom`).then(s => {
+      _tokenSites = s;
+      renderTokenSites();
+    });
+  } else {
+    renderTokenSites();
+  }
+  document.getElementById('modal-token-sub').textContent = '';
+  document.getElementById('token-role').value = 'dir_ops';
+  document.getElementById('token-nom').value = '';
+  document.getElementById('token-expire').value = '';
+  document.getElementById('token-result').style.display = 'none';
+  onTokenRoleChange();
+  document.getElementById('modal-token').classList.add('open');
+}
+
+function renderTokenSites() {
+  const el = document.getElementById('token-sites-checkboxes');
+  if (!el) return;
+  el.innerHTML = _tokenSites.map(s => `
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+      <input type="checkbox" value="${s.id}" style="width:14px;height:14px;cursor:pointer"> ${esc2(s.nom)}${s.ville?' · '+esc2(s.ville):''}
+    </label>`).join('');
+}
+
+function onTokenRoleChange() {
+  const role = document.getElementById('token-role').value;
+  const sec = document.getElementById('token-sites-section');
+  // Dir tech et resp_tech peuvent être filtrés par site ; dir_ops = tous les sites forcément
+  sec.style.display = (role === 'dir_tech' || role === 'resp_tech') ? 'block' : 'none';
+  document.getElementById('token-result').style.display = 'none';
+}
+
+async function genToken() {
+  const role = document.getElementById('token-role').value;
+  const nom = document.getElementById('token-nom').value.trim() || null;
+  const expire = document.getElementById('token-expire').value || null;
+  const checkedSites = [...document.querySelectorAll('#token-sites-checkboxes input:checked')].map(i=>i.value);
+  const tokenStr = crypto.randomUUID().replace(/-/g,'');
+  const data = {
+    client_id: _tokenClientId,
+    token: tokenStr,
+    role,
+    nom,
+    site_ids: checkedSites.length ? checkedSites : [],
+    actif: true,
+    expire_at: expire || null,
+  };
+  const res = await api('tokens','','*','POST', data);
+  const created = Array.isArray(res)?res[0]:res;
+  if (!created?.id) { showToast('Erreur création token','err'); return; }
+  const url = `${BASE_URL}/client.html?token=${tokenStr}`;
+  document.getElementById('token-url').textContent = url;
+  document.getElementById('token-result').style.display = 'block';
+  showToast('Lien généré ✓');
+  // Refresh tokens in detail panel
+  const dpEl = document.getElementById(`dp-tokens-${_tokenClientId}`);
+  if (dpEl) loadDpTokens(_tokenClientId, _tokenSites);
+}
+
+async function revokeToken(tokenId, clientId) {
+  if (!confirm('Révoquer ce lien ? Il ne fonctionnera plus.')) return;
+  await api('tokens', `&id=eq.${tokenId}`, '*', 'PATCH', {actif: false});
+  showToast('Lien révoqué');
+  loadDpTokens(clientId, _tokenSites);
+}
+
+// ══════════════════════════════════════════════
+// MINI-WIZARD AJOUT SITE (dans panneau édition)
+// ══════════════════════════════════════════════
+
+let _newSiteWiz = { step: 1, siteId: null, nom: '', groupes: [], cuve: null };
+
+function epShowAddSiteWiz(panelId, detailId) {
+  _newSiteWiz = { step: 1, siteId: null, nom: '', groupes: [], cuve: null };
+  renderNewSiteWiz(panelId, detailId);
+  document.getElementById('ep-add-site-form').style.display = 'block';
+}
+
+function renderNewSiteWiz(panelId, detailId) {
+  const el = document.getElementById('ep-add-site-form');
+  if (!el) return;
+  if (_newSiteWiz.step === 1) {
+    el.innerHTML = `
+      <div class="ep-card" style="border:1px dashed rgba(200,146,42,0.4);background:rgba(200,146,42,0.05)">
+        <div class="ep-card-head"><div class="ep-card-title" style="color:var(--or)">Nouveau site — Étape 1/3 · Identité</div></div>
+        <div class="ep-row c3">
+          <div class="ep-field"><label>Nom du site</label><input id="nsw-nom" placeholder="Hôtel Abidjan"></div>
+          <div class="ep-field"><label>Ville</label><input id="nsw-ville" placeholder="Abidjan"></div>
+          <div class="ep-field"><label>Pays</label><input id="nsw-pays" value="${esc2(_editData.client?.pays||'')}"></div>
+        </div>
+        <div style="display:flex;gap:6px;justify-content:flex-end">
+          <button class="btn-ep btn-ep-ghost" onclick="document.getElementById('ep-add-site-form').style.display='none'">Annuler</button>
+          <button class="btn-ep btn-ep-add" onclick="nswStep1('${panelId}','${detailId}')">Suivant →</button>
+        </div>
+      </div>`;
+  } else if (_newSiteWiz.step === 2) {
+    const groupesHtml = _newSiteWiz.groupes.map((g,i) => `
+      <div class="ep-card" style="margin-bottom:6px">
+        <div class="ep-card-head">
+          <div class="ep-card-title">⚙️ Groupe ${i+1}</div>
+          <button class="btn-ep btn-ep-del" onclick="nswRemoveGroupe(${i},'${panelId}','${detailId}')">✕</button>
+        </div>
+        <div class="ep-row c3">
+          <div class="ep-field"><label>Nom</label><input id="nsw-g-nom-${i}" value="${esc2(g.nom)}" oninput="_newSiteWiz.groupes[${i}].nom=this.value"></div>
+          <div class="ep-field"><label>Marque</label><input id="nsw-g-marque-${i}" value="${esc2(g.marque)}" oninput="_newSiteWiz.groupes[${i}].marque=this.value"></div>
+          <div class="ep-field"><label>Puissance (kVA)</label><input type="number" id="nsw-g-kva-${i}" value="${g.kva}" oninput="_newSiteWiz.groupes[${i}].kva=this.value"></div>
+        </div>
+        <div class="ep-row c2">
+          <div class="ep-field"><label>Heures actuelles</label><input type="number" id="nsw-g-heures-${i}" value="${g.heures}" oninput="_newSiteWiz.groupes[${i}].heures=this.value"></div>
+          <div class="ep-field"><label>Seuil vidange (h)</label><input type="number" id="nsw-g-seuil-${i}" value="${g.seuil}" oninput="_newSiteWiz.groupes[${i}].seuil=this.value"></div>
+        </div>
+      </div>`).join('');
+    el.innerHTML = `
+      <div class="ep-card" style="border:1px dashed rgba(200,146,42,0.4);background:rgba(200,146,42,0.05)">
+        <div class="ep-card-head"><div class="ep-card-title" style="color:var(--or)">Nouveau site — Étape 2/3 · Groupes électrogènes · <span style="font-weight:400">${esc2(_newSiteWiz.nom)}</span></div></div>
+        ${groupesHtml||'<div style="font-size:12px;color:var(--t2);padding:6px 0">Aucun groupe ajouté</div>'}
+        <button class="btn-ep btn-ep-ghost" style="margin-bottom:10px" onclick="nswAddGroupe('${panelId}','${detailId}')">＋ Ajouter un groupe</button>
+        <div style="display:flex;gap:6px;justify-content:space-between">
+          <button class="btn-ep btn-ep-ghost" onclick="nswBack(1,'${panelId}','${detailId}')">← Retour</button>
+          <button class="btn-ep btn-ep-add" onclick="nswStep2('${panelId}','${detailId}')">Suivant →</button>
+        </div>
+      </div>`;
+  } else if (_newSiteWiz.step === 3) {
+    const cuve = _newSiteWiz.cuve;
+    el.innerHTML = `
+      <div class="ep-card" style="border:1px dashed rgba(200,146,42,0.4);background:rgba(200,146,42,0.05)">
+        <div class="ep-card-head"><div class="ep-card-title" style="color:var(--or)">Nouveau site — Étape 3/3 · Cuve · <span style="font-weight:400">${esc2(_newSiteWiz.nom)}</span></div></div>
+        ${cuve ? `
+          <div class="ep-row c2">
+            <div class="ep-field"><label>Capacité (litres)</label><input type="number" id="nsw-cuve-cap" value="${cuve.capacite}" oninput="_newSiteWiz.cuve.capacite=this.value"></div>
+            <div class="ep-field"><label>Alerte sous (litres)</label><input type="number" id="nsw-cuve-seuil" value="${cuve.seuil}" oninput="_newSiteWiz.cuve.seuil=this.value"></div>
+          </div>
+          <button class="btn-ep btn-ep-del" style="margin-bottom:10px" onclick="_newSiteWiz.cuve=null;renderNewSiteWiz('${panelId}','${detailId}')">Supprimer la cuve</button>
+        ` : `
+          <button class="btn-ep btn-ep-ghost" style="margin-bottom:10px" onclick="_newSiteWiz.cuve={capacite:500,seuil:150};renderNewSiteWiz('${panelId}','${detailId}')">＋ Ajouter une cuve commune</button>
+        `}
+        <div style="display:flex;gap:6px;justify-content:space-between">
+          <button class="btn-ep btn-ep-ghost" onclick="nswBack(2,'${panelId}','${detailId}')">← Retour</button>
+          <button class="btn-ep btn-ep-save" onclick="nswSave('${panelId}','${detailId}')">✅ Créer le site</button>
+        </div>
+      </div>`;
+  }
+}
+
+function nswAddGroupe(panelId, detailId) {
+  _newSiteWiz.groupes.push({nom:'',marque:'',kva:'',heures:0,seuil:250});
+  renderNewSiteWiz(panelId, detailId);
+}
+
+function nswRemoveGroupe(i, panelId, detailId) {
+  _newSiteWiz.groupes.splice(i,1);
+  renderNewSiteWiz(panelId, detailId);
+}
+
+function nswBack(toStep, panelId, detailId) {
+  _newSiteWiz.step = toStep;
+  renderNewSiteWiz(panelId, detailId);
+}
+
+function nswStep1(panelId, detailId) {
+  const nom = document.getElementById('nsw-nom')?.value?.trim();
+  if (!nom) { showToast('Nom du site requis','err'); return; }
+  _newSiteWiz.nom = nom;
+  _newSiteWiz.ville = document.getElementById('nsw-ville')?.value?.trim()||null;
+  _newSiteWiz.pays = document.getElementById('nsw-pays')?.value?.trim()||null;
+  _newSiteWiz.step = 2;
+  renderNewSiteWiz(panelId, detailId);
+}
+
+function nswStep2(panelId, detailId) {
+  _newSiteWiz.step = 3;
+  renderNewSiteWiz(panelId, detailId);
+}
+
+async function nswSave(panelId, detailId) {
+  // 1. Créer le site
+  const siteRes = await api('sites','','*','POST', {
+    client_id: _editClientId,
+    nom: _newSiteWiz.nom,
+    ville: _newSiteWiz.ville||null,
+    pays: _newSiteWiz.pays||null,
+    actif: true
+  });
+  const site = Array.isArray(siteRes)?siteRes[0]:siteRes;
+  if (!site?.id) { showToast('Erreur création site','err'); return; }
+
+  // 2. Créer les groupes
+  for (const g of _newSiteWiz.groupes) {
+    if (!g.nom) continue;
+    await api('groupes','','*','POST', {
+      client_id: _editClientId,
+      site_id: site.id,
+      nom: g.nom,
+      marque: g.marque||'',
+      puissance_kva: parseInt(g.kva)||0,
+      heures_total: parseFloat(g.heures)||0,
+      seuil_vidange_heures: parseInt(g.seuil)||250,
+      actif: true
+    });
+  }
+
+  // 3. Créer la cuve et lier aux groupes
+  if (_newSiteWiz.cuve) {
+    const cuveRes = await api('cuves','','*','POST', {
+      client_id: _editClientId,
+      site_id: site.id,
+      nom: 'Cuve principale',
+      capacite_litres: parseInt(_newSiteWiz.cuve.capacite)||500,
+      seuil_alerte_litres: parseInt(_newSiteWiz.cuve.seuil)||150,
+      actif: true
+    });
+    const cuve = Array.isArray(cuveRes)?cuveRes[0]:cuveRes;
+    if (cuve?.id) {
+      await api('groupes',`&site_id=eq.${site.id}`,'*','PATCH',{cuve_id: cuve.id});
+    }
+  }
+
+  showToast(`Site "${_newSiteWiz.nom}" créé ✓`);
+  document.getElementById('ep-add-site-form').style.display = 'none';
+
+  // Recharger les données d'édition
+  const [sites, groupes, cuves] = await Promise.all([
+    api('sites', `&client_id=eq.${_editClientId}&order=nom`),
+    api('groupes', `&client_id=eq.${_editClientId}&order=nom`),
+    api('cuves', `&client_id=eq.${_editClientId}&order=nom`),
+  ]);
+  _editData.sites = sites;
+  _editData.groupes = groupes;
+  _editData.cuves = cuves;
+  const panel = document.getElementById(panelId);
+  renderEditPanel(panel, panelId, detailId);
 }
 
 loadAll();
