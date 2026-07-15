@@ -533,7 +533,11 @@ async function api(table, q='', select='*', method='GET', body=null) {
     body:body?JSON.stringify(body):undefined
   });
   if(res.status===204||res.status===404)return[];
-  if(!res.ok){console.warn(`API ${method} ${table} → ${res.status}`);return[];}
+  if(!res.ok){
+    const txt = await res.text().catch(()=>'');
+    console.warn(`API ${method} ${table} → ${res.status}`, txt);
+    return[];
+  }
   return res.json();
 }
 
@@ -1534,8 +1538,9 @@ async function loadDpTokens(clientId, sites) {
   }
   el.innerHTML = dashTokens.map(t => {
     const url = `${BASE_URL}/client.html?token=${t.token}`;
-    const siteLabels = t.site_ids?.length
-      ? t.site_ids.map(sid => sites.find(s=>s.id===sid)?.nom||sid).join(', ')
+    const rawSiteIds = t.site_ids ? (typeof t.site_ids === 'string' ? JSON.parse(t.site_ids) : t.site_ids) : [];
+    const siteLabels = rawSiteIds.length
+      ? rawSiteIds.map(sid => sites.find(s=>s.id===sid)?.nom||sid).join(', ')
       : 'Tous les sites';
     const expTxt = t.expire_at ? ` · exp. ${fmtDate(t.expire_at)}` : '';
     return `<div class="lien-box" style="flex-direction:column;align-items:flex-start;gap:6px">
@@ -1598,23 +1603,26 @@ async function genToken() {
   const expire = document.getElementById('token-expire').value || null;
   const checkedSites = [...document.querySelectorAll('#token-sites-checkboxes input:checked')].map(i=>i.value);
   const tokenStr = crypto.randomUUID().replace(/-/g,'');
+
+  // Construire le payload sans champs null pour éviter les 400 Supabase
   const data = {
     client_id: _tokenClientId,
     token: tokenStr,
     role,
-    nom,
-    site_ids: checkedSites.length ? checkedSites : [],
     actif: true,
-    expire_at: expire || null,
   };
+  if(nom) data.nom = nom;
+  if(expire) data.expire_at = expire;
+  // site_ids : envoyer seulement si non vide, en tant que littéral PostgreSQL array
+  if(checkedSites.length) data.site_ids = JSON.stringify(checkedSites);
+
   const res = await api('tokens','','*','POST', data);
   const created = Array.isArray(res)?res[0]:res;
-  if (!created?.id) { showToast('Erreur création token','err'); return; }
+  if (!created?.id) { showToast('Erreur création token — vérifiez la migration SQL','err'); return; }
   const url = `${BASE_URL}/client.html?token=${tokenStr}`;
   document.getElementById('token-url').textContent = url;
   document.getElementById('token-result').style.display = 'block';
   showToast('Lien généré ✓');
-  // Refresh tokens in detail panel
   const dpEl = document.getElementById(`dp-tokens-${_tokenClientId}`);
   if (dpEl) loadDpTokens(_tokenClientId, _tokenSites);
 }

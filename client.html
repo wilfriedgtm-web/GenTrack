@@ -225,7 +225,8 @@ async function loadByToken(token) {
     showError('Lien expiré', 'Ce lien d\'accès a expiré. Contactez votre responsable GenTrack.'); return;
   }
   const role = tok.role || null;
-  const siteIds = tok.site_ids || [];
+  const rawSiteIds = tok.site_ids || [];
+  const siteIds = typeof rawSiteIds === 'string' ? JSON.parse(rawSiteIds) : rawSiteIds;
 
   // Rôles dashboard avec logique multi-site
   if(role === 'dir_ops') {
