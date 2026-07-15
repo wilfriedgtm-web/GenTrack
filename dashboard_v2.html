@@ -153,7 +153,7 @@ body{background:var(--noir);color:var(--t);font-family:'Inter',sans-serif;displa
 .ep-field input,.ep-field select{background:var(--s);border:1px solid var(--b);border-radius:6px;padding:7px 10px;color:var(--t);font-size:12px;font-family:'Inter',sans-serif;outline:none;width:100%}
 .ep-field input:focus,.ep-field select:focus{border-color:var(--or)}
 .ep-field input[type="color"]{padding:3px 5px;height:32px;cursor:pointer}
-.ep-contact-row{display:grid;grid-template-columns:1fr 1fr 140px 64px;gap:6px;align-items:center;background:var(--s2);border-radius:6px;padding:8px 10px;margin-bottom:6px;border:1px solid var(--b)}
+.ep-contact-row{display:grid;grid-template-columns:1fr 1fr 120px 120px 64px;gap:6px;align-items:center;background:var(--s2);border-radius:6px;padding:8px 10px;margin-bottom:6px;border:1px solid var(--b)}
 .ep-contact-row input,.ep-contact-row select{background:var(--s);border:1px solid var(--b);border-radius:5px;padding:6px 8px;color:var(--t);font-size:12px;font-family:'Inter',sans-serif;outline:none;width:100%}
 .ep-contact-row input:focus,.ep-contact-row select:focus{border-color:var(--or)}
 .ep-contact-new{border:1px dashed rgba(200,146,42,0.4);background:rgba(200,146,42,0.05)}
@@ -1279,6 +1279,8 @@ function renderEditPanel(panel, panelId, detailId) {
     </div>`;
   }).join('');
 
+  const _siteOptsFor = (selId) => `<option value="">Tous les sites</option>${sites.map(s=>`<option value="${s.id}"${s.id===selId?' selected':''}>${esc2(s.nom)}</option>`).join('')}`;
+
   const contactsHtml = contacts.map(ct => `
     <div class="ep-contact-row" id="ep-ct-${ct.id}">
       <input id="ep-ct-nom-${ct.id}" value="${esc2(ct.nom||'')}" placeholder="Nom">
@@ -1287,6 +1289,7 @@ function renderEditPanel(panel, panelId, detailId) {
         <option value="technicien"${ct.role==='technicien'?' selected':''}>Technicien</option>
         <option value="resp_tech"${ct.role==='resp_tech'?' selected':''}>Resp. technique</option>
       </select>
+      <select id="ep-ct-site-${ct.id}">${_siteOptsFor(ct.site_id||'')}</select>
       <div style="display:flex;gap:4px">
         <button class="btn-ep btn-ep-save" onclick="epSaveContact('${ct.id}')" title="Enregistrer">💾</button>
         <button class="btn-ep btn-ep-del" onclick="epDeleteContact('${ct.id}')" title="Supprimer">✕</button>
@@ -1351,10 +1354,11 @@ function renderEditPanel(panel, panelId, detailId) {
           <div class="ep-section-title">Contacts (${contacts.length})</div>
           <button class="btn-ep btn-ep-add" onclick="epAddContactRow()">＋ Ajouter</button>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 140px 64px;gap:6px;padding:0 0 6px;margin-bottom:4px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 120px 120px 64px;gap:6px;padding:0 0 6px;margin-bottom:4px">
           <div style="font-size:10px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:0.8px">Nom</div>
           <div style="font-size:10px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:0.8px">WhatsApp</div>
           <div style="font-size:10px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:0.8px">Rôle</div>
+          <div style="font-size:10px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:0.8px">Site</div>
           <div></div>
         </div>
         <div id="ep-contacts-list">${contactsHtml||'<div style="font-size:12px;color:var(--t2);padding:8px 0" id="ep-contacts-empty">Aucun contact</div>'}</div>
@@ -1457,6 +1461,8 @@ async function epSaveCuve(id) {
 // ── CONTACTS ──
 function epAddContactRow() {
   const uid = 'new-'+Date.now();
+  const sites = _editData.sites||[];
+  const siteOpts = `<option value="">Tous les sites</option>${sites.map(s=>`<option value="${s.id}">${esc2(s.nom)}</option>`).join('')}`;
   const el = document.createElement('div');
   el.className='ep-contact-row ep-contact-new';
   el.id=`ep-ct-new-${uid}`;
@@ -1467,6 +1473,7 @@ function epAddContactRow() {
       <option value="technicien">Technicien</option>
       <option value="resp_tech">Resp. technique</option>
     </select>
+    <select id="ep-ct-new-site-${uid}">${siteOpts}</select>
     <div style="display:flex;gap:4px">
       <button class="btn-ep btn-ep-save" onclick="epSaveNewContact('${uid}')" title="Créer">✓</button>
       <button class="btn-ep btn-ep-ghost" onclick="document.getElementById('ep-ct-new-${uid}').remove()" title="Annuler">✕</button>
@@ -1478,11 +1485,13 @@ function epAddContactRow() {
 async function epSaveNewContact(uid) {
   const nom = document.getElementById(`ep-ct-new-nom-${uid}`)?.value?.trim();
   if(!nom){showToast('Nom requis','err');return;}
+  const siteId = document.getElementById(`ep-ct-new-site-${uid}`)?.value||null;
   const data = {
     client_id: _editClientId,
     nom,
     whatsapp: document.getElementById(`ep-ct-new-wa-${uid}`)?.value?.trim()||null,
     role: document.getElementById(`ep-ct-new-role-${uid}`)?.value||'technicien',
+    site_id: siteId||null,
     actif: true
   };
   const res = await api('contacts','','*','POST',data);
@@ -1490,6 +1499,8 @@ async function epSaveNewContact(uid) {
   if(!created?.id){showToast('Erreur création contact','err');return;}
   _editData.contacts.push(created);
   document.getElementById(`ep-ct-new-${uid}`)?.remove();
+  const sites = _editData.sites||[];
+  const siteOpts2 = `<option value="">Tous les sites</option>${sites.map(s=>`<option value="${s.id}"${s.id===created.site_id?' selected':''}>${esc2(s.nom)}</option>`).join('')}`;
   const row = document.createElement('div');
   row.className='ep-contact-row';
   row.id=`ep-ct-${created.id}`;
@@ -1500,6 +1511,7 @@ async function epSaveNewContact(uid) {
       <option value="technicien"${created.role==='technicien'?' selected':''}>Technicien</option>
       <option value="resp_tech"${created.role==='resp_tech'?' selected':''}>Resp. technique</option>
     </select>
+    <select id="ep-ct-site-${created.id}">${siteOpts2}</select>
     <div style="display:flex;gap:4px">
       <button class="btn-ep btn-ep-save" onclick="epSaveContact('${created.id}')" title="Enregistrer">💾</button>
       <button class="btn-ep btn-ep-del" onclick="epDeleteContact('${created.id}')" title="Supprimer">✕</button>
@@ -1513,6 +1525,7 @@ async function epSaveContact(id) {
     nom: document.getElementById(`ep-ct-nom-${id}`)?.value?.trim(),
     whatsapp: document.getElementById(`ep-ct-wa-${id}`)?.value?.trim()||null,
     role: document.getElementById(`ep-ct-role-${id}`)?.value||'technicien',
+    site_id: document.getElementById(`ep-ct-site-${id}`)?.value||null,
   };
   if(!data.nom){showToast('Nom requis','err');return;}
   await api('contacts',`&id=eq.${id}`,'*','PATCH',data);
