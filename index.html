@@ -1262,6 +1262,10 @@ function renderEditPanel(panel, panelId, detailId) {
         <div class="ep-field"><label>Seuil vidange (h)</label><input type="number" id="ep-g-seuil-${g.id}" value="${g.seuil_vidange_heures||250}"></div>
         <div class="ep-field"><label>Heures totales</label><input type="number" id="ep-g-heures-${g.id}" value="${g.heures_total||0}"></div>
       </div>
+      <div class="ep-row c2">
+        <div class="ep-field"><label>Conso théorique (L/h)</label><input type="number" step="0.1" id="ep-g-conso-${g.id}" value="${g.conso_theorique_lh||''}" placeholder="Ex: 65"></div>
+        <div class="ep-field"><label>Réservoir propre (L) <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--t2)">— vide si cuve commune</span></label><input type="number" id="ep-g-reservoir-${g.id}" value="${g.capacite_reservoir_litres||''}" placeholder="Laisser vide si cuve commune"></div>
+      </div>
     </div>`;
   }).join('');
 
@@ -1430,6 +1434,7 @@ async function epToggleSite(id, actif) {
 
 // ── SAVE GROUPE ──
 async function epSaveGroupe(id) {
+  const reservoirVal = document.getElementById(`ep-g-reservoir-${id}`)?.value?.trim();
   const data = {
     nom: document.getElementById(`ep-g-nom-${id}`)?.value?.trim(),
     marque: document.getElementById(`ep-g-marque-${id}`)?.value?.trim()||null,
@@ -1437,6 +1442,8 @@ async function epSaveGroupe(id) {
     puissance_kva: parseFloat(document.getElementById(`ep-g-kva-${id}`)?.value)||null,
     seuil_vidange_heures: parseInt(document.getElementById(`ep-g-seuil-${id}`)?.value)||250,
     heures_total: parseFloat(document.getElementById(`ep-g-heures-${id}`)?.value)||0,
+    conso_theorique_lh: parseFloat(document.getElementById(`ep-g-conso-${id}`)?.value)||null,
+    capacite_reservoir_litres: reservoirVal ? parseInt(reservoirVal) : null,
   };
   if(!data.nom){showToast('Nom requis','err');return;}
   await api('groupes',`&id=eq.${id}`,'*','PATCH',data);
