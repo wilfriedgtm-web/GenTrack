@@ -784,7 +784,7 @@ function renderTechnique(client, groupes, saisies30, saisiesCuve30, pannesOuvert
           <div><div class="gd-stat-label">Heures totales</div><div class="gd-stat-val">${fmtNum(heuresTotal)}h</div></div>
           <div><div class="gd-stat-label">Seuil vidange</div><div class="gd-stat-val">${fmtNum(seuil)}h</div></div>
           <div><div class="gd-stat-label">Progression</div><div class="gd-stat-val" style="color:${barColor}">${pct}%</div></div>
-          <div><div class="gd-stat-label">Réservoir</div><div class="gd-stat-val">${fmtNum(g.capacite_reservoir_litres||0)}L</div></div>
+          ${g.capacite_reservoir_litres ? `<div><div class="gd-stat-label">Réservoir</div><div class="gd-stat-val">${fmtNum(g.capacite_reservoir_litres)}L</div></div>` : `<div><div class="gd-stat-label">Réservoir</div><div class="gd-stat-val" style="color:var(--texte2);font-size:12px">Cuve commune</div></div>`}
         </div>
         <div class="gd-bar"><div class="gd-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
       </div>
