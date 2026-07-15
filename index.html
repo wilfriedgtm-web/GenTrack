@@ -131,6 +131,38 @@ body{background:var(--noir);color:var(--t);font-family:'Inter',sans-serif;displa
 .wz-equip-site-title{font-size:12px;font-weight:700;font-family:'Space Grotesk',sans-serif;color:var(--or);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--b)}
 .wz-groupe-row{background:var(--s2);border-radius:6px;padding:10px 12px;margin-bottom:6px;border:1px solid var(--b)}
 .wz-cuve-row{background:var(--s2);border-radius:6px;padding:10px 12px;margin-bottom:6px;border:1px solid var(--b)}
+
+/* ── PANNEAU ÉDITION CLIENT ── */
+.edit-panel{display:none;background:var(--s);border-radius:10px;border:1px solid var(--b);margin-bottom:16px;overflow:hidden;animation:su 0.2s ease}
+.edit-panel.open{display:block}
+.ep-head{padding:14px 16px;background:var(--s2);border-bottom:1px solid var(--b);display:flex;justify-content:space-between;align-items:center}
+.ep-nom{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700}
+.ep-sub{font-size:11px;color:var(--t2);margin-top:2px}
+.ep-body{padding:16px}
+.ep-section{margin-bottom:20px}
+.ep-section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--b)}
+.ep-section-title{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;color:var(--t2);font-weight:600}
+.ep-card{background:var(--s2);border-radius:8px;padding:11px 13px;margin-bottom:8px;border:1px solid var(--b)}
+.ep-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.ep-card-title{font-size:12px;font-weight:600}
+.ep-row{display:grid;gap:8px;margin-bottom:8px}
+.ep-row.c2{grid-template-columns:1fr 1fr}
+.ep-row.c3{grid-template-columns:1fr 1fr 1fr}
+.ep-field{display:flex;flex-direction:column;gap:4px}
+.ep-field label{font-size:10px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:0.8px}
+.ep-field input,.ep-field select{background:var(--s);border:1px solid var(--b);border-radius:6px;padding:7px 10px;color:var(--t);font-size:12px;font-family:'Inter',sans-serif;outline:none;width:100%}
+.ep-field input:focus,.ep-field select:focus{border-color:var(--or)}
+.ep-field input[type="color"]{padding:3px 5px;height:32px;cursor:pointer}
+.ep-contact-row{display:grid;grid-template-columns:1fr 1fr 140px 64px;gap:6px;align-items:center;background:var(--s2);border-radius:6px;padding:8px 10px;margin-bottom:6px;border:1px solid var(--b)}
+.ep-contact-row input,.ep-contact-row select{background:var(--s);border:1px solid var(--b);border-radius:5px;padding:6px 8px;color:var(--t);font-size:12px;font-family:'Inter',sans-serif;outline:none;width:100%}
+.ep-contact-row input:focus,.ep-contact-row select:focus{border-color:var(--or)}
+.ep-contact-new{border:1px dashed rgba(200,146,42,0.4);background:rgba(200,146,42,0.05)}
+.btn-ep{border:none;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:opacity 0.15s;font-family:'Inter',sans-serif}
+.btn-ep:active{opacity:0.75}
+.btn-ep-save{background:rgba(34,197,94,0.12);color:var(--vert);border:1px solid rgba(34,197,94,0.3) !important}
+.btn-ep-add{background:var(--or-p);color:var(--or);border:1px solid rgba(200,146,42,0.3) !important}
+.btn-ep-del{background:var(--rp);color:var(--rouge);border:1px solid rgba(239,68,68,0.3) !important}
+.btn-ep-ghost{background:var(--s2);color:var(--t2);border:1px solid var(--b) !important}
 </style>
 </head>
 <body>
@@ -188,6 +220,7 @@ body{background:var(--noir);color:var(--t);font-family:'Inter',sans-serif;displa
   </div>
 
   <div id="detail-panel-accueil" class="detail-panel"></div>
+  <div id="edit-panel-accueil" class="edit-panel"></div>
 
   <div class="card">
     <div class="card-head"><div class="card-title">🔔 Alertes récentes</div><button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick="goTo('alertes')">Voir tout →</button></div>
@@ -215,6 +248,7 @@ body{background:var(--noir);color:var(--t);font-family:'Inter',sans-serif;displa
     </div>
     <div id="clients-list"><div class="loading"><div class="spinner"></div>Chargement...</div></div>
   </div>
+  <div id="edit-panel-clients" class="edit-panel"></div>
 </div>
 
 <!-- ALERTES -->
@@ -554,7 +588,7 @@ function renderClientsSante(elId, clients, groupes, saisies, alertes, pannes, de
       <div class="cr-actions" onclick="event.stopPropagation()">
         <button class="btn btn-icon" title="Copier le lien" onclick="copyLien('${lien}')">📋</button>
         <button class="btn btn-icon" title="Ouvrir le dashboard client" onclick="window.open('${lien}','_blank')">↗</button>
-        <button class="btn btn-icon" title="Éditer ce client" onclick="window.open('edit_client.html?id=${c.id}','_blank')" style="color:var(--or)">✏️</button>
+        <button class="btn btn-icon" title="Éditer ce client" onclick="openEditPanel('${c.id}','${detailId}')" style="color:var(--or)">✏️</button>
       </div>
     </div>`;
   }).join('');
@@ -1077,6 +1111,398 @@ async function saveMaintenance() {
     date_intervention:new Date().toISOString().split('T')[0]
   });
   closeModalDirect('modal-maint');showToast('Maintenance enregistrée ✓');loadMaintenance();
+}
+
+// ══════════════════════════════════════════════════
+// PANNEAU ÉDITION CLIENT (inline dans le dashboard)
+// ══════════════════════════════════════════════════
+
+let _editClientId = null;
+let _editData = {};
+
+function editPanelId(detailId) {
+  return detailId.replace('detail-panel', 'edit-panel');
+}
+
+async function openEditPanel(clientId, detailId) {
+  // Fermer le panneau de détail si ouvert
+  document.getElementById(detailId)?.classList.remove('open');
+  selectedClientId = null;
+
+  const panelId = editPanelId(detailId);
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+
+  // Toggle si déjà ouvert sur ce client
+  if (_editClientId === clientId && panel.classList.contains('open')) {
+    panel.classList.remove('open');
+    _editClientId = null;
+    return;
+  }
+
+  _editClientId = clientId;
+  panel.classList.add('open');
+  panel.innerHTML = '<div class="loading"><div class="spinner"></div>Chargement...</div>';
+  panel.scrollIntoView({behavior:'smooth', block:'start'});
+
+  const [clients, sites, groupes, cuves, contacts] = await Promise.all([
+    api('clients', `&id=eq.${clientId}`),
+    api('sites', `&client_id=eq.${clientId}&order=nom`),
+    api('groupes', `&client_id=eq.${clientId}&order=nom`),
+    api('cuves', `&client_id=eq.${clientId}&order=nom`),
+    api('contacts', `&client_id=eq.${clientId}&order=nom`),
+  ]);
+
+  _editData = { client: clients[0], sites, groupes, cuves, contacts };
+  renderEditPanel(panel, panelId, detailId);
+}
+
+function renderEditPanel(panel, panelId, detailId) {
+  const { client, sites, groupes, cuves, contacts } = _editData;
+
+  const sitesHtml = sites.map(s => `
+    <div class="ep-card" id="ep-site-${s.id}">
+      <div class="ep-card-head">
+        <div class="ep-card-title">${esc2(s.nom)} <span style="color:var(--t2);font-weight:400;font-size:11px">${esc2(s.ville||'')}${s.actif?'':' · <span style="color:var(--rouge)">Inactif</span>'}</span></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-ep btn-ep-save" onclick="epSaveSite('${s.id}')">💾</button>
+          ${s.actif
+            ? `<button class="btn-ep btn-ep-del" onclick="epToggleSite('${s.id}',false)">Désactiver</button>`
+            : `<button class="btn-ep btn-ep-add" onclick="epToggleSite('${s.id}',true)">Réactiver</button>`}
+        </div>
+      </div>
+      <div class="ep-row c3">
+        <div class="ep-field"><label>Nom</label><input id="ep-s-nom-${s.id}" value="${esc2(s.nom||'')}"></div>
+        <div class="ep-field"><label>Ville</label><input id="ep-s-ville-${s.id}" value="${esc2(s.ville||'')}"></div>
+        <div class="ep-field"><label>Pays</label><input id="ep-s-pays-${s.id}" value="${esc2(s.pays||'')}"></div>
+      </div>
+    </div>`).join('');
+
+  const groupesHtml = groupes.map(g => {
+    const siteNom = sites.find(s=>s.id===g.site_id)?.nom||'—';
+    return `<div class="ep-card" id="ep-groupe-${g.id}">
+      <div class="ep-card-head">
+        <div class="ep-card-title">${esc2(g.nom)} <span style="color:var(--t2);font-weight:400;font-size:11px">· ${esc2(siteNom)}</span></div>
+        <button class="btn-ep btn-ep-save" onclick="epSaveGroupe('${g.id}')">💾 Enregistrer</button>
+      </div>
+      <div class="ep-row c3">
+        <div class="ep-field"><label>Nom</label><input id="ep-g-nom-${g.id}" value="${esc2(g.nom||'')}"></div>
+        <div class="ep-field"><label>Marque</label><input id="ep-g-marque-${g.id}" value="${esc2(g.marque||'')}"></div>
+        <div class="ep-field"><label>Site</label>
+          <select id="ep-g-site-${g.id}">${sites.map(s=>`<option value="${s.id}"${s.id===g.site_id?' selected':''}>${esc2(s.nom)}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="ep-row c3">
+        <div class="ep-field"><label>Puissance (kVA)</label><input type="number" id="ep-g-kva-${g.id}" value="${g.puissance_kva||''}"></div>
+        <div class="ep-field"><label>Seuil vidange (h)</label><input type="number" id="ep-g-seuil-${g.id}" value="${g.seuil_vidange_heures||250}"></div>
+        <div class="ep-field"><label>Heures totales</label><input type="number" id="ep-g-heures-${g.id}" value="${g.heures_total||0}"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const cuvesHtml = cuves.map(cv => {
+    const siteNom = sites.find(s=>s.id===cv.site_id)?.nom||'—';
+    return `<div class="ep-card" id="ep-cuve-${cv.id}">
+      <div class="ep-card-head">
+        <div class="ep-card-title">${esc2(cv.nom||'Cuve')} <span style="color:var(--t2);font-weight:400;font-size:11px">· ${esc2(siteNom)}</span></div>
+        <button class="btn-ep btn-ep-save" onclick="epSaveCuve('${cv.id}')">💾 Enregistrer</button>
+      </div>
+      <div class="ep-row c2">
+        <div class="ep-field"><label>Nom</label><input id="ep-cv-nom-${cv.id}" value="${esc2(cv.nom||'')}"></div>
+        <div class="ep-field"><label>Capacité (litres)</label><input type="number" id="ep-cv-cap-${cv.id}" value="${cv.capacite_litres||''}"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const contactsHtml = contacts.map(ct => `
+    <div class="ep-contact-row" id="ep-ct-${ct.id}">
+      <input id="ep-ct-nom-${ct.id}" value="${esc2(ct.nom||'')}" placeholder="Nom">
+      <input id="ep-ct-wa-${ct.id}" value="${esc2(ct.whatsapp||'')}" placeholder="+221 7X XXX XX XX">
+      <select id="ep-ct-role-${ct.id}">
+        <option value="technicien"${ct.role==='technicien'?' selected':''}>Technicien</option>
+        <option value="resp_tech"${ct.role==='resp_tech'?' selected':''}>Resp. technique</option>
+      </select>
+      <div style="display:flex;gap:4px">
+        <button class="btn-ep btn-ep-save" onclick="epSaveContact('${ct.id}')" title="Enregistrer">💾</button>
+        <button class="btn-ep btn-ep-del" onclick="epDeleteContact('${ct.id}')" title="Supprimer">✕</button>
+      </div>
+    </div>`).join('');
+
+  panel.innerHTML = `
+    <div class="ep-head">
+      <div>
+        <div class="ep-nom">✏️ Édition — ${esc2(client.nom)}</div>
+        <div class="ep-sub">Modifications enregistrées individuellement</div>
+      </div>
+      <button class="dp-close" onclick="document.getElementById('${panelId}').classList.remove('open');_editClientId=null">✕</button>
+    </div>
+    <div class="ep-body">
+
+      <!-- INFOS CLIENT -->
+      <div class="ep-section">
+        <div class="ep-section-head">
+          <div class="ep-section-title">Informations client</div>
+          <button class="btn-ep btn-ep-save" onclick="epSaveClient()">💾 Enregistrer</button>
+        </div>
+        <div class="ep-row c2">
+          <div class="ep-field"><label>Nom</label><input id="ep-c-nom" value="${esc2(client.nom||'')}"></div>
+          <div class="ep-field"><label>Pays</label><input id="ep-c-pays" value="${esc2(client.pays||'')}"></div>
+        </div>
+        <div class="ep-row c2">
+          <div class="ep-field"><label>WhatsApp gardien</label><input id="ep-c-wa-gardien" value="${esc2(client.whatsapp_gardien||'')}" placeholder="+221 7X XXX XX XX"></div>
+          <div class="ep-field"><label>WhatsApp patron</label><input id="ep-c-wa-patron" value="${esc2(client.whatsapp_patron||'')}" placeholder="+221 7X XXX XX XX"></div>
+        </div>
+        <div class="ep-row c2">
+          <div class="ep-field"><label>Couleur de marque</label><input type="color" id="ep-c-couleur" value="${client.couleur_marque||'#8B1A2E'}"></div>
+          <div class="ep-field"><label>Prix litre FCFA</label><input type="number" id="ep-c-prix" value="${client.prix_litre_fcfa||695}"></div>
+        </div>
+      </div>
+
+      <!-- SITES -->
+      <div class="ep-section">
+        <div class="ep-section-head">
+          <div class="ep-section-title">Sites (${sites.length})</div>
+          <button class="btn-ep btn-ep-add" onclick="epShowAddSite('${panelId}','${detailId}')">＋ Ajouter</button>
+        </div>
+        <div id="ep-sites-list">${sitesHtml||'<div style="font-size:12px;color:var(--t2);padding:8px 0">Aucun site</div>'}</div>
+        <div id="ep-add-site-form" style="display:none">
+          <div class="ep-card" style="border:1px dashed rgba(200,146,42,0.4);background:rgba(200,146,42,0.05)">
+            <div class="ep-row c3">
+              <div class="ep-field"><label>Nom</label><input id="ep-new-site-nom" placeholder="Hôtel Principal"></div>
+              <div class="ep-field"><label>Ville</label><input id="ep-new-site-ville" placeholder="Dakar"></div>
+              <div class="ep-field"><label>Pays</label><input id="ep-new-site-pays" value="${esc2(client.pays||'')}"></div>
+            </div>
+            <div style="display:flex;gap:6px;justify-content:flex-end">
+              <button class="btn-ep btn-ep-ghost" onclick="document.getElementById('ep-add-site-form').style.display='none'">Annuler</button>
+              <button class="btn-ep btn-ep-add" onclick="epAddSite('${panelId}','${detailId}')">Créer</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GROUPES -->
+      <div class="ep-section">
+        <div class="ep-section-head"><div class="ep-section-title">Groupes électrogènes (${groupes.length})</div></div>
+        <div id="ep-groupes-list">${groupesHtml||'<div style="font-size:12px;color:var(--t2);padding:8px 0">Aucun groupe</div>'}</div>
+      </div>
+
+      <!-- CUVES -->
+      <div class="ep-section">
+        <div class="ep-section-head"><div class="ep-section-title">Cuves (${cuves.length})</div></div>
+        <div id="ep-cuves-list">${cuvesHtml||'<div style="font-size:12px;color:var(--t2);padding:8px 0">Aucune cuve</div>'}</div>
+      </div>
+
+      <!-- CONTACTS -->
+      <div class="ep-section">
+        <div class="ep-section-head">
+          <div class="ep-section-title">Contacts (${contacts.length})</div>
+          <button class="btn-ep btn-ep-add" onclick="epAddContactRow()">＋ Ajouter</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 140px 64px;gap:6px;padding:0 0 6px;margin-bottom:4px">
+          <div style="font-size:10px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:0.8px">Nom</div>
+          <div style="font-size:10px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:0.8px">WhatsApp</div>
+          <div style="font-size:10px;color:var(--t2);font-weight:600;text-transform:uppercase;letter-spacing:0.8px">Rôle</div>
+          <div></div>
+        </div>
+        <div id="ep-contacts-list">${contactsHtml||'<div style="font-size:12px;color:var(--t2);padding:8px 0" id="ep-contacts-empty">Aucun contact</div>'}</div>
+        <div id="ep-new-contacts"></div>
+      </div>
+
+    </div>`;
+}
+
+function esc2(s) { return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+// ── SAVE CLIENT ──
+async function epSaveClient() {
+  const data = {
+    nom: document.getElementById('ep-c-nom')?.value?.trim(),
+    pays: document.getElementById('ep-c-pays')?.value?.trim()||null,
+    whatsapp_gardien: document.getElementById('ep-c-wa-gardien')?.value?.trim()||null,
+    whatsapp_patron: document.getElementById('ep-c-wa-patron')?.value?.trim()||null,
+    couleur_marque: document.getElementById('ep-c-couleur')?.value||null,
+    prix_litre_fcfa: parseInt(document.getElementById('ep-c-prix')?.value)||695,
+  };
+  if(!data.nom){showToast('Nom requis','err');return;}
+  await api('clients',`&id=eq.${_editClientId}`,'*','PATCH',data);
+  _editData.client = {..._editData.client,...data};
+  showToast('Client mis à jour ✓');
+  loadAll();
+}
+
+// ── SAVE SITE ──
+async function epSaveSite(id) {
+  const data = {
+    nom: document.getElementById(`ep-s-nom-${id}`)?.value?.trim(),
+    ville: document.getElementById(`ep-s-ville-${id}`)?.value?.trim()||null,
+    pays: document.getElementById(`ep-s-pays-${id}`)?.value?.trim()||null,
+  };
+  if(!data.nom){showToast('Nom requis','err');return;}
+  await api('sites',`&id=eq.${id}`,'*','PATCH',data);
+  const idx = _editData.sites.findIndex(s=>s.id===id);
+  if(idx>=0) _editData.sites[idx]={..._editData.sites[idx],...data};
+  showToast('Site mis à jour ✓');
+  document.querySelector(`#ep-site-${id} .ep-card-title`).childNodes[0].textContent = data.nom+' ';
+}
+
+async function epToggleSite(id, actif) {
+  if(!confirm(actif?'Réactiver ce site ?':'Désactiver ce site ?')) return;
+  await api('sites',`&id=eq.${id}`,'*','PATCH',{actif});
+  const idx = _editData.sites.findIndex(s=>s.id===id);
+  if(idx>=0) _editData.sites[idx].actif=actif;
+  showToast(actif?'Site réactivé ✓':'Site désactivé');
+  // Re-render sites list
+  document.getElementById('ep-sites-list').innerHTML = _editData.sites.map(s=>`
+    <div class="ep-card" id="ep-site-${s.id}">
+      <div class="ep-card-head">
+        <div class="ep-card-title">${esc2(s.nom)} <span style="color:var(--t2);font-weight:400;font-size:11px">${esc2(s.ville||'')}${s.actif?'':' · <span style="color:var(--rouge)">Inactif</span>'}</span></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-ep btn-ep-save" onclick="epSaveSite('${s.id}')">💾</button>
+          ${s.actif?`<button class="btn-ep btn-ep-del" onclick="epToggleSite('${s.id}',false)">Désactiver</button>`:`<button class="btn-ep btn-ep-add" onclick="epToggleSite('${s.id}',true)">Réactiver</button>`}
+        </div>
+      </div>
+      <div class="ep-row c3">
+        <div class="ep-field"><label>Nom</label><input id="ep-s-nom-${s.id}" value="${esc2(s.nom||'')}"></div>
+        <div class="ep-field"><label>Ville</label><input id="ep-s-ville-${s.id}" value="${esc2(s.ville||'')}"></div>
+        <div class="ep-field"><label>Pays</label><input id="ep-s-pays-${s.id}" value="${esc2(s.pays||'')}"></div>
+      </div>
+    </div>`).join('');
+}
+
+function epShowAddSite(panelId, detailId) {
+  document.getElementById('ep-add-site-form').style.display='block';
+}
+
+async function epAddSite(panelId, detailId) {
+  const nom = document.getElementById('ep-new-site-nom')?.value?.trim();
+  if(!nom){showToast('Nom requis','err');return;}
+  const data = {
+    client_id: _editClientId,
+    nom,
+    ville: document.getElementById('ep-new-site-ville')?.value?.trim()||null,
+    pays: document.getElementById('ep-new-site-pays')?.value?.trim()||null,
+    actif: true
+  };
+  const res = await api('sites','','*','POST',data);
+  const created = Array.isArray(res)?res[0]:res;
+  if(!created?.id){showToast('Erreur création site','err');return;}
+  _editData.sites.push(created);
+  showToast(`Site "${nom}" créé ✓`);
+  document.getElementById('ep-add-site-form').style.display='none';
+  // Re-render sites
+  const panel = document.getElementById(panelId);
+  const detailEl = document.getElementById(detailId);
+  renderEditPanel(panel, panelId, detailId);
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// ── SAVE GROUPE ──
+async function epSaveGroupe(id) {
+  const data = {
+    nom: document.getElementById(`ep-g-nom-${id}`)?.value?.trim(),
+    marque: document.getElementById(`ep-g-marque-${id}`)?.value?.trim()||null,
+    site_id: document.getElementById(`ep-g-site-${id}`)?.value||null,
+    puissance_kva: parseFloat(document.getElementById(`ep-g-kva-${id}`)?.value)||null,
+    seuil_vidange_heures: parseInt(document.getElementById(`ep-g-seuil-${id}`)?.value)||250,
+    heures_total: parseFloat(document.getElementById(`ep-g-heures-${id}`)?.value)||0,
+  };
+  if(!data.nom){showToast('Nom requis','err');return;}
+  await api('groupes',`&id=eq.${id}`,'*','PATCH',data);
+  const idx = _editData.groupes.findIndex(g=>g.id===id);
+  if(idx>=0) _editData.groupes[idx]={..._editData.groupes[idx],...data};
+  showToast('Groupe mis à jour ✓');
+}
+
+// ── SAVE CUVE ──
+async function epSaveCuve(id) {
+  const data = {
+    nom: document.getElementById(`ep-cv-nom-${id}`)?.value?.trim(),
+    capacite_litres: parseInt(document.getElementById(`ep-cv-cap-${id}`)?.value)||null,
+  };
+  if(!data.nom){showToast('Nom requis','err');return;}
+  await api('cuves',`&id=eq.${id}`,'*','PATCH',data);
+  const idx = _editData.cuves.findIndex(cv=>cv.id===id);
+  if(idx>=0) _editData.cuves[idx]={..._editData.cuves[idx],...data};
+  showToast('Cuve mise à jour ✓');
+}
+
+// ── CONTACTS ──
+function epAddContactRow() {
+  const uid = 'new-'+Date.now();
+  const el = document.createElement('div');
+  el.className='ep-contact-row ep-contact-new';
+  el.id=`ep-ct-new-${uid}`;
+  el.innerHTML=`
+    <input id="ep-ct-new-nom-${uid}" placeholder="Nom complet">
+    <input id="ep-ct-new-wa-${uid}" placeholder="+221 7X XXX XX XX">
+    <select id="ep-ct-new-role-${uid}">
+      <option value="technicien">Technicien</option>
+      <option value="resp_tech">Resp. technique</option>
+    </select>
+    <div style="display:flex;gap:4px">
+      <button class="btn-ep btn-ep-save" onclick="epSaveNewContact('${uid}')" title="Créer">✓</button>
+      <button class="btn-ep btn-ep-ghost" onclick="document.getElementById('ep-ct-new-${uid}').remove()" title="Annuler">✕</button>
+    </div>`;
+  document.getElementById('ep-contacts-empty')?.remove();
+  document.getElementById('ep-new-contacts').appendChild(el);
+}
+
+async function epSaveNewContact(uid) {
+  const nom = document.getElementById(`ep-ct-new-nom-${uid}`)?.value?.trim();
+  if(!nom){showToast('Nom requis','err');return;}
+  const data = {
+    client_id: _editClientId,
+    nom,
+    whatsapp: document.getElementById(`ep-ct-new-wa-${uid}`)?.value?.trim()||null,
+    role: document.getElementById(`ep-ct-new-role-${uid}`)?.value||'technicien',
+    actif: true
+  };
+  const res = await api('contacts','','*','POST',data);
+  const created = Array.isArray(res)?res[0]:res;
+  if(!created?.id){showToast('Erreur création contact','err');return;}
+  _editData.contacts.push(created);
+  document.getElementById(`ep-ct-new-${uid}`)?.remove();
+  const row = document.createElement('div');
+  row.className='ep-contact-row';
+  row.id=`ep-ct-${created.id}`;
+  row.innerHTML=`
+    <input id="ep-ct-nom-${created.id}" value="${esc2(created.nom||'')}" placeholder="Nom">
+    <input id="ep-ct-wa-${created.id}" value="${esc2(created.whatsapp||'')}" placeholder="+221 7X XXX XX XX">
+    <select id="ep-ct-role-${created.id}">
+      <option value="technicien"${created.role==='technicien'?' selected':''}>Technicien</option>
+      <option value="resp_tech"${created.role==='resp_tech'?' selected':''}>Resp. technique</option>
+    </select>
+    <div style="display:flex;gap:4px">
+      <button class="btn-ep btn-ep-save" onclick="epSaveContact('${created.id}')" title="Enregistrer">💾</button>
+      <button class="btn-ep btn-ep-del" onclick="epDeleteContact('${created.id}')" title="Supprimer">✕</button>
+    </div>`;
+  document.getElementById('ep-contacts-list').appendChild(row);
+  showToast(`Contact "${nom}" ajouté ✓`);
+}
+
+async function epSaveContact(id) {
+  const data = {
+    nom: document.getElementById(`ep-ct-nom-${id}`)?.value?.trim(),
+    whatsapp: document.getElementById(`ep-ct-wa-${id}`)?.value?.trim()||null,
+    role: document.getElementById(`ep-ct-role-${id}`)?.value||'technicien',
+  };
+  if(!data.nom){showToast('Nom requis','err');return;}
+  await api('contacts',`&id=eq.${id}`,'*','PATCH',data);
+  const idx = _editData.contacts.findIndex(c=>c.id===id);
+  if(idx>=0) _editData.contacts[idx]={..._editData.contacts[idx],...data};
+  showToast('Contact mis à jour ✓');
+}
+
+async function epDeleteContact(id) {
+  const ct = _editData.contacts.find(c=>c.id===id);
+  if(!confirm(`Supprimer "${ct?.nom||id}" ?`)) return;
+  await api('contacts',`&id=eq.${id}`,'*','DELETE');
+  _editData.contacts = _editData.contacts.filter(c=>c.id!==id);
+  document.getElementById(`ep-ct-${id}`)?.remove();
+  if(!_editData.contacts.length) {
+    document.getElementById('ep-contacts-list').innerHTML='<div style="font-size:12px;color:var(--t2);padding:8px 0" id="ep-contacts-empty">Aucun contact</div>';
+  }
+  showToast('Contact supprimé');
 }
 
 loadAll();
