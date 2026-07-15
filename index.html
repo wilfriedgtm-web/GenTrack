@@ -6,7 +6,7 @@
 <title>GenTrack — Dashboard Admin</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500&display=swap');
-:root{--noir:#0A0A0A;--s:#141414;--s2:#1C1C1C;--s3:#242424;--b:#2A2A2A;--or:#C8922A;--or-p:rgba(200,146,42,0.1);--vert:#22C55E;--vp:rgba(34,197,94,0.1);--rouge:#EF4444;--rp:rgba(239,68,68,0.1);--orange:#F97316;--op:rgba(249,115,22,0.1);--bleu:#3B82F6;--bp:rgba(59,130,246,0.1);--t:#F0F0F0;--t2:#808080;--t3:#404040}
+:root{--noir:#F4F2EE;--s:#FFFFFF;--s2:#F4F2EE;--s3:#E8E4DC;--b:#DDD8CE;--or:#C8922A;--or-p:rgba(200,146,42,0.1);--vert:#16A34A;--vp:rgba(22,163,74,0.1);--rouge:#DC2626;--rp:rgba(220,38,38,0.1);--orange:#EA580C;--op:rgba(234,88,12,0.1);--bleu:#2563EB;--bp:rgba(37,99,235,0.1);--t:#1A1611;--t2:#7A6E5F;--t3:#C4BAA8}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--noir);color:var(--t);font-family:'Inter',sans-serif;display:flex;min-height:100vh}
 .sb{width:200px;flex-shrink:0;background:var(--s);border-right:1px solid var(--b);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
@@ -715,6 +715,27 @@ async function openClientDetail(clientId, detailId) {
         <button class="btn btn-ghost" style="font-size:11px;padding:5px 10px" onclick="openGenToken('${client.id}')">＋ Générer un lien</button>
       </div>
       <div class="section-label" style="margin-top:4px">Groupes — aujourd'hui</div>
+      ${client.groupe_hotelier && sites.length > 1 ? `
+      <div class="section-label" style="margin-top:12px">Établissements (${sites.length})</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        ${sites.map(s=>{
+          const sGroupes = groupes.filter(g=>g.site_id===s.id);
+          const sSaisies = saisiesJ.filter(x=>sGroupes.some(g=>g.id===x.groupe_id));
+          const taux = sGroupes.length ? Math.round(sSaisies.length/sGroupes.length*100) : 0;
+          const tauxColor = taux===100?'var(--vert)':taux>0?'var(--orange)':'var(--rouge)';
+          return `<div class="dp-kpi" style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-size:12px;font-weight:600;color:var(--t)">🏨 ${s.nom}</div>
+              <div style="font-size:10px;color:var(--t2);margin-top:2px">${s.ville||'—'} · ${sGroupes.length} groupe${sGroupes.length>1?'s':''}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:13px;font-weight:700;color:${tauxColor}">${sSaisies.length}/${sGroupes.length}</div>
+              <div style="font-size:10px;color:var(--t2)">saisies</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="section-label">Groupes — aujourd'hui</div>` : ''}
       ${groupesHtml||'<div class="empty">Aucun groupe</div>'}
       <div class="section-label" style="margin-top:12px">Alertes actives</div>
       <div>${alertesHtml}</div>
