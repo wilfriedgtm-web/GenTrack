@@ -532,7 +532,8 @@ async function api(table, q='', select='*', method='GET', body=null) {
     headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json','Prefer':method==='POST'?'return=representation':''},
     body:body?JSON.stringify(body):undefined
   });
-  if(res.status===204)return[];
+  if(res.status===204||res.status===404)return[];
+  if(!res.ok){console.warn(`API ${method} ${table} → ${res.status}`);return[];}
   return res.json();
 }
 
@@ -642,7 +643,7 @@ async function openClientDetail(clientId, detailId) {
 
   const today = new Date().toISOString().split('T')[0];
   const dateDebut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
-  const [client,groupes,saisiesJ,saisies30,alertes,pannes,maints] = await Promise.all([
+  const [client,groupes,saisiesJ,saisies30,alertes,pannes,maints,sites] = await Promise.all([
     api('clients',`&id=eq.${clientId}`).then(r=>r[0]),
     api('groupes',`&client_id=eq.${clientId}&actif=eq.true`),
     api('saisies',`&client_id=eq.${clientId}&date=eq.${today}&order=created_at.desc`),
@@ -650,6 +651,7 @@ async function openClientDetail(clientId, detailId) {
     api('alertes',`&client_id=eq.${clientId}&resolue=eq.false`),
     api('pannes',`&client_id=eq.${clientId}&resolue=eq.false`),
     api('maintenances',`&client_id=eq.${clientId}&order=created_at.desc&limit=3`),
+    api('sites',`&client_id=eq.${clientId}&actif=eq.true&order=nom`),
   ]);
 
   const litres30 = saisies30.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
@@ -1522,8 +1524,10 @@ let _tokenSites = [];
 async function loadDpTokens(clientId, sites) {
   const el = document.getElementById(`dp-tokens-${clientId}`);
   if (!el) return;
-  const tokens = await api('tokens', `&client_id=eq.${clientId}&actif=eq.true&order=created_at.desc`);
-  const dashTokens = tokens.filter(t => ['dir_ops','dir_tech','resp_tech'].includes(t.role));
+  let tokens = [];
+  try { tokens = await api('tokens', `&client_id=eq.${clientId}&order=created_at.desc`); } catch(e) {}
+  if (!Array.isArray(tokens)) tokens = [];
+  const dashTokens = tokens.filter(t => t.actif !== false && ['dir_ops','dir_tech','resp_tech'].includes(t.role));
   if (!dashTokens.length) {
     el.innerHTML = `<div style="font-size:12px;color:var(--t2);padding:6px 0">Aucun lien généré.</div>`;
     return;
