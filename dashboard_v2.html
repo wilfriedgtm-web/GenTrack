@@ -51,7 +51,7 @@ body{background:var(--noir);color:var(--t);font-family:'Inter',sans-serif;displa
 .pill-warn{background:var(--op);color:var(--orange)}
 .pill-danger{background:var(--rp);color:var(--rouge)}
 .pill-gray{background:var(--s3);color:var(--t2)}
-.client-row{display:grid;grid-template-columns:2fr 70px 60px 80px 90px;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--b);cursor:pointer;transition:background 0.15s}
+.client-row{display:grid;grid-template-columns:2fr 70px 60px 80px 130px;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--b);cursor:pointer;transition:background 0.15s}
 .client-row:hover{background:var(--s2)}.client-row:last-child{border-bottom:none}
 .client-row.hd{background:var(--s2);cursor:default}.client-row.hd:hover{background:var(--s2)}
 .cr-nom{font-size:13px;font-weight:600;font-family:'Space Grotesk',sans-serif;color:var(--t)}
@@ -553,7 +553,8 @@ function renderClientsSante(elId, clients, groupes, saisies, alertes, pannes, de
       <div><span class="pill ${pillClass}">${statusLabel}</span></div>
       <div class="cr-actions" onclick="event.stopPropagation()">
         <button class="btn btn-icon" title="Copier le lien" onclick="copyLien('${lien}')">📋</button>
-        <button class="btn btn-icon" title="Ouvrir" onclick="window.open('${lien}','_blank')">↗</button>
+        <button class="btn btn-icon" title="Ouvrir le dashboard client" onclick="window.open('${lien}','_blank')">↗</button>
+        <button class="btn btn-icon" title="Éditer ce client" onclick="window.open('edit_client.html?id=${c.id}','_blank')" style="color:var(--or)">✏️</button>
       </div>
     </div>`;
   }).join('');
