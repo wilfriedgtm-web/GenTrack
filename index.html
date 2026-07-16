@@ -742,6 +742,7 @@ async function openClientDetail(clientId, detailId) {
       ${maints.length?`<div class="section-label" style="margin-top:12px">Dernières maintenances</div>${maints.map(m=>`<div style="padding:8px 0;border-bottom:1px solid var(--b);font-size:12px;color:var(--t2)">${TYPE_MAINT[m.type]||m.type}${m.technicien?' · '+m.technicien:''} · ${fmtDate(m.date_intervention)}${m.cout>0?' · '+fmtNum(m.cout)+' FCFA':''}</div>`).join('')}`:''}
       <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--b);display:flex;gap:8px">
         <button class="btn btn-ghost" style="font-size:12px" onclick="showToast('WhatsApp patron : ${client.whatsapp_patron||'—'}')">📱 ${client.whatsapp_patron||'Patron'}</button>
+        <button class="btn btn-ghost" style="font-size:12px;color:var(--vert)" onclick="envoyerBienvenue('${client.id}','${client.nom}')">👋 Messages de bienvenue</button>
         <button class="btn btn-ghost" style="font-size:12px;color:var(--rouge)" onclick="deleteClient('${client.id}','${client.nom}')">🗑️ Supprimer</button>
       </div>
     </div>`;
@@ -1840,6 +1841,29 @@ async function nswSave(panelId, detailId) {
   _editData.cuves = cuves;
   const panel = document.getElementById(panelId);
   renderEditPanel(panel, panelId, detailId);
+}
+
+async function envoyerBienvenue(clientId, clientNom) {
+  if(!confirm(`Envoyer les messages de bienvenue à tous les contacts de "${clientNom}" ?\n\nTechniciens → code WhatsApp + commandes\nResp. techniques → info rapports`)) return;
+  try {
+    const res = await fetch(`${SUPA_URL}/functions/v1/notify-new-client`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPA_KEY,
+        'Authorization': `Bearer ${SUPA_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ client_id: clientId })
+    });
+    const data = await res.json();
+    if(data.success) {
+      showToast(`Messages envoyés — ${data.techniciens||0} technicien(s), ${data.resp_techs||0} resp. technique(s) ✓`);
+    } else {
+      showToast(data.error||'Erreur envoi messages','err');
+    }
+  } catch(e) {
+    showToast('Erreur connexion','err');
+  }
 }
 
 loadAll();
