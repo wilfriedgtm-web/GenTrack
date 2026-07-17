@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack — Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+:root{
+  --bx:#8B1A2E;--bx-pale:rgba(139,26,46,0.08);--bx-mid:rgba(139,26,46,0.15);
+  --or:#C9A96E;--or-pale:rgba(201,169,110,0.12);
+  --surface:#FDFAF5;--surface2:#F5EFE6;--surface3:#EDE3D4;
+  --bordure:#DDD0BC;--texte:#2C1810;--texte2:#7A6855;--texte3:#B5A090;
+  --vert:#2D7A4F;--vert-pale:rgba(45,122,79,0.08);
+  --rouge:#C0392B;--rouge-pale:rgba(192,57,43,0.08);--rouge-bordure:rgba(192,57,43,0.3);
+  --orange:#D4761E;--orange-pale:rgba(212,118,30,0.08);--orange-bordure:rgba(212,118,30,0.3);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--surface);color:var(--texte);font-family:'Inter',sans-serif;min-height:100vh}
+
+/* HEADER */
+.header{background:var(--bx);color:white}
+.header-top{display:flex;justify-content:space-between;align-items:center;padding:20px 36px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.logo{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;letter-spacing:3px;text-transform:uppercase}
+.logo span{color:var(--or);font-weight:400}
+.logo-sub{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-top:2px}
+.header-right{text-align:right}
+.header-date{font-size:11px;color:rgba(255,255,255,0.5)}
+.header-title{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--or);margin-top:3px}
+
+/* NAV SITES (vue groupe) */
+.site-nav{background:rgba(0,0,0,0.2);padding:0 36px;display:flex;gap:0;overflow-x:auto}
+.site-btn{padding:12px 20px;font-size:12px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:rgba(255,255,255,0.5);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;white-space:nowrap;flex-shrink:0}
+.site-btn:hover{color:rgba(255,255,255,0.8)}
+.site-btn.active{color:white;border-bottom-color:var(--or)}
+
+.container{max-width:960px;margin:0 auto;padding:32px 36px 60px}
+
+/* ONGLETS */
+.tabs{display:flex;gap:4px;margin-bottom:28px;border-bottom:1px solid var(--bordure)}
+.tab{padding:11px 20px;font-size:12px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--texte2);cursor:pointer;border-bottom:2px solid transparent;transition:color 0.15s,border-color 0.15s}
+.tab:hover{color:var(--texte)}
+.tab.active{color:var(--bx);border-bottom-color:var(--bx)}
+.tab-panel{display:none}
+.tab-panel.active{display:block;animation:fadeIn 0.2s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* BANNIÈRE */
+.action-banner{background:var(--rouge-pale);border:1px solid var(--rouge-bordure);border-radius:6px;padding:14px 18px;display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.action-banner.warn{background:var(--orange-pale);border-color:var(--orange-bordure)}
+.ab-icon{font-size:20px;flex-shrink:0}
+.ab-body{flex:1}
+.ab-titre{font-size:13px;font-weight:600;color:var(--rouge)}
+.ab-titre.orange{color:var(--orange)}
+.ab-sub{font-size:12px;color:var(--texte2);margin-top:2px}
+
+/* SECTION */
+.section-title{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--texte);margin-bottom:4px}
+.section-sub{font-size:11px;color:var(--texte2);letter-spacing:0.5px;margin-bottom:16px}
+.section-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--texte2);font-weight:600;margin-bottom:10px}
+
+/* MÉTRIQUES */
+.biz-metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.bm{border-radius:6px;border:1px solid var(--bordure);padding:16px 18px}
+.bm.normal{background:var(--surface2)}
+.bm.danger{background:var(--rouge-pale);border-color:var(--rouge-bordure)}
+.bm.warn{background:var(--orange-pale);border-color:var(--orange-bordure)}
+.bm-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--texte2);margin-bottom:8px;font-weight:600}
+.bm-val{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:600;line-height:1;letter-spacing:-0.5px}
+.bm-sub{font-size:11px;color:var(--texte2);margin-top:5px}
+
+/* COÛTS */
+.couts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.cout-card{background:white;border-radius:6px;border:1px solid var(--bordure);padding:14px 16px}
+.cout-card.maint{border-top:3px solid var(--orange)}
+.cout-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--texte2);font-weight:500;margin-bottom:8px}
+.cout-val{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;color:var(--texte)}
+.cout-sub{font-size:11px;color:var(--texte2);margin-top:4px}
+
+/* GROUPES */
+.groupe-detail{border:1px solid var(--bordure);border-radius:6px;overflow:hidden;margin-bottom:10px;background:white}
+.gd-header{padding:12px 14px;border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:center;background:var(--surface2)}
+.gd-nom{font-size:13px;font-weight:600}
+.gd-saisie{font-size:11px;color:var(--texte2);margin-top:2px}
+.gd-body{padding:12px 14px}
+.gd-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.gd-stat-label{font-size:11px;color:var(--texte2)}
+.gd-stat-val{font-size:14px;font-weight:600;margin-top:2px}
+.gd-bar{height:4px;background:var(--bordure);border-radius:2px;overflow:hidden}
+.gd-bar-fill{height:100%;border-radius:2px}
+
+/* VUE GROUPE — liste des sites */
+.site-card{border:1px solid var(--bordure);border-radius:6px;background:white;margin-bottom:10px;overflow:hidden;cursor:pointer;transition:box-shadow 0.15s}
+.site-card:hover{box-shadow:0 2px 8px rgba(0,0,0,0.08)}
+.sc-header{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border-bottom:1px solid var(--bordure)}
+.sc-nom{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600}
+.sc-sub{font-size:11px;color:var(--texte2);margin-top:2px}
+.sc-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+.sc-kpi{padding:12px 16px;border-right:1px solid var(--bordure);text-align:center}
+.sc-kpi:last-child{border-right:none}
+.sc-kpi-val{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600}
+.sc-kpi-label{font-size:10px;color:var(--texte2);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
+.sc-detail{display:none;padding:16px;border-top:1px solid var(--bordure);animation:fadeIn 0.2s ease}
+.sc-detail.open{display:block}
+
+/* GRAPHIQUE */
+.chart-card{border:1px solid var(--bordure);border-radius:6px;overflow:hidden;margin-bottom:18px;background:white}
+.chart-head{padding:12px 16px;border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:center;background:var(--surface2)}
+.chart-head-title{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600}
+.chart-body{padding:16px}
+.chart-insight{margin-top:10px;padding-top:10px;border-top:1px solid var(--bordure);font-size:12px;color:var(--texte2)}
+
+/* TABLE */
+.table-card{border:1px solid var(--bordure);border-radius:6px;overflow:hidden;margin-bottom:22px;background:white}
+.table-head{padding:12px 16px;border-bottom:1px solid var(--bordure);background:var(--surface2)}
+.table-head-title{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600}
+.table-head-sub{font-size:11px;color:var(--texte2);margin-top:2px}
+table.data{width:100%;border-collapse:collapse;font-size:12px}
+table.data th{text-align:left;padding:9px 14px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--texte2);border-bottom:1px solid var(--bordure);background:var(--surface2);font-weight:600}
+table.data td{padding:9px 14px;border-bottom:1px solid var(--surface3);color:var(--texte)}
+table.data tr:last-child td{border-bottom:none}
+table.data tr:hover td{background:var(--surface2)}
+
+/* PILLS */
+.pill{padding:3px 10px;border-radius:2px;font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;display:inline-block}
+.pill-ok{background:var(--vert-pale);color:var(--vert)}
+.pill-warn{background:var(--orange-pale);color:var(--orange)}
+.pill-danger{background:var(--rouge-pale);color:var(--rouge)}
+
+.divider{height:1px;background:var(--bordure);margin:28px 0;position:relative}
+.divider::after{content:'◆';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--surface);padding:0 12px;color:var(--or);font-size:9px}
+
+.footer{background:var(--bx);color:rgba(255,255,255,0.4);text-align:center;padding:18px;font-size:11px;letter-spacing:1px;margin-top:40px}
+.footer strong{color:var(--or)}
+
+.loading{padding:40px;text-align:center;color:var(--texte2);font-size:13px}
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--bordure);border-top-color:var(--bx);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{padding:30px;text-align:center;color:var(--texte2);font-size:12px}
+.error-page{max-width:400px;margin:80px auto;text-align:center;padding:40px}
+.error-page h2{font-family:'Cormorant Garamond',serif;font-size:28px;margin-bottom:12px;color:var(--texte)}
+.error-page p{font-size:13px;color:var(--texte2);line-height:1.6}
+
+@media(max-width:700px){
+  .container{padding:20px}
+  .biz-metrics{grid-template-columns:1fr}.couts-grid{grid-template-columns:1fr}
+  .gd-stats{grid-template-columns:repeat(2,1fr)}
+  .sc-kpis{grid-template-columns:repeat(2,1fr)}
+  .header-top{padding:16px 20px}
+  .site-nav{padding:0 16px}
+  table.data{font-size:11px}
+  table.data th,table.data td{padding:7px 8px}
+}
+</style>
+</head>
+<body>
+
+<div id="app"><div class="loading" style="padding:80px"><span class="spinner"></span>Chargement...</div></div>
+
+<script>
+const SUPA_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+
+let _chartOp = null, _chartTech = null;
+
+// ── UTILS ──
+async function api(table, q='', select='*') {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?select=${select}${q}`, {
+    headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`}
+  });
+  if(!res.ok) return [];
+  return res.json();
+}
+
+function fmtNum(n){return Math.round(n||0).toLocaleString('fr-FR');}
+function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});}
+function fmtDateShort(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});}
+function fmtHeure(d,tz='Africa/Dakar'){if(!d)return null;return new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:tz});}
+function carbColor(n){return n<25?'var(--rouge)':n<50?'var(--orange)':'var(--vert)';}
+function autoColor(j){return j<2?'var(--rouge)':j<5?'var(--orange)':'var(--vert)';}
+function huileColor(h){return h==='critique'?'var(--rouge)':h==='bas'?'var(--orange)':'var(--vert)';}
+function retardLabel(date, heure, today) {
+  if(!date) return {label:'Aucune saisie', color:'var(--rouge)', jours:null};
+  const j = Math.round((new Date(today)-new Date(date))/86400000);
+  if(j===0) return {label:`Saisi aujourd'hui${heure?' à '+heure:''}`, color:'var(--texte2)', jours:0};
+  if(j===1) return {label:`Saisi hier${heure?' à '+heure:''}`, color:'var(--orange)', jours:1};
+  return {label:`Saisi il y a ${j} jours`, color:'var(--rouge)', jours:j};
+}
+
+function applyBrandColor(hex) {
+  if(!hex) return;
+  const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+  document.documentElement.style.setProperty('--bx', hex);
+  document.documentElement.style.setProperty('--bx-pale', `rgba(${r},${g},${b},0.08)`);
+  document.documentElement.style.setProperty('--bx-mid', `rgba(${r},${g},${b},0.15)`);
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+}
+
+// ── ROUTING ──
+async function init() {
+  const params = new URLSearchParams(window.location.search);
+  const token  = params.get('token');
+  const clientId = params.get('id'); // fallback legacy
+
+  if(token) {
+    await loadByToken(token);
+  } else if(clientId) {
+    await loadByClientId(clientId);
+  } else {
+    showError('Lien invalide', 'Ce lien ne contient pas d\'identifiant valide. Contactez votre responsable GenTrack.');
+  }
+}
+
+async function loadByToken(token) {
+  const rows = await api('tokens', `&token=eq.${token}&actif=eq.true`);
+  if(!rows.length) { showError('Lien expiré', 'Ce lien d\'accès n\'est plus valide. Contactez votre responsable GenTrack.'); return; }
+  const tok = rows[0];
+  if(tok.expire_at && new Date(tok.expire_at) < new Date()) {
+    showError('Lien expiré', 'Ce lien d\'accès a expiré. Contactez votre responsable GenTrack.'); return;
+  }
+  const role = tok.role || null;
+  const rawSiteIds = tok.site_ids || [];
+  const siteIds = typeof rawSiteIds === 'string' ? JSON.parse(rawSiteIds) : rawSiteIds;
+
+  // Rôles dashboard avec logique multi-site
+  if(role === 'dir_ops') {
+    // Vue consolidée tous les sites, onglet Opérations uniquement
+    await loadClientView(tok.client_id, {role:'dir_ops'});
+  } else if(role === 'dir_tech') {
+    // Opérations + Technique, sites filtrés si site_ids défini
+    await loadClientView(tok.client_id, {role:'dir_tech', siteIds});
+  } else if(role === 'resp_tech') {
+    // Opérations + Technique, 1 site
+    const siteId = siteIds.length ? siteIds[0] : tok.site_id || null;
+    await loadSiteView(tok.client_id, siteId, {role:'resp_tech'});
+  } else if(tok.site_id) {
+    // Ancien format legacy
+    await loadSiteView(tok.client_id, tok.site_id, {role:'technicien'});
+  } else {
+    await loadClientView(tok.client_id, {role:null});
+  }
+}
+
+async function loadByClientId(clientId) {
+  await loadClientView(clientId);
+}
+
+// ── VUE CLIENT (groupe ou solo) ──
+async function loadClientView(clientId, access={}) {
+  const clients = await api('clients', `&id=eq.${clientId}`);
+  if(!clients.length) { showError('Client introuvable', 'Ce client n\'existe pas dans la base GenTrack.'); return; }
+  const client = clients[0];
+  applyBrandColor(client.couleur_marque);
+
+  let sites = await api('sites', `&client_id=eq.${clientId}&actif=eq.true&order=nom`);
+
+  // Filtrer les sites si dir_tech avec site_ids définis
+  if(access.role === 'dir_tech' && access.siteIds?.length) {
+    sites = sites.filter(s => access.siteIds.includes(s.id));
+  }
+
+  const showTechnique = access.role !== 'dir_ops';
+
+  if((client.groupe_hotelier || sites.length > 1) && access.role === 'dir_ops') {
+    await renderGroupeView(client, sites);
+  } else if(sites.length > 1 && access.role === 'dir_tech') {
+    await renderMultiSiteView(client, sites);
+  } else {
+    const siteId = sites.length ? sites[0].id : null;
+    await renderHotelView(client, siteId, null, {showTechnique});
+  }
+}
+
+async function loadSiteView(clientId, siteId, access={}) {
+  const clients = await api('clients', `&id=eq.${clientId}`);
+  if(!clients.length) { showError('Client introuvable', ''); return; }
+  const client = clients[0];
+  applyBrandColor(client.couleur_marque);
+  const showTechnique = access.role !== 'technicien';
+  await renderHotelView(client, siteId, null, {showTechnique});
+}
+
+// ════════════════════════════════════════
+// VUE MULTI-SITE — dir_tech (plusieurs sites filtrés)
+// Réutilise renderHotelView site par site avec navigation
+// ════════════════════════════════════════
+async function renderMultiSiteView(client, sites) {
+  // Pour dir_tech multi-site : on affiche site par site avec nav, Opérations + Technique
+  let activeSiteIdx = 0;
+
+  async function showSite(idx) {
+    activeSiteIdx = idx;
+    const navHtml = sites.map((s,i)=>`
+      <div class="site-btn ${i===idx?'active':''}" onclick="window._msShowSite(${i})">${s.nom}</div>
+    `).join('');
+    document.querySelector('.site-nav').innerHTML = navHtml;
+    const site = sites[idx];
+    // Ré-render le contenu sans recréer le header
+    const mainEl = document.getElementById('ms-main');
+    if(mainEl) mainEl.innerHTML = '<div class="loading"><span class="spinner"></span>Chargement...</div>';
+    await renderHotelView(client, site.id, site.nom, {showTechnique: true, inContainer: 'ms-main'});
+  }
+
+  const dateStr = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <div class="logo">${client.nom}</div>
+          <div class="logo-sub">Directeur technique · ${sites.length} sites</div>
+        </div>
+        <div class="header-right">
+          <div class="header-date">${dateStr}</div>
+          <div class="header-title">Groupes électrogènes</div>
+        </div>
+      </div>
+      <div class="site-nav">${sites.map((s,i)=>`<div class="site-btn ${i===0?'active':''}" onclick="window._msShowSite(${i})">${s.nom}</div>`).join('')}</div>
+    </div>
+    <div id="ms-main"><div class="loading" style="padding:60px"><span class="spinner"></span>Chargement...</div></div>
+    <div class="footer">Powered by <strong>GenTrack</strong> · ${client.nom}</div>`;
+
+  window._msShowSite = async (idx) => {
+    document.querySelectorAll('.site-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
+    const mainEl = document.getElementById('ms-main');
+    mainEl.innerHTML = '<div class="loading" style="padding:60px"><span class="spinner"></span>Chargement...</div>';
+    await renderHotelView(client, sites[idx].id, sites[idx].nom, {showTechnique:true, inContainer:'ms-main'});
+  };
+
+  // Charger le premier site
+  await renderHotelView(client, sites[0].id, sites[0].nom, {showTechnique:true, inContainer:'ms-main'});
+}
+
+// ════════════════════════════════════════
+// VUE GROUPE — tous les hôtels
+// ════════════════════════════════════════
+async function renderGroupeView(client, sites) {
+  const today = new Date().toISOString().split('T')[0];
+  const dateDebut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
+
+  const [tousGroupes, toutesSaisies, toutesAlertes, toutesPannes, toutesCuves, toutesSaisiesCuve] = await Promise.all([
+    api('groupes', `&client_id=eq.${client.id}&actif=eq.true`),
+    api('saisies', `&client_id=eq.${client.id}&date=eq.${today}`),
+    api('alertes', `&client_id=eq.${client.id}&resolue=eq.false`),
+    api('pannes',  `&client_id=eq.${client.id}&resolue=eq.false`),
+    api('cuves',   `&client_id=eq.${client.id}&actif=eq.true`),
+    api('saisies_cuve', `&client_id=eq.${client.id}&date=gte.${dateDebut30}&order=date.desc`),
+  ]);
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  // KPIs consolidés
+  const totalGroupes = tousGroupes.length;
+  const saisiesOk = toutesSaisies.filter(s=>s.heures_marche!=null).length;
+  const alertesDanger = toutesAlertes.filter(a=>a.severite==='danger').length;
+  const pannesOuvertes = toutesPannes.length;
+
+  // Nav sites
+  const siteNavHtml = sites.map((s,i)=>`
+    <div class="site-btn ${i===0?'active':''}" onclick="toggleSiteDetail('${s.id}',this)">${s.nom}</div>
+  `).join('');
+
+  // Cartes sites
+  const sitesHtml = sites.map((s,i)=>{
+    const sGroupes = tousGroupes.filter(g=>g.site_id===s.id);
+    const sSaisies = toutesSaisies.filter(x=>sGroupes.some(g=>g.id===x.groupe_id));
+    const sAlertes = toutesAlertes.filter(a=>sGroupes.some(g=>g.id===a.groupe_id)||a.site_id===s.id);
+    const sCuve = toutesCuves.find(c=>c.site_id===s.id)||null;
+    const sSaisieCuve = sCuve ? toutesSaisiesCuve.find(sc=>sc.cuve_id===sCuve.id) : null;
+
+    const pctCuve = sSaisieCuve && sCuve ? Math.round(sSaisieCuve.niveau_litres/sCuve.capacite_litres*100) : null;
+    const tauxSaisies = sGroupes.length ? Math.round(sSaisies.length/sGroupes.length*100) : 0;
+    const statusColor = sAlertes.some(a=>a.severite==='danger')||sSaisieCuve&&pctCuve<30 ? 'var(--rouge)' :
+                        sAlertes.length||tauxSaisies<100 ? 'var(--orange)' : 'var(--vert)';
+    const pillClass = sAlertes.some(a=>a.severite==='danger') ? 'pill-danger' : sAlertes.length ? 'pill-warn' : 'pill-ok';
+    const pillTxt = sAlertes.some(a=>a.severite==='danger') ? 'Critique' : sAlertes.length ? 'Attention' : 'Normal';
+
+    return `<div class="site-card" id="site-card-${s.id}" onclick="toggleSiteDetail('${s.id}',null,${i})">
+      <div class="sc-header">
+        <div>
+          <div class="sc-nom">🏨 ${s.nom}</div>
+          <div class="sc-sub">${s.ville||''} · ${sGroupes.length} groupe${sGroupes.length>1?'s':''}</div>
+        </div>
+        <span class="pill ${pillClass}">${pillTxt}</span>
+      </div>
+      <div class="sc-kpis">
+        <div class="sc-kpi">
+          <div class="sc-kpi-val" style="color:${tauxSaisies===100?'var(--vert)':tauxSaisies>0?'var(--orange)':'var(--rouge)'}">${sSaisies.length}/${sGroupes.length}</div>
+          <div class="sc-kpi-label">Saisies</div>
+        </div>
+        <div class="sc-kpi">
+          <div class="sc-kpi-val" style="color:${pctCuve!=null?carbColor(pctCuve):'var(--texte2)'}">${pctCuve!=null?pctCuve+'%':'—'}</div>
+          <div class="sc-kpi-label">Cuve</div>
+        </div>
+        <div class="sc-kpi">
+          <div class="sc-kpi-val" style="color:${sAlertes.length?'var(--rouge)':'var(--vert)'}">${sAlertes.length||'✓'}</div>
+          <div class="sc-kpi-label">Alertes</div>
+        </div>
+        <div class="sc-kpi">
+          <div class="sc-kpi-val" style="color:${toutesPannes.filter(p=>sGroupes.some(g=>g.id===p.groupe_id)).length?'var(--rouge)':'var(--vert)'}">${toutesPannes.filter(p=>sGroupes.some(g=>g.id===p.groupe_id)).length||'✓'}</div>
+          <div class="sc-kpi-label">Pannes</div>
+        </div>
+      </div>
+      <div class="sc-detail" id="sc-detail-${s.id}">
+        <div class="loading"><span class="spinner"></span>Chargement du détail...</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <div class="logo">${client.nom}</div>
+          <div class="logo-sub">Pilote GenTrack · Groupe hôtelier</div>
+        </div>
+        <div class="header-right">
+          <div class="header-date" id="header-date">${dateStr}</div>
+          <div class="header-title">Vue consolidée</div>
+        </div>
+      </div>
+    </div>
+    <div class="container">
+      <div class="biz-metrics">
+        <div class="bm ${alertesDanger>0?'danger':pannesOuvertes>0?'warn':'normal'}">
+          <div class="bm-label">Saisies aujourd'hui</div>
+          <div class="bm-val" style="color:${saisiesOk===totalGroupes?'var(--vert)':saisiesOk>0?'var(--orange)':'var(--rouge)'}">${saisiesOk} / ${totalGroupes}</div>
+          <div class="bm-sub">${sites.length} établissement${sites.length>1?'s':''}</div>
+        </div>
+        <div class="bm ${alertesDanger>0?'danger':toutesAlertes.length?'warn':'normal'}">
+          <div class="bm-label">Alertes actives</div>
+          <div class="bm-val" style="color:${alertesDanger>0?'var(--rouge)':toutesAlertes.length?'var(--orange)':'var(--vert)'}">${toutesAlertes.length||'✓'}</div>
+          <div class="bm-sub">${pannesOuvertes} panne${pannesOuvertes>1?'s':''} en cours</div>
+        </div>
+      </div>
+      <div class="section-label">Établissements</div>
+      ${sitesHtml}
+    </div>
+    <div class="footer">Powered by <strong>GenTrack</strong> · ${client.nom}</div>`;
+
+  // Stocker les données pour le drill-down
+  window._groupeData = {client, sites, tousGroupes, toutesSaisies, toutesAlertes, toutesPannes, toutesCuves, toutesSaisiesCuve, today};
+}
+
+let _openSiteId = null;
+async function toggleSiteDetail(siteId, navBtn, idx) {
+  const el = document.getElementById(`sc-detail-${siteId}`);
+  if(!el) return;
+
+  // Fermer si déjà ouvert
+  if(_openSiteId===siteId && el.classList.contains('open')) {
+    el.classList.remove('open');
+    _openSiteId = null;
+    return;
+  }
+
+  // Fermer les autres
+  document.querySelectorAll('.sc-detail.open').forEach(d=>d.classList.remove('open'));
+  _openSiteId = siteId;
+  el.classList.add('open');
+
+  const d = window._groupeData;
+  if(!d) return;
+
+  const site = d.sites.find(s=>s.id===siteId);
+  const sGroupes = d.tousGroupes.filter(g=>g.site_id===siteId);
+  const sSaisies = d.toutesSaisies.filter(x=>sGroupes.some(g=>g.id===x.groupe_id));
+  const sAlertes = d.toutesAlertes.filter(a=>sGroupes.some(g=>g.id===a.groupe_id));
+  const sCuve = d.toutesCuves.find(c=>c.site_id===siteId)||null;
+  const sSaisieCuve = sCuve ? d.toutesSaisiesCuve.find(sc=>sc.cuve_id===sCuve.id) : null;
+
+  el.innerHTML = buildSiteDetailHtml(d.client, site, sGroupes, sSaisies, sAlertes, sCuve, sSaisieCuve, d.today);
+}
+
+function buildSiteDetailHtml(client, site, groupes, saisiesJour, alertes, cuve, saisieCuve, today) {
+  const cuveHtml = buildCuveHtml(cuve, saisieCuve, today);
+  const groupesHtml = groupes.map(g => {
+    const s = saisiesJour.find(x=>x.groupe_id===g.id);
+    const heure = fmtHeure(s?.created_at);
+    const rd = retardLabel(s?.date, heure, today);
+    const pctVidange = g.heures_total && g.seuil_vidange_heures ? Math.round(g.heures_total/g.seuil_vidange_heures*100) : null;
+    const pillClass = !s?'pill-warn':rd.jours===0?'pill-ok':rd.jours===1?'pill-warn':'pill-danger';
+    const pillTxt = !s?'Pas de saisie':rd.jours===0?'Saisi ✓':rd.jours===1?'Hier':`J-${rd.jours}`;
+    return `<div class="groupe-detail">
+      <div class="gd-header">
+        <div>
+          <div class="gd-nom">⚙️ ${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA</div>
+          <div class="gd-saisie" style="color:${rd.color}">${rd.label}</div>
+        </div>
+        <span class="pill ${pillClass}">${pillTxt}</span>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Compteur moteur</div><div class="gd-stat-val">${s?.heures_marche!=null?s.heures_marche+'h':'—'}</div></div>
+          <div><div class="gd-stat-label">Seuil vidange</div><div class="gd-stat-val" style="color:${pctVidange>=100?'var(--rouge)':pctVidange>=80?'var(--orange)':'var(--vert)'}">${pctVidange!=null?pctVidange+'%':'—'}</div></div>
+          <div><div class="gd-stat-label">Huile</div><div class="gd-stat-val" style="color:${huileColor(s?.niveau_huile)}">${s?.niveau_huile||'—'}</div></div>
+          <div><div class="gd-stat-label">Opérateur</div><div class="gd-stat-val">${s?.operateur||'—'}</div></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const alertesHtml = alertes.length ? alertes.map(a=>`
+    <div class="action-banner" style="margin-bottom:8px">
+      <div class="ab-icon">${a.severite==='danger'?'🔴':'🟡'}</div>
+      <div class="ab-body"><div class="ab-titre" style="color:${a.severite==='danger'?'var(--rouge)':'var(--orange)'}">${a.message}</div></div>
+    </div>`).join('') : '';
+
+  return `${alertesHtml}${cuveHtml}${groupesHtml||'<div class="empty">Aucun groupe configuré pour ce site</div>'}`;
+}
+
+// ════════════════════════════════════════
+// VUE HÔTEL SOLO
+// ════════════════════════════════════════
+async function renderHotelView(client, siteId, siteName, opts={}) {
+  const showTechnique = opts.showTechnique !== false;
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  const dateDebut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
+  const dateDebutAnnee = new Date(now.getFullYear(),0,1).toISOString().split('T')[0];
+
+  const siteFilter = siteId ? `&site_id=eq.${siteId}` : `&client_id=eq.${client.id}`;
+
+  const [groupes, saisiesRecentes, alertes, pannesOuvertes, pannesResolues, cuves] = await Promise.all([
+    api('groupes', `&client_id=eq.${client.id}${siteId?'&site_id=eq.'+siteId:''}&actif=eq.true&order=nom`),
+    api('saisies', `&client_id=eq.${client.id}&date=gte.${dateDebut30}&order=date.desc,created_at.desc&limit=100`),
+    api('alertes', `&client_id=eq.${client.id}&resolue=eq.false`),
+    api('pannes',  `&client_id=eq.${client.id}&resolue=eq.false&order=date_panne.desc`),
+    api('pannes',  `&client_id=eq.${client.id}&resolue=eq.true&order=date_resolution.desc&limit=20`),
+    api('cuves',   `&client_id=eq.${client.id}${siteId?'&site_id=eq.'+siteId:''}&actif=eq.true`),
+  ]);
+
+  // Dernière saisie connue par groupe
+  const derniereSaisieParGroupe = {};
+  saisiesRecentes.forEach(s=>{
+    if(!derniereSaisieParGroupe[s.groupe_id]) derniereSaisieParGroupe[s.groupe_id] = s;
+  });
+  const saisiesJour = Object.values(derniereSaisieParGroupe);
+
+  const cuve = cuves.length ? cuves[0] : null;
+  let saisiesCuve30 = [], saisieCuveJour = null;
+  if(cuve) {
+    saisiesCuve30 = await api('saisies_cuve', `&cuve_id=eq.${cuve.id}&date=gte.${dateDebut30}&order=date.desc,created_at.desc`);
+    saisieCuveJour = saisiesCuve30[0]||null;
+  }
+
+  const prixLitre = client.prix_litre_fcfa || 695;
+  const saisiesCuveAnnee = cuve ? await api('saisies_cuve', `&cuve_id=eq.${cuve.id}&date=gte.${dateDebutAnnee}`) : [];
+  const coutCarburantAnnee = Math.round(saisiesCuveAnnee.reduce((a,s)=>a+(s.litres_ajoutes||0),0)*prixLitre);
+  const coutMaintenanceAnnee = pannesResolues.filter(p=>p.date_resolution>=dateDebutAnnee).reduce((a,p)=>a+(p.cout_reparation||0),0);
+
+  const nom = siteName || client.nom;
+  const dateStr = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  const inContainer = opts.inContainer || null;
+  const rootEl = inContainer ? document.getElementById(inContainer) : document.getElementById('app');
+
+  const headerHtml = inContainer ? '' : `
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <div class="logo">${nom}</div>
+          <div class="logo-sub">Pilote GenTrack</div>
+        </div>
+        <div class="header-right">
+          <div class="header-date">${dateStr}</div>
+          <div class="header-title">Groupes électrogènes</div>
+        </div>
+      </div>
+    </div>`;
+  const footerHtml = inContainer ? '' : `<div class="footer">Powered by <strong>GenTrack</strong> · ${nom}</div>`;
+
+  rootEl.innerHTML = `${headerHtml}
+    <div class="container">
+      <div class="tabs">
+        <div class="tab active" data-tab="operations" onclick="switchTab('operations')">Opérations</div>
+        ${showTechnique?'<div class="tab" data-tab="technique" onclick="switchTab(\'technique\')">Technique</div>':''}
+      </div>
+      <div class="tab-panel active" id="panel-operations">
+        <div id="op-banner-wrap"></div>
+        <div class="section-title">Vue d'ensemble</div>
+        <div class="section-sub" id="op-date">Données du ${now.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})}</div>
+        <div class="biz-metrics" id="op-metrics"></div>
+        <div class="couts-grid" id="op-couts"></div>
+        <div class="section-label">Groupes & Cuve</div>
+        <div id="op-groupes"></div>
+        <div id="op-alertes"></div>
+        <div class="chart-card" style="margin-top:6px">
+          <div class="chart-head">
+            <div class="chart-head-title">Évolution cuve — 14 jours</div>
+            <div style="font-size:11px;color:var(--texte2)" id="op-chart-sub"></div>
+          </div>
+          <div class="chart-body">
+            <canvas id="op-chart" height="130"></canvas>
+            <div class="chart-insight" id="op-chart-insight"></div>
+          </div>
+        </div>
+      </div>
+      ${showTechnique?`<div class="tab-panel" id="panel-technique">
+        <div class="section-title">État des groupes</div>
+        <div class="section-sub">Heures de marche, vidange, pannes</div>
+        <div id="tech-groupes"></div>
+        <div class="divider"></div>
+        <div class="section-title">Coûts</div>
+        <div class="section-sub">Année en cours</div>
+        <div class="couts-grid" id="tech-couts"></div>
+        <div class="section-title" style="margin-top:8px">Pannes en cours</div>
+        <div class="section-sub">Interventions requises</div>
+        <div class="table-card" id="tech-pannes-ouvertes"></div>
+        <div class="section-title">Historique des pannes</div>
+        <div class="section-sub">Coût, intervenant, résolution</div>
+        <div class="table-card" id="tech-pannes-resolues"></div>
+        <div class="section-title">Évolution cuve — 14 jours</div>
+        <div class="section-sub">Niveau en litres</div>
+        <div class="chart-card">
+          <div class="chart-head">
+            <div class="chart-head-title">${cuve?'Cuve — '+fmtNum(cuve.capacite_litres)+'L':'Cuve commune'}</div>
+            <div style="font-size:11px;color:var(--texte2)" id="tech-chart-insight"></div>
+          </div>
+          <div class="chart-body"><canvas id="tech-chart" height="130"></canvas></div>
+        </div>
+        <div class="section-title">Historique saisies moteur</div>
+        <div class="section-sub">30 dernières saisies</div>
+        <div class="table-card" id="tech-saisies"></div>
+        <div class="section-title">Historique relevés cuve</div>
+        <div class="section-sub">30 derniers relevés</div>
+        <div class="table-card" id="tech-saisies-cuve"></div>
+      </div>`:''}
+    </div>
+    ${footerHtml}`;
+
+  renderOperations(client, groupes, saisiesJour, saisiesCuve30, alertes, pannesOuvertes, coutCarburantAnnee, coutMaintenanceAnnee, prixLitre, cuve, saisieCuveJour, today, now);
+  if(showTechnique) renderTechnique(client, groupes, saisiesRecentes, saisiesCuve30, pannesOuvertes, pannesResolues, coutCarburantAnnee, coutMaintenanceAnnee, cuve, today);
+}
+
+// ── CUVE HTML (réutilisable) ──
+function buildCuveHtml(cuve, saisieCuve, today) {
+  if(!cuve) return '';
+  const capCuve = cuve.capacite_litres||500;
+  const niveauCuve = saisieCuve?.niveau_litres;
+  const pctCuve = niveauCuve!=null ? Math.round(niveauCuve/capCuve*100) : null;
+  const consoJour = 65*8;
+  const autoJours = niveauCuve!=null ? Math.round((niveauCuve/consoJour)*10)/10 : null;
+  const heureCuve = fmtHeure(saisieCuve?.created_at);
+  const rd = retardLabel(saisieCuve?.date, heureCuve, today);
+  return `<div class="groupe-detail" style="border-top:3px solid var(--or);margin-bottom:10px">
+    <div class="gd-header" style="background:var(--or-pale)">
+      <div>
+        <div class="gd-nom">🛢️ Cuve commune${cuve.nom?' · '+cuve.nom:''}</div>
+        <div class="gd-saisie" style="color:${rd.color}">Capacité ${fmtNum(capCuve)}L · ${rd.label}</div>
+      </div>
+      <div class="pill ${!saisieCuve?'pill-warn':pctCuve<30?'pill-danger':pctCuve<50?'pill-warn':'pill-ok'}">${!saisieCuve?'Pas de relevé':niveauCuve+'L / '+capCuve+'L ('+pctCuve+'%)'}</div>
+    </div>
+    <div class="gd-body">
+      <div class="gd-stats">
+        <div><div class="gd-stat-label">Niveau actuel</div><div class="gd-stat-val" style="color:${pctCuve!=null?carbColor(pctCuve):'var(--texte2)'}">${niveauCuve!=null?niveauCuve+'L':'—'}</div></div>
+        <div><div class="gd-stat-label">Capacité</div><div class="gd-stat-val">${fmtNum(capCuve)}L</div></div>
+        <div><div class="gd-stat-label">Autonomie</div><div class="gd-stat-val" style="color:${autoJours!=null?autoColor(autoJours):'var(--texte2)'}">${autoJours!=null?autoJours+'j':'—'}</div></div>
+        <div><div class="gd-stat-label">Taux</div><div class="gd-stat-val">${pctCuve!=null?pctCuve+'%':'—'}</div></div>
+      </div>
+      ${pctCuve!=null?`<div class="gd-bar"><div class="gd-bar-fill" style="width:${pctCuve}%;background:${carbColor(pctCuve)}"></div></div>`:''}
+    </div>
+  </div>`;
+}
+
+// ── ONGLET OPÉRATIONS ──
+function renderOperations(client, groupes, saisiesJour, saisiesCuve30, alertes, pannesOuvertes, coutCarburantAnnee, coutMaintenanceAnnee, prixLitre, cuve, saisieCuveJour, today, now) {
+  const capCuve = cuve?.capacite_litres||500;
+  const niveauCuve = saisieCuveJour?.niveau_litres;
+  const pctCuve = niveauCuve!=null ? Math.round(niveauCuve/capCuve*100) : null;
+  const consoJour = (groupes[0]?.conso_theorique_lh||65)*8;
+  const autoJours = niveauCuve!=null ? Math.round((niveauCuve/consoJour)*10)/10 : null;
+
+  // Bannière
+  const urgences = (autoJours!==null&&autoJours<2?1:0)+pannesOuvertes.length+(alertes.filter(a=>a.severite==='danger').length);
+  const bannerEl = document.getElementById('op-banner-wrap');
+  if(urgences>0){
+    const subs=[];
+    if(autoJours!==null&&autoJours<2) subs.push(`Cuve critique (${autoJours}j)`);
+    if(pannesOuvertes.length) subs.push(`${pannesOuvertes.length} panne${pannesOuvertes.length>1?'s':''}`);
+    bannerEl.innerHTML=`<div class="action-banner"><div class="ab-icon">🚨</div><div class="ab-body"><div class="ab-titre">${urgences} action${urgences>1?'s':''} requise${urgences>1?'s':''}</div><div class="ab-sub">${subs.join(' · ')}</div></div></div>`;
+  }
+
+  // Métriques
+  const litres30 = saisiesCuve30.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
+  const cout30 = Math.round(litres30*prixLitre);
+  const statusCuve = pctCuve==null?'normal':pctCuve<30?'danger':pctCuve<50?'warn':'normal';
+  document.getElementById('op-metrics').innerHTML=`
+    <div class="bm normal">
+      <div class="bm-label">Coût carburant — 30 jours</div>
+      <div class="bm-val">${cout30>0?fmtNum(cout30):'—'}</div>
+      <div class="bm-sub">FCFA · ${fmtNum(litres30)}L ajoutés</div>
+    </div>
+    <div class="bm ${statusCuve}">
+      <div class="bm-label" style="color:${statusCuve==='danger'?'var(--rouge)':statusCuve==='warn'?'var(--orange)':'var(--texte2)'}">Autonomie cuve</div>
+      <div class="bm-val" style="color:${statusCuve==='danger'?'var(--rouge)':statusCuve==='warn'?'var(--orange)':'var(--vert)'}">${autoJours!==null?autoJours+' jours':'—'}</div>
+      <div class="bm-sub">${niveauCuve!=null?niveauCuve+'L / '+capCuve+'L ('+pctCuve+'%)':'Pas de relevé'}</div>
+    </div>`;
+
+  // Coûts
+  document.getElementById('op-couts').innerHTML=`
+    <div class="cout-card"><div class="cout-label">⛽ Carburant — ${now.getFullYear()}</div><div class="cout-val">${coutCarburantAnnee>0?fmtNum(coutCarburantAnnee):'—'}</div><div class="cout-sub">FCFA</div></div>
+    <div class="cout-card maint"><div class="cout-label">🔧 Maintenance — ${now.getFullYear()}</div><div class="cout-val" style="color:${coutMaintenanceAnnee>0?'var(--orange)':'var(--vert)'}">${fmtNum(coutMaintenanceAnnee)}</div><div class="cout-sub">FCFA</div></div>`;
+
+  // Cuve + groupes
+  const groupesHtml = groupes.map(g=>{
+    const s = saisiesJour.find(x=>x.groupe_id===g.id);
+    const heure = fmtHeure(s?.created_at);
+    const rd = retardLabel(s?.date, heure, today);
+    const pctVidange = g.heures_total&&g.seuil_vidange_heures ? Math.round(g.heures_total/g.seuil_vidange_heures*100) : null;
+    const pillClass = !s?'pill-warn':rd.jours===0?'pill-ok':rd.jours===1?'pill-warn':'pill-danger';
+    const pillTxt = !s?'Pas de saisie':rd.jours===0?'Saisi ✓':rd.jours===1?'Hier':`J-${rd.jours}`;
+    return `<div class="groupe-detail">
+      <div class="gd-header">
+        <div>
+          <div class="gd-nom">⚙️ ${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA</div>
+          <div class="gd-saisie" style="color:${rd.color}">${rd.label}</div>
+        </div>
+        <span class="pill ${pillClass}">${pillTxt}</span>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Compteur moteur</div><div class="gd-stat-val">${s?.heures_marche!=null?s.heures_marche+'h':'—'}</div></div>
+          <div><div class="gd-stat-label">Seuil vidange</div><div class="gd-stat-val" style="color:${pctVidange>=100?'var(--rouge)':pctVidange>=80?'var(--orange)':'var(--vert)'}">${pctVidange!=null?pctVidange+'%':'—'}</div></div>
+          <div><div class="gd-stat-label">Huile</div><div class="gd-stat-val" style="color:${huileColor(s?.niveau_huile)}">${s?.niveau_huile||'—'}</div></div>
+          <div><div class="gd-stat-label">Opérateur</div><div class="gd-stat-val">${s?.operateur||'—'}</div></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('op-groupes').innerHTML = buildCuveHtml(cuve, saisieCuveJour, today) + groupesHtml;
+
+  // Alertes
+  const alEl = document.getElementById('op-alertes');
+  alEl.innerHTML = alertes.length ? `<div style="margin:14px 0"><div class="section-label">Alertes actives</div>`+
+    alertes.map(a=>`<div class="action-banner" style="margin-bottom:8px"><div class="ab-icon">${a.severite==='danger'?'🔴':'🟡'}</div><div class="ab-body"><div class="ab-titre" style="color:${a.severite==='danger'?'var(--rouge)':'var(--orange)'}">${a.message}</div></div></div>`).join('')+`</div>` : '';
+
+  // Graphique 14j
+  const dates14 = Array.from({length:14},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(13-i));return d.toISOString().split('T')[0];});
+  const carbData = dates14.map(d=>{const sc=saisiesCuve30.find(s=>s.date===d);return sc?.niveau_litres!=null?Math.round(sc.niveau_litres/capCuve*100):null;});
+  const valides = carbData.filter(v=>v!==null);
+  const trendTxt = valides.length<2?'Pas assez de données.': (()=>{const delta=valides[valides.length-1]-valides[0];return delta>=0?`Niveau stable ou en hausse (+${delta} pts).`:`Baisse de ${Math.abs(delta)} pts — surveiller les pleins.`;})();
+  document.getElementById('op-chart-insight').textContent = trendTxt;
+  document.getElementById('op-chart-sub').textContent = cuve?`Cuve ${fmtNum(capCuve)}L`:'';
+
+  setTimeout(()=>{
+    if(_chartOp) _chartOp.destroy();
+    const ctx = document.getElementById('op-chart');
+    if(!ctx) return;
+    const bx = getComputedStyle(document.documentElement).getPropertyValue('--bx').trim()||'#8B1A2E';
+    _chartOp = new Chart(ctx.getContext('2d'),{type:'line',data:{labels:dates14.map(fmtDateShort),datasets:[{data:carbData,borderColor:bx,backgroundColor:bx+'18',borderWidth:1.5,tension:0.3,fill:true,spanGaps:true,pointRadius:3,pointBackgroundColor:bx}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#EDE3D4'},ticks:{color:'#7A6855',font:{size:10}}},y:{grid:{color:'#EDE3D4'},ticks:{color:'#7A6855',font:{size:10},callback:v=>v+'%'},min:0,max:100}}}});
+  },50);
+}
+
+// ── ONGLET TECHNIQUE ──
+function renderTechnique(client, groupes, saisies30, saisiesCuve30, pannesOuvertes, pannesResolues, coutCarburantAnnee, coutMaintenanceAnnee, cuve, today) {
+  const capCuve = cuve?.capacite_litres||500;
+  const groupeMap = Object.fromEntries(groupes.map(g=>[g.id,g.nom]));
+  const panneLabels = {ne_demarre_pas:'Ne démarre pas',arret_inopin:'Arrêt inopiné',bruit_anormal:'Bruit anormal',surchauffe:'Surchauffe',fuite:'Fuite',autre:'Autre'};
+
+  // État groupes (heures totales / vidange)
+  const derniereCuve = saisiesCuve30[0]||null;
+  const cuveCardTech = buildCuveHtml(cuve, derniereCuve, today);
+  const groupesTechHtml = groupes.map(g=>{
+    const heuresTotal = g.heures_total||0;
+    const seuil = g.seuil_vidange_heures||250;
+    const pct = Math.min(100,Math.round((heuresTotal/seuil)*100));
+    const barColor = pct>=100?'var(--rouge)':pct>=80?'var(--orange)':'var(--vert)';
+    const pillClass = pct>=100?'pill-danger':pct>=80?'pill-warn':'pill-ok';
+    return `<div class="groupe-detail">
+      <div class="gd-header">
+        <div><div class="gd-nom">${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA</div><div class="gd-saisie">Conso théorique ${g.conso_theorique_lh||'—'} L/h</div></div>
+        <span class="pill ${pillClass}">${pct>=100?'Vidange requise':pct>=80?'Vidange bientôt':'OK'}</span>
+      </div>
+      <div class="gd-body">
+        <div class="gd-stats">
+          <div><div class="gd-stat-label">Heures totales</div><div class="gd-stat-val">${fmtNum(heuresTotal)}h</div></div>
+          <div><div class="gd-stat-label">Seuil vidange</div><div class="gd-stat-val">${fmtNum(seuil)}h</div></div>
+          <div><div class="gd-stat-label">Progression</div><div class="gd-stat-val" style="color:${barColor}">${pct}%</div></div>
+          ${g.capacite_reservoir_litres ? `<div><div class="gd-stat-label">Réservoir</div><div class="gd-stat-val">${fmtNum(g.capacite_reservoir_litres)}L</div></div>` : `<div><div class="gd-stat-label">Réservoir</div><div class="gd-stat-val" style="color:var(--texte2);font-size:12px">Cuve commune</div></div>`}
+        </div>
+        <div class="gd-bar"><div class="gd-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('tech-groupes').innerHTML = cuveCardTech + groupesTechHtml;
+
+  // Coûts
+  const yr = new Date().getFullYear();
+  document.getElementById('tech-couts').innerHTML=`
+    <div class="cout-card"><div class="cout-label">⛽ Carburant — ${yr}</div><div class="cout-val">${coutCarburantAnnee>0?fmtNum(coutCarburantAnnee):'—'}</div><div class="cout-sub">FCFA</div></div>
+    <div class="cout-card maint"><div class="cout-label">🔧 Maintenance — ${yr}</div><div class="cout-val" style="color:${coutMaintenanceAnnee>0?'var(--orange)':'var(--vert)'}">${fmtNum(coutMaintenanceAnnee)}</div><div class="cout-sub">FCFA</div></div>`;
+
+  // Pannes ouvertes
+  const elOuv = document.getElementById('tech-pannes-ouvertes');
+  elOuv.innerHTML = pannesOuvertes.length
+    ? `<table class="data"><thead><tr><th>Date</th><th>Groupe</th><th>Problème</th><th>Action</th></tr></thead><tbody>`+
+      pannesOuvertes.map(p=>`<tr><td>${fmtDate(p.date_panne)}</td><td>${groupeMap[p.groupe_id]||'—'}</td><td>${p.description||panneLabels[p.type]||p.type}</td><td><button onclick="resoudrePanne('${p.id}')" style="background:var(--vert-pale);color:var(--vert);border:1px solid rgba(45,122,79,0.3);border-radius:4px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600">✅ Résoudre</button></td></tr>`).join('')+
+      `</tbody></table>`
+    : `<div class="empty">Aucune panne en cours ✅</div>`;
+
+  // Pannes résolues
+  const elRes = document.getElementById('tech-pannes-resolues');
+  elRes.innerHTML = pannesResolues.length
+    ? `<table class="data"><thead><tr><th>Date</th><th>Groupe</th><th>Problème</th><th>Résolution</th><th>Intervenant</th><th>Coût</th></tr></thead><tbody>`+
+      pannesResolues.map(p=>`<tr><td>${fmtDate(p.date_resolution||p.date_panne)}</td><td>${groupeMap[p.groupe_id]||'—'}</td><td>${p.description||panneLabels[p.type]||p.type}</td><td>${p.resolution_note||'—'}</td><td>${p.intervenant||'—'}</td><td>${p.cout_reparation?fmtNum(p.cout_reparation)+' FCFA':'—'}</td></tr>`).join('')+
+      `</tbody></table>`
+    : `<div class="empty">Aucune panne résolue enregistrée</div>`;
+
+  // Graphique cuve
+  const dates14 = Array.from({length:14},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(13-i));return d.toISOString().split('T')[0];});
+  const carbDataTech = dates14.map(d=>{const sc=saisiesCuve30.find(s=>s.date===d);return sc?.niveau_litres!=null?Math.round(sc.niveau_litres/capCuve*100):null;});
+  const validesTech = carbDataTech.filter(v=>v!==null);
+  const trendTech = validesTech.length<2?'Pas assez de données.':(()=>{const delta=validesTech[validesTech.length-1]-validesTech[0];return delta>=0?`Stable ou en hausse (+${delta} pts).`:`Baisse de ${Math.abs(delta)} pts.`;})();
+  document.getElementById('tech-chart-insight').textContent = trendTech;
+  setTimeout(()=>{
+    if(_chartTech) _chartTech.destroy();
+    const ctx = document.getElementById('tech-chart');
+    if(!ctx) return;
+    const bx = getComputedStyle(document.documentElement).getPropertyValue('--bx').trim()||'#8B1A2E';
+    _chartTech = new Chart(ctx.getContext('2d'),{type:'line',data:{labels:dates14.map(fmtDateShort),datasets:[{data:carbDataTech,borderColor:bx,backgroundColor:bx+'18',borderWidth:1.5,tension:0.3,fill:true,spanGaps:true,pointRadius:3,pointBackgroundColor:bx}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#EDE3D4'},ticks:{color:'#7A6855',font:{size:10}}},y:{grid:{color:'#EDE3D4'},ticks:{color:'#7A6855',font:{size:10},callback:v=>v+'%'},min:0,max:100}}}});
+  },100);
+
+  // Historique saisies moteur — avec heure
+  const saisiesMoteur = saisies30.filter(s=>s.heures_marche!=null||s.niveau_huile!=null)
+    .sort((a,b)=>(b.date+((b.created_at||'').slice(11))).localeCompare(a.date+((a.created_at||'').slice(11)))).slice(0,30);
+  const elSai = document.getElementById('tech-saisies');
+  elSai.innerHTML = saisiesMoteur.length
+    ? `<table class="data"><thead><tr><th>Date</th><th>Heure</th><th>Groupe</th><th>Compteur</th><th>Huile</th><th>Opérateur</th></tr></thead><tbody>`+
+      saisiesMoteur.map(s=>`<tr>
+        <td>${fmtDate(s.date)}</td>
+        <td style="color:var(--texte2)">${fmtHeure(s.created_at)||'—'}</td>
+        <td>${groupeMap[s.groupe_id]||'—'}</td>
+        <td>${s.heures_marche!=null?s.heures_marche+'h':'—'}</td>
+        <td style="color:${huileColor(s.niveau_huile)}">${s.niveau_huile||'—'}</td>
+        <td>${s.operateur||'—'}</td>
+      </tr>`).join('')+`</tbody></table>`
+    : `<div class="empty">Aucune saisie moteur sur 30 jours</div>`;
+
+  // Historique cuve — avec heure
+  const cuveTriees = [...saisiesCuve30].sort((a,b)=>(b.date+((b.created_at||'').slice(11))).localeCompare(a.date+((a.created_at||'').slice(11)))).slice(0,30);
+  const elCuve = document.getElementById('tech-saisies-cuve');
+  elCuve.innerHTML = cuveTriees.length
+    ? `<table class="data"><thead><tr><th>Date</th><th>Heure</th><th>Niveau</th><th>Litres ajoutés</th><th>Opérateur</th></tr></thead><tbody>`+
+      cuveTriees.map(s=>{
+        const pctC = s.niveau_litres!=null?Math.round(s.niveau_litres/capCuve*100):null;
+        return `<tr>
+          <td>${fmtDate(s.date)}</td>
+          <td style="color:var(--texte2)">${fmtHeure(s.created_at)||'—'}</td>
+          <td style="color:${pctC!=null?carbColor(pctC):'var(--texte2)'}">${s.niveau_litres!=null?s.niveau_litres+'L / '+capCuve+'L ('+pctC+'%)':'—'}</td>
+          <td>${s.litres_ajoutes>0?'+'+s.litres_ajoutes+'L':'—'}</td>
+          <td>${s.operateur||'—'}</td>
+        </tr>`;}).join('')+`</tbody></table>`
+    : `<div class="empty">Aucun relevé cuve sur 30 jours</div>`;
+}
+
+// ── RÉSOUDRE PANNE ──
+async function resoudrePanne(id) {
+  if(!confirm('Marquer cette panne comme résolue ?')) return;
+  const res = await fetch(`${SUPA_URL}/rest/v1/pannes?id=eq.${id}`,{
+    method:'PATCH',
+    headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json','Prefer':'return=representation'},
+    body:JSON.stringify({resolue:true,date_resolution:new Date().toISOString().split('T')[0],resolu_via:'Dashboard client'})
+  });
+  if(res.ok){alert('✅ Panne résolue');location.reload();}
+  else{alert('Erreur lors de la résolution');}
+}
+
+// ── ERREUR ──
+function showError(titre, msg) {
+  document.getElementById('app').innerHTML=`
+    <div class="error-page">
+      <div style="font-size:48px;margin-bottom:20px">🔒</div>
+      <h2>${titre}</h2>
+      <p>${msg}</p>
+    </div>`;
+}
+
+init();
+</script>
+</body>
+</html>
