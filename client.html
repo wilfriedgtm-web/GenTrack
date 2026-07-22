@@ -268,9 +268,9 @@ async function loadClientView(clientId, access={}) {
   const showTechnique = access.role !== 'dir_ops';
 
   if((client.groupe_hotelier || sites.length > 1) && access.role === 'dir_ops') {
-    await renderGroupeView(client, sites);
+    await renderGroupeView(client, sites, {showTechnique: false});
   } else if(sites.length > 1 && access.role === 'dir_tech') {
-    await renderMultiSiteView(client, sites);
+    await renderGroupeView(client, sites, {showTechnique: true});
   } else {
     const siteId = sites.length ? sites[0].id : null;
     await renderHotelView(client, siteId, null, {showTechnique});
@@ -339,7 +339,8 @@ async function renderMultiSiteView(client, sites) {
 // ════════════════════════════════════════
 // VUE GROUPE — tous les hôtels
 // ════════════════════════════════════════
-async function renderGroupeView(client, sites) {
+async function renderGroupeView(client, sites, opts={}) {
+  const showTechnique = opts.showTechnique === true;
   const today = new Date().toISOString().split('T')[0];
   const dateDebut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
 
@@ -418,7 +419,7 @@ async function renderGroupeView(client, sites) {
       <div class="header-top">
         <div>
           <div class="logo">${client.nom}</div>
-          <div class="logo-sub">Pilote GenTrack · Groupe hôtelier</div>
+          <div class="logo-sub">${showTechnique ? 'Directeur technique · ' : 'Pilote GenTrack · '}${sites.length} site${sites.length>1?'s':''}</div>
         </div>
         <div class="header-right">
           <div class="header-date" id="header-date">${dateStr}</div>
@@ -445,7 +446,7 @@ async function renderGroupeView(client, sites) {
     <div class="footer">Powered by <strong>GenTrack</strong> · ${client.nom}</div>`;
 
   // Stocker les données pour le drill-down
-  window._groupeData = {client, sites, tousGroupes, toutesSaisies, toutesAlertes, toutesPannes, toutesCuves, toutesSaisiesCuve, today};
+  window._groupeData = {client, sites, tousGroupes, toutesSaisies, toutesAlertes, toutesPannes, toutesCuves, toutesSaisiesCuve, today, showTechnique};
 }
 
 let _openSiteId = null;
@@ -475,10 +476,10 @@ async function toggleSiteDetail(siteId, navBtn, idx) {
   const sCuve = d.toutesCuves.find(c=>c.site_id===siteId)||null;
   const sSaisieCuve = sCuve ? d.toutesSaisiesCuve.find(sc=>sc.cuve_id===sCuve.id) : null;
 
-  el.innerHTML = buildSiteDetailHtml(d.client, site, sGroupes, sSaisies, sAlertes, sCuve, sSaisieCuve, d.today);
+  el.innerHTML = buildSiteDetailHtml(d.client, site, sGroupes, sSaisies, sAlertes, sCuve, sSaisieCuve, d.today, d.showTechnique);
 }
 
-function buildSiteDetailHtml(client, site, groupes, saisiesJour, alertes, cuve, saisieCuve, today) {
+function buildSiteDetailHtml(client, site, groupes, saisiesJour, alertes, cuve, saisieCuve, today, showTechnique) {
   const cuveHtml = buildCuveHtml(cuve, saisieCuve, today);
   const groupesHtml = groupes.map(g => {
     const s = saisiesJour.find(x=>x.groupe_id===g.id);
@@ -512,7 +513,15 @@ function buildSiteDetailHtml(client, site, groupes, saisiesJour, alertes, cuve, 
       <div class="ab-body"><div class="ab-titre" style="color:${a.severite==='danger'?'var(--rouge)':'var(--orange)'}">${a.message}</div></div>
     </div>`).join('') : '';
 
-  return `${alertesHtml}${cuveHtml}${groupesHtml||'<div class="empty">Aucun groupe configuré pour ce site</div>'}`;
+  const techniqueLinkHtml = showTechnique ? `
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--bordure)">
+      <button onclick="event.stopPropagation();drillToSite('${site.id}','${site.nom}')"
+        style="background:var(--bx-pale);color:var(--bx);border:1px solid var(--bx-mid);border-radius:4px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;width:100%">
+        🔧 Voir détail technique — ${site.nom} →
+      </button>
+    </div>` : '';
+
+  return `${alertesHtml}${cuveHtml}${groupesHtml||'<div class="empty">Aucun groupe configuré pour ce site</div>'}${techniqueLinkHtml}`;
 }
 
 // ════════════════════════════════════════
@@ -859,6 +868,47 @@ function renderTechnique(client, groupes, saisies30, saisiesCuve30, pannesOuvert
           <td>${s.operateur||'—'}</td>
         </tr>`;}).join('')+`</tbody></table>`
     : `<div class="empty">Aucun relevé cuve sur 30 jours</div>`;
+}
+
+// ── DRILL TECHNIQUE (dir_tech : vue consolidée → détail site) ──
+async function drillToSite(siteId, siteNom) {
+  const d = window._groupeData;
+  if(!d) return;
+
+  // Snapshot pour pouvoir revenir
+  const snapshot = {client: d.client, sites: d.sites, showTechnique: d.showTechnique};
+
+  // Injecter un header avec bouton retour, puis la vue hôtel complète dans un container
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <div class="header-top">
+        <div>
+          <div class="logo">${d.client.nom}</div>
+          <div class="logo-sub">Directeur technique · ${siteNom}</div>
+        </div>
+        <div class="header-right">
+          <div class="header-date">${new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
+          <div class="header-title">Détail site</div>
+        </div>
+      </div>
+      <div class="site-nav">
+        <div class="site-btn active" onclick="backToConsolidated()">← Vue consolidée</div>
+        ${snapshot.sites.map(s=>`<div class="site-btn ${s.id===siteId?'active':''}" onclick="drillToSite('${s.id}','${s.nom}')">${s.nom}</div>`).join('')}
+      </div>
+    </div>
+    <div id="drill-main"><div class="loading" style="padding:60px"><span class="spinner"></span>Chargement...</div></div>
+    <div class="footer">Powered by <strong>GenTrack</strong> · ${d.client.nom}</div>`;
+
+  await renderHotelView(d.client, siteId, siteNom, {showTechnique: true, inContainer: 'drill-main'});
+
+  // Restaurer snapshot pour le retour
+  window._groupeSnapshot = snapshot;
+}
+
+async function backToConsolidated() {
+  const snap = window._groupeSnapshot;
+  if(!snap) { location.reload(); return; }
+  await renderGroupeView(snap.client, snap.sites, {showTechnique: snap.showTechnique});
 }
 
 // ── RÉSOUDRE PANNE ──
