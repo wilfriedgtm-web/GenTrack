@@ -60,7 +60,7 @@ export default function SiteDetailPage() {
       <section className="bg-white border rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-medium text-slate-900">Équipements ({equipements.length})</h2>
-          <button onClick={() => setShowForm((s) => !s)} className="text-sm text-slate-600 hover:underline">
+          <button onClick={() => setShowForm((s) => !s)} className={`text-sm px-4 py-2 rounded-md font-medium ${showForm ? 'bg-gray-200 text-gray-700' : 'bg-slate-900 text-white'}`}>
             {showForm ? 'Annuler' : '+ Ajouter un équipement'}
           </button>
         </div>
