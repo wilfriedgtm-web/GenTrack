@@ -35,7 +35,34 @@ export default function SiteDetailPage() {
 
   async function createEquipement(e) {
     e.preventDefault();
-    await supabase.from('equipements').insert({ ...form, site_id: id, type_id: form.type_id || null });
+    const { data: eq } = await supabase
+      .from('equipements')
+      .insert({ ...form, site_id: id, type_id: form.type_id || null })
+      .select()
+      .single();
+
+    // Auto-appliquer le modèle de questions si un modèle existe pour ce type
+    if (eq && form.type_id) {
+      const { data: modele } = await supabase
+        .from('modeles_questions')
+        .select('*, modeles_questions_items(*)')
+        .eq('type_id', form.type_id)
+        .single();
+      if (modele?.modeles_questions_items?.length) {
+        const rows = modele.modeles_questions_items.map((item) => ({
+          equipement_id: eq.id,
+          texte: item.texte,
+          type_reponse: item.type_reponse,
+          unite: item.unite,
+          ordre: item.ordre,
+          frequences: item.frequences,
+          seuil_min: item.seuil_min,
+          seuil_max: item.seuil_max,
+        }));
+        await supabase.from('questions').insert(rows);
+      }
+    }
+
     setForm({ nom: '', type_id: '', ordre_ronde: 0, photo_requise: false });
     setShowForm(false);
     load();
