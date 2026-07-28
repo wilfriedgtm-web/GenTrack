@@ -122,6 +122,8 @@ tbody tr:hover { background: #faf9f6; }
 #toast.show { opacity: 1; }
 .info-box { background: #fffbf3; border: 1px solid var(--gold-light); border-radius: 7px; padding: 12px; font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
 .section-sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+.site-check-list { border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; max-height: 160px; overflow-y: auto; }
+.site-check-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -606,16 +608,22 @@ function renderTabAcces(client, tokens) {
   const roleLabels = { technicien:'Technicien', dir_ops:'Dir. Opérations', dir_tech:'Dir. Technique', resp_tech:'Resp. Technique' };
   return `<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="genToken('${client.id}')">+ Générer un accès</button></div>
     ${!tokens.length?'<p style="color:var(--text-muted);font-size:13px">Aucun lien d\'accès.</p>':
-      tokens.filter(t=>t.actif).map(t=>`<div class="token-item">
+      tokens.filter(t=>t.actif).map(t=>{
+        const rawIds = t.site_ids||'[]';
+        let ids=[]; try{ids=typeof rawIds==='string'?JSON.parse(rawIds||'[]'):rawIds;}catch(e){ids=[];}
+        const siteNames = ids.map(sid=>S.sites.find(s=>s.id===sid)?.nom).filter(Boolean);
+        const sitesLabel = t.site_id ? (S.sites.find(s=>s.id===t.site_id)?.nom||'1 site') : (siteNames.length?siteNames.join(', '):'Tous les sites');
+        return `<div class="token-item">
         <div>
           <div style="font-size:13px;font-weight:500">${esc(t.nom||'Accès')} <span class="kpi-badge badge-gray" style="font-size:10px">${roleLabels[t.role]||t.role||'—'}</span></div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px"><span class="token-code">${t.token?.slice(0,16)}…</span>${t.expire_at?' · Expire: '+fmtDate(t.expire_at):' · Sans expiration'}</div>
+          ${['resp_tech','dir_tech'].includes(t.role)?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px">🏨 ${esc(sitesLabel)}</div>`:''}
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-outline btn-xs" onclick="copyToken('${BASE_URL}/client.html?token=${t.token}')">📋 Copier</button>
           <button class="btn btn-danger btn-xs" onclick="revokeToken('${t.id}','${client.id}')">🗑️</button>
         </div>
-      </div>`).join('')}`;
+      </div>`;}).join('')}`;
 }
 
 // TAB HISTORIQUE
@@ -973,27 +981,48 @@ async function deleteContact(id,clientId) {
 
 // ── TOKENS ─────────────────────────────────────────────────
 function genToken(clientId) {
+  const sites = S.sites.filter(s=>s.client_id===clientId);
   showModal('modal-tok',`<div class="modal modal-sm">
     <div class="modal-header"><h3>Générer un accès</h3><button class="close-btn" onclick="closeModal('modal-tok')">×</button></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Label</label><input class="form-input" id="tok-nom" placeholder="Accès direction" /></div>
       <div class="form-group"><label class="form-label">Rôle</label>
-        <select class="form-select" id="tok-role">
+        <select class="form-select" id="tok-role" onchange="renderTokSiteFields('${clientId}')">
           <option value="technicien">Technicien</option><option value="resp_tech">Resp. technique</option>
           <option value="dir_tech">Dir. technique</option><option value="dir_ops">Dir. opérations</option>
         </select>
       </div>
+      <div id="tok-site-fields"></div>
       <div class="form-group"><label class="form-label">Expiration</label>
         <select class="form-select" id="tok-exp"><option value="">Sans expiration</option><option value="30">30 jours</option><option value="90">90 jours</option><option value="365">1 an</option></select>
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-tok')">Annuler</button><button class="btn btn-primary" onclick="createToken('${clientId}')">Générer</button></div>
   </div>`);
+  renderTokSiteFields(clientId);
+}
+function renderTokSiteFields(clientId) {
+  const role = document.getElementById('tok-role')?.value;
+  const wrap = document.getElementById('tok-site-fields');
+  if (!wrap) return;
+  if (role !== 'resp_tech' && role !== 'dir_tech') { wrap.innerHTML=''; return; }
+  const sites = S.sites.filter(s=>s.client_id===clientId);
+  if (!sites.length) { wrap.innerHTML = '<div class="info-box">⚠️ Aucun site créé pour ce client — l\'accès portera sur tout le client.</div>'; return; }
+  const hint = role==='resp_tech' ? 'Le responsable technique gère un seul site. Si plusieurs sont cochés, le premier sera utilisé.' : 'Cochez les sites gérés par ce directeur technique. Aucun site coché = accès à tous les sites du client.';
+  wrap.innerHTML = `<div class="form-group">
+    <label class="form-label">Sites gérés</label>
+    <div class="site-check-list">${sites.map(s=>`<label class="site-check-row"><input type="checkbox" class="tok-site-cb" value="${s.id}"> ${esc(s.nom)}</label>`).join('')}</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${hint}</div>
+  </div>`;
 }
 async function createToken(clientId) {
   const expDays=document.getElementById('tok-exp').value;
   const expire_at=expDays?new Date(Date.now()+expDays*86400000).toISOString():null;
-  await api('tokens','','*','POST',{nom:document.getElementById('tok-nom').value||'Accès',role:document.getElementById('tok-role').value,client_id:clientId,expire_at,actif:true});
+  const role=document.getElementById('tok-role').value;
+  const siteIds = Array.from(document.querySelectorAll('.tok-site-cb:checked')).map(el=>el.value);
+  const body={nom:document.getElementById('tok-nom').value||'Accès',role,client_id:clientId,expire_at,actif:true};
+  if (['resp_tech','dir_tech'].includes(role) && siteIds.length) body.site_ids = JSON.stringify(siteIds);
+  await api('tokens','','*','POST',body);
   closeModal('modal-tok'); toast('Accès généré !'); await loadAll(); openClient(clientId,'acces');
 }
 async function revokeToken(id,clientId) {
@@ -1118,14 +1147,22 @@ async function renderModeles() {
 // ── BIENVENUE ──────────────────────────────────────────────
 async function envoyerBienvenue(clientId) {
   const c=S.clients.find(x=>x.id===clientId); if(!c) return;
-  const tok=S.tokens.find(t=>t.client_id===clientId&&t.actif);
-  const url=tok?`${BASE_URL}/client.html?token=${tok.token}`:BASE_URL+'/client.html';
+  const clientTokens = S.tokens.filter(t=>t.client_id===clientId&&t.actif);
+  const anyTok = clientTokens[0];
   const BOT_NUMBER = '+221770000000'; // ← remplacez par le vrai numéro WhatsApp du bot
 
-  // Contacts technicien + resp_tech
-  const contacts=S.contacts.filter(ct=>ct.client_id===clientId&&['technicien','resp_tech'].includes(ct.role));
+  // Contacts : technicien, resp_tech, dir_tech, dir_ops
+  const contacts=S.contacts.filter(ct=>ct.client_id===clientId&&['technicien','resp_tech','dir_tech','dir_ops'].includes(ct.role));
 
-  const msgTech = `Bonjour ! 👋
+  function tokenUrlFor(role) {
+    const tok = clientTokens.find(t=>t.role===role) || anyTok;
+    return tok ? `${BASE_URL}/client.html?token=${tok.token}` : BASE_URL+'/client.html';
+  }
+
+  const msgFor = (ct) => {
+    const url = tokenUrlFor(ct.role);
+    if (ct.role === 'technicien') {
+      return `Bonjour ! 👋
 
 Bienvenue sur *GenTrack* — le système de suivi des groupes électrogènes et équipements de *${c.nom}*.
 
@@ -1147,12 +1184,13 @@ ${url}
 
 Pour toute question, répondez simplement à ce message.
 — Équipe GenTrack ✅`;
-
-  const msgResp = `Bonjour ! 👋
+    }
+    const roleLabel = {resp_tech:'responsable technique', dir_tech:'directeur technique', dir_ops:'directeur des opérations'}[ct.role]||'responsable';
+    return `Bonjour ! 👋
 
 Bienvenue sur *GenTrack* — tableau de bord de suivi pour *${c.nom}*.
 
-En tant que responsable, vous recevrez :
+En tant que ${roleLabel}, vous recevrez :
 • Les alertes critiques en temps réel 🔴
 • Les rapports hebdomadaires 📊
 • Les notifications de pannes 🔧
@@ -1164,6 +1202,10 @@ ${url}
 ${BOT_NUMBER}
 
 — Équipe GenTrack ✅`;
+  };
+
+  const msgTech = msgFor({role:'technicien'});
+  const msgResp = msgFor({role:'resp_tech'});
 
   let contactsHtml = '';
   if (contacts.length) {
@@ -1171,14 +1213,11 @@ ${BOT_NUMBER}
       contacts.map(ct=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
         <div><span style="font-size:13px;font-weight:500">${esc(ct.nom)}</span> <span class="kpi-badge badge-gray" style="font-size:10px">${ct.role}</span>
         ${ct.whatsapp?`<span style="font-size:11px;color:var(--text-muted);margin-left:6px">${esc(ct.whatsapp)}</span>`:' <span style="font-size:11px;color:var(--red)">⚠️ Pas de WhatsApp</span>'}</div>
-        ${ct.whatsapp?`<a href="https://wa.me/${ct.whatsapp.replace(/[^0-9]/g,'')}?text=${encodeURIComponent(ct.role==='technicien'?msgTech:msgResp)}" target="_blank" class="btn btn-primary btn-xs">📤 Envoyer</a>`:''}
+        ${ct.whatsapp?`<a href="https://wa.me/${ct.whatsapp.replace(/[^0-9]/g,'')}?text=${encodeURIComponent(msgFor(ct))}" target="_blank" class="btn btn-primary btn-xs">📤 Envoyer</a>`:''}
       </div>`).join('') + '</div>';
   } else {
-    contactsHtml = `<p style="font-size:12px;color:var(--orange);margin-top:10px">⚠️ Aucun contact technicien/resp_tech trouvé. Ajoutez-en dans l'onglet Contacts.</p>`;
+    contactsHtml = `<p style="font-size:12px;color:var(--orange);margin-top:10px">⚠️ Aucun contact technicien/resp_tech/dir_tech/dir_ops trouvé. Ajoutez-en dans l'onglet Contacts.</p>`;
   }
-
-  // Aperçu du message technicien par défaut
-  const previewMsg = contacts.find(ct=>ct.role==='technicien') ? msgTech : msgResp;
 
   showModal('modal-bienv',`<div class="modal modal-md">
     <div class="modal-header"><h3>Message de bienvenue — ${esc(c.nom)}</h3><button class="close-btn" onclick="closeModal('modal-bienv')">×</button></div>
@@ -1190,7 +1229,7 @@ ${BOT_NUMBER}
       <div id="bienv-tech" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;font-size:12.5px;line-height:1.7;white-space:pre-wrap;font-family:monospace">${msgTech}</div>
       <div id="bienv-resp" class="hidden" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px;font-size:12.5px;line-height:1.7;white-space:pre-wrap;font-family:monospace">${msgResp}</div>
       ${contactsHtml}
-      <div style="margin-top:12px;font-size:11px;color:var(--text-muted)">🤖 Bot : ${BOT_NUMBER} · Cliquez "Envoyer" pour ouvrir WhatsApp Web avec le message pré-rempli.</div>
+      <div style="margin-top:12px;font-size:11px;color:var(--text-muted)">🤖 Bot : ${BOT_NUMBER} · Cliquez "Envoyer" pour ouvrir WhatsApp Web avec le message pré-rempli (chaque contact reçoit le lien correspondant à son propre accès quand un token de son rôle existe).</div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-bienv')">Fermer</button></div>
   </div>`);
