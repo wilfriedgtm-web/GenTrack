@@ -226,7 +226,7 @@ async function loadByToken(token) {
   }
   const role = tok.role || null;
   const rawSiteIds = tok.site_ids || [];
-  const siteIds = typeof rawSiteIds === 'string' ? JSON.parse(rawSiteIds) : rawSiteIds;
+  const siteIds = typeof rawSiteIds === 'string' ? JSON.parse(rawSiteIds||'[]') : rawSiteIds;
 
   // Rôles dashboard avec logique multi-site
   if(role === 'dir_ops') {
@@ -236,11 +236,15 @@ async function loadByToken(token) {
     // Opérations + Technique, sites filtrés si site_ids défini
     await loadClientView(tok.client_id, {role:'dir_tech', siteIds});
   } else if(role === 'resp_tech') {
-    // Opérations + Technique, 1 site
+    // Opérations + Technique, 1 site (responsable technique d'un établissement)
     const siteId = siteIds.length ? siteIds[0] : tok.site_id || null;
     await loadSiteView(tok.client_id, siteId, {role:'resp_tech'});
+  } else if(role === 'tech' || role === 'technicien') {
+    // Opérations uniquement, 1 site (technicien de terrain / opérateur)
+    const siteId = siteIds.length ? siteIds[0] : tok.site_id || null;
+    await loadSiteView(tok.client_id, siteId, {role:'technicien'});
   } else if(tok.site_id) {
-    // Ancien format legacy
+    // Ancien format legacy (pas de rôle défini mais 1 site attaché)
     await loadSiteView(tok.client_id, tok.site_id, {role:'technicien'});
   } else {
     await loadClientView(tok.client_id, {role:null});
