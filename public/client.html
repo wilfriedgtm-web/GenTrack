@@ -6,7 +6,7 @@
 <title>GenTrack — Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
 :root{
   --bx:#8B1A2E;--bx-pale:rgba(139,26,46,0.07);--bx-mid:rgba(139,26,46,0.15);
   --or:#C9A96E;--or-pale:rgba(201,169,110,0.10);
@@ -18,142 +18,99 @@
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--surface);color:var(--texte);font-family:'Inter',sans-serif;min-height:100vh}
-
-/* HEADER */
 .header{background:var(--bx);color:white}
 .header-top{display:flex;justify-content:space-between;align-items:center;padding:20px 36px;border-bottom:1px solid rgba(255,255,255,0.1)}
 .logo{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;letter-spacing:3px;text-transform:uppercase}
-.logo span{color:var(--or);font-weight:400}
 .logo-sub{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.45);margin-top:2px}
 .header-right{display:flex;align-items:center;gap:16px}
 .header-date{font-size:11px;color:rgba(255,255,255,0.5);text-align:right}
 .header-title{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--or);margin-top:3px}
 .pdf-btn{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:white;padding:7px 14px;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:0.5px;cursor:pointer;text-transform:uppercase}
-.pdf-btn:hover{background:rgba(255,255,255,0.2)}
-
-/* SITE NAV (dir_tech) */
 .site-nav{background:rgba(0,0,0,0.2);padding:0 36px;display:flex;gap:0;overflow-x:auto}
-.site-btn{padding:12px 20px;font-size:12px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:rgba(255,255,255,0.5);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;white-space:nowrap;flex-shrink:0}
-.site-btn:hover{color:rgba(255,255,255,0.8)}
+.site-btn{padding:12px 20px;font-size:12px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:rgba(255,255,255,0.5);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;flex-shrink:0}
 .site-btn.active{color:white;border-bottom-color:var(--or)}
-
 .container{max-width:960px;margin:0 auto;padding:28px 36px 60px}
-
-/* BANNIÈRE ALERTE */
 .alert-banner{background:var(--rouge-pale);border:1px solid var(--rouge-bordure);border-left:3px solid var(--rouge);border-radius:6px;padding:12px 16px;display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
 .alert-banner.warn{background:var(--orange-pale);border-color:var(--orange-bordure);border-left-color:var(--orange)}
-.ab-icon{font-size:18px;flex-shrink:0;margin-top:1px}
 .ab-body{flex:1}
 .ab-titre{font-size:13px;font-weight:600;color:var(--rouge)}
-.ab-titre.orange{color:var(--orange)}
 .ab-sub{font-size:12px;color:var(--texte2);margin-top:2px}
-
-/* KPI CARDS */
 .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:24px}
 .kpi{background:white;border:1px solid var(--bordure);border-radius:6px;padding:14px 16px}
 .kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--texte2);font-weight:600;margin-bottom:6px}
 .kpi-value{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:600;color:var(--texte);line-height:1}
 .kpi-trend{font-size:11px;color:var(--texte2);margin-top:5px}
-.kpi-trend.danger{color:var(--rouge)}
-.kpi-trend.warn{color:var(--orange)}
-.kpi-trend.ok{color:var(--vert)}
-
-/* SECTION */
 .section-title{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--texte);margin-bottom:4px}
-.section-sub{font-size:11px;color:var(--texte2);letter-spacing:0.3px;margin-bottom:14px}
+.section-sub{font-size:11px;color:var(--texte2);margin-bottom:14px}
 .section-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--texte2);font-weight:600;margin-bottom:10px}
-
-/* CARTES ÉQUIPEMENT */
 .equip-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px}
-.equip-card{background:white;border:1px solid var(--bordure);border-radius:6px;overflow:hidden;cursor:pointer;transition:border-color 0.15s}
-.equip-card:hover,.equip-card.open{border-color:var(--bx)}
+.equip-card{background:white;border:1px solid var(--bordure);border-radius:6px;overflow:hidden;cursor:pointer}
+.equip-card.open{border-color:var(--bx)}
 .equip-card-header{padding:12px 14px;border-bottom:1px solid var(--bordure);display:flex;align-items:center;gap:10px;background:var(--surface2)}
 .equip-icon{width:32px;height:32px;background:var(--bx-pale);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
 .equip-name{font-size:13px;font-weight:600;color:var(--texte)}
 .equip-count{font-size:11px;color:var(--texte2);margin-top:1px}
-.equip-chevron{margin-left:auto;color:var(--texte3);font-size:12px;transition:transform 0.2s;flex-shrink:0}
-.equip-card.open .equip-chevron{transform:rotate(180deg)}
+.equip-chev{margin-left:auto;color:var(--texte3);font-size:11px;flex-shrink:0;transition:transform 0.2s}
+.equip-card.open .equip-chev{transform:rotate(180deg)}
 .equip-body{padding:12px 14px}
 .equip-stat{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}
-.equip-stat:last-child{margin-bottom:0}
 .equip-stat-label{color:var(--texte2)}
-.equip-stat-value{font-weight:600;color:var(--texte)}
-
-/* DRILL-DOWN */
-.drill{border-top:1px solid var(--surface3);display:none;padding:10px 14px;background:var(--surface);animation:fadeIn 0.15s ease}
-.drill.show{display:block}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.equip-stat-val{font-weight:600;color:var(--texte)}
+.drill{border-top:1px solid var(--surface3);padding:8px 14px;display:none}
+.drill.open{display:block}
 .drill-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--surface3)}
 .drill-row:last-child{border-bottom:none}
-.drill-left{flex:1}
 .drill-name{font-size:12px;font-weight:600;color:var(--texte)}
-.drill-detail{font-size:11px;color:var(--texte2);margin-top:2px}
-.mini-bars{display:flex;align-items:flex-end;gap:2px;height:24px}
-.mini-bar{width:7px;border-radius:1px 1px 0 0;background:var(--or);opacity:0.6}
-.mini-bar.anomalie{background:var(--rouge);opacity:0.85}
-.drill-badge{padding:2px 8px;border-radius:2px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
-.db-ok{background:var(--vert-pale);color:var(--vert)}
-.db-warn{background:var(--orange-pale);color:var(--orange)}
-.db-danger{background:var(--rouge-pale);color:var(--rouge)}
-
-/* CUVE */
+.drill-meta{font-size:11px;color:var(--texte2);margin-top:2px}
+.mini-bars{display:flex;align-items:flex-end;gap:2px;height:22px}
+.mini-bar{width:7px;border-radius:1px 1px 0 0;background:var(--or);opacity:0.65}
+.pill{padding:3px 9px;border-radius:2px;font-size:10px;font-weight:600;letter-spacing:0.4px;text-transform:uppercase;display:inline-block}
+.pill-ok{background:var(--vert-pale);color:var(--vert)}
+.pill-warn{background:var(--orange-pale);color:var(--orange)}
+.pill-danger{background:var(--rouge-pale);color:var(--rouge)}
 .cuve-card{background:white;border:1px solid var(--bordure);border-top:3px solid var(--or);border-radius:6px;padding:16px;margin-bottom:24px}
-.cuve-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.cuve-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
 .cuve-title{font-size:14px;font-weight:600;color:var(--texte)}
 .cuve-sub{font-size:11px;color:var(--texte2);margin-top:3px}
-.autonomie-block{text-align:right}
-.autonomie-val{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:600;line-height:1}
-.autonomie-unit{font-size:11px;color:var(--texte2);margin-top:2px}
-.cuve-bar-bg{height:7px;background:var(--surface3);border-radius:4px;margin:10px 0 8px;overflow:hidden}
-.cuve-bar-fill{height:100%;border-radius:4px;transition:width 0.5s ease}
-.cuve-meta{display:flex;gap:20px;flex-wrap:wrap;font-size:11px;color:var(--texte2);margin-bottom:10px}
+.auto-val{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:600;line-height:1;text-align:right}
+.auto-unit{font-size:11px;color:var(--texte2);margin-top:2px;text-align:right}
+.cuve-bar{height:7px;background:var(--surface3);border-radius:4px;margin:8px 0;overflow:hidden}
+.cuve-bar-fill{height:100%;border-radius:4px}
+.cuve-meta{display:flex;gap:18px;flex-wrap:wrap;font-size:11px;color:var(--texte2);margin-bottom:10px}
 .cuve-meta strong{color:var(--texte)}
-.ge-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.ge-chips{display:flex;gap:6px;flex-wrap:wrap}
 .ge-chip{padding:4px 10px;border-radius:3px;font-size:11px;font-weight:600;border:1px solid var(--bordure);background:var(--surface2);color:var(--texte2)}
 .ge-chip.actif{border-color:rgba(45,122,79,0.35);background:var(--vert-pale);color:var(--vert)}
 .cuve-note{font-size:11px;color:var(--texte3);margin-top:10px;padding-top:10px;border-top:1px solid var(--surface3);font-style:italic}
-
-/* PANNES */
 .pannes-section{margin-bottom:24px}
-.panne-ouverte{background:var(--rouge-pale);border:1px solid var(--rouge-bordure);border-radius:6px;padding:14px;margin-bottom:8px}
-.panne-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.panne-equip{font-size:13px;font-weight:600;color:var(--texte);flex:1}
-.panne-date{font-size:11px;color:var(--texte3)}
+.panne-open{background:var(--rouge-pale);border:1px solid var(--rouge-bordure);border-radius:6px;padding:14px;margin-bottom:8px}
+.panne-hdr{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.panne-nom{font-size:13px;font-weight:600;color:var(--texte);flex:1}
+.panne-dt{font-size:11px;color:var(--texte3)}
 .panne-desc{font-size:12px;color:var(--texte2);margin-bottom:10px}
-.panne-footer{display:flex;justify-content:space-between;align-items:center}
+.panne-ftr{display:flex;justify-content:space-between;align-items:center}
 .panne-cout{font-size:11px;color:var(--texte2)}
-.resolve-btn{background:var(--vert);color:white;border:none;padding:6px 14px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px}
-.resolve-btn:hover{opacity:0.9}
-
-/* TABLEAUX */
-.table-card{border:1px solid var(--bordure);border-radius:6px;overflow:hidden;background:white;margin-bottom:8px}
-.table-head{padding:10px 14px;border-bottom:1px solid var(--bordure);background:var(--surface2);display:flex;justify-content:space-between;align-items:center}
-.table-head-title{font-size:13px;font-weight:600;color:var(--texte)}
-.table-head-sub{font-size:11px;color:var(--texte2)}
+.resolve-btn{background:var(--vert);color:white;border:none;padding:6px 14px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer}
+.table-card{border:1px solid var(--bordure);border-radius:6px;overflow:hidden;background:white;margin-bottom:10px}
+.table-hdr{padding:10px 14px;border-bottom:1px solid var(--bordure);background:var(--surface2);display:flex;justify-content:space-between;align-items:center}
+.table-hdr-title{font-size:13px;font-weight:600;color:var(--texte)}
+.table-hdr-sub{font-size:11px;color:var(--texte2)}
 table.data{width:100%;border-collapse:collapse;font-size:12px}
 table.data th{text-align:left;padding:8px 12px;font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:var(--texte2);border-bottom:1px solid var(--bordure);background:var(--surface2);font-weight:600}
 table.data td{padding:8px 12px;border-bottom:1px solid var(--surface3);color:var(--texte)}
 table.data tr:last-child td{border-bottom:none}
 table.data tr:hover td{background:var(--surface2)}
-
-/* PILLS */
-.pill{padding:3px 9px;border-radius:2px;font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;display:inline-block}
-.pill-ok{background:var(--vert-pale);color:var(--vert)}
-.pill-warn{background:var(--orange-pale);color:var(--orange)}
-.pill-danger{background:var(--rouge-pale);color:var(--rouge)}
-
-/* SAISIES COLLAPSIBLES */
-.saisies-toggle{width:100%;text-align:left;background:var(--surface2);border:1px solid var(--bordure);border-radius:6px;padding:12px 16px;font-size:12px;font-weight:600;color:var(--texte2);cursor:pointer;display:flex;justify-content:space-between;align-items:center;letter-spacing:0.3px;margin-bottom:4px}
-.saisies-toggle:hover{background:var(--surface3)}
-.saisies-toggle-icon{transition:transform 0.2s;font-size:12px}
-.saisies-toggle.open .saisies-toggle-icon{transform:rotate(180deg)}
+.chart-card{border:1px solid var(--bordure);border-radius:6px;overflow:hidden;background:white;margin-bottom:18px}
+.chart-hdr{padding:11px 14px;border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:center;background:var(--surface2)}
+.chart-hdr-title{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600}
+.chart-body{padding:14px}
+.chart-insight{margin-top:8px;padding-top:8px;border-top:1px solid var(--surface3);font-size:11px;color:var(--texte2)}
+.saisies-toggle{width:100%;text-align:left;background:var(--surface2);border:1px solid var(--bordure);border-radius:6px;padding:12px 16px;font-size:12px;font-weight:600;color:var(--texte2);cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 .saisies-body{display:none}
-.saisies-body.show{display:block}
-
-/* VUE CONSOLIDATED (dir_ops / groupe) */
-.site-card{border:1px solid var(--bordure);border-radius:6px;background:white;margin-bottom:10px;overflow:hidden;cursor:pointer;transition:box-shadow 0.15s}
+.saisies-body.open{display:block}
+.site-card{border:1px solid var(--bordure);border-radius:6px;background:white;margin-bottom:10px;overflow:hidden;cursor:pointer}
 .site-card:hover{box-shadow:0 2px 8px rgba(0,0,0,0.06)}
-.sc-header{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border-bottom:1px solid var(--bordure)}
+.sc-hdr{padding:14px 16px;display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border-bottom:1px solid var(--bordure)}
 .sc-nom{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600}
 .sc-sub{font-size:11px;color:var(--texte2);margin-top:2px}
 .sc-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
@@ -161,25 +118,10 @@ table.data tr:hover td{background:var(--surface2)}
 .sc-kpi:last-child{border-right:none}
 .sc-kpi-val{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600}
 .sc-kpi-label{font-size:10px;color:var(--texte2);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
-.sc-detail{display:none;padding:16px;border-top:1px solid var(--bordure);animation:fadeIn 0.2s ease}
+.sc-detail{display:none;padding:16px;border-top:1px solid var(--bordure)}
 .sc-detail.open{display:block}
-
-/* GRAPHIQUE */
-.chart-card{border:1px solid var(--bordure);border-radius:6px;overflow:hidden;background:white;margin-bottom:18px}
-.chart-head{padding:11px 14px;border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:center;background:var(--surface2)}
-.chart-head-title{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600}
-.chart-body{padding:14px}
-.chart-insight{margin-top:8px;padding-top:8px;border-top:1px solid var(--surface3);font-size:11px;color:var(--texte2)}
-
-/* DIVIDER */
-.section-divider{height:1px;background:var(--bordure);margin:24px 0;position:relative}
-.section-divider::after{content:'◆';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--surface);padding:0 12px;color:var(--or);font-size:9px}
-
-/* FOOTER */
 .footer{background:var(--bx);color:rgba(255,255,255,0.4);text-align:center;padding:16px;font-size:11px;letter-spacing:1px;margin-top:40px}
 .footer strong{color:var(--or)}
-
-/* MISC */
 .loading{padding:40px;text-align:center;color:var(--texte2);font-size:13px}
 .spinner{display:inline-block;width:16px;height:16px;border:2px solid var(--bordure);border-top-color:var(--bx);border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:middle;margin-right:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -187,734 +129,740 @@ table.data tr:hover td{background:var(--surface2)}
 .error-page{max-width:400px;margin:80px auto;text-align:center;padding:40px}
 .error-page h2{font-family:'Cormorant Garamond',serif;font-size:28px;margin-bottom:12px}
 .error-page p{font-size:13px;color:var(--texte2);line-height:1.6}
-.tag-danger{display:inline-block;background:var(--rouge-pale);color:var(--rouge);border:1px solid var(--rouge-bordure);border-radius:3px;font-size:10px;font-weight:600;padding:2px 7px;text-transform:uppercase;letter-spacing:0.4px}
-.tag-ok{display:inline-block;background:var(--vert-pale);color:var(--vert);border-radius:3px;font-size:10px;font-weight:600;padding:2px 7px;text-transform:uppercase;letter-spacing:0.4px}
-.tag-warn{display:inline-block;background:var(--orange-pale);color:var(--orange);border-radius:3px;font-size:10px;font-weight:600;padding:2px 7px;text-transform:uppercase;letter-spacing:0.4px}
-
-/* PRINT */
-@media print{
-  .pdf-btn,.site-nav,.saisies-toggle,.resolve-btn{display:none!important}
-  .header{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .kpi,.equip-card,.cuve-card,.table-card,.chart-card{break-inside:avoid}
-  body{background:white}
-}
-
-@media(max-width:700px){
-  .container{padding:16px}
-  .kpi-grid{grid-template-columns:1fr 1fr}
-  .equip-grid{grid-template-columns:1fr}
-  .header-top{padding:14px 16px}
-  .kpi-value{font-size:22px}
-  table.data{font-size:11px}
-  table.data th,table.data td{padding:6px 8px}
-  .sc-kpis{grid-template-columns:repeat(2,1fr)}
-}
+@media print{.pdf-btn,.site-nav,.saisies-toggle,.resolve-btn{display:none!important}.header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@media(max-width:700px){.container{padding:16px}.kpi-grid{grid-template-columns:1fr 1fr}.equip-grid{grid-template-columns:1fr}.header-top{padding:14px 16px}.sc-kpis{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
-
 <div id="app"><div class="loading" style="padding:80px"><span class="spinner"></span>Chargement...</div></div>
-
 <script>
-const SUPA_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+var SUPA_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
+var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+var _chartInst = null;
 
-let _chartInst = null;
-
-// ── UTILS ──
-async function api(table, q='') {
-  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?select=*${q}`, {
-    headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`}
-  });
-  if(!res.ok) return [];
-  return res.json();
+function api(table, q) {
+  if (!q) q = '';
+  return fetch(SUPA_URL + '/rest/v1/' + table + '?select=*' + q, {
+    headers: {'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY}
+  }).then(function(r) { return r.ok ? r.json() : []; });
 }
 
-async function apiPatch(table, q, body) {
-  return fetch(`${SUPA_URL}/rest/v1/${table}?${q}`, {
-    method:'PATCH',
-    headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json','Prefer':'return=representation'},
-    body:JSON.stringify(body)
+function apiPatch(table, q, body) {
+  return fetch(SUPA_URL + '/rest/v1/' + table + '?' + q, {
+    method: 'PATCH',
+    headers: {'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation'},
+    body: JSON.stringify(body)
   });
 }
 
-function fmtNum(n){return Math.round(n||0).toLocaleString('fr-FR');}
-function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});}
-function fmtDateShort(d){if(!d)return'—';return new Date(d).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});}
-function fmtHeure(d){if(!d)return null;return new Date(d).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Africa/Dakar'});}
-function carbColor(n){return n<25?'var(--rouge)':n<50?'var(--orange)':'var(--vert)';}
-function autoColor(j){return j<2?'var(--rouge)':j<5?'var(--orange)':'var(--vert)';}
-function huileColor(h){return h==='critique'?'var(--rouge)':h==='bas'?'var(--orange)':'var(--vert)';}
+function fmtNum(n) { return Math.round(n || 0).toLocaleString('fr-FR'); }
+function fmtDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit', year:'numeric'}); }
+function fmtDateShort(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('fr-FR', {day:'2-digit', month:'short'}); }
+function fmtHeure(d) { if (!d) return ''; return new Date(d).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit', timeZone:'Africa/Dakar'}); }
+function carbColor(n) { return n < 25 ? 'var(--rouge)' : n < 50 ? 'var(--orange)' : 'var(--vert)'; }
+function autoColor(j) { return j < 2 ? 'var(--rouge)' : j < 5 ? 'var(--orange)' : 'var(--vert)'; }
+function huileColor(h) { return h === 'critique' ? 'var(--rouge)' : h === 'bas' ? 'var(--orange)' : 'var(--vert)'; }
+function getProp(obj, key) { return obj ? obj[key] : null; }
+
 function retardLabel(date, today) {
-  if(!date) return {label:'Aucune saisie', color:'var(--rouge)', jours:null};
-  const j = Math.round((new Date(today)-new Date(date))/86400000);
-  if(j===0) return {label:"Saisi aujourd'hui", color:'var(--vert)', jours:0};
-  if(j===1) return {label:'Saisi hier', color:'var(--orange)', jours:1};
-  return {label:`Saisi il y a ${j} jours`, color:'var(--rouge)', jours:j};
+  if (!date) return {label: 'Aucune saisie', color: 'var(--rouge)', jours: null};
+  var j = Math.round((new Date(today) - new Date(date)) / 86400000);
+  if (j === 0) return {label: "Saisi aujourd'hui", color: 'var(--vert)', jours: 0};
+  if (j === 1) return {label: 'Saisi hier', color: 'var(--orange)', jours: 1};
+  return {label: 'Saisi il y a ' + j + ' jours', color: 'var(--rouge)', jours: j};
 }
-function autoJoursCalc(niveauCuve, consoLh) {
-  if(niveauCuve==null) return null;
-  const cLh = consoLh || 65;
-  return Math.round((niveauCuve / (cLh * 8)) * 10) / 10;
+
+function calcAutoJours(niveau, consoLh) {
+  if (niveau == null) return null;
+  var c = consoLh || 65;
+  return Math.round((niveau / (c * 8)) * 10) / 10;
 }
 
 function applyBrandColor(hex) {
-  if(!hex) return;
-  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  if (!hex) return;
+  var r = parseInt(hex.slice(1,3), 16), g = parseInt(hex.slice(3,5), 16), b = parseInt(hex.slice(5,7), 16);
   document.documentElement.style.setProperty('--bx', hex);
-  document.documentElement.style.setProperty('--bx-pale', `rgba(${r},${g},${b},0.07)`);
-  document.documentElement.style.setProperty('--bx-mid', `rgba(${r},${g},${b},0.15)`);
-}
-
-// ── ROUTING ──
-async function init() {
-  const params = new URLSearchParams(window.location.search);
-  const token = params.get('token');
-  const clientId = params.get('id');
-  if(token) { await loadByToken(token); }
-  else if(clientId) { await loadClientView(clientId, {}); }
-  else { showError('Lien invalide', 'Ce lien ne contient pas d\'identifiant valide.'); }
-}
-
-async function loadByToken(token) {
-  const rows = await api('tokens', `&token=eq.${token}&actif=eq.true`);
-  if(!rows.length) { showError('Lien expiré', 'Ce lien d\'accès n\'est plus valide.'); return; }
-  const tok = rows[0];
-  if(tok.expire_at && new Date(tok.expire_at) < new Date()) { showError('Lien expiré', 'Ce lien d\'accès a expiré.'); return; }
-  const role = tok.role || null;
-  const rawSiteIds = tok.site_ids || [];
-  const siteIds = typeof rawSiteIds === 'string' ? JSON.parse(rawSiteIds||'[]') : rawSiteIds;
-
-  if(role === 'dir_ops') {
-    await loadClientView(tok.client_id, {role:'dir_ops'});
-  } else if(role === 'dir_tech') {
-    await loadClientView(tok.client_id, {role:'dir_tech', siteIds});
-  } else if(role === 'resp_tech') {
-    const siteId = siteIds.length ? siteIds[0] : tok.site_id || null;
-    await loadSiteView(tok.client_id, siteId, {role:'resp_tech'});
-  } else if(role === 'tech' || role === 'technicien') {
-    const siteId = siteIds.length ? siteIds[0] : tok.site_id || null;
-    await loadSiteView(tok.client_id, siteId, {role:'technicien'});
-  } else if(tok.site_id) {
-    await loadSiteView(tok.client_id, tok.site_id, {role:'technicien'});
-  } else {
-    await loadClientView(tok.client_id, {role:null});
-  }
-}
-
-async function loadClientView(clientId, access={}) {
-  const clients = await api('clients', `&id=eq.${clientId}`);
-  if(!clients.length) { showError('Client introuvable', ''); return; }
-  const client = clients[0];
-  applyBrandColor(client.couleur_marque);
-  let sites = await api('sites', `&client_id=eq.${clientId}&actif=eq.true&order=nom`);
-  if(access.role === 'dir_tech' && access.siteIds?.length) {
-    sites = sites.filter(s => access.siteIds.includes(s.id));
-  }
-  if(sites.length > 1 && (access.role === 'dir_ops' || access.role === 'dir_tech')) {
-    await renderGroupeView(client, sites, access.role === 'dir_ops');
-  } else {
-    const siteId = sites.length ? sites[0].id : null;
-    await renderHotelView(client, siteId, null, {role: access.role || 'resp_tech'});
-  }
-}
-
-async function loadSiteView(clientId, siteId, access={}) {
-  const clients = await api('clients', `&id=eq.${clientId}`);
-  if(!clients.length) { showError('Client introuvable', ''); return; }
-  const client = clients[0];
-  applyBrandColor(client.couleur_marque);
-  await renderHotelView(client, siteId, null, {role: access.role || 'technicien'});
-}
-
-// ════════════════════════════════════════
-// VUE HÔTEL — resp_tech / technicien
-// ════════════════════════════════════════
-async function renderHotelView(client, siteId, siteName, opts={}) {
-  const role = opts.role || 'resp_tech';
-  const showFull = role !== 'technicien'; // resp_tech voit tout
-  const inContainer = opts.inContainer || null;
-  const rootEl = inContainer ? document.getElementById(inContainer) : document.getElementById('app');
-
-  if(!rootEl) return;
-  rootEl.innerHTML = '<div class="loading" style="padding:60px"><span class="spinner"></span>Chargement...</div>';
-
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
-  const debut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
-  const debutAnnee = new Date(now.getFullYear(),0,1).toISOString().split('T')[0];
-
-  const [groupes, saisies30, alertes, pannesOuv, pannesRes, cuves] = await Promise.all([
-    api('groupes', `&client_id=eq.${client.id}${siteId?'&site_id=eq.'+siteId:''}&actif=eq.true&order=nom`),
-    api('saisies', `&client_id=eq.${client.id}&date=gte.${debut30}&order=date.desc,created_at.desc&limit=200`),
-    api('alertes', `&client_id=eq.${client.id}&resolue=eq.false`),
-    api('pannes', `&client_id=eq.${client.id}&resolue=eq.false&order=date_panne.desc`),
-    showFull ? api('pannes', `&client_id=eq.${client.id}&resolue=eq.true&order=date_resolution.desc&limit=20`) : Promise.resolve([]),
-    api('cuves', `&client_id=eq.${client.id}${siteId?'&site_id=eq.'+siteId:''}&actif=eq.true`),
-  ]);
-
-  // Dernière saisie connue par groupe
-  const dernSaisie = {};
-  saisies30.forEach(s=>{if(!dernSaisie[s.groupe_id]) dernSaisie[s.groupe_id] = s;});
-  const saisiesJour = Object.values(dernSaisie);
-
-  const cuve = cuves[0] || null;
-  let saisiesCuve30 = [], saisieCuveJour = null, ravitaillements = [];
-  if(cuve) {
-    saisiesCuve30 = await api('saisies_cuve', `&cuve_id=eq.${cuve.id}&date=gte.${debut30}&order=date.desc,created_at.desc`);
-    saisieCuveJour = saisiesCuve30[0] || null;
-    ravitaillements = saisiesCuve30.filter(s=>(s.litres_ajoutes||0)>0);
-  }
-
-  const prixLitre = client.prix_litre_fcfa || 695;
-  const litresAnnee = cuve ? (await api('saisies_cuve', `&cuve_id=eq.${cuve.id}&date=gte.${debutAnnee}`)).reduce((a,s)=>a+(s.litres_ajoutes||0),0) : 0;
-  const litres30 = saisiesCuve30.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
-  const coutCarb30 = Math.round(litres30 * prixLitre);
-  const coutMaint = pannesRes.filter(p=>p.date_resolution>=debut30).reduce((a,p)=>a+(p.cout_reparation||0),0);
-
-  const capCuve = cuve?.capacite_litres || 500;
-  const niveauCuve = saisieCuveJour?.niveau_litres;
-  const pctCuve = niveauCuve!=null ? Math.round(niveauCuve/capCuve*100) : null;
-  const consoLh = groupes[0]?.conso_theorique_lh ? parseFloat(groupes[0].conso_theorique_lh) : 65;
-  const autoJours = autoJoursCalc(niveauCuve, consoLh);
-  const groupeMap = Object.fromEntries(groupes.map(g=>[g.id,g.nom]));
-  const panneLabels = {ne_demarre_pas:'Ne démarre pas',arret_inopin:'Arrêt inopiné',bruit_anormal:'Bruit anormal',surchauffe:'Surchauffe',fuite:'Fuite carburant',autre:'Autre'};
-
-  // ── KPIs ──
-  const saisiesOkCount = groupes.filter(g=>saisiesJour.find(s=>s.groupe_id===g.id&&retardLabel(s.date,today).jours===0)).length;
-  const dateStr = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  const nom = siteName || client.nom;
-
-  // ── ALERTE BANNER ──
-  const urgences = [];
-  if(autoJours!==null&&autoJours<3) urgences.push(`Autonomie cuve critique (${autoJours}j)`);
-  pannesOuv.forEach(p=>urgences.push(`Panne en cours : ${groupeMap[p.groupe_id]||'équipement'}`));
-  alertes.filter(a=>a.severite==='danger').forEach(a=>urgences.push(a.message));
-
-  const alerteBannerHtml = urgences.length
-    ? `<div class="alert-banner"><div class="ab-icon">⚠️</div><div class="ab-body"><div class="ab-titre">${urgences.length === 1 ? '1 action requise' : urgences.length+' actions requises'}</div><div class="ab-sub">${urgences.join(' · ')}</div></div></div>`
-    : '';
-
-  // ── ÉQUIPEMENTS PAR TYPE ──
-  // Regroupement : tous les groupes sont de type "Groupes électrogènes" pour l'instant
-  const groupeParType = {};
-  groupes.forEach(g=>{
-    const type = 'ge'; // à étendre si type field ajouté
-    if(!groupeParType[type]) groupeParType[type] = [];
-    groupeParType[type].push(g);
-  });
-  const typeMeta = {
-    ge: {label:'Groupes électrogènes', icon:'⚡', unite:'L/h', field:'conso_theorique_lh'}
-  };
-
-  const equipCardsHtml = Object.entries(groupeParType).map(([type, gList])=>{
-    const meta = typeMeta[type] || {label:type, icon:'⚙️', unite:'', field:null};
-    const pannesType = pannesOuv.filter(p=>gList.some(g=>g.id===p.groupe_id));
-    const anomaliesType = alertes.filter(a=>gList.some(g=>g.id===a.groupe_id));
-    const status = pannesType.length||anomaliesType.some(a=>a.severite==='danger') ? 'danger' : anomaliesType.length ? 'warn' : 'ok';
-    const statusBadge = status==='danger'?'<span class="tag-danger">Anomalie</span>':status==='warn'?'<span class="tag-warn">Attention</span>':'<span class="tag-ok">Normal</span>';
-    const consoMoy = meta.field ? (gList.reduce((a,g)=>a+parseFloat(g[meta.field]||0),0)/gList.length).toFixed(0) : null;
-
-    // Drill-down rows
-    const drillRows = gList.map(g=>{
-      const s = saisiesJour.find(x=>x.groupe_id===g.id);
-      const rd = retardLabel(s?.date, today);
-      const saisiesG = saisies30.filter(x=>x.groupe_id===g.id).slice(0,7).reverse();
-      const isActif = s?.demarre === true;
-      const pctVidange = g.heures_total&&g.seuil_vidange_heures ? Math.round(g.heures_total/g.seuil_vidange_heures*100) : null;
-      const vidBadge = pctVidange!=null ? (pctVidange>=100?'<span class="tag-danger">Vidange</span>':pctVidange>=80?'<span class="tag-warn">Bientôt</span>':'') : '';
-      const huile = s?.niveau_huile;
-      const huileBadge = huile==='critique'?'<span class="tag-danger">Huile critique</span>':huile==='bas'?'<span class="tag-warn">Huile basse</span>':'';
-      const miniBars = saisiesG.length ? saisiesG.map((_,i,arr)=>{
-        const haut = Math.min(28, 10 + i*3);
-        return `<div class="mini-bar" style="height:${haut}px"></div>`;
-      }).join('') : '';
-      return `<div class="drill-row">
-        <div class="drill-left">
-          <div class="drill-name">${g.nom} — ${g.marque||''} ${g.puissance_kva||''}kVA ${isActif?'<span style="color:var(--vert);font-size:10px">● actif</span>':''}</div>
-          <div class="drill-detail" style="color:${rd.color}">${rd.label}${s?.heures_marche!=null?' · Compteur '+s.heures_marche+'h':''} ${vidBadge} ${huileBadge}</div>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <div class="mini-bars">${miniBars}</div>
-        </div>
-      </div>`;
-    }).join('');
-
-    return `<div class="equip-card" id="ec-${type}" onclick="toggleEquip('${type}')">
-      <div class="equip-card-header">
-        <div class="equip-icon">${meta.icon}</div>
-        <div>
-          <div class="equip-name">${meta.label}</div>
-          <div class="equip-count">${gList.length} unité${gList.length>1?'s':''}</div>
-        </div>
-        <div class="equip-chevron">▼</div>
-      </div>
-      <div class="equip-body">
-        ${consoMoy ? `<div class="equip-stat"><span class="equip-stat-label">Conso théorique moy.</span><span class="equip-stat-value">${consoMoy} ${meta.unite}</span></div>` : ''}
-        <div class="equip-stat"><span class="equip-stat-label">Saisies aujourd'hui</span><span class="equip-stat-value" style="color:${saisiesOkCount===gList.length?'var(--vert)':'var(--orange)'}">${saisiesOkCount} / ${gList.length}</span></div>
-        <div class="equip-stat"><span class="equip-stat-label">Statut</span><span>${statusBadge}</span></div>
-      </div>
-      <div class="drill show" id="drill-${type}">
-        ${drillRows}
-      </div>
-    </div>`;
-  }).join('');
-
-  // ── CUVE ──
-  const cuveHtml = cuve ? (()=>{
-    const barColor = pctCuve!=null ? (pctCuve<25?'var(--rouge)':pctCuve<50?'var(--orange)':'var(--or)') : 'var(--or)';
-    const autoStr = autoJours!=null ? autoJours+'j' : '—';
-    const autoC = autoJours!=null ? autoColor(autoJours) : 'var(--texte2)';
-    const rd = retardLabel(saisieCuveJour?.date, today);
-
-    // GE actif/standby depuis la dernière saisie
-    const geChipsHtml = groupes.map(g=>{
-      const s = saisiesJour.find(x=>x.groupe_id===g.id);
-      const actif = s?.demarre === true && groupes.indexOf(g)===0; // premier groupe = actif par défaut
-      return `<span class="ge-chip ${actif?'actif':''}">${actif?'●':''} ${g.nom} — ${actif?'actif':'standby'}</span>`;
-    }).join('');
-
-    const noteAlternance = groupes.length > 1 ? `<div class="cuve-note">En alternance : le second groupe démarre automatiquement si la charge dépasse le premier. L'autonomie est calculée sur la consommation du groupe actif (${consoLh} L/h × 8h/j).</div>` : '';
-
-    return `<div class="cuve-card">
-      <div class="cuve-header">
-        <div>
-          <div class="cuve-title">🛢️ Cuve commune${cuve.nom?' — '+cuve.nom:''}</div>
-          <div class="cuve-sub">Capacité ${fmtNum(capCuve)} L · ${rd.label}</div>
-        </div>
-        <div class="autonomie-block">
-          <div class="autonomie-val" style="color:${autoC}">${autoStr}</div>
-          <div class="autonomie-unit">autonomie estimée</div>
-        </div>
-      </div>
-      ${pctCuve!=null?`<div class="cuve-bar-bg"><div class="cuve-bar-fill" style="width:${pctCuve}%;background:${barColor}"></div></div>`:''}
-      <div class="cuve-meta">
-        <span><strong>${niveauCuve!=null?fmtNum(niveauCuve)+'L':'—'}</strong> niveau actuel</span>
-        <span><strong>${pctCuve!=null?pctCuve+'%':'—'}</strong> du réservoir</span>
-        <span><strong>${consoLh} L/h</strong> conso théorique</span>
-        ${saisieCuveJour?.date?`<span><strong>${fmtDate(saisieCuveJour.date)}</strong> dernier relevé</span>`:''}
-      </div>
-      <div class="ge-chips">${geChipsHtml}</div>
-      ${noteAlternance}
-    </div>`;
-  })() : '';
-
-  // ── PANNES (si resp_tech ou dir_tech) ──
-  const pannesHtml = showFull ? (()=>{
-    const panneFiltrees = pannesOuv.filter(p=>groupes.some(g=>g.id===p.groupe_id));
-    const resolusFiltres = pannesRes.filter(p=>groupes.some(g=>g.id===p.groupe_id));
-
-    const ouvertesHtml = panneFiltrees.length
-      ? panneFiltrees.map(p=>`<div class="panne-ouverte">
-          <div class="panne-header">
-            <span class="tag-danger">${groupeMap[p.groupe_id]||'Équipement'}</span>
-            <div class="panne-equip">${p.description||panneLabels[p.type]||p.type||'Panne'}</div>
-            <div class="panne-date">${fmtDate(p.date_panne)}</div>
-          </div>
-          ${p.resolution_note?`<div class="panne-desc">${p.resolution_note}</div>`:''}
-          <div class="panne-footer">
-            <span class="panne-cout">${p.cout_reparation?fmtNum(p.cout_reparation)+' FCFA estimé':'Coût non défini'}</span>
-            <button class="resolve-btn" onclick="resoudrePanne('${p.id}',event)">✓ Marquer résolu</button>
-          </div>
-        </div>`).join('')
-      : `<div class="empty" style="background:white;border:1px solid var(--bordure);border-radius:6px;margin-bottom:8px">Aucune panne en cours ✅</div>`;
-
-    const historHtml = resolusFiltres.length
-      ? `<div class="table-card">
-          <div class="table-head"><div class="table-head-title">Historique résolu</div><div class="table-head-sub">${resolusFiltres.length} panne${resolusFiltres.length>1?'s':''}</div></div>
-          <table class="data"><thead><tr><th>Résolu le</th><th>Équipement</th><th>Problème</th><th>Intervenant</th><th>Coût</th></tr></thead><tbody>
-          ${resolusFiltres.map(p=>`<tr>
-            <td>${fmtDate(p.date_resolution||p.date_panne)}</td>
-            <td>${groupeMap[p.groupe_id]||'—'}</td>
-            <td>${p.description||panneLabels[p.type]||p.type||'—'}</td>
-            <td>${p.intervenant||'—'}</td>
-            <td><strong>${p.cout_reparation?fmtNum(p.cout_reparation)+' F':'—'}</strong></td>
-          </tr>`).join('')}
-          </tbody></table>
-        </div>`
-      : '';
-
-    return `<div class="pannes-section">
-      <div class="section-title">Pannes & maintenance</div>
-      <div class="section-sub" style="margin-bottom:12px">En cours (${panneFiltrees.length})</div>
-      ${ouvertesHtml}
-      ${historHtml}
-    </div>`;
-  })() : '';
-
-  // ── RAVITAILLEMENTS ──
-  const ravitHtml = showFull && ravitaillements.length ? (()=>{
-    const totalL = ravitaillements.reduce((a,s)=>a+(s.litres_ajoutes||0),0);
-    const totalF = Math.round(totalL*prixLitre);
-    return `<div class="table-card" style="margin-bottom:24px">
-      <div class="table-head">
-        <div class="table-head-title">⛽ Ravitaillements — 30 jours</div>
-        <div class="table-head-sub">${fmtNum(totalL)} L · ${fmtNum(totalF)} FCFA</div>
-      </div>
-      <table class="data"><thead><tr><th>Date</th><th>Litres ajoutés</th><th>Coût estimé</th><th>Opérateur</th></tr></thead><tbody>
-      ${ravitaillements.map(s=>`<tr>
-        <td>${fmtDate(s.date)}</td>
-        <td><strong>+${fmtNum(s.litres_ajoutes)} L</strong></td>
-        <td>${fmtNum(Math.round(s.litres_ajoutes*prixLitre))} FCFA</td>
-        <td>${s.operateur||'—'}</td>
-      </tr>`).join('')}
-      </tbody></table>
-    </div>`;
-  })() : '';
-
-  // ── GRAPHIQUE CUVE 14J ──
-  const dates14 = Array.from({length:14},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(13-i));return d.toISOString().split('T')[0];});
-  const carbData = dates14.map(d=>{const sc=saisiesCuve30.find(s=>s.date===d);return sc?.niveau_litres!=null?Math.round(sc.niveau_litres/capCuve*100):null;});
-
-  // ── SAISIES LOG (repliées) ──
-  const saisiesLogHtml = (()=>{
-    const saisies = [...saisies30].sort((a,b)=>(b.date+((b.created_at||'').slice(11))).localeCompare(a.date+((a.created_at||'').slice(11)))).slice(0,50);
-    if(!saisies.length) return '';
-    return `<button class="saisies-toggle" onclick="toggleSaisies(this)" id="saisies-toggle">
-        <span>📋 Journal des saisies (${saisies.length} entrées)</span>
-        <span class="saisies-toggle-icon">▼</span>
-      </button>
-      <div class="saisies-body" id="saisies-body">
-        <div class="table-card" style="margin-top:6px">
-          <table class="data"><thead><tr><th>Date</th><th>Heure</th><th>Groupe</th><th>Compteur</th><th>Huile</th><th>Opérateur</th></tr></thead><tbody>
-          ${saisies.map(s=>`<tr>
-            <td>${fmtDate(s.date)}</td>
-            <td style="color:var(--texte2)">${fmtHeure(s.created_at)||'—'}</td>
-            <td>${groupeMap[s.groupe_id]||'—'}</td>
-            <td>${s.heures_marche!=null?s.heures_marche+'h':'—'}</td>
-            <td style="color:${huileColor(s.niveau_huile)}">${s.niveau_huile||'—'}</td>
-            <td>${s.operateur||'—'}</td>
-          </tr>`).join('')}
-          </tbody></table>
-        </div>
-      </div>`;
-  })();
-
-  // ── RENDER ──
-  const headerHtml = inContainer ? '' : `
-    <div class="header">
-      <div class="header-top">
-        <div>
-          <div class="logo">${nom}</div>
-          <div class="logo-sub">${role==='resp_tech'?'Responsable technique':role==='technicien'?'Technicien':'Dashboard'}</div>
-        </div>
-        <div class="header-right">
-          <div>
-            <div class="header-date">${dateStr}</div>
-            <div class="header-title">Tableau de bord</div>
-          </div>
-          <button class="pdf-btn" onclick="window.print()">↓ PDF</button>
-        </div>
-      </div>
-    </div>`;
-  const footerHtml = inContainer ? '' : `<div class="footer">Powered by <strong>GenTrack</strong> · ${nom}</div>`;
-
-  rootEl.innerHTML = `${headerHtml}
-    <div class="container">
-      ${alerteBannerHtml}
-      <div class="kpi-grid">
-        <div class="kpi">
-          <div class="kpi-label">Saisies — aujourd'hui</div>
-          <div class="kpi-value" style="color:${saisiesOkCount===groupes.length?'var(--vert)':saisiesOkCount>0?'var(--orange)':'var(--rouge)'}">${saisiesOkCount} / ${groupes.length}</div>
-          <div class="kpi-trend">${groupes.length} groupe${groupes.length>1?'s':''} · ${saisiesOkCount===groupes.length?'complet':'en attente'}</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Carburant — 30j</div>
-          <div class="kpi-value">${coutCarb30>0?fmtNum(coutCarb30):'—'}</div>
-          <div class="kpi-trend">${litres30>0?'FCFA · '+fmtNum(litres30)+' L ajoutés':'Aucun ravitaillement'}</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Autonomie cuve</div>
-          <div class="kpi-value" style="color:${autoJours!=null?autoColor(autoJours):'var(--texte2)'}">${autoJours!=null?autoJours+'j':'—'}</div>
-          <div class="kpi-trend ${autoJours!=null&&autoJours<3?'danger':autoJours!=null&&autoJours<6?'warn':'ok'}">${pctCuve!=null?pctCuve+'% · '+fmtNum(niveauCuve||0)+'L':'Pas de relevé'}</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Pannes en cours</div>
-          <div class="kpi-value" style="color:${pannesOuv.length?'var(--rouge)':'var(--vert)'}">${pannesOuv.length||'✓'}</div>
-          <div class="kpi-trend ${pannesOuv.length?'danger':'ok'}">${showFull?(pannesRes.length+' résolue'+(pannesRes.length>1?'s':'')+' · '+fmtNum(coutMaint)+' F':pannesOuv.length?'action requise':'OK')}</div>
-        </div>
-      </div>
-
-      <div style="margin-bottom:6px;display:flex;justify-content:space-between;align-items:baseline">
-        <div class="section-title">Équipements</div>
-        <div style="font-size:11px;color:var(--texte2)">${groupes.length} unité${groupes.length>1?'s':''}</div>
-      </div>
-      <div class="equip-grid">${equipCardsHtml||'<div class="empty">Aucun groupe configuré</div>'}</div>
-
-      ${cuveHtml}
-
-      ${pannesHtml}
-
-      ${ravitHtml}
-
-      <div class="chart-card">
-        <div class="chart-head">
-          <div class="chart-head-title">Évolution cuve — 14 jours</div>
-          <div style="font-size:11px;color:var(--texte2)">${cuve?'Cuve '+fmtNum(capCuve)+'L':''}</div>
-        </div>
-        <div class="chart-body">
-          <canvas id="cuve-chart" height="120"></canvas>
-          <div class="chart-insight" id="chart-insight"></div>
-        </div>
-      </div>
-
-      ${saisiesLogHtml}
-    </div>
-    ${footerHtml}`;
-
-  // Graphique
-  setTimeout(()=>{
-    const ctx = document.getElementById('cuve-chart');
-    if(!ctx) return;
-    if(_chartInst) _chartInst.destroy();
-    const bx = getComputedStyle(document.documentElement).getPropertyValue('--bx').trim()||'#8B1A2E';
-    const valides = carbData.filter(v=>v!==null);
-    const trendTxt = valides.length<2?'Pas assez de données sur la période.':(()=>{
-      const delta=valides[valides.length-1]-valides[0];
-      return delta>=0?`Niveau stable ou en hausse (+${delta} pts sur 14j).`:`Baisse de ${Math.abs(delta)} pts — surveiller les pleins.`;
-    })();
-    document.getElementById('chart-insight').textContent = trendTxt;
-    _chartInst = new Chart(ctx.getContext('2d'),{
-      type:'line',
-      data:{labels:dates14.map(fmtDateShort),datasets:[{data:carbData,borderColor:bx,backgroundColor:bx+'15',borderWidth:1.5,tension:0.3,fill:true,spanGaps:true,pointRadius:3,pointBackgroundColor:bx}]},
-      options:{responsive:true,plugins:{legend:{display:false}},scales:{
-        x:{grid:{color:'#EDE3D4'},ticks:{color:'#7A6855',font:{size:10}}},
-        y:{grid:{color:'#EDE3D4'},ticks:{color:'#7A6855',font:{size:10},callback:v=>v+'%'},min:0,max:100}
-      }}
-    });
-  },80);
-
-  // Stocker pour resoudrePanne
-  window._hotelCtx = {client, groupes, saisies30, saisiesCuve30, pannesOuv, pannesRes, role, siteId, siteName, opts};
-}
-
-// ════════════════════════════════════════
-// VUE GROUPE — dir_ops / dir_tech multi-site
-// ════════════════════════════════════════
-async function renderGroupeView(client, sites, opsOnly=false) {
-  const now = new Date();
-  const today = now.toISOString().split('T')[0];
-  const debut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
-  const dateStr = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-
-  const [tousGroupes, toutesSaisies, toutesAlertes, toutesPannes, toutesCuves, toutesSaisiesCuve] = await Promise.all([
-    api('groupes', `&client_id=eq.${client.id}&actif=eq.true`),
-    api('saisies', `&client_id=eq.${client.id}&date=eq.${today}`),
-    api('alertes', `&client_id=eq.${client.id}&resolue=eq.false`),
-    api('pannes',  `&client_id=eq.${client.id}&resolue=eq.false`),
-    api('cuves',   `&client_id=eq.${client.id}&actif=eq.true`),
-    api('saisies_cuve', `&client_id=eq.${client.id}&date=gte.${debut30}&order=date.desc`),
-  ]);
-
-  const saisiesOk = toutesSaisies.filter(s=>s.heures_marche!=null).length;
-  const alertesDanger = toutesAlertes.filter(a=>a.severite==='danger').length;
-
-  // Site cards
-  const sitesHtml = sites.map((s)=>{
-    const sGroupes = tousGroupes.filter(g=>g.site_id===s.id);
-    const sSaisies = toutesSaisies.filter(x=>sGroupes.some(g=>g.id===x.groupe_id));
-    const sAlertes = toutesAlertes.filter(a=>sGroupes.some(g=>g.id===a.groupe_id)||a.site_id===s.id);
-    const sCuve = toutesCuves.find(c=>c.site_id===s.id)||null;
-    const sSaisieCuve = sCuve ? toutesSaisiesCuve.find(sc=>sc.cuve_id===sCuve.id) : null;
-    const pctCuve = sSaisieCuve && sCuve ? Math.round(sSaisieCuve.niveau_litres/sCuve.capacite_litres*100) : null;
-    const consoLh = sGroupes[0]?.conso_theorique_lh ? parseFloat(sGroupes[0].conso_theorique_lh) : 65;
-    const autoJ = sSaisieCuve ? autoJoursCalc(sSaisieCuve.niveau_litres, consoLh) : null;
-    const pannesS = toutesPannes.filter(p=>sGroupes.some(g=>g.id===p.groupe_id));
-    const tauxSaisies = sGroupes.length ? Math.round(sSaisies.length/sGroupes.length*100) : 0;
-    const pillClass = sAlertes.some(a=>a.severite==='danger')||pannesS.length ? 'pill-danger' : sAlertes.length||tauxSaisies<100 ? 'pill-warn' : 'pill-ok';
-    const pillTxt = sAlertes.some(a=>a.severite==='danger')||pannesS.length ? 'Action requise' : sAlertes.length ? 'Attention' : 'Normal';
-
-    return `<div class="site-card" id="site-card-${s.id}" onclick="toggleSiteDetail('${s.id}')">
-      <div class="sc-header">
-        <div>
-          <div class="sc-nom">🏨 ${s.nom}</div>
-          <div class="sc-sub">${s.ville||''} · ${sGroupes.length} groupe${sGroupes.length>1?'s':''}</div>
-        </div>
-        <span class="pill ${pillClass}">${pillTxt}</span>
-      </div>
-      <div class="sc-kpis">
-        <div class="sc-kpi">
-          <div class="sc-kpi-val" style="color:${tauxSaisies===100?'var(--vert)':tauxSaisies>0?'var(--orange)':'var(--rouge)'}">${sSaisies.length}/${sGroupes.length}</div>
-          <div class="sc-kpi-label">Saisies</div>
-        </div>
-        <div class="sc-kpi">
-          <div class="sc-kpi-val" style="color:${pctCuve!=null?carbColor(pctCuve):'var(--texte2)'}">${pctCuve!=null?pctCuve+'%':'—'}</div>
-          <div class="sc-kpi-label">Cuve</div>
-        </div>
-        <div class="sc-kpi">
-          <div class="sc-kpi-val" style="color:${autoJ!=null?autoColor(autoJ):'var(--texte2)'}">${autoJ!=null?autoJ+'j':'—'}</div>
-          <div class="sc-kpi-label">Autonomie</div>
-        </div>
-        <div class="sc-kpi">
-          <div class="sc-kpi-val" style="color:${pannesS.length?'var(--rouge)':'var(--vert)'}">${pannesS.length||'✓'}</div>
-          <div class="sc-kpi-label">Pannes</div>
-        </div>
-      </div>
-      <div class="sc-detail" id="sc-detail-${s.id}">
-        <div class="loading"><span class="spinner"></span>Chargement...</div>
-      </div>
-    </div>`;
-  }).join('');
-
-  document.getElementById('app').innerHTML = `
-    <div class="header">
-      <div class="header-top">
-        <div>
-          <div class="logo">${client.nom}</div>
-          <div class="logo-sub">${opsOnly?'Directeur des opérations':'Directeur technique'} · ${sites.length} sites</div>
-        </div>
-        <div class="header-right">
-          <div>
-            <div class="header-date">${dateStr}</div>
-            <div class="header-title">Vue consolidée</div>
-          </div>
-          <button class="pdf-btn" onclick="window.print()">↓ PDF</button>
-        </div>
-      </div>
-    </div>
-    <div class="container">
-      <div class="kpi-grid">
-        <div class="kpi">
-          <div class="kpi-label">Saisies aujourd'hui</div>
-          <div class="kpi-value" style="color:${saisiesOk===tousGroupes.length?'var(--vert)':saisiesOk>0?'var(--orange)':'var(--rouge)'}">${saisiesOk} / ${tousGroupes.length}</div>
-          <div class="kpi-trend">${sites.length} établissement${sites.length>1?'s':''}</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Alertes actives</div>
-          <div class="kpi-value" style="color:${alertesDanger>0?'var(--rouge)':toutesAlertes.length?'var(--orange)':'var(--vert)'}">${toutesAlertes.length||'✓'}</div>
-          <div class="kpi-trend ${alertesDanger?'danger':''}">${alertesDanger} critique${alertesDanger>1?'s':''}</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Pannes en cours</div>
-          <div class="kpi-value" style="color:${toutesPannes.length?'var(--rouge)':'var(--vert)'}">${toutesPannes.length||'✓'}</div>
-          <div class="kpi-trend ${toutesPannes.length?'danger':'ok'}">${toutesPannes.length?'intervention requise':'Tout est résolu'}</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Équipements</div>
-          <div class="kpi-value">${tousGroupes.length}</div>
-          <div class="kpi-trend">${sites.length} site${sites.length>1?'s':''}</div>
-        </div>
-      </div>
-      <div class="section-label">Établissements</div>
-      ${sitesHtml}
-    </div>
-    <div class="footer">Powered by <strong>GenTrack</strong> · ${client.nom}</div>`;
-
-  window._groupeData = {client, sites, tousGroupes, toutesSaisies, toutesAlertes, toutesPannes, toutesCuves, toutesSaisiesCuve, today, opsOnly};
-}
-
-// ── DIR_TECH multi-site avec nav (réutilise renderHotelView) ──
-async function renderMultiSiteView(client, sites) {
-  const dateStr = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  document.getElementById('app').innerHTML = `
-    <div class="header">
-      <div class="header-top">
-        <div>
-          <div class="logo">${client.nom}</div>
-          <div class="logo-sub">Directeur technique · ${sites.length} sites</div>
-        </div>
-        <div class="header-right">
-          <div><div class="header-date">${dateStr}</div><div class="header-title">Tableau de bord</div></div>
-          <button class="pdf-btn" onclick="window.print()">↓ PDF</button>
-        </div>
-      </div>
-      <div class="site-nav">${sites.map((s,i)=>`<div class="site-btn ${i===0?'active':''}" onclick="window._msShow(${i})">${s.nom}</div>`).join('')}</div>
-    </div>
-    <div id="ms-main"><div class="loading" style="padding:60px"><span class="spinner"></span>Chargement...</div></div>
-    <div class="footer">Powered by <strong>GenTrack</strong> · ${client.nom}</div>`;
-
-  window._msShow = async (idx) => {
-    document.querySelectorAll('.site-btn').forEach((b,i)=>b.classList.toggle('active',i===idx));
-    document.getElementById('ms-main').innerHTML='<div class="loading" style="padding:60px"><span class="spinner"></span>Chargement...</div>';
-    await renderHotelView(client, sites[idx].id, sites[idx].nom, {role:'resp_tech', inContainer:'ms-main'});
-  };
-  await renderHotelView(client, sites[0].id, sites[0].nom, {role:'resp_tech', inContainer:'ms-main'});
-}
-
-// ── DRILL-DOWN SITE (vue groupe) ──
-let _openSiteId = null;
-async function toggleSiteDetail(siteId) {
-  const el = document.getElementById(`sc-detail-${siteId}`);
-  if(!el) return;
-  if(_openSiteId===siteId && el.classList.contains('open')) {
-    el.classList.remove('open'); _openSiteId = null; return;
-  }
-  document.querySelectorAll('.sc-detail.open').forEach(d=>d.classList.remove('open'));
-  _openSiteId = siteId;
-  el.classList.add('open');
-
-  const d = window._groupeData;
-  if(!d) return;
-  const site = d.sites.find(s=>s.id===siteId);
-  const sGroupes = d.tousGroupes.filter(g=>g.site_id===siteId);
-  const sSaisies = d.toutesSaisies.filter(x=>sGroupes.some(g=>g.id===x.groupe_id));
-  const sAlertes = d.toutesAlertes.filter(a=>sGroupes.some(g=>g.id===a.groupe_id));
-  const sCuve = d.toutesCuves.find(c=>c.site_id===siteId)||null;
-  const sSaisieCuve = sCuve ? d.toutesSaisiesCuve.find(sc=>sc.cuve_id===sCuve.id) : null;
-  const consoLh = sGroupes[0]?.conso_theorique_lh ? parseFloat(sGroupes[0].conso_theorique_lh) : 65;
-  const niv = sSaisieCuve?.niveau_litres;
-  const cap = sCuve?.capacite_litres || 500;
-  const pctC = niv!=null ? Math.round(niv/cap*100) : null;
-  const autoJ = autoJoursCalc(niv, consoLh);
-
-  const groupesHtml = sGroupes.map(g=>{
-    const s = sSaisies.find(x=>x.groupe_id===g.id);
-    const rd = retardLabel(s?.date, d.today);
-    const pctV = g.heures_total&&g.seuil_vidange_heures ? Math.round(g.heures_total/g.seuil_vidange_heures*100) : null;
-    const pillC = !s?'pill-warn':rd.jours===0?'pill-ok':rd.jours===1?'pill-warn':'pill-danger';
-    return `<div style="border:1px solid var(--bordure);border-radius:6px;overflow:hidden;margin-bottom:8px;background:white">
-      <div style="padding:10px 12px;background:var(--surface2);border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:center">
-        <div><div style="font-size:13px;font-weight:600">⚙️ ${g.nom}</div><div style="font-size:11px;color:${rd.color}">${rd.label}</div></div>
-        <span class="pill ${pillC}">${!s?'Pas de saisie':rd.jours===0?'Saisi ✓':rd.jours===1?'Hier':'J-'+rd.jours}</span>
-      </div>
-      <div style="padding:10px 12px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px">
-        <span><span style="color:var(--texte2)">Compteur</span> <strong>${s?.heures_marche!=null?s.heures_marche+'h':'—'}</strong></span>
-        <span><span style="color:var(--texte2)">Vidange</span> <strong style="color:${pctV>=100?'var(--rouge)':pctV>=80?'var(--orange)':'var(--vert)'}">${pctV!=null?pctV+'%':'—'}</strong></span>
-        <span><span style="color:var(--texte2)">Huile</span> <strong style="color:${huileColor(s?.niveau_huile)}">${s?.niveau_huile||'—'}</strong></span>
-        <span><span style="color:var(--texte2)">Opérateur</span> <strong>${s?.operateur||'—'}</strong></span>
-      </div>
-    </div>`;
-  }).join('');
-
-  const alertesH = sAlertes.length ? sAlertes.map(a=>`<div class="alert-banner ${a.severite!=='danger'?'warn':''}" style="margin-bottom:8px"><div class="ab-icon">${a.severite==='danger'?'🔴':'🟡'}</div><div class="ab-body"><div class="ab-titre ${a.severite!=='danger'?'orange':''}">${a.message}</div></div></div>`).join('') : '';
-
-  const cuveResume = sCuve ? `<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;background:var(--or-pale);border:1px solid rgba(201,169,110,0.3);border-radius:6px;padding:10px 14px;margin-bottom:10px">
-    <span>🛢️ <strong>${fmtNum(cap)}L</strong></span>
-    ${pctC!=null?`<span>Niveau <strong style="color:${carbColor(pctC)}">${pctC}%</strong></span>`:''}
-    ${autoJ!=null?`<span>Autonomie <strong style="color:${autoColor(autoJ)}">${autoJ}j</strong></span>`:''}
-  </div>` : '';
-
-  el.innerHTML = `${alertesH}${cuveResume}${groupesHtml||'<div class="empty">Aucun groupe configuré</div>'}`;
-}
-
-// ── ACTIONS ──
-function toggleEquip(type) {
-  const card = document.getElementById('ec-'+type);
-  const drill = document.getElementById('drill-'+type);
-  if(!card||!drill) return;
-  card.classList.toggle('open');
-  drill.classList.toggle('show');
-}
-
-function toggleSaisies(btn) {
-  btn.classList.toggle('open');
-  document.getElementById('saisies-body').classList.toggle('show');
-}
-
-async function resoudrePanne(id, evt) {
-  evt && evt.stopPropagation();
-  if(!confirm('Marquer cette panne comme résolue ?')) return;
-  const res = await apiPatch('pannes', `id=eq.${id}`, {
-    resolue:true,
-    date_resolution:new Date().toISOString().split('T')[0],
-    resolu_via:'Dashboard client'
-  });
-  if(res.ok) { alert('✅ Panne résolue'); location.reload(); }
-  else { alert('Erreur lors de la résolution'); }
+  document.documentElement.style.setProperty('--bx-pale', 'rgba(' + r + ',' + g + ',' + b + ',0.07)');
+  document.documentElement.style.setProperty('--bx-mid', 'rgba(' + r + ',' + g + ',' + b + ',0.15)');
 }
 
 function showError(titre, msg) {
-  document.getElementById('app').innerHTML=`<div class="error-page"><div style="font-size:48px;margin-bottom:20px">🔒</div><h2>${titre}</h2><p>${msg}</p></div>`;
+  document.getElementById('app').innerHTML = '<div class="error-page"><div style="font-size:48px;margin-bottom:20px">&#128274;</div><h2>' + titre + '</h2><p>' + msg + '</p></div>';
+}
+
+// ── ROUTING ──
+function init() {
+  var params = new URLSearchParams(window.location.search);
+  var token = params.get('token');
+  var clientId = params.get('id');
+  if (token) { loadByToken(token); }
+  else if (clientId) { loadClientView(clientId, {}); }
+  else { showError('Lien invalide', 'Ce lien ne contient pas d\'identifiant valide.'); }
+}
+
+function loadByToken(token) {
+  api('tokens', '&token=eq.' + token + '&actif=eq.true').then(function(rows) {
+    if (!rows.length) { showError('Lien expiré', 'Ce lien d\'accès n\'est plus valide.'); return; }
+    var tok = rows[0];
+    if (tok.expire_at && new Date(tok.expire_at) < new Date()) { showError('Lien expiré', 'Ce lien a expiré.'); return; }
+    var role = tok.role || null;
+    var rawSiteIds = tok.site_ids || [];
+    var siteIds = typeof rawSiteIds === 'string' ? JSON.parse(rawSiteIds || '[]') : rawSiteIds;
+    if (role === 'dir_ops') {
+      loadClientView(tok.client_id, {role: 'dir_ops'});
+    } else if (role === 'dir_tech') {
+      loadClientView(tok.client_id, {role: 'dir_tech', siteIds: siteIds});
+    } else if (role === 'resp_tech') {
+      var sid = siteIds.length ? siteIds[0] : (tok.site_id || null);
+      loadSiteView(tok.client_id, sid, {role: 'resp_tech'});
+    } else if (role === 'tech' || role === 'technicien') {
+      var sid2 = siteIds.length ? siteIds[0] : (tok.site_id || null);
+      loadSiteView(tok.client_id, sid2, {role: 'technicien'});
+    } else if (tok.site_id) {
+      loadSiteView(tok.client_id, tok.site_id, {role: 'technicien'});
+    } else {
+      loadClientView(tok.client_id, {role: null});
+    }
+  });
+}
+
+function loadClientView(clientId, access) {
+  if (!access) access = {};
+  api('clients', '&id=eq.' + clientId).then(function(clients) {
+    if (!clients.length) { showError('Client introuvable', ''); return; }
+    var client = clients[0];
+    applyBrandColor(client.couleur_marque);
+    api('sites', '&client_id=eq.' + clientId + '&actif=eq.true&order=nom').then(function(sites) {
+      if (access.role === 'dir_tech' && access.siteIds && access.siteIds.length) {
+        sites = sites.filter(function(s) { return access.siteIds.indexOf(s.id) >= 0; });
+      }
+      if (sites.length > 1 && (access.role === 'dir_ops' || access.role === 'dir_tech')) {
+        renderGroupeView(client, sites, access.role === 'dir_ops');
+      } else {
+        var siteId = sites.length ? sites[0].id : null;
+        renderHotelView(client, siteId, null, {role: access.role || 'resp_tech'}, null);
+      }
+    });
+  });
+}
+
+function loadSiteView(clientId, siteId, access) {
+  if (!access) access = {};
+  api('clients', '&id=eq.' + clientId).then(function(clients) {
+    if (!clients.length) { showError('Client introuvable', ''); return; }
+    var client = clients[0];
+    applyBrandColor(client.couleur_marque);
+    renderHotelView(client, siteId, null, {role: access.role || 'technicien'}, null);
+  });
+}
+
+// ════════════════════════════════════════
+// VUE HOTEL
+// ════════════════════════════════════════
+function renderHotelView(client, siteId, siteName, opts, container) {
+  var role = opts.role || 'resp_tech';
+  var showFull = role !== 'technicien';
+  var rootEl = container ? document.getElementById(container) : document.getElementById('app');
+  if (!rootEl) return;
+  rootEl.innerHTML = '<div class="loading" style="padding:60px"><span class="spinner"></span>Chargement...</div>';
+
+  var now = new Date();
+  var today = now.toISOString().split('T')[0];
+  var debut30 = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+  var debutAnnee = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+
+  var groupeQ = '&client_id=eq.' + client.id + (siteId ? '&site_id=eq.' + siteId : '') + '&actif=eq.true&order=nom';
+  var saisiesQ = '&client_id=eq.' + client.id + '&date=gte.' + debut30 + '&order=date.desc,created_at.desc&limit=200';
+  var alertesQ = '&client_id=eq.' + client.id + '&resolue=eq.false';
+  var pannesOuvQ = '&client_id=eq.' + client.id + '&resolue=eq.false&order=date_panne.desc';
+  var pannesResQ = '&client_id=eq.' + client.id + '&resolue=eq.true&order=date_resolution.desc&limit=20';
+  var cuvesQ = '&client_id=eq.' + client.id + (siteId ? '&site_id=eq.' + siteId : '') + '&actif=eq.true';
+
+  Promise.all([
+    api('groupes', groupeQ),
+    api('saisies', saisiesQ),
+    api('alertes', alertesQ),
+    api('pannes', pannesOuvQ),
+    showFull ? api('pannes', pannesResQ) : Promise.resolve([]),
+    api('cuves', cuvesQ)
+  ]).then(function(results) {
+    var groupes = results[0];
+    var saisies30 = results[1];
+    var alertes = results[2];
+    var pannesOuv = results[3];
+    var pannesRes = results[4];
+    var cuves = results[5];
+
+    var dernSaisie = {};
+    saisies30.forEach(function(s) {
+      if (!dernSaisie[s.groupe_id]) dernSaisie[s.groupe_id] = s;
+    });
+    var saisiesJour = [];
+    for (var gid in dernSaisie) { saisiesJour.push(dernSaisie[gid]); }
+
+    var cuve = cuves.length ? cuves[0] : null;
+
+    var fetchCuve = cuve
+      ? api('saisies_cuve', '&cuve_id=eq.' + cuve.id + '&date=gte.' + debut30 + '&order=date.desc,created_at.desc')
+      : Promise.resolve([]);
+
+    var fetchCuveAnnee = cuve
+      ? api('saisies_cuve', '&cuve_id=eq.' + cuve.id + '&date=gte.' + debutAnnee)
+      : Promise.resolve([]);
+
+    Promise.all([fetchCuve, fetchCuveAnnee]).then(function(cuveResults) {
+      var saisiesCuve30 = cuveResults[0];
+      var saisiesCuveAnnee = cuveResults[1];
+
+      var saisieCuveJour = saisiesCuve30.length ? saisiesCuve30[0] : null;
+      var ravits = saisiesCuve30.filter(function(s) { return (s.litres_ajoutes || 0) > 0; });
+
+      var prixLitre = client.prix_litre_fcfa || 695;
+      var litres30 = ravits.reduce(function(a, s) { return a + (s.litres_ajoutes || 0); }, 0);
+      var coutCarb30 = Math.round(litres30 * prixLitre);
+
+      var coutMaint = 0;
+      if (showFull) {
+        pannesRes.filter(function(p) { return p.date_resolution >= debut30; }).forEach(function(p) {
+          coutMaint += (p.cout_reparation || 0);
+        });
+      }
+
+      var capCuve = cuve ? (cuve.capacite_litres || 500) : 500;
+      var niveauCuve = saisieCuveJour ? saisieCuveJour.niveau_litres : null;
+      var pctCuve = (niveauCuve != null) ? Math.round(niveauCuve / capCuve * 100) : null;
+      var consoLh = (groupes.length && groupes[0].conso_theorique_lh) ? parseFloat(groupes[0].conso_theorique_lh) : 65;
+      var autoJours = calcAutoJours(niveauCuve, consoLh);
+
+      var groupeMap = {};
+      groupes.forEach(function(g) { groupeMap[g.id] = g.nom; });
+
+      var panneLabels = {
+        ne_demarre_pas: 'Ne démarre pas',
+        arret_inopin: 'Arrêt inopiné',
+        bruit_anormal: 'Bruit anormal',
+        surchauffe: 'Surchauffe',
+        fuite: 'Fuite carburant',
+        autre: 'Autre'
+      };
+
+      var nom = siteName || client.nom;
+      var dateStr = now.toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+
+      // Saisies OK today
+      var saisiesOkCount = 0;
+      groupes.forEach(function(g) {
+        var s = saisiesJour.find ? saisiesJour.find(function(x) { return x.groupe_id === g.id; }) : null;
+        if (!s) { for (var i = 0; i < saisiesJour.length; i++) { if (saisiesJour[i].groupe_id === g.id) { s = saisiesJour[i]; break; } } }
+        if (s && retardLabel(s.date, today).jours === 0) saisiesOkCount++;
+      });
+
+      // Urgences
+      var urgences = [];
+      if (autoJours !== null && autoJours < 3) urgences.push('Autonomie cuve critique (' + autoJours + 'j)');
+      pannesOuv.forEach(function(p) { urgences.push('Panne : ' + (groupeMap[p.groupe_id] || 'équipement')); });
+      alertes.filter(function(a) { return a.severite === 'danger'; }).forEach(function(a) { urgences.push(a.message); });
+
+      var bannerHtml = '';
+      if (urgences.length) {
+        bannerHtml = '<div class="alert-banner"><div class="ab-body"><div class="ab-titre">' +
+          (urgences.length === 1 ? '1 action requise' : urgences.length + ' actions requises') +
+          '</div><div class="ab-sub">' + urgences.join(' · ') + '</div></div></div>';
+      }
+
+      // Equip cards
+      var equipHtml = buildEquipCards(groupes, saisiesJour, saisies30, pannesOuv, alertes, today);
+
+      // Cuve
+      var cuveHtml = buildCuveCard(cuve, saisieCuveJour, niveauCuve, pctCuve, capCuve, autoJours, consoLh, groupes, saisiesJour, today);
+
+      // Pannes
+      var pannesHtml = '';
+      if (showFull) {
+        pannesHtml = buildPannesSection(pannesOuv, pannesRes, groupes, groupeMap, panneLabels);
+      }
+
+      // Ravits
+      var ravitHtml = '';
+      if (showFull && ravits.length) {
+        ravitHtml = buildRavitsSection(ravits, litres30, coutCarb30, prixLitre);
+      }
+
+      // Saisies log
+      var saisiesLogHtml = buildSaisiesLog(saisies30, groupeMap);
+
+      // Chart data
+      var dates14 = [];
+      for (var di = 0; di < 14; di++) {
+        var dd = new Date();
+        dd.setDate(dd.getDate() - (13 - di));
+        dates14.push(dd.toISOString().split('T')[0]);
+      }
+      var carbData = dates14.map(function(d) {
+        var sc = null;
+        for (var i = 0; i < saisiesCuve30.length; i++) { if (saisiesCuve30[i].date === d) { sc = saisiesCuve30[i]; break; } }
+        return (sc && sc.niveau_litres != null) ? Math.round(sc.niveau_litres / capCuve * 100) : null;
+      });
+
+      // Header
+      var roleLabel = role === 'resp_tech' ? 'Responsable technique' : role === 'technicien' ? 'Technicien' : 'Dashboard';
+      var headerHtml = container ? '' :
+        '<div class="header"><div class="header-top"><div>' +
+        '<div class="logo">' + nom + '</div>' +
+        '<div class="logo-sub">' + roleLabel + '</div>' +
+        '</div><div class="header-right"><div>' +
+        '<div class="header-date">' + dateStr + '</div>' +
+        '<div class="header-title">Tableau de bord</div>' +
+        '</div><button class="pdf-btn" onclick="window.print()">&#8595; PDF</button></div></div></div>';
+
+      var footerHtml = container ? '' : '<div class="footer">Powered by <strong>GenTrack</strong> · ' + nom + '</div>';
+
+      var kpiSaisieColor = saisiesOkCount === groupes.length ? 'var(--vert)' : saisiesOkCount > 0 ? 'var(--orange)' : 'var(--rouge)';
+      var kpiAutoColor = autoJours != null ? autoColor(autoJours) : 'var(--texte2)';
+      var kpiPanneColor = pannesOuv.length ? 'var(--rouge)' : 'var(--vert)';
+      var pannesResLabel = showFull ? (pannesRes.length + ' résolue' + (pannesRes.length > 1 ? 's' : '') + ' · ' + fmtNum(coutMaint) + ' F') : (pannesOuv.length ? 'action requise' : 'OK');
+      var kpiAutoTrend = pctCuve != null ? (pctCuve + '% · ' + fmtNum(niveauCuve || 0) + 'L') : 'Pas de relevé';
+
+      rootEl.innerHTML = headerHtml +
+        '<div class="container">' +
+        bannerHtml +
+        '<div class="kpi-grid">' +
+          '<div class="kpi"><div class="kpi-label">Saisies aujourd\'hui</div>' +
+            '<div class="kpi-value" style="color:' + kpiSaisieColor + '">' + saisiesOkCount + ' / ' + groupes.length + '</div>' +
+            '<div class="kpi-trend">' + groupes.length + ' groupe' + (groupes.length > 1 ? 's' : '') + '</div></div>' +
+          '<div class="kpi"><div class="kpi-label">Carburant — 30j</div>' +
+            '<div class="kpi-value">' + (coutCarb30 > 0 ? fmtNum(coutCarb30) : '—') + '</div>' +
+            '<div class="kpi-trend">' + (litres30 > 0 ? 'FCFA · ' + fmtNum(litres30) + 'L' : 'Aucun ravitaillement') + '</div></div>' +
+          '<div class="kpi"><div class="kpi-label">Autonomie cuve</div>' +
+            '<div class="kpi-value" style="color:' + kpiAutoColor + '">' + (autoJours != null ? autoJours + 'j' : '—') + '</div>' +
+            '<div class="kpi-trend">' + kpiAutoTrend + '</div></div>' +
+          '<div class="kpi"><div class="kpi-label">Pannes en cours</div>' +
+            '<div class="kpi-value" style="color:' + kpiPanneColor + '">' + (pannesOuv.length || '&#10003;') + '</div>' +
+            '<div class="kpi-trend">' + pannesResLabel + '</div></div>' +
+        '</div>' +
+        '<div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline">' +
+          '<div class="section-title">Equipements</div>' +
+          '<div style="font-size:11px;color:var(--texte2)">' + groupes.length + ' unité' + (groupes.length > 1 ? 's' : '') + '</div>' +
+        '</div>' +
+        '<div class="equip-grid">' + (equipHtml || '<div class="empty">Aucun groupe configuré</div>') + '</div>' +
+        cuveHtml +
+        pannesHtml +
+        ravitHtml +
+        '<div class="chart-card"><div class="chart-hdr"><div class="chart-hdr-title">Evolution cuve — 14 jours</div>' +
+          '<div style="font-size:11px;color:var(--texte2)">' + (cuve ? 'Cuve ' + fmtNum(capCuve) + 'L' : '') + '</div></div>' +
+          '<div class="chart-body"><canvas id="cuve-chart" height="120"></canvas>' +
+          '<div class="chart-insight" id="chart-insight"></div></div></div>' +
+        saisiesLogHtml +
+        '</div>' + footerHtml;
+
+      // Chart
+      setTimeout(function() {
+        var ctx = document.getElementById('cuve-chart');
+        if (!ctx) return;
+        if (_chartInst) _chartInst.destroy();
+        var bx = getComputedStyle(document.documentElement).getPropertyValue('--bx').trim() || '#8B1A2E';
+        var valides = carbData.filter(function(v) { return v !== null; });
+        var trendTxt = 'Pas assez de données.';
+        if (valides.length >= 2) {
+          var delta = valides[valides.length - 1] - valides[0];
+          trendTxt = delta >= 0 ? 'Niveau stable ou en hausse (+' + delta + ' pts).' : 'Baisse de ' + Math.abs(delta) + ' pts — surveiller les pleins.';
+        }
+        var insightEl = document.getElementById('chart-insight');
+        if (insightEl) insightEl.textContent = trendTxt;
+        _chartInst = new Chart(ctx.getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: dates14.map(fmtDateShort),
+            datasets: [{data: carbData, borderColor: bx, backgroundColor: bx + '15', borderWidth: 1.5, tension: 0.3, fill: true, spanGaps: true, pointRadius: 3, pointBackgroundColor: bx}]
+          },
+          options: {
+            responsive: true, plugins: {legend: {display: false}},
+            scales: {
+              x: {grid: {color: '#EDE3D4'}, ticks: {color: '#7A6855', font: {size: 10}}},
+              y: {grid: {color: '#EDE3D4'}, ticks: {color: '#7A6855', font: {size: 10}, callback: function(v) { return v + '%'; }}, min: 0, max: 100}
+            }
+          }
+        });
+      }, 80);
+
+      window._hotelCtx = {client: client, groupes: groupes, role: role, siteId: siteId, siteName: siteName, opts: opts, container: container};
+    });
+  });
+}
+
+// ── BUILD HELPERS ──
+function buildEquipCards(groupes, saisiesJour, saisies30, pannesOuv, alertes, today) {
+  if (!groupes.length) return '';
+  var pannesCount = pannesOuv.filter(function(p) {
+    return groupes.some(function(g) { return g.id === p.groupe_id; });
+  }).length;
+  var anomaliesDanger = alertes.filter(function(a) {
+    return a.severite === 'danger' && groupes.some(function(g) { return g.id === a.groupe_id; });
+  }).length;
+  var statusBadge = (pannesCount || anomaliesDanger) ?
+    '<span class="pill pill-danger">Anomalie</span>' :
+    '<span class="pill pill-ok">Normal</span>';
+
+  var saisiesOkCount = 0;
+  groupes.forEach(function(g) {
+    var s = null;
+    for (var i = 0; i < saisiesJour.length; i++) { if (saisiesJour[i].groupe_id === g.id) { s = saisiesJour[i]; break; } }
+    if (s && retardLabel(s.date, today).jours === 0) saisiesOkCount++;
+  });
+
+  var consoMoy = 0;
+  groupes.forEach(function(g) { consoMoy += parseFloat(g.conso_theorique_lh || 0); });
+  consoMoy = Math.round(consoMoy / groupes.length);
+
+  var drillRows = '';
+  groupes.forEach(function(g) {
+    var s = null;
+    for (var i = 0; i < saisiesJour.length; i++) { if (saisiesJour[i].groupe_id === g.id) { s = saisiesJour[i]; break; } }
+    var rd = retardLabel(s ? s.date : null, today);
+    var pctV = (g.heures_total && g.seuil_vidange_heures) ? Math.round(g.heures_total / g.seuil_vidange_heures * 100) : null;
+    var compteur = (s && s.heures_marche != null) ? ' · Compteur ' + s.heures_marche + 'h' : '';
+    var vidTxt = (pctV != null && pctV >= 100) ? ' — Vidange requise' : (pctV != null && pctV >= 80) ? ' — Vidange bientôt' : '';
+    var huileTxt = (s && s.niveau_huile === 'critique') ? ' — Huile critique' : (s && s.niveau_huile === 'bas') ? ' — Huile basse' : '';
+    var saisiesG = saisies30.filter(function(x) { return x.groupe_id === g.id; }).slice(0, 7);
+    var bars = '';
+    for (var bi = 0; bi < saisiesG.length; bi++) {
+      var h = Math.min(22, 8 + bi * 2);
+      bars += '<div class="mini-bar" style="height:' + h + 'px"></div>';
+    }
+    drillRows += '<div class="drill-row">' +
+      '<div><div class="drill-name">' + g.nom + ' — ' + (g.marque || '') + ' ' + (g.puissance_kva || '') + 'kVA</div>' +
+      '<div class="drill-meta" style="color:' + rd.color + '">' + rd.label + compteur + vidTxt + huileTxt + '</div></div>' +
+      '<div class="mini-bars">' + bars + '</div></div>';
+  });
+
+  return '<div class="equip-card open" id="ec-ge" onclick="toggleEquip(\'ge\')">' +
+    '<div class="equip-card-header">' +
+      '<div class="equip-icon">&#9889;</div>' +
+      '<div><div class="equip-name">Groupes électrogènes</div><div class="equip-count">' + groupes.length + ' unité' + (groupes.length > 1 ? 's' : '') + '</div></div>' +
+      '<div class="equip-chev">&#9660;</div>' +
+    '</div>' +
+    '<div class="equip-body">' +
+      '<div class="equip-stat"><span class="equip-stat-label">Conso théorique moy.</span><span class="equip-stat-val">' + consoMoy + ' L/h</span></div>' +
+      '<div class="equip-stat"><span class="equip-stat-label">Saisies aujourd\'hui</span><span class="equip-stat-val" style="color:' + (saisiesOkCount === groupes.length ? 'var(--vert)' : 'var(--orange)') + '">' + saisiesOkCount + ' / ' + groupes.length + '</span></div>' +
+      '<div class="equip-stat"><span class="equip-stat-label">Statut</span><span>' + statusBadge + '</span></div>' +
+    '</div>' +
+    '<div class="drill open" id="drill-ge">' + drillRows + '</div>' +
+  '</div>';
+}
+
+function buildCuveCard(cuve, saisieCuveJour, niveauCuve, pctCuve, capCuve, autoJours, consoLh, groupes, saisiesJour, today) {
+  if (!cuve) return '';
+  var barColor = pctCuve != null ? (pctCuve < 25 ? 'var(--rouge)' : pctCuve < 50 ? 'var(--orange)' : 'var(--or)') : 'var(--or)';
+  var autoStr = autoJours != null ? autoJours + 'j' : '—';
+  var autoC = autoJours != null ? autoColor(autoJours) : 'var(--texte2)';
+  var rd = retardLabel(saisieCuveJour ? saisieCuveJour.date : null, today);
+  var barHtml = pctCuve != null ?
+    '<div class="cuve-bar"><div class="cuve-bar-fill" style="width:' + pctCuve + '%;background:' + barColor + '"></div></div>' : '';
+
+  var chips = '';
+  groupes.forEach(function(g, idx) {
+    var s = null;
+    for (var i = 0; i < saisiesJour.length; i++) { if (saisiesJour[i].groupe_id === g.id) { s = saisiesJour[i]; break; } }
+    var actif = s && s.demarre === true;
+    chips += '<span class="ge-chip' + (actif ? ' actif' : '') + '">' + (actif ? '&#9679; ' : '') + g.nom + ' — ' + (actif ? 'actif' : 'standby') + '</span>';
+  });
+
+  var note = groupes.length > 1 ?
+    '<div class="cuve-note">En alternance : le second groupe démarre si la charge dépasse le premier. Autonomie calculée sur ' + consoLh + ' L/h x 8h/j.</div>' : '';
+
+  var cuveNom = cuve.nom ? ' — ' + cuve.nom : '';
+  var niveauTxt = niveauCuve != null ? fmtNum(niveauCuve) + 'L' : '—';
+  var pctTxt = pctCuve != null ? pctCuve + '%' : '—';
+  var dateTxt = saisieCuveJour ? fmtDate(saisieCuveJour.date) : '';
+
+  return '<div class="cuve-card">' +
+    '<div class="cuve-header">' +
+      '<div><div class="cuve-title">&#128738; Cuve commune' + cuveNom + '</div>' +
+      '<div class="cuve-sub">Capacité ' + fmtNum(capCuve) + ' L · ' + rd.label + '</div></div>' +
+      '<div><div class="auto-val" style="color:' + autoC + '">' + autoStr + '</div>' +
+      '<div class="auto-unit">autonomie estimée</div></div>' +
+    '</div>' +
+    barHtml +
+    '<div class="cuve-meta">' +
+      '<span><strong>' + niveauTxt + '</strong> niveau actuel</span>' +
+      '<span><strong>' + pctTxt + '</strong> du réservoir</span>' +
+      '<span><strong>' + consoLh + ' L/h</strong> conso théorique</span>' +
+      (dateTxt ? '<span><strong>' + dateTxt + '</strong> dernier relevé</span>' : '') +
+    '</div>' +
+    '<div class="ge-chips">' + chips + '</div>' +
+    note +
+  '</div>';
+}
+
+function buildPannesSection(pannesOuv, pannesRes, groupes, groupeMap, panneLabels) {
+  var groupeIds = {};
+  groupes.forEach(function(g) { groupeIds[g.id] = true; });
+  var panneFiltrees = pannesOuv.filter(function(p) { return groupeIds[p.groupe_id]; });
+  var resolusFiltres = pannesRes.filter(function(p) { return groupeIds[p.groupe_id]; });
+
+  var ouvertesHtml = '';
+  if (panneFiltrees.length) {
+    panneFiltrees.forEach(function(p) {
+      var gNom = groupeMap[p.groupe_id] || 'Equipement';
+      var pbLabel = p.description || panneLabels[p.type] || p.type || 'Panne';
+      var coutTxt = p.cout_reparation ? fmtNum(p.cout_reparation) + ' FCFA estimé' : 'Coût non défini';
+      ouvertesHtml += '<div class="panne-open">' +
+        '<div class="panne-hdr"><span class="pill pill-danger">' + gNom + '</span>' +
+        '<div class="panne-nom">' + pbLabel + '</div>' +
+        '<div class="panne-dt">' + fmtDate(p.date_panne) + '</div></div>' +
+        '<div class="panne-ftr"><span class="panne-cout">' + coutTxt + '</span>' +
+        '<button class="resolve-btn" onclick="resoudrePanne(\'' + p.id + '\',event)">&#10003; Marquer résolu</button></div>' +
+      '</div>';
+    });
+  } else {
+    ouvertesHtml = '<div class="empty" style="background:white;border:1px solid var(--bordure);border-radius:6px;margin-bottom:8px">Aucune panne en cours &#10003;</div>';
+  }
+
+  var historHtml = '';
+  if (resolusFiltres.length) {
+    var rows = '';
+    resolusFiltres.forEach(function(p) {
+      rows += '<tr><td>' + fmtDate(p.date_resolution || p.date_panne) + '</td>' +
+        '<td>' + (groupeMap[p.groupe_id] || '—') + '</td>' +
+        '<td>' + (p.description || panneLabels[p.type] || p.type || '—') + '</td>' +
+        '<td>' + (p.intervenant || '—') + '</td>' +
+        '<td><strong>' + (p.cout_reparation ? fmtNum(p.cout_reparation) + ' F' : '—') + '</strong></td></tr>';
+    });
+    historHtml = '<div class="table-card"><div class="table-hdr">' +
+      '<div class="table-hdr-title">Historique résolu</div>' +
+      '<div class="table-hdr-sub">' + resolusFiltres.length + ' panne' + (resolusFiltres.length > 1 ? 's' : '') + '</div></div>' +
+      '<table class="data"><thead><tr><th>Résolu le</th><th>Equipement</th><th>Problème</th><th>Intervenant</th><th>Coût</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div>';
+  }
+
+  return '<div class="pannes-section">' +
+    '<div class="section-title">Pannes &amp; maintenance</div>' +
+    '<div class="section-sub">En cours (' + panneFiltrees.length + ')</div>' +
+    ouvertesHtml + historHtml + '</div>';
+}
+
+function buildRavitsSection(ravits, litres30, coutCarb30, prixLitre) {
+  var rows = '';
+  ravits.forEach(function(s) {
+    rows += '<tr><td>' + fmtDate(s.date) + '</td>' +
+      '<td><strong>+' + fmtNum(s.litres_ajoutes) + ' L</strong></td>' +
+      '<td>' + fmtNum(Math.round(s.litres_ajoutes * prixLitre)) + ' FCFA</td>' +
+      '<td>' + (s.operateur || '—') + '</td></tr>';
+  });
+  return '<div class="table-card" style="margin-bottom:24px">' +
+    '<div class="table-hdr"><div class="table-hdr-title">&#9981; Ravitaillements — 30 jours</div>' +
+    '<div class="table-hdr-sub">' + fmtNum(litres30) + ' L · ' + fmtNum(coutCarb30) + ' FCFA</div></div>' +
+    '<table class="data"><thead><tr><th>Date</th><th>Litres ajoutés</th><th>Coût estimé</th><th>Opérateur</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div>';
+}
+
+function buildSaisiesLog(saisies30, groupeMap) {
+  var saisies = saisies30.slice().sort(function(a, b) {
+    var ka = a.date + (a.created_at || '').slice(11);
+    var kb = b.date + (b.created_at || '').slice(11);
+    return kb.localeCompare(ka);
+  }).slice(0, 50);
+  if (!saisies.length) return '';
+  var rows = '';
+  saisies.forEach(function(s) {
+    rows += '<tr><td>' + fmtDate(s.date) + '</td>' +
+      '<td style="color:var(--texte2)">' + (fmtHeure(s.created_at) || '—') + '</td>' +
+      '<td>' + (groupeMap[s.groupe_id] || '—') + '</td>' +
+      '<td>' + (s.heures_marche != null ? s.heures_marche + 'h' : '—') + '</td>' +
+      '<td style="color:' + huileColor(s.niveau_huile) + '">' + (s.niveau_huile || '—') + '</td>' +
+      '<td>' + (s.operateur || '—') + '</td></tr>';
+  });
+  return '<button class="saisies-toggle" onclick="toggleSaisies(this)">' +
+    '<span>Journal des saisies (' + saisies.length + ' entrées)</span>' +
+    '<span>&#9660;</span></button>' +
+    '<div class="saisies-body" id="saisies-body">' +
+      '<div class="table-card" style="margin-top:6px">' +
+        '<table class="data"><thead><tr><th>Date</th><th>Heure</th><th>Groupe</th><th>Compteur</th><th>Huile</th><th>Opérateur</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody></table></div></div>';
+}
+
+// ════════════════════════════════════════
+// VUE GROUPE (dir_ops / dir_tech consolide)
+// ════════════════════════════════════════
+function renderGroupeView(client, sites, opsOnly) {
+  var now = new Date();
+  var today = now.toISOString().split('T')[0];
+  var debut30 = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+  var dateStr = now.toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+
+  Promise.all([
+    api('groupes', '&client_id=eq.' + client.id + '&actif=eq.true'),
+    api('saisies', '&client_id=eq.' + client.id + '&date=eq.' + today),
+    api('alertes', '&client_id=eq.' + client.id + '&resolue=eq.false'),
+    api('pannes',  '&client_id=eq.' + client.id + '&resolue=eq.false'),
+    api('cuves',   '&client_id=eq.' + client.id + '&actif=eq.true'),
+    api('saisies_cuve', '&client_id=eq.' + client.id + '&date=gte.' + debut30 + '&order=date.desc')
+  ]).then(function(results) {
+    var tousGroupes = results[0];
+    var toutesSaisies = results[1];
+    var toutesAlertes = results[2];
+    var toutesPannes = results[3];
+    var toutesCuves = results[4];
+    var toutesSaisiesCuve = results[5];
+
+    var saisiesOk = toutesSaisies.filter(function(s) { return s.heures_marche != null; }).length;
+    var alertesDanger = toutesAlertes.filter(function(a) { return a.severite === 'danger'; }).length;
+
+    var sitesHtml = '';
+    sites.forEach(function(s) {
+      var sGroupes = tousGroupes.filter(function(g) { return g.site_id === s.id; });
+      var sSaisies = toutesSaisies.filter(function(x) { return sGroupes.some(function(g) { return g.id === x.groupe_id; }); });
+      var sAlertes = toutesAlertes.filter(function(a) { return sGroupes.some(function(g) { return g.id === a.groupe_id; }) || a.site_id === s.id; });
+      var sCuve = null;
+      for (var ci = 0; ci < toutesCuves.length; ci++) { if (toutesCuves[ci].site_id === s.id) { sCuve = toutesCuves[ci]; break; } }
+      var sSaisieCuve = null;
+      if (sCuve) { for (var sci = 0; sci < toutesSaisiesCuve.length; sci++) { if (toutesSaisiesCuve[sci].cuve_id === sCuve.id) { sSaisieCuve = toutesSaisiesCuve[sci]; break; } } }
+      var pctCuve = (sSaisieCuve && sCuve) ? Math.round(sSaisieCuve.niveau_litres / sCuve.capacite_litres * 100) : null;
+      var cLh = (sGroupes.length && sGroupes[0].conso_theorique_lh) ? parseFloat(sGroupes[0].conso_theorique_lh) : 65;
+      var autoJ = sSaisieCuve ? calcAutoJours(sSaisieCuve.niveau_litres, cLh) : null;
+      var pannesS = toutesPannes.filter(function(p) { return sGroupes.some(function(g) { return g.id === p.groupe_id; }); });
+      var tauxSaisies = sGroupes.length ? Math.round(sSaisies.length / sGroupes.length * 100) : 0;
+      var pillClass = (sAlertes.some(function(a) { return a.severite === 'danger'; }) || pannesS.length) ? 'pill-danger' : (sAlertes.length || tauxSaisies < 100) ? 'pill-warn' : 'pill-ok';
+      var pillTxt = (sAlertes.some(function(a) { return a.severite === 'danger'; }) || pannesS.length) ? 'Action requise' : sAlertes.length ? 'Attention' : 'Normal';
+      var saisieColor = tauxSaisies === 100 ? 'var(--vert)' : tauxSaisies > 0 ? 'var(--orange)' : 'var(--rouge)';
+      var pctCuveColor = pctCuve != null ? carbColor(pctCuve) : 'var(--texte2)';
+      var autoColor2 = autoJ != null ? autoColor(autoJ) : 'var(--texte2)';
+      var panneSColor = pannesS.length ? 'var(--rouge)' : 'var(--vert)';
+
+      sitesHtml += '<div class="site-card" id="site-card-' + s.id + '" onclick="toggleSiteDetail(\'' + s.id + '\')">' +
+        '<div class="sc-hdr"><div><div class="sc-nom">&#127968; ' + s.nom + '</div>' +
+        '<div class="sc-sub">' + (s.ville || '') + ' · ' + sGroupes.length + ' groupe' + (sGroupes.length > 1 ? 's' : '') + '</div></div>' +
+        '<span class="pill ' + pillClass + '">' + pillTxt + '</span></div>' +
+        '<div class="sc-kpis">' +
+          '<div class="sc-kpi"><div class="sc-kpi-val" style="color:' + saisieColor + '">' + sSaisies.length + '/' + sGroupes.length + '</div><div class="sc-kpi-label">Saisies</div></div>' +
+          '<div class="sc-kpi"><div class="sc-kpi-val" style="color:' + pctCuveColor + '">' + (pctCuve != null ? pctCuve + '%' : '—') + '</div><div class="sc-kpi-label">Cuve</div></div>' +
+          '<div class="sc-kpi"><div class="sc-kpi-val" style="color:' + autoColor2 + '">' + (autoJ != null ? autoJ + 'j' : '—') + '</div><div class="sc-kpi-label">Autonomie</div></div>' +
+          '<div class="sc-kpi"><div class="sc-kpi-val" style="color:' + panneSColor + '">' + (pannesS.length || '&#10003;') + '</div><div class="sc-kpi-label">Pannes</div></div>' +
+        '</div>' +
+        '<div class="sc-detail" id="sc-detail-' + s.id + '"><div class="loading"><span class="spinner"></span>Chargement...</div></div>' +
+      '</div>';
+    });
+
+    var kpiAlerteColor = alertesDanger > 0 ? 'var(--rouge)' : toutesAlertes.length ? 'var(--orange)' : 'var(--vert)';
+    var kpiPanneColor2 = toutesPannes.length ? 'var(--rouge)' : 'var(--vert)';
+    var kpiSaisieColor2 = saisiesOk === tousGroupes.length ? 'var(--vert)' : saisiesOk > 0 ? 'var(--orange)' : 'var(--rouge)';
+    var subtitleLabel = opsOnly ? 'Directeur des opérations' : 'Directeur technique';
+
+    document.getElementById('app').innerHTML =
+      '<div class="header"><div class="header-top"><div>' +
+        '<div class="logo">' + client.nom + '</div>' +
+        '<div class="logo-sub">' + subtitleLabel + ' · ' + sites.length + ' sites</div>' +
+      '</div><div class="header-right"><div>' +
+        '<div class="header-date">' + dateStr + '</div>' +
+        '<div class="header-title">Vue consolidée</div>' +
+      '</div><button class="pdf-btn" onclick="window.print()">&#8595; PDF</button></div></div></div>' +
+      '<div class="container">' +
+      '<div class="kpi-grid">' +
+        '<div class="kpi"><div class="kpi-label">Saisies aujourd\'hui</div><div class="kpi-value" style="color:' + kpiSaisieColor2 + '">' + saisiesOk + ' / ' + tousGroupes.length + '</div><div class="kpi-trend">' + sites.length + ' établissement' + (sites.length > 1 ? 's' : '') + '</div></div>' +
+        '<div class="kpi"><div class="kpi-label">Alertes actives</div><div class="kpi-value" style="color:' + kpiAlerteColor + '">' + (toutesAlertes.length || '&#10003;') + '</div><div class="kpi-trend">' + alertesDanger + ' critique' + (alertesDanger > 1 ? 's' : '') + '</div></div>' +
+        '<div class="kpi"><div class="kpi-label">Pannes en cours</div><div class="kpi-value" style="color:' + kpiPanneColor2 + '">' + (toutesPannes.length || '&#10003;') + '</div><div class="kpi-trend">' + (toutesPannes.length ? 'intervention requise' : 'Tout est résolu') + '</div></div>' +
+        '<div class="kpi"><div class="kpi-label">Equipements</div><div class="kpi-value">' + tousGroupes.length + '</div><div class="kpi-trend">' + sites.length + ' site' + (sites.length > 1 ? 's' : '') + '</div></div>' +
+      '</div>' +
+      '<div class="section-label">Etablissements</div>' +
+      sitesHtml +
+      '</div>' +
+      '<div class="footer">Powered by <strong>GenTrack</strong> · ' + client.nom + '</div>';
+
+    window._groupeData = {client: client, sites: sites, tousGroupes: tousGroupes, toutesSaisies: toutesSaisies, toutesAlertes: toutesAlertes, toutesPannes: toutesPannes, toutesCuves: toutesCuves, toutesSaisiesCuve: toutesSaisiesCuve, today: today, opsOnly: opsOnly};
+  });
+}
+
+// ── TOGGLES ──
+function toggleEquip(type) {
+  var card = document.getElementById('ec-' + type);
+  var drill = document.getElementById('drill-' + type);
+  if (!card || !drill) return;
+  var isOpen = drill.classList.contains('open');
+  card.classList.toggle('open', !isOpen);
+  drill.classList.toggle('open', !isOpen);
+}
+
+function toggleSaisies(btn) {
+  var body = document.getElementById('saisies-body');
+  if (body) body.classList.toggle('open');
+}
+
+// ── DRILL-DOWN SITE ──
+var _openSiteId = null;
+function toggleSiteDetail(siteId) {
+  var el = document.getElementById('sc-detail-' + siteId);
+  if (!el) return;
+  if (_openSiteId === siteId && el.classList.contains('open')) {
+    el.classList.remove('open'); _openSiteId = null; return;
+  }
+  document.querySelectorAll('.sc-detail.open').forEach(function(d) { d.classList.remove('open'); });
+  _openSiteId = siteId;
+  el.classList.add('open');
+
+  var d = window._groupeData;
+  if (!d) return;
+  var site = null;
+  for (var i = 0; i < d.sites.length; i++) { if (d.sites[i].id === siteId) { site = d.sites[i]; break; } }
+  var sGroupes = d.tousGroupes.filter(function(g) { return g.site_id === siteId; });
+  var sSaisies = d.toutesSaisies.filter(function(x) { return sGroupes.some(function(g) { return g.id === x.groupe_id; }); });
+  var sCuve = null;
+  for (var ci = 0; ci < d.toutesCuves.length; ci++) { if (d.toutesCuves[ci].site_id === siteId) { sCuve = d.toutesCuves[ci]; break; } }
+  var sSaisieCuve = null;
+  if (sCuve) { for (var sci = 0; sci < d.toutesSaisiesCuve.length; sci++) { if (d.toutesSaisiesCuve[sci].cuve_id === sCuve.id) { sSaisieCuve = d.toutesSaisiesCuve[sci]; break; } } }
+
+  var cLh = (sGroupes.length && sGroupes[0].conso_theorique_lh) ? parseFloat(sGroupes[0].conso_theorique_lh) : 65;
+  var niv = sSaisieCuve ? sSaisieCuve.niveau_litres : null;
+  var cap = sCuve ? (sCuve.capacite_litres || 500) : 500;
+  var pctC = niv != null ? Math.round(niv / cap * 100) : null;
+  var autoJ = calcAutoJours(niv, cLh);
+
+  var cuveResume = '';
+  if (sCuve) {
+    cuveResume = '<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;background:var(--or-pale);border:1px solid rgba(201,169,110,0.3);border-radius:6px;padding:10px 14px;margin-bottom:10px">' +
+      '<span>&#128738; <strong>' + fmtNum(cap) + 'L</strong></span>' +
+      (pctC != null ? '<span>Niveau <strong style="color:' + carbColor(pctC) + '">' + pctC + '%</strong></span>' : '') +
+      (autoJ != null ? '<span>Autonomie <strong style="color:' + autoColor(autoJ) + '">' + autoJ + 'j</strong></span>' : '') +
+      '</div>';
+  }
+
+  var groupesHtml = '';
+  sGroupes.forEach(function(g) {
+    var s = null;
+    for (var i = 0; i < sSaisies.length; i++) { if (sSaisies[i].groupe_id === g.id) { s = sSaisies[i]; break; } }
+    var rd = retardLabel(s ? s.date : null, d.today);
+    var pctV = (g.heures_total && g.seuil_vidange_heures) ? Math.round(g.heures_total / g.seuil_vidange_heures * 100) : null;
+    var pillC = !s ? 'pill-warn' : rd.jours === 0 ? 'pill-ok' : rd.jours === 1 ? 'pill-warn' : 'pill-danger';
+    var pillTxt2 = !s ? 'Pas de saisie' : rd.jours === 0 ? 'Saisi &#10003;' : rd.jours === 1 ? 'Hier' : 'J-' + rd.jours;
+    var vColor = (pctV != null && pctV >= 100) ? 'var(--rouge)' : (pctV != null && pctV >= 80) ? 'var(--orange)' : 'var(--vert)';
+    groupesHtml += '<div style="border:1px solid var(--bordure);border-radius:6px;overflow:hidden;margin-bottom:8px;background:white">' +
+      '<div style="padding:10px 12px;background:var(--surface2);border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:center">' +
+        '<div><div style="font-size:13px;font-weight:600">&#9881; ' + g.nom + '</div>' +
+        '<div style="font-size:11px;color:' + rd.color + '">' + rd.label + '</div></div>' +
+        '<span class="pill ' + pillC + '">' + pillTxt2 + '</span>' +
+      '</div>' +
+      '<div style="padding:10px 12px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px">' +
+        '<span><span style="color:var(--texte2)">Compteur</span> <strong>' + (s && s.heures_marche != null ? s.heures_marche + 'h' : '—') + '</strong></span>' +
+        '<span><span style="color:var(--texte2)">Vidange</span> <strong style="color:' + vColor + '">' + (pctV != null ? pctV + '%' : '—') + '</strong></span>' +
+        '<span><span style="color:var(--texte2)">Huile</span> <strong style="color:' + huileColor(s ? s.niveau_huile : null) + '">' + (s && s.niveau_huile ? s.niveau_huile : '—') + '</strong></span>' +
+        '<span><span style="color:var(--texte2)">Opérateur</span> <strong>' + (s && s.operateur ? s.operateur : '—') + '</strong></span>' +
+      '</div></div>';
+  });
+
+  el.innerHTML = cuveResume + (groupesHtml || '<div class="empty">Aucun groupe configuré</div>');
+}
+
+// ── RESOUDRE PANNE ──
+function resoudrePanne(id, evt) {
+  if (evt) evt.stopPropagation();
+  if (!confirm('Marquer cette panne comme résolue ?')) return;
+  apiPatch('pannes', 'id=eq.' + id, {
+    resolue: true,
+    date_resolution: new Date().toISOString().split('T')[0],
+    resolu_via: 'Dashboard client'
+  }).then(function(res) {
+    if (res.ok) { alert('Panne résolue'); location.reload(); }
+    else { alert('Erreur lors de la résolution'); }
+  });
 }
 
 init();
