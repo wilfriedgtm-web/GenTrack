@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #F4F2EE;
+  --gold: #C8922A;
+  --gold-light: #f0d9a8;
+  --gold-dark: #a67520;
+  --sidebar-bg: #1C1C1E;
+  --sidebar-text: #a0a0a8;
+  --sidebar-active: #C8922A;
+  --card: #ffffff;
+  --border: #e4e1db;
+  --text: #1a1a1a;
+  --text-muted: #6b6b6b;
+  --red: #e53e3e;
+  --green: #38a169;
+  --orange: #dd6b20;
+  --blue: #3182ce;
+}
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+
+/* SIDEBAR */
+#sidebar {
+  width: 220px; min-width: 220px; background: var(--sidebar-bg); display: flex; flex-direction: column;
+  padding: 0; overflow-y: auto;
+}
+.sidebar-logo {
+  padding: 20px 20px 16px; border-bottom: 1px solid #2c2c2e;
+}
+.sidebar-logo h1 { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+.sidebar-logo span { color: var(--gold); }
+.sidebar-logo small { display: block; font-size: 10px; color: var(--sidebar-text); margin-top: 2px; }
+.sidebar-nav { flex: 1; padding: 12px 0; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 20px;
+  color: var(--sidebar-text); cursor: pointer; font-size: 13.5px; font-weight: 500;
+  transition: all 0.15s; border-left: 3px solid transparent;
+}
+.nav-item:hover { color: #fff; background: rgba(255,255,255,0.04); }
+.nav-item.active { color: #fff; border-left-color: var(--gold); background: rgba(200,146,42,0.1); }
+.nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+.sidebar-footer { padding: 12px 20px; border-top: 1px solid #2c2c2e; }
+.sidebar-footer small { color: #444; font-size: 11px; }
+
+/* MAIN */
+#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#topbar {
+  background: var(--card); border-bottom: 1px solid var(--border);
+  padding: 0 28px; height: 56px; display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+#topbar h2 { font-family: 'Space Grotesk', sans-serif; font-size: 17px; font-weight: 600; }
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+#content { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+/* CARDS */
+.card { background: var(--card); border-radius: 10px; border: 1px solid var(--border); padding: 20px; }
+.card-sm { padding: 14px 18px; }
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.card-header h3 { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; }
+
+/* GRID */
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+
+/* KPI */
+.kpi-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.kpi-value { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 700; }
+.kpi-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.kpi-badge { display: inline-block; padding: 2px 7px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-top: 6px; }
+.badge-green { background: #d4edda; color: #276749; }
+.badge-red { background: #fed7d7; color: #9b2c2c; }
+.badge-orange { background: #feebc8; color: #7b341e; }
+.badge-blue { background: #bee3f8; color: #2a4365; }
+.badge-gray { background: #e2e8f0; color: #4a5568; }
+.badge-gold { background: #fef3cd; color: #7d5a00; }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; font-family: 'Inter', sans-serif; }
+.btn-primary { background: var(--gold); color: #fff; }
+.btn-primary:hover { background: var(--gold-dark); }
+.btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.btn-outline:hover { background: var(--bg); }
+.btn-danger { background: #fff0f0; color: var(--red); border: 1px solid #fecaca; }
+.btn-danger:hover { background: #fee2e2; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.btn-xs { padding: 2px 8px; font-size: 11px; }
+
+/* TABLE */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th { text-align: left; padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); border-bottom: 1px solid var(--border); font-weight: 600; }
+tbody td { padding: 11px 12px; border-bottom: 1px solid #f0ede8; vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: #faf9f6; }
+.clickable-row { cursor: pointer; }
+
+/* ALERT items */
+.alert-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.alert-item:last-child { border-bottom: none; }
+.alert-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.dot-red { background: var(--red); }
+.dot-orange { background: var(--orange); }
+.dot-green { background: var(--green); }
+.alert-body { flex: 1; }
+.alert-title { font-size: 13px; font-weight: 500; }
+.alert-meta { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* STATUS dot */
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal { background: #fff; border-radius: 12px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+.modal-sm { max-width: 480px; }
+.modal-md { max-width: 640px; }
+.modal-lg { max-width: 820px; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); }
+.modal-header h3 { font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 600; }
+.modal-body { padding: 20px 22px; }
+.modal-footer { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+.close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-muted); line-height: 1; }
+
+/* TABS */
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.tab { padding: 9px 16px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+.tab:hover { color: var(--text); }
+
+/* FORM */
+.form-group { margin-bottom: 14px; }
+.form-label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.4px; }
+.form-input, .form-select, .form-textarea {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 7px;
+  font-size: 13.5px; font-family: 'Inter', sans-serif; color: var(--text);
+  background: #fff; outline: none; transition: border 0.15s;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--gold); }
+.form-textarea { resize: vertical; min-height: 80px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+/* TOGGLE */
+.toggle { position: relative; display: inline-block; width: 36px; height: 20px; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; background: #ccc; border-radius: 20px; cursor: pointer; transition: 0.2s; }
+.toggle-slider:before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s; }
+.toggle input:checked + .toggle-slider { background: var(--gold); }
+.toggle input:checked + .toggle-slider:before { transform: translateX(16px); }
+
+/* Modèles cards */
+.template-card { border: 1px solid var(--border); border-radius: 8px; padding: 14px; cursor: pointer; transition: all 0.15s; }
+.template-card:hover { border-color: var(--gold); background: #fffbf3; }
+.template-card.selected { border-color: var(--gold); background: #fff8ec; }
+.template-card h4 { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.template-card p { font-size: 11px; color: var(--text-muted); }
+
+/* Separator */
+.section-title { font-family: 'Space Grotesk', sans-serif; font-size: 14px; font-weight: 600; margin-bottom: 12px; margin-top: 20px; }
+.section-title:first-child { margin-top: 0; }
+
+/* Hidden */
+.hidden { display: none !important; }
+
+/* Toast */
+#toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+  background: #1C1C1E; color: #fff; padding: 12px 18px; border-radius: 8px;
+  font-size: 13px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); opacity: 0;
+  transition: opacity 0.3s; pointer-events: none;
+}
+#toast.show { opacity: 1; }
+
+/* Equipment list */
+.equip-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--border); border-radius: 7px; margin-bottom: 8px; }
+.equip-item-left { display: flex; align-items: center; gap: 10px; }
+.equip-icon { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; background: #f0ede8; }
+.equip-name { font-size: 13px; font-weight: 500; }
+.equip-meta { font-size: 11px; color: var(--text-muted); }
+
+/* Contact list */
+.contact-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.contact-item:last-child { border-bottom: none; }
+.contact-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--gold-light); color: var(--gold-dark); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+
+/* Question table rows */
+.q-row { display: grid; grid-template-columns: 2fr 100px 100px 100px 60px 50px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0ede8; font-size: 13px; }
+.q-row:last-child { border-bottom: none; }
+.q-header { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
+
+/* Token row */
+.token-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.token-item:last-child { border-bottom: none; }
+.token-code { font-family: monospace; font-size: 12px; background: var(--bg); padding: 3px 8px; border-radius: 4px; }
+
+/* Ronde item */
+.ronde-item { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.ronde-item:last-child { border-bottom: none; }
+.ronde-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="sidebar-logo">
+    <h1>Gen<span>Track</span></h1>
+    <small>Administration</small>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-item active" data-section="vue" onclick="showSection('vue')">
+      <span class="icon">📊</span> Vue globale
+    </div>
+    <div class="nav-item" data-section="finance" onclick="showSection('finance')">
+      <span class="icon">💰</span> Finance
+    </div>
+    <div class="nav-item" data-section="clients" onclick="showSection('clients')">
+      <span class="icon">🏢</span> Clients
+    </div>
+    <div class="nav-item" data-section="alertes" onclick="showSection('alertes')">
+      <span class="icon">🔔</span> Alertes
+      <span id="alert-badge" class="kpi-badge badge-red hidden" style="margin-left:auto;padding:1px 6px;font-size:10px;">0</span>
+    </div>
+    <div class="nav-item" data-section="pannes" onclick="showSection('pannes')">
+      <span class="icon">🔧</span> Pannes &amp; maint.
+    </div>
+    <div class="nav-item" data-section="modeles" onclick="showSection('modeles')">
+      <span class="icon">📋</span> Modèles
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <small id="sync-status">Synchronisation…</small>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="topbar">
+    <h2 id="topbar-title">Vue globale</h2>
+    <div class="topbar-actions">
+      <button class="btn btn-outline btn-sm" onclick="loadAll()">↻ Actualiser</button>
+      <button class="btn btn-primary btn-sm hidden" id="btn-new-client" onclick="openNewClientModal()">+ Nouveau client</button>
+    </div>
+  </div>
+  <div id="content"></div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- MODALS container -->
+<div id="modals"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════
+const SUPA_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+const BASE_URL = 'https://gen-track.vercel.app';
+const PLANS = { starter: 10000, business: 20000, pro: 50000 };
+
+// ═══════════════════════════════════════════════════════════
+// EQUIPMENT TEMPLATES
+// ═══════════════════════════════════════════════════════════
+const EQUIPMENT_TEMPLATES = {
+  groupe_electrogene: {
+    label: 'Groupe électrogène',
+    icon: '⚡',
+    questions: [
+      { libelle: 'Niveau carburant (%)', type: 'number', unite: '%', seuil_alerte: 30, seuil_critique: 15, obligatoire: true },
+      { libelle: 'Heure moteur', type: 'number', unite: 'h', seuil_alerte: null, seuil_critique: null, obligatoire: true },
+      { libelle: 'Température moteur (°C)', type: 'number', unite: '°C', seuil_alerte: 85, seuil_critique: 100, obligatoire: false },
+      { libelle: 'Pression huile (bar)', type: 'number', unite: 'bar', seuil_alerte: 2, seuil_critique: 1, obligatoire: false },
+      { libelle: 'Tension batterie (V)', type: 'number', unite: 'V', seuil_alerte: 11.5, seuil_critique: 10.5, obligatoire: false },
+      { libelle: 'État général', type: 'choix', options: 'OK,Dégradé,Hors service', obligatoire: true },
+      { libelle: 'Observations', type: 'texte', obligatoire: false },
+    ]
+  },
+  cuve: {
+    label: 'Cuve à carburant',
+    icon: '🛢️',
+    questions: [
+      { libelle: 'Niveau cuve (%)', type: 'number', unite: '%', seuil_alerte: 25, seuil_critique: 10, obligatoire: true },
+      { libelle: 'Volume estimé (L)', type: 'number', unite: 'L', seuil_alerte: null, seuil_critique: null, obligatoire: false },
+      { libelle: 'Fuite détectée', type: 'booleen', seuil_alerte: null, seuil_critique: null, obligatoire: true },
+      { libelle: 'Observations', type: 'texte', obligatoire: false },
+    ]
+  },
+  chambre_froide: {
+    label: 'Chambre froide',
+    icon: '❄️',
+    questions: [
+      { libelle: 'Température (°C)', type: 'number', unite: '°C', seuil_alerte: -15, seuil_critique: -10, obligatoire: true },
+      { libelle: 'Humidité (%)', type: 'number', unite: '%', seuil_alerte: 85, seuil_critique: 95, obligatoire: false },
+      { libelle: 'Alarme active', type: 'booleen', obligatoire: true },
+      { libelle: 'Observations', type: 'texte', obligatoire: false },
+    ]
+  },
+  groupe_eau_glacee: {
+    label: 'Groupe eau glacée',
+    icon: '🧊',
+    questions: [
+      { libelle: 'Température de consigne actuelle (°C)', type: 'number', unite: '°C', seuil_alerte: 11, seuil_critique: 13, obligatoire: true },
+      { libelle: 'Température eau glacée ENTRÉE (°C)', type: 'number', unite: '°C', seuil_alerte: 11, seuil_critique: 13, obligatoire: true },
+      { libelle: 'Température eau glacée SORTIE (°C)', type: 'number', unite: '°C', seuil_alerte: 9, seuil_critique: 11, obligatoire: true },
+      { libelle: 'ΔT entrée/sortie (°C)', type: 'number', unite: '°C', seuil_alerte: 4, seuil_critique: 2, obligatoire: false },
+      { libelle: 'État des pompes de circulation', type: 'choix', options: 'OK,Dégradé,En panne', seuil_alerte: null, seuil_critique: null, obligatoire: true },
+      { libelle: 'État des variateurs de vitesse', type: 'choix', options: 'OK,Dégradé,En panne', seuil_alerte: null, seuil_critique: null, obligatoire: true },
+      { libelle: 'Bruit ou vibration anormal ?', type: 'booleen', obligatoire: false },
+      { libelle: 'Observations', type: 'texte', obligatoire: false },
+    ]
+  },
+  personnalise: {
+    label: 'Personnalisé',
+    icon: '🔩',
+    questions: [
+      { libelle: 'État général', type: 'choix', options: 'OK,Dégradé,Hors service', obligatoire: true },
+      { libelle: 'Observations', type: 'texte', obligatoire: false },
+    ]
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// API HELPER
+// ═══════════════════════════════════════════════════════════
+async function api(table, q='', select='*', method='GET', body=null) {
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/${table}?select=${select}${q}`, {
+      method,
+      headers: {
+        'apikey': SUPA_KEY,
+        'Authorization': `Bearer ${SUPA_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': method === 'POST' ? 'return=representation' : (method === 'PATCH' ? 'return=representation' : '')
+      },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    if (res.status === 204 || res.status === 404) return [];
+    if (!res.ok) { const t = await res.text().catch(() => ''); console.warn('API error', table, res.status, t); return []; }
+    return res.json();
+  } catch(e) { console.error('API fetch error', e); return []; }
+}
+
+async function apiDelete(table, q) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?${q}`, {
+    method: 'DELETE',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` }
+  });
+  return res.ok;
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let state = {
+  clients: [],
+  sites: [],
+  equipements: [],
+  questions: [],
+  rondes: [],
+  reponses: [],
+  alertes: [],
+  pannes: [],
+  tokens: [],
+  contacts: [],
+};
+let currentSection = 'vue';
+let openClientId = null;
+let openClientTab = 'infos';
+
+// ═══════════════════════════════════════════════════════════
+// LOAD
+// ═══════════════════════════════════════════════════════════
+async function loadAll() {
+  document.getElementById('sync-status').textContent = 'Chargement…';
+  const [clients, sites, equipements, questions, rondes, alertes, pannes, tokens, contacts] = await Promise.all([
+    api('clients', '', '*'),
+    api('sites', '', '*'),
+    api('equipements', '', '*'),
+    api('questions', '', '*'),
+    api('rondes', '&order=created_at.desc&limit=200', '*'),
+    api('alertes', '&order=created_at.desc', '*'),
+    api('pannes', '&order=created_at.desc', '*'),
+    api('tokens', '', '*'),
+    api('contacts', '', '*'),
+  ]);
+  state = { clients, sites, equipements, questions, rondes, alertes, pannes, tokens, contacts };
+  document.getElementById('sync-status').textContent = `Màj ${new Date().toLocaleTimeString('fr-FR')}`;
+  // Alert badge
+  const openAlerts = alertes.filter(a => a.statut !== 'resolved').length;
+  const badge = document.getElementById('alert-badge');
+  if (openAlerts > 0) { badge.textContent = openAlerts; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
+  renderSection(currentSection);
+}
+
+// ═══════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════
+function showSection(sec) {
+  currentSection = sec;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.section === sec));
+  const titles = { vue: 'Vue globale', finance: 'Finance', clients: 'Clients', alertes: 'Alertes', pannes: 'Pannes & maintenance', modeles: 'Modèles d\'équipements' };
+  document.getElementById('topbar-title').textContent = titles[sec] || sec;
+  const btnNewClient = document.getElementById('btn-new-client');
+  btnNewClient.classList.toggle('hidden', sec !== 'clients');
+  renderSection(sec);
+}
+
+function renderSection(sec) {
+  if (sec === 'vue') renderVue();
+  else if (sec === 'finance') renderFinance();
+  else if (sec === 'clients') renderClients();
+  else if (sec === 'alertes') renderAlertes();
+  else if (sec === 'pannes') renderPannes();
+  else if (sec === 'modeles') renderModeles();
+}
+
+// ═══════════════════════════════════════════════════════════
+// VUE GLOBALE
+// ═══════════════════════════════════════════════════════════
+function renderVue() {
+  const { clients, equipements, alertes, rondes } = state;
+  const activeClients = clients.filter(c => c.statut === 'actif').length;
+  const totalEquip = equipements.length;
+  const openAlerts = alertes.filter(a => a.statut !== 'resolved').length;
+  const critAlerts = alertes.filter(a => a.severite === 'critique' && a.statut !== 'resolved').length;
+  const mrr = clients.filter(c => c.statut === 'actif').reduce((s, c) => s + (c.prix_mensuel || 0), 0);
+  const today = new Date().toISOString().slice(0, 10);
+  const rondesToday = rondes.filter(r => r.created_at && r.created_at.slice(0, 10) === today).length;
+
+  // Health per client
+  const clientHealth = clients.map(c => {
+    const cAlertes = alertes.filter(a => a.client_id === c.id && a.statut !== 'resolved');
+    const cEquip = equipements.filter(e => e.client_id === c.id || (state.sites.find(s => s.id === e.site_id)?.client_id === c.id));
+    const lastRonde = rondes.find(r => r.client_id === c.id || (cEquip.find(eq => eq.id === r.equipement_id)));
+    const health = cAlertes.some(a => a.severite === 'critique') ? 'critique' : cAlertes.length > 0 ? 'alerte' : 'ok';
+    return { ...c, cAlertes: cAlertes.length, cEquip: cEquip.length, health, lastRonde };
+  });
+
+  document.getElementById('content').innerHTML = `
+    <div class="grid-4">
+      <div class="card card-sm">
+        <div class="kpi-label">Clients actifs</div>
+        <div class="kpi-value">${activeClients}</div>
+        <div class="kpi-sub">${clients.length} total</div>
+      </div>
+      <div class="card card-sm">
+        <div class="kpi-label">Équipements</div>
+        <div class="kpi-value">${totalEquip}</div>
+        <div class="kpi-sub">surveillés</div>
+      </div>
+      <div class="card card-sm">
+        <div class="kpi-label">Alertes ouvertes</div>
+        <div class="kpi-value" style="color:${openAlerts>0?'var(--red)':'inherit'}">${openAlerts}</div>
+        ${critAlerts > 0 ? `<span class="kpi-badge badge-red">${critAlerts} critiques</span>` : `<span class="kpi-badge badge-green">OK</span>`}
+      </div>
+      <div class="card card-sm">
+        <div class="kpi-label">MRR</div>
+        <div class="kpi-value">${fmtCFA(mrr)}</div>
+        <div class="kpi-sub">ARR: ${fmtCFA(mrr * 12)}</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h3>État des clients</h3></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Client</th><th>Équipements</th><th>Alertes</th><th>Dernière ronde</th><th>Statut</th></tr></thead>
+            <tbody>
+              ${clientHealth.length === 0 ? '<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">Aucun client</td></tr>' :
+                clientHealth.map(c => `
+                <tr class="clickable-row" onclick="openClient('${c.id}')">
+                  <td><strong>${esc(c.nom)}</strong></td>
+                  <td>${c.cEquip}</td>
+                  <td>${c.cAlertes > 0 ? `<span class="kpi-badge badge-red">${c.cAlertes}</span>` : '—'}</td>
+                  <td style="font-size:12px;color:var(--text-muted)">${c.lastRonde ? relativeTime(c.lastRonde.created_at) : 'Jamais'}</td>
+                  <td>
+                    <span class="status-dot" style="background:${c.health==='ok'?'var(--green)':c.health==='critique'?'var(--red)':'var(--orange)'}"></span>
+                    ${c.health === 'ok' ? 'OK' : c.health === 'critique' ? 'Critique' : 'Alerte'}
+                  </td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>Alertes récentes</h3><a href="#" onclick="showSection('alertes')" style="font-size:12px;color:var(--gold)">Tout voir →</a></div>
+        ${alertes.filter(a=>a.statut!=='resolved').slice(0,8).map(a => `
+          <div class="alert-item">
+            <div class="alert-dot ${a.severite==='critique'?'dot-red':a.severite==='alerte'?'dot-orange':'dot-green'}"></div>
+            <div class="alert-body">
+              <div class="alert-title">${esc(a.message||a.type||'Alerte')}</div>
+              <div class="alert-meta">${clientName(a.client_id)} · ${relativeTime(a.created_at)}</div>
+            </div>
+            <span class="kpi-badge ${a.severite==='critique'?'badge-red':'badge-orange'}">${a.severite}</span>
+          </div>`).join('') || '<p style="color:var(--text-muted);font-size:13px">Aucune alerte ouverte ✓</p>'}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>Rondes aujourd'hui <span class="kpi-badge badge-blue">${rondesToday}</span></h3></div>
+      ${rondesToday === 0 ? '<p style="color:var(--text-muted);font-size:13px">Aucune ronde enregistrée aujourd\'hui.</p>' :
+        rondes.filter(r => r.created_at && r.created_at.slice(0,10) === today).slice(0,10).map(r => {
+          const equip = state.equipements.find(e => e.id === r.equipement_id);
+          const site = equip ? state.sites.find(s => s.id === equip.site_id) : null;
+          const client = site ? state.clients.find(c => c.id === site.client_id) : null;
+          return `<div class="alert-item">
+            <div class="alert-dot dot-green"></div>
+            <div class="alert-body">
+              <div class="alert-title">${equip ? esc(equip.nom) : 'Équipement inconnu'}</div>
+              <div class="alert-meta">${client ? esc(client.nom) : ''} ${site ? '· '+esc(site.nom) : ''} · ${relativeTime(r.created_at)}</div>
+            </div>
+          </div>`;
+        }).join('')}
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════
+// FINANCE
+// ═══════════════════════════════════════════════════════════
+function renderFinance() {
+  const actifs = state.clients.filter(c => c.statut === 'actif');
+  const mrr = actifs.reduce((s, c) => s + (c.prix_mensuel || 0), 0);
+  const arr = mrr * 12;
+  const byPlan = {};
+  actifs.forEach(c => { const p = c.plan||'custom'; byPlan[p] = (byPlan[p]||0) + 1; });
+
+  document.getElementById('content').innerHTML = `
+    <div class="grid-3">
+      <div class="card card-sm">
+        <div class="kpi-label">MRR</div>
+        <div class="kpi-value">${fmtCFA(mrr)}</div>
+        <div class="kpi-sub">${actifs.length} clients actifs</div>
+      </div>
+      <div class="card card-sm">
+        <div class="kpi-label">ARR</div>
+        <div class="kpi-value">${fmtCFA(arr)}</div>
+        <div class="kpi-sub">Revenu annuel projeté</div>
+      </div>
+      <div class="card card-sm">
+        <div class="kpi-label">Revenu moyen / client</div>
+        <div class="kpi-value">${actifs.length > 0 ? fmtCFA(Math.round(mrr/actifs.length)) : '—'}</div>
+        <div class="kpi-sub">par mois</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>Détail par client</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Client</th><th>Plan</th><th>Prix mensuel</th><th>ARR</th><th>Statut</th><th></th></tr></thead>
+          <tbody>
+            ${state.clients.map(c => `
+              <tr>
+                <td><strong>${esc(c.nom)}</strong></td>
+                <td><span class="kpi-badge badge-gray">${c.plan||'custom'}</span></td>
+                <td>${fmtCFA(c.prix_mensuel||0)}</td>
+                <td style="color:var(--gold);font-weight:600">${fmtCFA((c.prix_mensuel||0)*12)}</td>
+                <td><span class="kpi-badge ${c.statut==='actif'?'badge-green':'badge-gray'}">${c.statut||'—'}</span></td>
+                <td><button class="btn btn-outline btn-xs" onclick="editClientPrix('${c.id}','${c.prix_mensuel||0}','${c.plan||''}')">✏️ Modifier</button></td>
+              </tr>`).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="font-weight:700;border-top:2px solid var(--border)">
+              <td colspan="2">Total</td>
+              <td>${fmtCFA(mrr)}</td>
+              <td style="color:var(--gold)">${fmtCFA(arr)}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function editClientPrix(id, prix, plan) {
+  const plans = Object.entries(PLANS).map(([k,v]) => `<option value="${k}" ${plan===k?'selected':''}>${k} (${fmtCFA(v)}/mois)</option>`).join('');
+  showModal('modal-prix', `
+    <div class="modal modal-sm">
+      <div class="modal-header"><h3>Modifier le pricing</h3><button class="close-btn" onclick="closeModal('modal-prix')">×</button></div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Plan</label>
+          <select class="form-select" id="edit-plan" onchange="syncPlan()">
+            ${plans}
+            <option value="custom" ${!Object.keys(PLANS).includes(plan)?'selected':''}>Personnalisé</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prix mensuel (FCFA)</label>
+          <input class="form-input" id="edit-prix" type="number" value="${prix}" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-prix')">Annuler</button>
+        <button class="btn btn-primary" onclick="saveClientPrix('${id}')">Enregistrer</button>
+      </div>
+    </div>`);
+}
+
+function syncPlan() {
+  const plan = document.getElementById('edit-plan').value;
+  if (PLANS[plan]) document.getElementById('edit-prix').value = PLANS[plan];
+}
+
+async function saveClientPrix(id) {
+  const prix = parseInt(document.getElementById('edit-prix').value) || 0;
+  const plan = document.getElementById('edit-plan').value;
+  await api('clients', `&id=eq.${id}`, '*', 'PATCH', { prix_mensuel: prix, plan });
+  closeModal('modal-prix');
+  toast('Prix mis à jour');
+  await loadAll();
+}
+
+// ═══════════════════════════════════════════════════════════
+// CLIENTS LIST
+// ═══════════════════════════════════════════════════════════
+function renderClients() {
+  const { clients } = state;
+  document.getElementById('content').innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <h3>Clients <span class="kpi-badge badge-gray">${clients.length}</span></h3>
+        <input class="form-input" id="search-clients" style="width:220px" placeholder="Rechercher…" oninput="filterClients()" />
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nom</th><th>Plan</th><th>Sites</th><th>Équipements</th><th>MRR</th><th>Statut</th><th></th></tr></thead>
+          <tbody id="clients-tbody">
+            ${renderClientRows(clients)}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderClientRows(clients) {
+  if (!clients.length) return '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted)">Aucun client</td></tr>';
+  return clients.map(c => {
+    const sites = state.sites.filter(s => s.client_id === c.id);
+    const equips = state.equipements.filter(e => sites.find(s => s.id === e.site_id));
+    return `<tr class="clickable-row" onclick="openClient('${c.id}')">
+      <td><strong>${esc(c.nom)}</strong>${c.email?`<br><span style='font-size:11px;color:var(--text-muted)'>${esc(c.email)}</span>`:''}
+      </td>
+      <td><span class="kpi-badge badge-gray">${c.plan||'—'}</span></td>
+      <td>${sites.length}</td>
+      <td>${equips.length}</td>
+      <td>${fmtCFA(c.prix_mensuel||0)}</td>
+      <td><span class="kpi-badge ${c.statut==='actif'?'badge-green':c.statut==='inactif'?'badge-gray':'badge-orange'}">${c.statut||'—'}</span></td>
+      <td onclick="event.stopPropagation()">
+        <button class="btn btn-outline btn-xs" onclick="openClient('${c.id}')">Gérer →</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterClients() {
+  const q = document.getElementById('search-clients').value.toLowerCase();
+  const filtered = state.clients.filter(c => c.nom?.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q));
+  document.getElementById('clients-tbody').innerHTML = renderClientRows(filtered);
+}
+
+// ═══════════════════════════════════════════════════════════
+// FICHE CLIENT (drawer/modal)
+// ═══════════════════════════════════════════════════════════
+function openClient(id, tab = 'infos') {
+  openClientId = id;
+  openClientTab = tab;
+  renderClientFiche();
+}
+
+function renderClientFiche() {
+  const client = state.clients.find(c => c.id === openClientId);
+  if (!client) return;
+  const sites = state.sites.filter(s => s.client_id === client.id);
+  const allEquip = state.equipements.filter(e => sites.find(s => s.id === e.site_id));
+  const tokens = state.tokens.filter(t => t.client_id === client.id);
+  const contacts = state.contacts.filter(c => c.client_id === client.id);
+  const rondes = state.rondes.filter(r => allEquip.find(e => e.id === r.equipement_id)).slice(0, 50);
+
+  const tabs = ['infos', 'sites', 'questions', 'contacts', 'acces', 'historique'];
+  const tabLabels = { infos: 'Infos', sites: 'Sites & Équipements', questions: 'Questions', contacts: 'Contacts', acces: 'Accès', historique: 'Historique' };
+
+  let tabContent = '';
+  if (openClientTab === 'infos') tabContent = renderTabInfos(client);
+  else if (openClientTab === 'sites') tabContent = renderTabSites(client, sites, allEquip);
+  else if (openClientTab === 'questions') tabContent = renderTabQuestions(client, allEquip);
+  else if (openClientTab === 'contacts') tabContent = renderTabContacts(client, contacts);
+  else if (openClientTab === 'acces') tabContent = renderTabAcces(client, tokens);
+  else if (openClientTab === 'historique') tabContent = renderTabHistorique(client, rondes, allEquip);
+
+  showModal('modal-client', `
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <div>
+          <h3>${esc(client.nom)}</h3>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${client.ville||''} · ${client.plan||''} · ${fmtCFA(client.prix_mensuel||0)}/mois</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="kpi-badge ${client.statut==='actif'?'badge-green':'badge-gray'}">${client.statut||'—'}</span>
+          <button class="close-btn" onclick="closeModal('modal-client')">×</button>
+        </div>
+      </div>
+      <div style="padding:0 22px">
+        <div class="tabs">
+          ${tabs.map(t => `<div class="tab ${openClientTab===t?'active':''}" onclick="openClient('${client.id}','${t}')">${tabLabels[t]}</div>`).join('')}
+        </div>
+      </div>
+      <div class="modal-body" style="padding-top:0">${tabContent}</div>
+    </div>`);
+}
+
+function renderTabInfos(client) {
+  return `
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Nom</label>
+        <input class="form-input" id="ci-nom" value="${esc(client.nom||'')}" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="ci-email" type="email" value="${esc(client.email||'')}" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Téléphone</label>
+        <input class="form-input" id="ci-tel" value="${esc(client.telephone||'')}" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ville</label>
+        <input class="form-input" id="ci-ville" value="${esc(client.ville||'')}" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Plan</label>
+        <select class="form-select" id="ci-plan" onchange="syncClientPlan()">
+          <option value="starter" ${client.plan==='starter'?'selected':''}>Starter</option>
+          <option value="business" ${client.plan==='business'?'selected':''}>Business</option>
+          <option value="pro" ${client.plan==='pro'?'selected':''}>Pro</option>
+          <option value="custom" ${!['starter','business','pro'].includes(client.plan)?'selected':''}>Personnalisé</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Prix mensuel (FCFA)</label>
+        <input class="form-input" id="ci-prix" type="number" value="${client.prix_mensuel||0}" />
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Statut</label>
+        <select class="form-select" id="ci-statut">
+          <option value="actif" ${client.statut==='actif'?'selected':''}>Actif</option>
+          <option value="inactif" ${client.statut==='inactif'?'selected':''}>Inactif</option>
+          <option value="essai" ${client.statut==='essai'?'selected':''}>Essai</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">WhatsApp (numéro bot)</label>
+        <input class="form-input" id="ci-wa" value="${esc(client.whatsapp||'')}" placeholder="+2250700000000" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes</label>
+      <textarea class="form-textarea" id="ci-notes">${esc(client.notes||'')}</textarea>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn btn-primary" onclick="saveClientInfos('${client.id}')">💾 Enregistrer</button>
+      <button class="btn btn-outline" onclick="envoyerBienvenue('${client.id}')">📤 Envoyer bienvenue</button>
+      <button class="btn btn-danger" style="margin-left:auto" onclick="deleteClient('${client.id}')">🗑️ Supprimer</button>
+    </div>`;
+}
+
+function syncClientPlan() {
+  const plan = document.getElementById('ci-plan').value;
+  if (PLANS[plan]) document.getElementById('ci-prix').value = PLANS[plan];
+}
+
+async function saveClientInfos(id) {
+  const body = {
+    nom: document.getElementById('ci-nom').value,
+    email: document.getElementById('ci-email').value,
+    telephone: document.getElementById('ci-tel').value,
+    ville: document.getElementById('ci-ville').value,
+    plan: document.getElementById('ci-plan').value,
+    prix_mensuel: parseInt(document.getElementById('ci-prix').value)||0,
+    statut: document.getElementById('ci-statut').value,
+    whatsapp: document.getElementById('ci-wa').value,
+    notes: document.getElementById('ci-notes').value,
+  };
+  await api('clients', `&id=eq.${id}`, '*', 'PATCH', body);
+  toast('Client mis à jour');
+  await loadAll();
+  openClient(id, 'infos');
+}
+
+async function deleteClient(id) {
+  if (!confirm('Supprimer ce client ? Cette action est irréversible.')) return;
+  await apiDelete('clients', `id=eq.${id}`);
+  closeModal('modal-client');
+  toast('Client supprimé');
+  await loadAll();
+}
+
+function renderTabSites(client, sites, allEquip) {
+  let html = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <button class="btn btn-primary btn-sm" onclick="openAddSite('${client.id}')">+ Ajouter un site</button>
+  </div>`;
+  if (!sites.length) html += '<p style="color:var(--text-muted);font-size:13px">Aucun site configuré.</p>';
+  sites.forEach(site => {
+    const equips = allEquip.filter(e => e.site_id === site.id);
+    html += `<div class="card" style="margin-bottom:14px">
+      <div class="card-header">
+        <div>
+          <strong style="font-size:14px">${esc(site.nom)}</strong>
+          ${site.adresse ? `<div style="font-size:11px;color:var(--text-muted)">${esc(site.adresse)}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-xs" onclick="openAddEquipement('${site.id}','${client.id}')">+ Équipement</button>
+          <button class="btn btn-danger btn-xs" onclick="deleteSite('${site.id}','${client.id}')">🗑️</button>
+        </div>
+      </div>`;
+    if (!equips.length) {
+      html += '<p style="font-size:12px;color:var(--text-muted)">Aucun équipement sur ce site.</p>';
+    } else {
+      equips.forEach(eq => {
+        const tmpl = EQUIPMENT_TEMPLATES[eq.type] || EQUIPMENT_TEMPLATES.personnalise;
+        const freq = { quotidien: 'Quotidien', hebdomadaire: 'Hebdo', mensuel: 'Mensuel' }[eq.frequence] || eq.frequence || '—';
+        html += `<div class="equip-item">
+          <div class="equip-item-left">
+            <div class="equip-icon">${tmpl.icon}</div>
+            <div>
+              <div class="equip-name">${esc(eq.nom)}</div>
+              <div class="equip-meta">${tmpl.label} · ${freq}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-xs" onclick="openEditEquipement('${eq.id}','${client.id}')">✏️</button>
+            <button class="btn btn-danger btn-xs" onclick="deleteEquipement('${eq.id}','${client.id}')">🗑️</button>
+          </div>
+        </div>`;
+      });
+    }
+    html += '</div>';
+  });
+  return html;
+}
+
+function renderTabQuestions(client, allEquip) {
+  if (!allEquip.length) return '<p style="color:var(--text-muted);font-size:13px">Aucun équipement configuré. Ajoutez d\'abord des équipements dans l\'onglet Sites.</p>';
+  const allQ = state.questions.filter(q => allEquip.find(e => e.id === q.equipement_id));
+  let html = '';
+  allEquip.forEach(eq => {
+    const qs = allQ.filter(q => q.equipement_id === eq.id);
+    const tmpl = EQUIPMENT_TEMPLATES[eq.type] || EQUIPMENT_TEMPLATES.personnalise;
+    html += `<div style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div><span style="font-size:16px;margin-right:6px">${tmpl.icon}</span><strong style="font-size:13px">${esc(eq.nom)}</strong> <span style="font-size:11px;color:var(--text-muted)">(${tmpl.label})</span></div>
+        <button class="btn btn-outline btn-xs" onclick="addQuestion('${eq.id}','${client.id}')">+ Question</button>
+      </div>
+      <div class="q-row q-header">
+        <span>Libellé</span><span>Type</span><span>Seuil alerte</span><span>Seuil critique</span><span>Actif</span><span></span>
+      </div>`;
+    if (!qs.length) {
+      html += '<div style="font-size:12px;color:var(--text-muted);padding:8px 0">Aucune question. <a href="#" onclick="applyTemplate(\''+eq.id+'\',\''+eq.type+'\',\''+client.id+'\')">Appliquer le modèle</a></div>';
+    } else {
+      qs.forEach(q => {
+        html += `<div class="q-row">
+          <span>${esc(q.libelle)}</span>
+          <span><span class="kpi-badge badge-gray">${q.type}</span></span>
+          <span style="font-size:12px">${q.seuil_alerte ?? '—'}</span>
+          <span style="font-size:12px">${q.seuil_critique ?? '—'}</span>
+          <span>
+            <label class="toggle">
+              <input type="checkbox" ${q.actif!==false?'checked':''} onchange="toggleQuestion('${q.id}',this.checked,'${client.id}')">
+              <span class="toggle-slider"></span>
+            </label>
+          </span>
+          <span style="display:flex;gap:4px">
+            <button class="btn btn-outline btn-xs" onclick="editQuestion('${q.id}','${client.id}')">✏️</button>
+            <button class="btn btn-danger btn-xs" onclick="deleteQuestion('${q.id}','${client.id}')">🗑️</button>
+          </span>
+        </div>`;
+      });
+    }
+    html += '</div>';
+  });
+  return html;
+}
+
+function renderTabContacts(client, contacts) {
+  return `<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <button class="btn btn-primary btn-sm" onclick="addContact('${client.id}')">+ Ajouter un contact</button>
+  </div>
+  ${!contacts.length ? '<p style="color:var(--text-muted);font-size:13px">Aucun contact.</p>' :
+    contacts.map(ct => {
+      const initials = (ct.nom||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      return `<div class="contact-item">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="contact-avatar">${initials}</div>
+          <div>
+            <div style="font-size:13px;font-weight:500">${esc(ct.nom)}</div>
+            <div style="font-size:11px;color:var(--text-muted)">${esc(ct.role||'')} ${ct.telephone?'· '+esc(ct.telephone):''} ${ct.email?'· '+esc(ct.email):''}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-xs" onclick="editContact('${ct.id}','${client.id}')">✏️</button>
+          <button class="btn btn-danger btn-xs" onclick="deleteContact('${ct.id}','${client.id}')">🗑️</button>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+
+function renderTabAcces(client, tokens) {
+  const dashboardUrl = (tok) => `${BASE_URL}/client.html?token=${tok.token}`;
+  return `<div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <button class="btn btn-primary btn-sm" onclick="genToken('${client.id}')">+ Générer un accès</button>
+  </div>
+  ${!tokens.length ? '<p style="color:var(--text-muted);font-size:13px">Aucun lien d\'accès généré.</p>' :
+    tokens.map(t => `<div class="token-item">
+      <div>
+        <div style="font-size:13px;font-weight:500">${esc(t.label||t.role||'Accès')}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+          <span class="token-code">${t.token}</span>
+          ${t.expires_at ? ' · Expire: ' + fmtDate(t.expires_at) : ' · Sans expiration'}
+        </div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-outline btn-xs" onclick="copyToken('${dashboardUrl(t)}')">📋 Copier</button>
+        <button class="btn btn-danger btn-xs" onclick="revokeToken('${t.id}','${client.id}')">🗑️</button>
+      </div>
+    </div>`).join('')}`;
+}
+
+function renderTabHistorique(client, rondes, allEquip) {
+  if (!rondes.length) return '<p style="color:var(--text-muted);font-size:13px">Aucune ronde enregistrée.</p>';
+  return rondes.map(r => {
+    const equip = allEquip.find(e => e.id === r.equipement_id);
+    const reponses = state.reponses ? state.reponses.filter(rep => rep.ronde_id === r.id) : [];
+    return `<div class="ronde-item">
+      <div class="ronde-header">
+        <div>
+          <strong style="font-size:13px">${equip ? esc(equip.nom) : 'Équipement inconnu'}</strong>
+          <span style="font-size:11px;color:var(--text-muted);margin-left:8px">${fmtDate(r.created_at)}</span>
+        </div>
+        <span class="kpi-badge ${r.statut==='ok'?'badge-green':r.statut==='alerte'?'badge-orange':'badge-gray'}">${r.statut||'—'}</span>
+      </div>
+      ${r.operateur ? `<div style="font-size:11px;color:var(--text-muted)">Par: ${esc(r.operateur)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// NEW CLIENT
+// ═══════════════════════════════════════════════════════════
+function openNewClientModal() {
+  showModal('modal-new-client', `
+    <div class="modal modal-md">
+      <div class="modal-header"><h3>Nouveau client</h3><button class="close-btn" onclick="closeModal('modal-new-client')">×</button></div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Nom *</label><input class="form-input" id="nc-nom" placeholder="Hôtel Ivoire" /></div>
+          <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="nc-email" type="email" /></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Téléphone WhatsApp</label><input class="form-input" id="nc-tel" placeholder="+2250700000000" /></div>
+          <div class="form-group"><label class="form-label">Ville</label><input class="form-input" id="nc-ville" /></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Plan</label>
+            <select class="form-select" id="nc-plan" onchange="syncNcPlan()">
+              <option value="starter">Starter (${fmtCFA(PLANS.starter)}/mois)</option>
+              <option value="business">Business (${fmtCFA(PLANS.business)}/mois)</option>
+              <option value="pro">Pro (${fmtCFA(PLANS.pro)}/mois)</option>
+              <option value="custom">Personnalisé</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Prix mensuel (FCFA)</label><input class="form-input" id="nc-prix" type="number" value="${PLANS.starter}" /></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Statut</label>
+          <select class="form-select" id="nc-statut">
+            <option value="actif">Actif</option>
+            <option value="essai">Essai</option>
+            <option value="inactif">Inactif</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-new-client')">Annuler</button>
+        <button class="btn btn-primary" onclick="createClient()">Créer le client</button>
+      </div>
+    </div>`);
+}
+
+function syncNcPlan() {
+  const plan = document.getElementById('nc-plan').value;
+  if (PLANS[plan]) document.getElementById('nc-prix').value = PLANS[plan];
+}
+
+async function createClient() {
+  const nom = document.getElementById('nc-nom').value.trim();
+  if (!nom) { toast('Le nom est obligatoire'); return; }
+  const body = {
+    nom,
+    email: document.getElementById('nc-email').value,
+    telephone: document.getElementById('nc-tel').value,
+    whatsapp: document.getElementById('nc-tel').value,
+    ville: document.getElementById('nc-ville').value,
+    plan: document.getElementById('nc-plan').value,
+    prix_mensuel: parseInt(document.getElementById('nc-prix').value)||0,
+    statut: document.getElementById('nc-statut').value,
+  };
+  const result = await api('clients', '', '*', 'POST', body);
+  closeModal('modal-new-client');
+  toast('Client créé !');
+  await loadAll();
+  if (result && result[0]) openClient(result[0].id);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SITE MANAGEMENT
+// ═══════════════════════════════════════════════════════════
+function openAddSite(clientId) {
+  showModal('modal-site', `
+    <div class="modal modal-sm">
+      <div class="modal-header"><h3>Nouveau site</h3><button class="close-btn" onclick="closeModal('modal-site')">×</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Nom du site *</label><input class="form-input" id="site-nom" placeholder="Bâtiment principal" /></div>
+        <div class="form-group"><label class="form-label">Adresse</label><input class="form-input" id="site-adr" /></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-site')">Annuler</button>
+        <button class="btn btn-primary" onclick="createSite('${clientId}')">Créer</button>
+      </div>
+    </div>`);
+}
+
+async function createSite(clientId) {
+  const nom = document.getElementById('site-nom').value.trim();
+  if (!nom) { toast('Nom requis'); return; }
+  await api('sites', '', '*', 'POST', { nom, adresse: document.getElementById('site-adr').value, client_id: clientId });
+  closeModal('modal-site');
+  toast('Site ajouté');
+  await loadAll();
+  openClient(clientId, 'sites');
+}
+
+async function deleteSite(siteId, clientId) {
+  if (!confirm('Supprimer ce site et tous ses équipements ?')) return;
+  await apiDelete('sites', `id=eq.${siteId}`);
+  toast('Site supprimé');
+  await loadAll();
+  openClient(clientId, 'sites');
+}
+
+// ═══════════════════════════════════════════════════════════
+// EQUIPMENT MANAGEMENT
+// ═══════════════════════════════════════════════════════════
+function openAddEquipement(siteId, clientId) {
+  const typeOptions = Object.entries(EQUIPMENT_TEMPLATES).map(([k,v]) =>
+    `<option value="${k}">${v.icon} ${v.label}</option>`).join('');
+  showModal('modal-equip', `
+    <div class="modal modal-md">
+      <div class="modal-header"><h3>Ajouter un équipement</h3><button class="close-btn" onclick="closeModal('modal-equip')">×</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Nom de l'équipement *</label><input class="form-input" id="eq-nom" placeholder="GE Principal" /></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Type</label>
+            <select class="form-select" id="eq-type">${typeOptions}</select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fréquence de saisie</label>
+            <select class="form-select" id="eq-freq">
+              <option value="quotidien">Quotidien</option>
+              <option value="hebdomadaire">Hebdomadaire</option>
+              <option value="mensuel">Mensuel</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Description / notes</label><input class="form-input" id="eq-desc" /></div>
+        <div style="background:#fffbf3;border:1px solid var(--gold-light);border-radius:7px;padding:12px;font-size:12px;color:var(--text-muted)">
+          💡 Les questions par défaut du modèle sélectionné seront automatiquement créées. Vous pourrez les personnaliser ensuite.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-equip')">Annuler</button>
+        <button class="btn btn-primary" onclick="createEquipement('${siteId}','${clientId}')">Créer + questions</button>
+      </div>
+    </div>`);
+}
+
+async function createEquipement(siteId, clientId) {
+  const nom = document.getElementById('eq-nom').value.trim();
+  if (!nom) { toast('Nom requis'); return; }
+  const type = document.getElementById('eq-type').value;
+  const frequence = document.getElementById('eq-freq').value;
+  const description = document.getElementById('eq-desc').value;
+  const result = await api('equipements', '', '*', 'POST', { nom, type, frequence, description, site_id: siteId });
+  if (result && result[0]) {
+    const equipId = result[0].id;
+    const tmpl = EQUIPMENT_TEMPLATES[type] || EQUIPMENT_TEMPLATES.personnalise;
+    for (let i = 0; i < tmpl.questions.length; i++) {
+      const q = tmpl.questions[i];
+      await api('questions', '', '*', 'POST', {
+        equipement_id: equipId,
+        libelle: q.libelle,
+        type: q.type,
+        unite: q.unite || null,
+        options: q.options || null,
+        seuil_alerte: q.seuil_alerte ?? null,
+        seuil_critique: q.seuil_critique ?? null,
+        obligatoire: q.obligatoire !== false,
+        ordre: i + 1,
+        actif: true,
+      });
+    }
+  }
+  closeModal('modal-equip');
+  toast('Équipement créé avec questions');
+  await loadAll();
+  openClient(clientId, 'sites');
+}
+
+function openEditEquipement(equipId, clientId) {
+  const eq = state.equipements.find(e => e.id === equipId);
+  if (!eq) return;
+  const typeOptions = Object.entries(EQUIPMENT_TEMPLATES).map(([k,v]) =>
+    `<option value="${k}" ${eq.type===k?'selected':''}>${v.icon} ${v.label}</option>`).join('');
+  showModal('modal-equip-edit', `
+    <div class="modal modal-md">
+      <div class="modal-header"><h3>Modifier l'équipement</h3><button class="close-btn" onclick="closeModal('modal-equip-edit')">×</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Nom *</label><input class="form-input" id="eqe-nom" value="${esc(eq.nom)}" /></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Type</label><select class="form-select" id="eqe-type">${typeOptions}</select></div>
+          <div class="form-group">
+            <label class="form-label">Fréquence</label>
+            <select class="form-select" id="eqe-freq">
+              <option value="quotidien" ${eq.frequence==='quotidien'?'selected':''}>Quotidien</option>
+              <option value="hebdomadaire" ${eq.frequence==='hebdomadaire'?'selected':''}>Hebdomadaire</option>
+              <option value="mensuel" ${eq.frequence==='mensuel'?'selected':''}>Mensuel</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="eqe-desc" value="${esc(eq.description||'')}" /></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-equip-edit')">Annuler</button>
+        <button class="btn btn-primary" onclick="saveEquipement('${equipId}','${clientId}')">Enregistrer</button>
+      </div>
+    </div>`);
+}
+
+async function saveEquipement(equipId, clientId) {
+  await api('equipements', `&id=eq.${equipId}`, '*', 'PATCH', {
+    nom: document.getElementById('eqe-nom').value,
+    type: document.getElementById('eqe-type').value,
+    frequence: document.getElementById('eqe-freq').value,
+    description: document.getElementById('eqe-desc').value,
+  });
+  closeModal('modal-equip-edit');
+  toast('Équipement mis à jour');
+  await loadAll();
+  openClient(clientId, 'sites');
+}
+
+async function deleteEquipement(equipId, clientId) {
+  if (!confirm('Supprimer cet équipement et toutes ses questions ?')) return;
+  await apiDelete('equipements', `id=eq.${equipId}`);
+  toast('Équipement supprimé');
+  await loadAll();
+  openClient(clientId, 'sites');
+}
+
+// ═══════════════════════════════════════════════════════════
+// QUESTION MANAGEMENT
+// ═══════════════════════════════════════════════════════════
+async function applyTemplate(equipId, type, clientId) {
+  if (!confirm('Appliquer les questions du modèle ? Les questions existantes seront conservées.')) return;
+  const tmpl = EQUIPMENT_TEMPLATES[type] || EQUIPMENT_TEMPLATES.personnalise;
+  for (let i = 0; i < tmpl.questions.length; i++) {
+    const q = tmpl.questions[i];
+    await api('questions', '', '*', 'POST', {
+      equipement_id: equipId,
+      libelle: q.libelle, type: q.type, unite: q.unite||null, options: q.options||null,
+      seuil_alerte: q.seuil_alerte??null, seuil_critique: q.seuil_critique??null,
+      obligatoire: q.obligatoire!==false, ordre: i+1, actif: true,
+    });
+  }
+  toast('Modèle appliqué');
+  await loadAll();
+  openClient(clientId, 'questions');
+}
+
+function addQuestion(equipId, clientId) {
+  showModal('modal-q', `
+    <div class="modal modal-md">
+      <div class="modal-header"><h3>Ajouter une question</h3><button class="close-btn" onclick="closeModal('modal-q')">×</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Libellé *</label><input class="form-input" id="q-lib" /></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Type</label>
+            <select class="form-select" id="q-type">
+              <option value="number">Numérique</option>
+              <option value="texte">Texte</option>
+              <option value="booleen">Oui/Non</option>
+              <option value="choix">Choix</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Unité</label><input class="form-input" id="q-unit" placeholder="%, L, °C…" /></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Seuil alerte</label><input class="form-input" id="q-alerte" type="number" /></div>
+          <div class="form-group"><label class="form-label">Seuil critique</label><input class="form-input" id="q-critique" type="number" /></div>
+        </div>
+        <div class="form-group"><label class="form-label">Options (pour Choix, séparés par virgule)</label><input class="form-input" id="q-opts" placeholder="OK,Dégradé,Hors service" /></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-q')">Annuler</button>
+        <button class="btn btn-primary" onclick="saveNewQuestion('${equipId}','${clientId}')">Ajouter</button>
+      </div>
+    </div>`);
+}
+
+async function saveNewQuestion(equipId, clientId) {
+  const lib = document.getElementById('q-lib').value.trim();
+  if (!lib) { toast('Libellé requis'); return; }
+  await api('questions', '', '*', 'POST', {
+    equipement_id: equipId,
+    libelle: lib,
+    type: document.getElementById('q-type').value,
+    unite: document.getElementById('q-unit').value || null,
+    seuil_alerte: parseFloat(document.getElementById('q-alerte').value) || null,
+    seuil_critique: parseFloat(document.getElementById('q-critique').value) || null,
+    options: document.getElementById('q-opts').value || null,
+    actif: true, obligatoire: false, ordre: 99,
+  });
+  closeModal('modal-q');
+  toast('Question ajoutée');
+  await loadAll();
+  openClient(clientId, 'questions');
+}
+
+function editQuestion(qId, clientId) {
+  const q = state.questions.find(x => x.id === qId);
+  if (!q) return;
+  showModal('modal-qe', `
+    <div class="modal modal-md">
+      <div class="modal-header"><h3>Modifier la question</h3><button class="close-btn" onclick="closeModal('modal-qe')">×</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Libellé *</label><input class="form-input" id="qe-lib" value="${esc(q.libelle)}" /></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Type</label>
+            <select class="form-select" id="qe-type">
+              <option value="number" ${q.type==='number'?'selected':''}>Numérique</option>
+              <option value="texte" ${q.type==='texte'?'selected':''}>Texte</option>
+              <option value="booleen" ${q.type==='booleen'?'selected':''}>Oui/Non</option>
+              <option value="choix" ${q.type==='choix'?'selected':''}>Choix</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Unité</label><input class="form-input" id="qe-unit" value="${esc(q.unite||'')}" /></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Seuil alerte</label><input class="form-input" id="qe-alerte" type="number" value="${q.seuil_alerte??''}" /></div>
+          <div class="form-group"><label class="form-label">Seuil critique</label><input class="form-input" id="qe-critique" type="number" value="${q.seuil_critique??''}" /></div>
+        </div>
+        <div class="form-group"><label class="form-label">Options (choix)</label><input class="form-input" id="qe-opts" value="${esc(q.options||'')}" /></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-qe')">Annuler</button>
+        <button class="btn btn-primary" onclick="saveEditQuestion('${qId}','${clientId}')">Enregistrer</button>
+      </div>
+    </div>`);
+}
+
+async function saveEditQuestion(qId, clientId) {
+  await api('questions', `&id=eq.${qId}`, '*', 'PATCH', {
+    libelle: document.getElementById('qe-lib').value,
+    type: document.getElementById('qe-type').value,
+    unite: document.getElementById('qe-unit').value||null,
+    seuil_alerte: parseFloat(document.getElementById('qe-alerte').value)||null,
+    seuil_critique: parseFloat(document.getElementById('qe-critique').value)||null,
+    options: document.getElementById('qe-opts').value||null,
+  });
+  closeModal('modal-qe');
+  toast('Question mise à jour');
+  await loadAll();
+  openClient(clientId, 'questions');
+}
+
+async function toggleQuestion(qId, actif, clientId) {
+  await api('questions', `&id=eq.${qId}`, '*', 'PATCH', { actif });
+  // no full reload, just update state
+  const q = state.questions.find(x => x.id === qId);
+  if (q) q.actif = actif;
+}
+
+async function deleteQuestion(qId, clientId) {
+  if (!confirm('Supprimer cette question ?')) return;
+  await apiDelete('questions', `id=eq.${qId}`);
+  toast('Question supprimée');
+  await loadAll();
+  openClient(clientId, 'questions');
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONTACTS
+// ═══════════════════════════════════════════════════════════
+function addContact(clientId) { openContactModal(null, clientId); }
+function editContact(id, clientId) { openContactModal(state.contacts.find(c=>c.id===id), clientId); }
+
+function openContactModal(ct, clientId) {
+  const isEdit = !!ct;
+  showModal('modal-ct', `
+    <div class="modal modal-sm">
+      <div class="modal-header"><h3>${isEdit?'Modifier':'Ajouter'} un contact</h3><button class="close-btn" onclick="closeModal('modal-ct')">×</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Nom *</label><input class="form-input" id="ct-nom" value="${esc(ct?.nom||'')}" /></div>
+        <div class="form-group"><label class="form-label">Rôle</label><input class="form-input" id="ct-role" value="${esc(ct?.role||'')}" placeholder="Resp. technique, Directeur…" /></div>
+        <div class="form-group"><label class="form-label">Téléphone</label><input class="form-input" id="ct-tel" value="${esc(ct?.telephone||'')}" /></div>
+        <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="ct-email" type="email" value="${esc(ct?.email||'')}" /></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-ct')">Annuler</button>
+        <button class="btn btn-primary" onclick="saveContact('${isEdit?ct.id:''}','${clientId}',${isEdit})">Enregistrer</button>
+      </div>
+    </div>`);
+}
+
+async function saveContact(id, clientId, isEdit) {
+  const nom = document.getElementById('ct-nom').value.trim();
+  if (!nom) { toast('Nom requis'); return; }
+  const body = {
+    nom, role: document.getElementById('ct-role').value,
+    telephone: document.getElementById('ct-tel').value,
+    email: document.getElementById('ct-email').value,
+    client_id: clientId,
+  };
+  if (isEdit) await api('contacts', `&id=eq.${id}`, '*', 'PATCH', body);
+  else await api('contacts', '', '*', 'POST', body);
+  closeModal('modal-ct');
+  toast(isEdit ? 'Contact mis à jour' : 'Contact ajouté');
+  await loadAll();
+  openClient(clientId, 'contacts');
+}
+
+async function deleteContact(id, clientId) {
+  if (!confirm('Supprimer ce contact ?')) return;
+  await apiDelete('contacts', `id=eq.${id}`);
+  toast('Contact supprimé');
+  await loadAll();
+  openClient(clientId, 'contacts');
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOKENS
+// ═══════════════════════════════════════════════════════════
+function genToken(clientId) {
+  showModal('modal-tok', `
+    <div class="modal modal-sm">
+      <div class="modal-header"><h3>Générer un accès</h3><button class="close-btn" onclick="closeModal('modal-tok')">×</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Label</label><input class="form-input" id="tok-label" placeholder="Accès direction" /></div>
+        <div class="form-group">
+          <label class="form-label">Rôle</label>
+          <select class="form-select" id="tok-role">
+            <option value="readonly">Lecture seule</option>
+            <option value="operateur">Opérateur</option>
+            <option value="admin">Admin client</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Expiration</label>
+          <select class="form-select" id="tok-exp">
+            <option value="">Sans expiration</option>
+            <option value="30">30 jours</option>
+            <option value="90">90 jours</option>
+            <option value="365">1 an</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-tok')">Annuler</button>
+        <button class="btn btn-primary" onclick="createToken('${clientId}')">Générer</button>
+      </div>
+    </div>`);
+}
+
+async function createToken(clientId) {
+  const token = generateTokenStr();
+  const label = document.getElementById('tok-label').value;
+  const role = document.getElementById('tok-role').value;
+  const expDays = document.getElementById('tok-exp').value;
+  const expires_at = expDays ? new Date(Date.now() + expDays*86400000).toISOString() : null;
+  await api('tokens', '', '*', 'POST', { token, label, role, client_id: clientId, expires_at });
+  closeModal('modal-tok');
+  toast('Accès généré !');
+  await loadAll();
+  openClient(clientId, 'acces');
+}
+
+function generateTokenStr() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(20))).map(b => b.toString(36)).join('').slice(0,24);
+}
+
+async function revokeToken(id, clientId) {
+  if (!confirm('Révoquer cet accès ?')) return;
+  await apiDelete('tokens', `id=eq.${id}`);
+  toast('Accès révoqué');
+  await loadAll();
+  openClient(clientId, 'acces');
+}
+
+function copyToken(url) {
+  navigator.clipboard.writeText(url).then(() => toast('Lien copié !'));
+}
+
+// ═══════════════════════════════════════════════════════════
+// ALERTES
+// ═══════════════════════════════════════════════════════════
+function renderAlertes() {
+  const alertes = state.alertes;
+  const open = alertes.filter(a => a.statut !== 'resolved');
+  const resolved = alertes.filter(a => a.statut === 'resolved').slice(0, 20);
+  document.getElementById('content').innerHTML = `
+    <div class="grid-3" style="margin-bottom:20px">
+      <div class="card card-sm">
+        <div class="kpi-label">Ouvertes</div>
+        <div class="kpi-value" style="color:${open.length>0?'var(--red)':'inherit'}">${open.length}</div>
+      </div>
+      <div class="card card-sm">
+        <div class="kpi-label">Critiques</div>
+        <div class="kpi-value" style="color:var(--red)">${open.filter(a=>a.severite==='critique').length}</div>
+      </div>
+      <div class="card card-sm">
+        <div class="kpi-label">Résolues (total)</div>
+        <div class="kpi-value">${resolved.length}+</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header"><h3>Alertes ouvertes</h3></div>
+      ${!open.length ? '<p style="color:var(--text-muted);font-size:13px">Aucune alerte ouverte ✓</p>' :
+        `<table><thead><tr><th>Sévérité</th><th>Message</th><th>Client</th><th>Date</th><th></th></tr></thead><tbody>
+        ${open.map(a => `<tr>
+          <td><span class="kpi-badge ${a.severite==='critique'?'badge-red':'badge-orange'}">${a.severite}</span></td>
+          <td>${esc(a.message||a.type||'—')}</td>
+          <td>${clientName(a.client_id)}</td>
+          <td style="font-size:12px;color:var(--text-muted)">${relativeTime(a.created_at)}</td>
+          <td><button class="btn btn-outline btn-xs" onclick="resolveAlerte('${a.id}')">Résoudre</button></td>
+        </tr>`).join('')}
+        </tbody></table>`}
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h3>Historique (20 dernières résolues)</h3></div>
+      ${!resolved.length ? '<p style="color:var(--text-muted);font-size:13px">Aucune.</p>' :
+        `<table><thead><tr><th>Message</th><th>Client</th><th>Date</th></tr></thead><tbody>
+        ${resolved.map(a => `<tr>
+          <td style="color:var(--text-muted)">${esc(a.message||a.type||'—')}</td>
+          <td style="color:var(--text-muted)">${clientName(a.client_id)}</td>
+          <td style="font-size:12px;color:var(--text-muted)">${fmtDate(a.created_at)}</td>
+        </tr>`).join('')}
+        </tbody></table>`}
+    </div>`;
+}
+
+async function resolveAlerte(id) {
+  await api('alertes', `&id=eq.${id}`, '*', 'PATCH', { statut: 'resolved', resolved_at: new Date().toISOString() });
+  toast('Alerte résolue');
+  await loadAll();
+}
+
+// ═══════════════════════════════════════════════════════════
+// PANNES & MAINTENANCE
+// ═══════════════════════════════════════════════════════════
+function renderPannes() {
+  const pannes = state.pannes;
+  const ouvertes = pannes.filter(p => p.statut !== 'resolu');
+  const resolues = pannes.filter(p => p.statut === 'resolu').slice(0, 20);
+  document.getElementById('content').innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <button class="btn btn-primary btn-sm" onclick="openNewPanne()">+ Signaler une panne</button>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header"><h3>Pannes en cours <span class="kpi-badge badge-red">${ouvertes.length}</span></h3></div>
+      ${!ouvertes.length ? '<p style="color:var(--text-muted);font-size:13px">Aucune panne en cours ✓</p>' :
+        `<table><thead><tr><th>Client</th><th>Description</th><th>Priorité</th><th>Date</th><th></th></tr></thead><tbody>
+        ${ouvertes.map(p => `<tr>
+          <td><strong>${clientName(p.client_id)}</strong></td>
+          <td>${esc(p.description||'—')}</td>
+          <td><span class="kpi-badge ${p.priorite==='haute'?'badge-red':p.priorite==='moyenne'?'badge-orange':'badge-gray'}">${p.priorite||'—'}</span></td>
+          <td style="font-size:12px;color:var(--text-muted)">${relativeTime(p.created_at)}</td>
+          <td><button class="btn btn-outline btn-xs" onclick="resoudrePanne('${p.id}')">Résoudre</button></td>
+        </tr>`).join('')}
+        </tbody></table>`}
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>Historique</h3></div>
+      ${!resolues.length ? '<p style="color:var(--text-muted);font-size:13px">Aucune.</p>' :
+        `<table><thead><tr><th>Client</th><th>Description</th><th>Résolu</th></tr></thead><tbody>
+        ${resolues.map(p => `<tr>
+          <td style="color:var(--text-muted)">${clientName(p.client_id)}</td>
+          <td style="color:var(--text-muted)">${esc(p.description||'—')}</td>
+          <td style="font-size:12px;color:var(--text-muted)">${fmtDate(p.resolved_at||p.updated_at)}</td>
+        </tr>`).join('')}
+        </tbody></table>`}
+    </div>`;
+}
+
+function openNewPanne() {
+  const clientOpts = state.clients.map(c => `<option value="${c.id}">${esc(c.nom)}</option>`).join('');
+  showModal('modal-panne', `
+    <div class="modal modal-sm">
+      <div class="modal-header"><h3>Signaler une panne</h3><button class="close-btn" onclick="closeModal('modal-panne')">×</button></div>
+      <div class="modal-body">
+        <div class="form-group"><label class="form-label">Client</label><select class="form-select" id="pn-client"><option value="">— Sélectionner —</option>${clientOpts}</select></div>
+        <div class="form-group"><label class="form-label">Description *</label><textarea class="form-textarea" id="pn-desc"></textarea></div>
+        <div class="form-group">
+          <label class="form-label">Priorité</label>
+          <select class="form-select" id="pn-prio"><option value="basse">Basse</option><option value="moyenne" selected>Moyenne</option><option value="haute">Haute</option></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-panne')">Annuler</button>
+        <button class="btn btn-primary" onclick="createPanne()">Enregistrer</button>
+      </div>
+    </div>`);
+}
+
+async function createPanne() {
+  const desc = document.getElementById('pn-desc').value.trim();
+  if (!desc) { toast('Description requise'); return; }
+  await api('pannes', '', '*', 'POST', {
+    client_id: document.getElementById('pn-client').value || null,
+    description: desc,
+    priorite: document.getElementById('pn-prio').value,
+    statut: 'ouvert',
+  });
+  closeModal('modal-panne');
+  toast('Panne enregistrée');
+  await loadAll();
+}
+
+async function resoudrePanne(id) {
+  await api('pannes', `&id=eq.${id}`, '*', 'PATCH', { statut: 'resolu', resolved_at: new Date().toISOString() });
+  toast('Panne résolue');
+  await loadAll();
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODÈLES
+// ═══════════════════════════════════════════════════════════
+function renderModeles() {
+  document.getElementById('content').innerHTML = `
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">
+      Ces modèles définissent les questions par défaut appliquées lors de la création d'un équipement.
+      Ils servent de base — chaque client peut ensuite personnaliser ses questions.
+    </p>
+    <div class="grid-2">
+      ${Object.entries(EQUIPMENT_TEMPLATES).map(([key, tmpl]) => `
+        <div class="card">
+          <div class="card-header">
+            <h3>${tmpl.icon} ${tmpl.label}</h3>
+            <span class="kpi-badge badge-gray">${tmpl.questions.length} questions</span>
+          </div>
+          <div class="q-row q-header" style="font-size:10px">
+            <span>Libellé</span><span>Type</span><span>Seuil alerte</span><span>Seuil critique</span><span></span><span></span>
+          </div>
+          ${tmpl.questions.map(q => `
+            <div class="q-row">
+              <span style="font-size:12px">${esc(q.libelle)}</span>
+              <span><span class="kpi-badge badge-gray" style="font-size:10px">${q.type}</span></span>
+              <span style="font-size:12px;color:var(--text-muted)">${q.seuil_alerte??'—'}${q.unite?` ${q.unite}`:''}</span>
+              <span style="font-size:12px;color:var(--text-muted)">${q.seuil_critique??'—'}${q.unite?` ${q.unite}`:''}</span>
+              <span></span><span></span>
+            </div>`).join('')}
+          <div style="margin-top:12px;font-size:12px;color:var(--text-muted)">
+            💡 Ces questions sont copiées à la création d'un équipement de type <strong>${tmpl.label}</strong>.
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// WELCOME MESSAGE
+// ═══════════════════════════════════════════════════════════
+async function envoyerBienvenue(clientId) {
+  const client = state.clients.find(c => c.id === clientId);
+  if (!client) return;
+  const token = state.tokens.find(t => t.client_id === clientId);
+  const dashUrl = token ? `${BASE_URL}/client.html?token=${token.token}` : `${BASE_URL}/client.html`;
+  // In a real setup, this would call a Supabase Edge Function to send via Twilio
+  showModal('modal-welcome', `
+    <div class="modal modal-sm">
+      <div class="modal-header"><h3>Message de bienvenue</h3><button class="close-btn" onclick="closeModal('modal-welcome')">×</button></div>
+      <div class="modal-body">
+        <p style="font-size:13px;margin-bottom:12px">Message qui sera envoyé à <strong>${esc(client.nom)}</strong> via WhatsApp :</p>
+        <div style="background:var(--bg);border-radius:8px;padding:14px;font-size:13px;line-height:1.6">
+          Bonjour ! 👋 Bienvenue sur GenTrack.<br><br>
+          Votre tableau de bord est accessible ici :<br>
+          <a href="${dashUrl}" style="color:var(--gold)">${dashUrl}</a><br><br>
+          Pour toute question, contactez votre technicien GenTrack.
+        </div>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:10px">Numéro WhatsApp : ${esc(client.whatsapp||client.telephone||'Non renseigné')}</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-welcome')">Fermer</button>
+        <button class="btn btn-primary" onclick="toast('Message envoyé (simulation)');closeModal('modal-welcome')">📤 Envoyer</button>
+      </div>
+    </div>`);
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODAL HELPERS
+// ═══════════════════════════════════════════════════════════
+function showModal(id, html) {
+  let wrap = document.getElementById(id);
+  if (!wrap) { wrap = document.createElement('div'); wrap.id = id; document.getElementById('modals').appendChild(wrap); }
+  wrap.innerHTML = `<div class="modal-overlay" onclick="handleOverlayClick(event,'${id}')">${html}</div>`;
+}
+
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = '';
+}
+
+function handleOverlayClick(e, id) {
+  if (e.target.classList.contains('modal-overlay')) closeModal(id);
+}
+
+// ═══════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════
+function esc(str) {
+  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtCFA(n) {
+  return new Intl.NumberFormat('fr-FR').format(n||0) + ' FCFA';
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function relativeTime(d) {
+  if (!d) return '—';
+  const diff = Date.now() - new Date(d).getTime();
+  const mins = Math.floor(diff/60000);
+  if (mins < 1) return 'à l\'instant';
+  if (mins < 60) return `il y a ${mins}m`;
+  const hrs = Math.floor(mins/60);
+  if (hrs < 24) return `il y a ${hrs}h`;
+  const days = Math.floor(hrs/24);
+  return `il y a ${days}j`;
+}
+
+function clientName(id) {
+  const c = state.clients.find(x => x.id === id);
+  return c ? esc(c.nom) : '—';
+}
+
+function toast(msg, duration=3000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+loadAll();
+</script>
+</body>
+</html>
