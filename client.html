@@ -24,9 +24,23 @@ body{background:var(--surface);color:var(--texte);font-family:'Inter',sans-serif
 .header-top{display:flex;justify-content:space-between;align-items:center;padding:20px 36px;border-bottom:1px solid rgba(255,255,255,0.1)}
 .logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;letter-spacing:3px;text-transform:uppercase}
 .logo-sub{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.4);margin-top:2px}
-.header-right{text-align:right}
+.header-right{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .header-date{font-size:11px;color:rgba(255,255,255,0.5)}
 .header-title{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--or);margin-top:3px}
+
+/* SITE SWITCHER (resp_tech multi-site) */
+.site-switcher{display:flex;gap:0;border-top:1px solid rgba(255,255,255,0.1);overflow-x:auto;padding:0 36px}
+.site-tab{background:transparent;border:none;padding:10px 20px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,0.45);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:color 0.15s,border-color 0.15s}
+.site-tab:hover{color:rgba(255,255,255,0.8)}
+.site-tab.active{color:white;border-bottom-color:var(--or)}
+
+/* BACK BUTTON */
+.back-btn{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);padding:7px 14px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+.back-btn:hover{background:rgba(255,255,255,0.18)}
+
+/* VOIR DETAIL btn */
+.voir-detail-btn{background:var(--bx);color:white;border:none;padding:6px 12px;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0}
+.voir-detail-btn:hover{opacity:0.85}
 
 .container{max-width:960px;margin:0 auto;padding:28px 36px 60px}
 
@@ -162,7 +176,7 @@ table.data tr:hover td{background:var(--surface2)}
 .error-page{max-width:400px;margin:80px auto;text-align:center;padding:40px}
 .error-page h2{font-family:'Cormorant Garamond',serif;font-size:28px;margin-bottom:12px}
 .error-page p{font-size:13px;color:var(--texte2);line-height:1.6}
-@media(max-width:700px){.container{padding:16px 14px}.kpi-grid{grid-template-columns:repeat(2,1fr)}.type-grid{grid-template-columns:1fr}.header-top{padding:14px 16px}.sc-kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.container{padding:16px 14px}.kpi-grid{grid-template-columns:repeat(2,1fr)}.type-grid{grid-template-columns:1fr}.header-top{padding:14px 16px}.sc-kpis{grid-template-columns:repeat(2,1fr)}.site-switcher{padding:0 16px}}
 </style>
 </head>
 <body>
@@ -223,7 +237,6 @@ function showError(titre, msg) {
   document.getElementById('app').innerHTML = '<div class="error-page"><div style="font-size:48px;margin-bottom:20px">🔒</div><h2>'+titre+'</h2><p>'+msg+'</p></div>';
 }
 
-// ── ROUTING ──
 function init() {
   var params = new URLSearchParams(window.location.search);
   var token = params.get('token'), clientId = params.get('id');
@@ -242,9 +255,15 @@ function loadByToken(token) {
     var siteIds = typeof raw === 'string' ? JSON.parse(raw || '[]') : raw;
     if (role === 'dir_ops') { loadClientView(tok.client_id, {role:'dir_ops'}); }
     else if (role === 'dir_tech') { loadClientView(tok.client_id, {role:'dir_tech', siteIds:siteIds}); }
-    else if (role === 'resp_tech') { var s=siteIds.length?siteIds[0]:(tok.site_id||null); loadSiteView(tok.client_id,s,{role:'resp_tech'}); }
-    else if (role === 'tech' || role === 'technicien') { var s2=siteIds.length?siteIds[0]:(tok.site_id||null); loadSiteView(tok.client_id,s2,{role:'technicien'}); }
-    else if (tok.site_id) { loadSiteView(tok.client_id,tok.site_id,{role:'technicien'}); }
+    else if (role === 'resp_tech') {
+      var ids = siteIds.length ? siteIds : (tok.site_id ? [tok.site_id] : []);
+      loadSiteView(tok.client_id, ids, {role:'resp_tech'});
+    }
+    else if (role === 'tech' || role === 'technicien') {
+      var ids2 = siteIds.length ? siteIds : (tok.site_id ? [tok.site_id] : []);
+      loadSiteView(tok.client_id, ids2, {role:'technicien'});
+    }
+    else if (tok.site_id) { loadSiteView(tok.client_id, [tok.site_id], {role:'technicien'}); }
     else { loadClientView(tok.client_id,{}); }
   });
 }
@@ -269,20 +288,26 @@ function loadClientView(clientId, access) {
   });
 }
 
-function loadSiteView(clientId, siteId, access) {
+function loadSiteView(clientId, siteIds, access) {
   if (!access) access = {};
+  if (!Array.isArray(siteIds)) siteIds = siteIds ? [siteIds] : [];
   api('clients','&id=eq.'+clientId).then(function(clients) {
     if (!clients.length) { showError('Client introuvable',''); return; }
     var client = clients[0];
     applyBrandColor(client.couleur_marque);
-    if (siteId) {
-      api('sites','&id=eq.'+siteId).then(function(sites) {
-        var siteNom = sites.length ? sites[0].nom : null;
-        renderHotelView(client, siteId, siteNom, {role:access.role||'technicien'}, null);
-      });
-    } else {
+    if (!siteIds.length) {
       renderHotelView(client, null, null, {role:access.role||'technicien'}, null);
+      return;
     }
+    var filter = siteIds.length === 1
+      ? '&id=eq.'+siteIds[0]
+      : '&id=in.('+siteIds.join(',')+')';
+    api('sites', filter+'&order=nom').then(function(sites) {
+      if (!sites.length) { renderHotelView(client, null, null, {role:access.role||'technicien'}, null); return; }
+      var opts = {role: access.role||'technicien'};
+      if (sites.length > 1) opts.allSites = sites;
+      renderHotelView(client, sites[0].id, sites[0].nom, opts, null);
+    });
   });
 }
 
@@ -297,11 +322,14 @@ function renderHotelView(client, siteId, siteName, opts, containerId) {
   if (!rootEl) return;
   rootEl.innerHTML = '<div class="loading" style="padding:60px"><span class="spinner"></span>Chargement...</div>';
 
+  if (!containerId) {
+    window._currentSiteState = {client: client, siteId: siteId, siteName: siteName, opts: opts};
+  }
+
   var now = new Date();
   var today = now.toISOString().split('T')[0];
   var debut30  = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
   var debutAn  = new Date(now.getFullYear(),0,1).toISOString().split('T')[0];
-  var moisCour = now.getFullYear()+'-'+(now.getMonth()<9?'0':'')+(now.getMonth()+1);
   var moisPrec = new Date(now.getFullYear(), now.getMonth()-1, 1);
   var debutMoisPrec = moisPrec.getFullYear()+'-'+(moisPrec.getMonth()<9?'0':'')+(moisPrec.getMonth()+1)+'-01';
   var finMoisPrec   = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
@@ -316,7 +344,6 @@ function renderHotelView(client, siteId, siteName, opts, containerId) {
   ]).then(function(res) {
     var groupes=res[0], saisies30=res[1], alertes=res[2], pannesOuv=res[3], pannesRes=res[4], cuves=res[5];
 
-    // Dernière saisie par groupe (dans les 30j)
     var dernSaisie = {};
     saisies30.forEach(function(s){ if (!dernSaisie[s.groupe_id]) dernSaisie[s.groupe_id]=s; });
     var saisiesJour = [];
@@ -328,7 +355,7 @@ function renderHotelView(client, siteId, siteName, opts, containerId) {
     var fSaisiesMoisPrec = showFull ? api('saisies','&client_id=eq.'+client.id+'&date=gte.'+debutMoisPrec+'&date=lte.'+finMoisPrec+'&limit=300') : Promise.resolve([]);
 
     Promise.all([fCuve30, fCuveAn, fSaisiesMoisPrec]).then(function(cr) {
-      var sCuve30=cr[0], sCuveAn=cr[1], saisiesMoisPrec=cr[2];
+      var sCuve30=cr[0], sCuveAn=cr[1];
 
       var saisieCuve = sCuve30.length ? sCuve30[0] : null;
       var ravits = sCuve30.filter(function(s){ return (s.litres_ajoutes||0)>0; });
@@ -336,7 +363,6 @@ function renderHotelView(client, siteId, siteName, opts, containerId) {
       var litres30  = ravits.reduce(function(a,s){return a+(s.litres_ajoutes||0);},0);
       var coutCarb30 = Math.round(litres30*prixLitre);
 
-      // Coût carburant mois précédent (pour comparaison)
       var ravitsMoisPrec = sCuveAn.filter(function(s){
         return (s.litres_ajoutes||0)>0 && s.date>=debutMoisPrec && s.date<=finMoisPrec;
       });
@@ -361,14 +387,12 @@ function renderHotelView(client, siteId, siteName, opts, containerId) {
       var dateStr = now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
       var roleLabel = role==='resp_tech'?'Responsable technique':role==='dir_ops'?'Directeur des opérations':role==='dir_tech'?'Directeur technique':'Technicien';
 
-      // KPIs
       var rondesOk = 0;
       groupes.forEach(function(g){
         var s=null; for(var i=0;i<saisiesJour.length;i++){if(saisiesJour[i].groupe_id===g.id){s=saisiesJour[i];break;}}
         if(s && retardLabel(s.date,today).jours===0) rondesOk++;
       });
 
-      // Alertes bannière
       var urgences = [];
       if (autoJours!==null && autoJours<3) urgences.push('Autonomie cuve critique ('+autoJours+'j)');
       pannesOuv.forEach(function(p){ urgences.push('Panne — '+(groupeMap[p.groupe_id]||'équipement')); });
@@ -380,39 +404,25 @@ function renderHotelView(client, siteId, siteName, opts, containerId) {
           '<div class="ab-sub">'+urgences.join(' · ')+'</div></div></div>';
       }
 
-      // KPI values
       var kRondeColor = rondesOk===groupes.length?'var(--vert)':rondesOk>0?'var(--orange)':'var(--rouge)';
       var kCarbTrend = '';
       if (deltaCarbPct!==null) {
         var sign = deltaCarbPct>=0?'+':'';
-        var cls = deltaCarbPct>10?'trend-up':deltaCarbPct<-10?'trend-down':'';
         kCarbTrend = '<span class="kpi-trend-pill '+(deltaCarbPct>0?'trend-up':deltaCarbPct<0?'trend-down':'')+'" style="'+(deltaCarbPct>0?'background:var(--rouge-pale);color:var(--rouge)':deltaCarbPct<0?'background:var(--vert-pale);color:var(--vert)':'')+'">'+sign+deltaCarbPct+'%</span> vs mois dernier';
       } else { kCarbTrend = 'FCFA · '+fmtNum(litres30)+'L'; }
       var kMaintTrend = pannDelta>0?('<span class="kpi-trend-pill" style="background:var(--rouge-pale);color:var(--rouge)">+'+pannDelta+' panne'+(pannDelta>1?'s':'')+' de plus</span>') : (pannesRes.length+' résolue'+(pannesRes.length>1?'s':''));
 
-      // EQUIPMENT BY TYPE
       var typeHtml = buildEquipByType(groupes, saisiesJour, saisies30, pannesOuv, today);
-
-      // CUVE
       var cuveHtml = buildCuveCard(cuve, saisieCuve, niveauCuve, pctCuve, capCuve, autoJours, consoLh, groupes, saisiesJour, today);
-
-      // PANNES
       var pannesHtml = buildPannesSection(pannesOuv, showFull?pannesRes:[], groupes, groupeMap, panneLabels, showFull);
-
-      // RAVITS
       var ravitHtml = (showFull && ravits.length) ? buildRavitsSection(ravits, litres30, coutCarb30, prixLitre) : '';
-
-      // SAISIES LOG
       var saisiesLogHtml = buildSaisiesLog(saisies30, groupeMap);
-
-      // RAPPORT MENSUEL
       var moisNom = now.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
       var rapportHtml = showFull ? '<div class="rapport-card">' +
         '<div><div class="rapport-title">Rapport mensuel — '+moisNom+'</div>' +
         '<div class="rapport-sub">Comparaison vs mois précédent incluse</div></div>' +
         '<button class="export-btn" onclick="exportPDF()">&#128196; Exporter en PDF</button></div>' : '';
 
-      // CHART DATA — préparer mois
       var months = [];
       for (var mi=5; mi>=0; mi--) {
         var md = new Date(now.getFullYear(), now.getMonth()-mi, 1);
@@ -423,25 +433,41 @@ function renderHotelView(client, siteId, siteName, opts, containerId) {
         var md2 = new Date(now.getFullYear(), now.getMonth()-mi2, 1);
         months12.push(md2.getFullYear()+'-'+(md2.getMonth()<9?'0':'')+(md2.getMonth()+1));
       }
-
       function monthAvg(monthStr, cuveData) {
         var entries = cuveData.filter(function(s){ return s.date && s.date.slice(0,7)===monthStr && s.niveau_litres!=null; });
         if (!entries.length) return null;
         var sum = entries.reduce(function(a,s){ return a+s.niveau_litres; }, 0);
         return Math.round(sum/entries.length/capCuve*100);
       }
-
       var chartData6  = months.map(function(m)  { return monthAvg(m,  sCuveAn); });
       var chartData12 = months12.map(function(m) { return monthAvg(m, sCuveAn); });
 
+      // HEADER avec switcher et/ou bouton retour
+      var switcherHtml = '';
+      if (!containerId && opts.allSites && opts.allSites.length > 1) {
+        var tabs = opts.allSites.map(function(s) {
+          return '<button class="site-tab'+(s.id===siteId?' active':'')+'" onclick="switchSite(event,\''+s.id+'\')">'+s.nom+'</button>';
+        }).join('');
+        switcherHtml = '<div class="site-switcher">'+tabs+'</div>';
+      }
+      var backBtn = (!containerId && opts.fromConsolidated)
+        ? '<button class="back-btn" onclick="goBackConsolidated()">← Vue consolidée</button>'
+        : '';
       var headerHtml = containerId ? '' :
-        '<div class="header"><div class="header-top"><div>' +
-          '<div class="logo">'+nom+'</div>' +
-          '<div class="logo-sub">'+roleLabel+'</div>' +
-        '</div><div class="header-right">' +
-          '<div class="header-date">'+dateStr+'</div>' +
-          '<div class="header-title">Tableau de bord</div>' +
-        '</div></div></div>';
+        '<div class="header">' +
+          '<div class="header-top">' +
+            '<div>' +
+              '<div class="logo">'+(opts.fromConsolidated ? client.nom : nom)+'</div>' +
+              '<div class="logo-sub">'+(opts.fromConsolidated ? roleLabel+' — '+nom : roleLabel)+'</div>' +
+            '</div>' +
+            '<div class="header-right">' +
+              (backBtn || '<div class="header-date">'+dateStr+'</div>') +
+              '<div class="header-title">Tableau de bord</div>' +
+            '</div>' +
+          '</div>' +
+          switcherHtml +
+        '</div>';
+
       var footerHtml = containerId ? '' : '<div class="footer">Powered by <strong>GenTrack</strong> · '+nom+'</div>';
 
       rootEl.innerHTML = headerHtml +
@@ -471,18 +497,12 @@ function renderHotelView(client, siteId, siteName, opts, containerId) {
           saisiesLogHtml +
         '</div>' + footerHtml;
 
-      // stocker pour le chart
-      window._chartState = {
-        months6: months, months12: months12,
-        data6: chartData6, data12: chartData12,
-        capCuve: capCuve
-      };
+      window._chartState = {months6:months,months12:months12,data6:chartData6,data12:chartData12,capCuve:capCuve};
       renderChart('mois');
     });
   });
 }
 
-// ── GROUPER PAR TYPE ──
 function groupesByType(groupes) {
   var byType = {};
   groupes.forEach(function(g) {
@@ -493,7 +513,6 @@ function groupesByType(groupes) {
   return byType;
 }
 
-// ── CARDS PAR TYPE ──
 function buildEquipByType(groupes, saisiesJour, saisies30, pannesOuv, today) {
   if (!groupes.length) return '<div class="empty" style="grid-column:1/-1">Aucun équipement configuré</div>';
   var byType = groupesByType(groupes);
@@ -513,12 +532,8 @@ function buildEquipByType(groupes, saisiesJour, saisies30, pannesOuv, today) {
       if (g.heures_total && g.seuil_vidange_heures && g.heures_total>=g.seuil_vidange_heures) vidanges++;
     });
     var statusColor = pannes?'var(--rouge)':retards?'var(--orange)':'var(--vert)';
-    var statusTxt = pannes?pannes+' panne'+(pannes>1?'s en cours':''):
-      retards?retards+' en retard':
-      vidanges?vidanges+' vidange'+(vidanges>1?'s requises':' requise'):
-      'Tous à jour';
+    var statusTxt = pannes?pannes+' panne'+(pannes>1?'s en cours':''):retards?retards+' en retard':vidanges?vidanges+' vidange'+(vidanges>1?'s requises':' requise'):'Tous à jour';
     var cardId = 'tc-'+t;
-    // Drill-down
     var drillHtml = '';
     gs.forEach(function(g) {
       var s=null; for(var i=0;i<saisiesJour.length;i++){if(saisiesJour[i].groupe_id===g.id){s=saisiesJour[i];break;}}
@@ -529,28 +544,15 @@ function buildEquipByType(groupes, saisiesJour, saisies30, pannesOuv, today) {
       var hMarche = (s&&s.heures_marche!=null)?s.heures_marche+'h':'—';
       var huileVal = (s&&s.niveau_huile)?s.niveau_huile:'—';
       var saisiesG = saisies30.filter(function(x){return x.groupe_id===g.id;}).length;
-      drillHtml += '<div class="drill-item">' +
-        '<div>' +
-          '<div class="drill-nom">'+g.nom+'</div>' +
-          '<div class="drill-meta">'+(g.marque||'')+' '+(g.puissance_kva||''+(g.puissance_kva?'kVA':''))+(g.puissance_kva?' kVA · ':'')+'Compteur '+hMarche+' · Huile <span style="color:'+huileColor(s?s.niveau_huile:null)+'">'+huileVal+'</span></div>' +
-        '</div>' +
-        '<div class="drill-right">' +
-          '<span class="pill '+pillClass+'">'+pillTxt+'</span>' +
-          '<div class="drill-meta" style="margin-top:4px">'+saisiesG+' saisies/30j</div>' +
-        '</div>' +
-      '</div>';
+      drillHtml += '<div class="drill-item"><div><div class="drill-nom">'+g.nom+'</div>' +
+        '<div class="drill-meta">'+(g.marque||'')+' '+(g.puissance_kva?g.puissance_kva+' kVA · ':'')+'Compteur '+hMarche+' · Huile <span style="color:'+huileColor(s?s.niveau_huile:null)+'">'+huileVal+'</span></div></div>' +
+        '<div class="drill-right"><span class="pill '+pillClass+'">'+pillTxt+'</span>' +
+        '<div class="drill-meta" style="margin-top:4px">'+saisiesG+' saisies/30j</div></div></div>';
     });
     html += '<div class="type-card open" id="'+cardId+'" onclick="toggleTypeCard(\''+cardId+'\')">' +
-      '<div class="type-card-hdr">' +
-        '<div class="type-icon">'+info.icon+'</div>' +
-        '<div class="type-name">'+info.label+'</div>' +
-      '</div>' +
-      '<div class="type-card-body">' +
-        '<div class="type-count">'+gs.length+'</div>' +
-        '<div class="type-status" style="color:'+statusColor+'">'+statusTxt+'</div>' +
-      '</div>' +
-      '<div class="type-drill">'+drillHtml+'</div>' +
-    '</div>';
+      '<div class="type-card-hdr"><div class="type-icon">'+info.icon+'</div><div class="type-name">'+info.label+'</div></div>' +
+      '<div class="type-card-body"><div class="type-count">'+gs.length+'</div><div class="type-status" style="color:'+statusColor+'">'+statusTxt+'</div></div>' +
+      '<div class="type-drill">'+drillHtml+'</div></div>';
   });
   return html;
 }
@@ -560,7 +562,6 @@ function toggleTypeCard(id) {
   card.classList.toggle('open');
 }
 
-// ── CUVE CARD ──
 function buildCuveCard(cuve, saisieCuve, niveauCuve, pctCuve, capCuve, autoJours, consoLh, groupes, saisiesJour, today) {
   if (!cuve) return '';
   var barColor = pctCuve!=null?(pctCuve<25?'var(--rouge)':pctCuve<50?'var(--orange)':'var(--or)'):'var(--or)';
@@ -576,39 +577,26 @@ function buildCuveCard(cuve, saisieCuve, niveauCuve, pctCuve, capCuve, autoJours
   });
   var note = groupes.length>1?'<div class="cuve-note">Autonomie calculée sur '+consoLh+' L/h × 8h/j. En alternance, le second groupe prend le relais si nécessaire.</div>':'';
   var cuveNom = cuve.nom?' — '+cuve.nom:'';
-  return '<div class="cuve-card">' +
-    '<div class="cuve-header"><div>' +
-      '<div class="cuve-title">🪣 Cuve commune'+cuveNom+'</div>' +
-      '<div class="cuve-sub">Capacité '+fmtNum(capCuve)+'L · '+rd.label+'</div>' +
-    '</div><div>' +
-      '<div class="auto-val" style="color:'+autoC+'">'+autoStr+'</div>' +
-      '<div class="auto-unit">autonomie estimée</div>' +
-    '</div></div>' +
+  return '<div class="cuve-card"><div class="cuve-header"><div>' +
+    '<div class="cuve-title">🪣 Cuve commune'+cuveNom+'</div>' +
+    '<div class="cuve-sub">Capacité '+fmtNum(capCuve)+'L · '+rd.label+'</div></div><div>' +
+    '<div class="auto-val" style="color:'+autoC+'">'+autoStr+'</div>' +
+    '<div class="auto-unit">autonomie estimée</div></div></div>' +
     barHtml +
-    '<div class="cuve-meta">' +
-      '<span><strong>'+(niveauCuve!=null?fmtNum(niveauCuve)+'L':'—')+'</strong> niveau</span>' +
-      '<span><strong>'+(pctCuve!=null?pctCuve+'%':'—')+'</strong> du réservoir</span>' +
-      '<span><strong>'+consoLh+' L/h</strong> conso théorique</span>' +
-      (saisieCuve?'<span><strong>'+fmtDate(saisieCuve.date)+'</strong> dernier relevé</span>':'') +
-    '</div>' +
-    (chips?'<div class="ge-chips">'+chips+'</div>':'') +
-    note +
-  '</div>';
+    '<div class="cuve-meta"><span><strong>'+(niveauCuve!=null?fmtNum(niveauCuve)+'L':'—')+'</strong> niveau</span>' +
+    '<span><strong>'+(pctCuve!=null?pctCuve+'%':'—')+'</strong> du réservoir</span>' +
+    '<span><strong>'+consoLh+' L/h</strong> conso théorique</span>' +
+    (saisieCuve?'<span><strong>'+fmtDate(saisieCuve.date)+'</strong> dernier relevé</span>':'')+'</div>' +
+    (chips?'<div class="ge-chips">'+chips+'</div>':'')+note+'</div>';
 }
 
-// ── CHART CARD ──
 function buildChartCard() {
-  return '<div class="chart-card">' +
-    '<div class="chart-hdr">' +
-      '<div class="chart-hdr-title">Niveau cuve — cette année</div>' +
-      '<div class="chart-toggles">' +
-        '<button class="chart-toggle active" id="toggle-mois" onclick="switchChart(\'mois\')">Mois</button>' +
-        '<button class="chart-toggle" id="toggle-annee" onclick="switchChart(\'annee\')">Année</button>' +
-      '</div>' +
-    '</div>' +
+  return '<div class="chart-card"><div class="chart-hdr">' +
+    '<div class="chart-hdr-title">Niveau cuve — cette année</div>' +
+    '<div class="chart-toggles"><button class="chart-toggle active" id="toggle-mois" onclick="switchChart(\'mois\')">Mois</button>' +
+    '<button class="chart-toggle" id="toggle-annee" onclick="switchChart(\'annee\')">Année</button></div></div>' +
     '<div class="chart-body"><canvas id="cuve-chart" height="130"></canvas>' +
-    '<div class="chart-insight" id="chart-insight"></div></div>' +
-  '</div>';
+    '<div class="chart-insight" id="chart-insight"></div></div></div>';
 }
 
 function renderChart(mode) {
@@ -619,67 +607,59 @@ function renderChart(mode) {
   var labels = mode==='mois' ? st.months6.map(fmtMois) : st.months12.map(fmtMois);
   var data   = mode==='mois' ? st.data6 : st.data12;
   var bx = getComputedStyle(document.documentElement).getPropertyValue('--bx').trim()||'#8B1A2E';
-
-  // Calcul insight
   var valides = data.filter(function(v){return v!==null;});
   var delta = valides.length>=2 ? valides[valides.length-1]-valides[0] : null;
-  var moisActuel = data[data.length-1];
-  var moisPrecedent = data[data.length-2];
+  var moisActuel = data[data.length-1], moisPrecedent = data[data.length-2];
   var moisDelta = (moisActuel!=null&&moisPrecedent!=null) ? moisActuel-moisPrecedent : null;
   var insight = '';
   if (moisDelta!==null) {
-    if (moisDelta<0) insight = 'Baisse de '+Math.abs(moisDelta)+' points ce mois — comparé à '+(delta!==null?(delta>0?'+'+delta+' pts sur la période':delta+' pts sur la période'):'')+'le mois précédent.';
+    if (moisDelta<0) insight = 'Baisse de '+Math.abs(moisDelta)+' points ce mois.';
     else insight = 'Hausse de '+moisDelta+' points ce mois.';
   } else if (delta!==null) {
     insight = delta>=0 ? 'Niveau stable sur la période.' : 'Baisse de '+Math.abs(delta)+' pts — surveiller les ravitaillements.';
   } else { insight = 'Données insuffisantes pour l\'analyse.'; }
   var ins = document.getElementById('chart-insight'); if(ins) ins.textContent = insight;
-
   _chartInst = new Chart(ctx.getContext('2d'), {
     type:'bar',
-    data:{
-      labels:labels,
-      datasets:[{
-        data:data,
-        backgroundColor: data.map(function(v){
-          if (v===null) return 'rgba(200,200,200,0.2)';
-          if (v<25) return 'rgba(192,57,43,0.4)';
-          if (v<50) return 'rgba(212,118,30,0.4)';
-          return bx+'33';
-        }),
-        borderColor: data.map(function(v){
-          if (v===null) return 'rgba(200,200,200,0.4)';
-          if (v<25) return 'var(--rouge)';
-          if (v<50) return 'var(--orange)';
-          return bx;
-        }),
-        borderWidth:1.5,
-        borderRadius:4
-      }]
-    },
-    options:{
-      responsive:true,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return (ctx.raw!==null?ctx.raw+'%':'Pas de données');}}}},
-      scales:{
-        x:{grid:{display:false},ticks:{color:'#7A6855',font:{size:10}}},
-        y:{grid:{color:'#EDE3D4'},ticks:{color:'#7A6855',font:{size:10},callback:function(v){return v+'%';}},min:0,max:100}
-      }
-    }
+    data:{labels:labels,datasets:[{data:data,
+      backgroundColor:data.map(function(v){return v===null?'rgba(200,200,200,0.2)':v<25?'rgba(192,57,43,0.4)':v<50?'rgba(212,118,30,0.4)':bx+'33';}),
+      borderColor:data.map(function(v){return v===null?'rgba(200,200,200,0.4)':v<25?'var(--rouge)':v<50?'var(--orange)':bx;}),
+      borderWidth:1.5,borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return (ctx.raw!==null?ctx.raw+'%':'Pas de données');}}}},
+      scales:{x:{grid:{display:false},ticks:{color:'#7A6855',font:{size:10}}},y:{grid:{color:'#EDE3D4'},ticks:{color:'#7A6855',font:{size:10},callback:function(v){return v+'%';}},min:0,max:100}}}
   });
 }
 
 function switchChart(mode) {
   _chartMode = mode;
-  var btnM = document.getElementById('toggle-mois');
-  var btnA = document.getElementById('toggle-annee');
-  if (btnM && btnA) {
-    btnM.className = 'chart-toggle'+(mode==='mois'?' active':'');
-    btnA.className = 'chart-toggle'+(mode==='annee'?' active':'');
-  }
+  var btnM = document.getElementById('toggle-mois'), btnA = document.getElementById('toggle-annee');
+  if (btnM && btnA) { btnM.className='chart-toggle'+(mode==='mois'?' active':''); btnA.className='chart-toggle'+(mode==='annee'?' active':''); }
   renderChart(mode);
 }
 
-// ── PANNES ──
+function switchSite(evt, newSiteId) {
+  if (evt) evt.stopPropagation();
+  var st = window._currentSiteState;
+  if (!st || !st.opts.allSites) return;
+  var newSite = null;
+  for (var i=0; i<st.opts.allSites.length; i++) { if (st.opts.allSites[i].id===newSiteId) { newSite=st.opts.allSites[i]; break; } }
+  if (!newSite) return;
+  renderHotelView(st.client, newSite.id, newSite.nom, {role:st.opts.role, allSites:st.opts.allSites}, null);
+}
+
+function goBackConsolidated() {
+  var st = window._consolidatedState;
+  if (!st) return;
+  renderGroupeView(st.client, st.sites, st.opsOnly);
+}
+
+function drillSiteDetail(siteId, siteNom, evt) {
+  if (evt) evt.stopPropagation();
+  var st = window._consolidatedState;
+  if (!st) return;
+  renderHotelView(st.client, siteId, siteNom, {role:st.opsOnly?'dir_ops':'dir_tech', fromConsolidated:true}, null);
+}
+
 function buildPannesSection(pannesOuv, pannesRes, groupes, groupeMap, panneLabels, showFull) {
   var gids = {}; groupes.forEach(function(g){gids[g.id]=true;});
   var panneFilt = pannesOuv.filter(function(p){return gids[p.groupe_id];});
@@ -687,11 +667,9 @@ function buildPannesSection(pannesOuv, pannesRes, groupes, groupeMap, panneLabel
   var ouvertesHtml = '';
   if (panneFilt.length) {
     panneFilt.forEach(function(p){
-      var gNom = groupeMap[p.groupe_id]||'Equipement';
-      var pb   = p.description||(panneLabels[p.type]||p.type||'Panne');
-      var cout = p.cout_reparation?fmtNum(p.cout_reparation)+' FCFA estimé':'Coût non défini';
-      ouvertesHtml += '<div class="panne-open">' +
-        '<div class="panne-hdr"><span class="pill pill-danger">'+gNom+'</span>' +
+      var gNom=groupeMap[p.groupe_id]||'Equipement', pb=p.description||(panneLabels[p.type]||p.type||'Panne');
+      var cout=p.cout_reparation?fmtNum(p.cout_reparation)+' FCFA estimé':'Coût non défini';
+      ouvertesHtml += '<div class="panne-open"><div class="panne-hdr"><span class="pill pill-danger">'+gNom+'</span>' +
         '<div class="panne-nom">'+pb+'</div><div class="panne-dt">'+fmtDate(p.date_panne)+'</div></div>' +
         '<div class="panne-ftr"><span class="panne-cout">'+cout+'</span>' +
         '<button class="resolve-btn" onclick="resoudrePanne(\''+p.id+'\',event)">✓ Résolu</button></div></div>';
@@ -701,75 +679,54 @@ function buildPannesSection(pannesOuv, pannesRes, groupes, groupeMap, panneLabel
   }
   var historHtml = '';
   if (showFull && resFilt.length) {
-    var rows = ''; resFilt.forEach(function(p){
-      rows += '<tr><td>'+fmtDate(p.date_resolution||p.date_panne)+'</td>' +
-        '<td>'+(groupeMap[p.groupe_id]||'—')+'</td>' +
-        '<td>'+(p.description||(panneLabels[p.type]||p.type)||'—')+'</td>' +
-        '<td>'+(p.intervenant||'—')+'</td>' +
+    var rows=''; resFilt.forEach(function(p){
+      rows += '<tr><td>'+fmtDate(p.date_resolution||p.date_panne)+'</td><td>'+(groupeMap[p.groupe_id]||'—')+'</td>' +
+        '<td>'+(p.description||(panneLabels[p.type]||p.type)||'—')+'</td><td>'+(p.intervenant||'—')+'</td>' +
         '<td><strong>'+(p.cout_reparation?fmtNum(p.cout_reparation)+' F':'—')+'</strong></td></tr>';
     });
     historHtml = '<div class="table-card"><div class="table-hdr"><div class="table-hdr-title">Historique résolu</div>' +
       '<div class="table-hdr-sub">'+resFilt.length+' panne'+(resFilt.length>1?'s':'')+'</div></div>' +
-      '<table class="data"><thead><tr><th>Résolu le</th><th>Équipement</th><th>Problème</th><th>Intervenant</th><th>Coût</th></tr></thead>' +
-      '<tbody>'+rows+'</tbody></table></div>';
+      '<table class="data"><thead><tr><th>Résolu le</th><th>Équipement</th><th>Problème</th><th>Intervenant</th><th>Coût</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
   }
-  return '<div class="pannes-section">' +
-    '<div class="section-hdr"><div class="section-title">Pannes &amp; maintenance</div>' +
-    '<div class="section-sub">'+panneFilt.length+' en cours</div></div>' +
-    ouvertesHtml + historHtml + '</div>';
+  return '<div class="pannes-section"><div class="section-hdr"><div class="section-title">Pannes &amp; maintenance</div>' +
+    '<div class="section-sub">'+panneFilt.length+' en cours</div></div>'+ouvertesHtml+historHtml+'</div>';
 }
 
-// ── RAVITAILLEMENTS ──
 function buildRavitsSection(ravits, litres30, coutCarb30, prixLitre) {
-  var rows = ''; ravits.forEach(function(s){
-    rows += '<tr><td>'+fmtDate(s.date)+'</td>' +
-      '<td><strong>+'+fmtNum(s.litres_ajoutes)+'L</strong></td>' +
-      '<td>'+fmtNum(Math.round(s.litres_ajoutes*prixLitre))+' FCFA</td>' +
-      '<td>'+(s.operateur||'—')+'</td></tr>';
+  var rows=''; ravits.forEach(function(s){
+    rows += '<tr><td>'+fmtDate(s.date)+'</td><td><strong>+'+fmtNum(s.litres_ajoutes)+'L</strong></td>' +
+      '<td>'+fmtNum(Math.round(s.litres_ajoutes*prixLitre))+' FCFA</td><td>'+(s.operateur||'—')+'</td></tr>';
   });
-  return '<div class="table-card" style="margin-bottom:28px">' +
-    '<div class="table-hdr"><div class="table-hdr-title">Ravitaillements — 30 jours</div>' +
+  return '<div class="table-card" style="margin-bottom:28px"><div class="table-hdr">' +
+    '<div class="table-hdr-title">Ravitaillements — 30 jours</div>' +
     '<div class="table-hdr-sub">'+fmtNum(litres30)+'L · '+fmtNum(coutCarb30)+' FCFA</div></div>' +
-    '<table class="data"><thead><tr><th>Date</th><th>Litres ajoutés</th><th>Coût estimé</th><th>Opérateur</th></tr></thead>' +
-    '<tbody>'+rows+'</tbody></table></div>';
+    '<table class="data"><thead><tr><th>Date</th><th>Litres ajoutés</th><th>Coût estimé</th><th>Opérateur</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 
-// ── SAISIES LOG ──
 function buildSaisiesLog(saisies30, groupeMap) {
   var saisies = saisies30.slice().sort(function(a,b){
     return (b.date+((b.created_at||'').slice(11))).localeCompare(a.date+((a.created_at||'').slice(11)));
   }).slice(0,50);
   if (!saisies.length) return '';
-  var rows = ''; saisies.forEach(function(s){
-    rows += '<tr><td>'+fmtDate(s.date)+'</td>' +
-      '<td style="color:var(--texte2)">'+(fmtHeure(s.created_at)||'—')+'</td>' +
-      '<td>'+(groupeMap[s.groupe_id]||'—')+'</td>' +
-      '<td>'+(s.heures_marche!=null?s.heures_marche+'h':'—')+'</td>' +
-      '<td style="color:'+huileColor(s.niveau_huile)+'">'+(s.niveau_huile||'—')+'</td>' +
-      '<td>'+(s.operateur||'—')+'</td></tr>';
+  var rows=''; saisies.forEach(function(s){
+    rows += '<tr><td>'+fmtDate(s.date)+'</td><td style="color:var(--texte2)">'+(fmtHeure(s.created_at)||'—')+'</td>' +
+      '<td>'+(groupeMap[s.groupe_id]||'—')+'</td><td>'+(s.heures_marche!=null?s.heures_marche+'h':'—')+'</td>' +
+      '<td style="color:'+huileColor(s.niveau_huile)+'">'+(s.niveau_huile||'—')+'</td><td>'+(s.operateur||'—')+'</td></tr>';
   });
   return '<button class="saisies-toggle" onclick="toggleSaisies(this)">' +
     '<span>Journal des saisies ('+saisies.length+' entrées)</span><span>▾</span></button>' +
-    '<div class="saisies-body" id="saisies-body">' +
-    '<div class="table-card" style="margin-top:6px">' +
-    '<table class="data"><thead><tr><th>Date</th><th>Heure</th><th>Groupe</th><th>Compteur</th><th>Huile</th><th>Opérateur</th></tr></thead>' +
-    '<tbody>'+rows+'</tbody></table></div></div>';
+    '<div class="saisies-body" id="saisies-body"><div class="table-card" style="margin-top:6px">' +
+    '<table class="data"><thead><tr><th>Date</th><th>Heure</th><th>Groupe</th><th>Compteur</th><th>Huile</th><th>Opérateur</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
 }
 
-function toggleSaisies(btn) {
-  var body = document.getElementById('saisies-body');
-  if (body) body.classList.toggle('open');
-}
-
-// ── EXPORT PDF ──
-function exportPDF() {
-  alert('Export PDF — fonctionnalité en cours de développement.');
-}
+function toggleSaisies(btn) { var body=document.getElementById('saisies-body'); if(body) body.classList.toggle('open'); }
+function exportPDF() { alert('Export PDF — fonctionnalité en cours de développement.'); }
 
 // ════════════════════════════════════════
-// VUE GROUPE (dir_ops / dir_tech)
+// VUE CONSOLIDÉE (dir_ops / dir_tech)
 // ════════════════════════════════════════
 function renderGroupeView(client, sites, opsOnly) {
+  window._consolidatedState = {client:client, sites:sites, opsOnly:opsOnly};
   var now = new Date();
   var today = now.toISOString().split('T')[0];
   var debut30 = new Date(Date.now()-30*86400000).toISOString().split('T')[0];
@@ -786,8 +743,8 @@ function renderGroupeView(client, sites, opsOnly) {
     var saisiesOk = toutesSaisies.filter(function(s){return s.heures_marche!=null;}).length;
     var alertesDanger = toutesAlertes.filter(function(a){return a.severite==='danger';}).length;
     var sitesHtml = sites.map(function(s){
-      var sGroupes = tousGroupes.filter(function(g){return g.site_id===s.id;});
-      var sSaisies = toutesSaisies.filter(function(x){return sGroupes.some(function(g){return g.id===x.groupe_id;});});
+      var sGroupes=tousGroupes.filter(function(g){return g.site_id===s.id;});
+      var sSaisies=toutesSaisies.filter(function(x){return sGroupes.some(function(g){return g.id===x.groupe_id;});});
       var sCuve=null; for(var ci=0;ci<toutesCuves.length;ci++){if(toutesCuves[ci].site_id===s.id){sCuve=toutesCuves[ci];break;}}
       var sSaisieCuve=null; if(sCuve){for(var sci=0;sci<toutesSaisiesCuve.length;sci++){if(toutesSaisiesCuve[sci].cuve_id===sCuve.id){sSaisieCuve=toutesSaisiesCuve[sci];break;}}}
       var pctCuve=(sSaisieCuve&&sCuve)?Math.round(sSaisieCuve.niveau_litres/sCuve.capacite_litres*100):null;
@@ -797,10 +754,14 @@ function renderGroupeView(client, sites, opsOnly) {
       var hasDanger=toutesAlertes.some(function(a){return a.severite==='danger'&&sGroupes.some(function(g){return g.id===a.groupe_id;});});
       var pillClass=(hasDanger||sPannes.length)?'pill-danger':toutesAlertes.some(function(a){return sGroupes.some(function(g){return g.id===a.groupe_id;})})?'pill-warn':'pill-ok';
       var pillTxt=(hasDanger||sPannes.length)?'Action requise':'Normal';
-      return '<div class="site-card" id="site-card-'+s.id+'" onclick="toggleSiteDetail(\''+s.id+'\',event)">' +
+      var sNomEsc=s.nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      return '<div class="site-card" onclick="toggleSiteDetail(\''+s.id+'\',event)">' +
         '<div class="sc-hdr"><div><div class="sc-nom">🏨 '+s.nom+'</div>' +
         '<div class="sc-sub">'+(s.ville||'')+' · '+sGroupes.length+' groupe'+(sGroupes.length>1?'s':'')+'</div></div>' +
-        '<span class="pill '+pillClass+'">'+pillTxt+'</span></div>' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span class="pill '+pillClass+'">'+pillTxt+'</span>' +
+          '<button class="voir-detail-btn" onclick="drillSiteDetail(\''+s.id+'\',\''+sNomEsc+'\',event)">Détail →</button>' +
+        '</div></div>' +
         '<div class="sc-kpis">' +
           '<div class="sc-kpi"><div class="sc-kpi-val" style="color:'+(sSaisies.length===sGroupes.length?'var(--vert)':sSaisies.length>0?'var(--orange)':'var(--rouge)')+'">'+sSaisies.length+'/'+sGroupes.length+'</div><div class="sc-kpi-label">Saisies</div></div>' +
           '<div class="sc-kpi"><div class="sc-kpi-val" style="color:'+(pctCuve!=null?carbColor(pctCuve):'var(--texte2)')+'">'+( pctCuve!=null?pctCuve+'%':'—')+'</div><div class="sc-kpi-label">Cuve</div></div>' +
@@ -826,7 +787,7 @@ function renderGroupeView(client, sites, opsOnly) {
           '<div class="kpi"><div class="kpi-label">Pannes en cours</div><div class="kpi-value" style="color:'+(toutesPannes.length?'var(--rouge)':'var(--vert)')+'">'+(toutesPannes.length||'✓')+'</div><div class="kpi-trend">'+(toutesPannes.length?'intervention requise':'Tout résolu')+'</div></div>' +
           '<div class="kpi"><div class="kpi-label">Équipements</div><div class="kpi-value">'+tousGroupes.length+'</div><div class="kpi-trend">'+sites.length+' site'+(sites.length>1?'s':'')+'</div></div>' +
         '</div>' +
-        '<div class="section-hdr"><div class="section-title">Établissements</div></div>' +
+        '<div class="section-hdr"><div class="section-title">Établissements</div><div class="section-sub">Aperçu rapide · Détail → pour vue complète</div></div>' +
         sitesHtml +
       '</div>' +
       '<div class="footer">Powered by <strong>GenTrack</strong> · '+client.nom+'</div>';
@@ -842,21 +803,19 @@ function toggleSiteDetail(siteId, evt) {
   document.querySelectorAll('.sc-detail.open').forEach(function(d){d.classList.remove('open');});
   _openSiteId=siteId; el.classList.add('open');
   var d=window._groupeData; if (!d) return;
-  var sGroupes = d.tousGroupes.filter(function(g){return g.site_id===siteId;});
-  var sSaisies = d.toutesSaisies.filter(function(x){return sGroupes.some(function(g){return g.id===x.groupe_id;});});
+  var sGroupes=d.tousGroupes.filter(function(g){return g.site_id===siteId;});
+  var sSaisies=d.toutesSaisies.filter(function(x){return sGroupes.some(function(g){return g.id===x.groupe_id;});});
   var sCuve=null; for(var ci=0;ci<d.toutesCuves.length;ci++){if(d.toutesCuves[ci].site_id===siteId){sCuve=d.toutesCuves[ci];break;}}
   var sSaisieCuve=null; if(sCuve){for(var sci=0;sci<d.toutesSaisiesCuve.length;sci++){if(d.toutesSaisiesCuve[sci].cuve_id===sCuve.id){sSaisieCuve=d.toutesSaisiesCuve[sci];break;}}}
   var cLh=(sGroupes.length&&sGroupes[0].conso_theorique_lh)?parseFloat(sGroupes[0].conso_theorique_lh):65;
-  var niv=sSaisieCuve?sSaisieCuve.niveau_litres:null;
-  var cap=sCuve?(sCuve.capacite_litres||500):500;
-  var pctC=niv!=null?Math.round(niv/cap*100):null;
-  var autoJ=niv!=null?Math.round((niv/(cLh*8))*10)/10:null;
+  var niv=sSaisieCuve?sSaisieCuve.niveau_litres:null, cap=sCuve?(sCuve.capacite_litres||500):500;
+  var pctC=niv!=null?Math.round(niv/cap*100):null, autoJ=niv!=null?Math.round((niv/(cLh*8))*10)/10:null;
   var cuveHtml2='';
   if(sCuve){
     cuveHtml2='<div style="background:var(--or-pale);border:1px solid rgba(201,169,110,0.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px">' +
       '<span>🪣 Cuve <strong>'+fmtNum(cap)+'L</strong></span>' +
       (pctC!=null?'<span>Niveau <strong style="color:'+carbColor(pctC)+'">'+pctC+'%</strong></span>':'') +
-      (autoJ!=null?'<span>Autonomie <strong style="color:'+autoColor(autoJ)+'">'+autoJ+'j</strong></span>':'') +
+      (autoJ!=null?'<span>Autonomie <strong style="color:'+autoColor(autoJ)+'">'+autoJ+'j</strong></span>':'')+
     '</div>';
   }
   var gHtml=''; sGroupes.forEach(function(g){
@@ -864,7 +823,7 @@ function toggleSiteDetail(siteId, evt) {
     var rd=retardLabel(s?s.date:null, d.today);
     gHtml+='<div style="border:1px solid var(--bordure);border-radius:8px;overflow:hidden;margin-bottom:8px;background:white">' +
       '<div style="padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--bordure);display:flex;justify-content:space-between;align-items:center">' +
-        '<div><div style="font-size:13px;font-weight:600">⚡ '+g.nom+(g.marque?' — '+g.marque:'')+' '+(g.puissance_kva||'')+(g.puissance_kva?'kVA':'')+'</div>' +
+        '<div><div style="font-size:13px;font-weight:600">⚡ '+g.nom+(g.marque?' — '+g.marque:'')+' '+(g.puissance_kva?g.puissance_kva+'kVA':'')+'</div>' +
         '<div style="font-size:11px;color:'+rd.color+'">'+rd.label+'</div></div>' +
         '<span class="pill '+(rd.jours===0?'pill-ok':rd.jours===1?'pill-warn':'pill-danger')+'">'+(rd.jours===0?'OK ✓':rd.jours===1?'Hier':rd.jours===null?'Aucune saisie':'J-'+rd.jours)+'</span>' +
       '</div>' +
