@@ -343,7 +343,8 @@ function renderHotelView(client,siteId,siteName,opts,containerId){
       var capCuve=cuve?(cuve.capacite_litres||500):500;
       var niveauCuve=saisieCuve?saisieCuve.niveau_litres:null;
       var pctCuve=niveauCuve!=null?Math.round(niveauCuve/capCuve*100):null;
-      var consoLh=(groupes.length&&groupes[0].conso_theorique_lh)?parseFloat(groupes[0].conso_theorique_lh):65;
+      var groupesGE=groupes.filter(function(g){return(g.type_equipement||'ge')==='ge';});
+      var consoLh=(groupesGE.length&&groupesGE[0].conso_theorique_lh)?parseFloat(groupesGE[0].conso_theorique_lh):65;
       var autoJours=niveauCuve!=null?Math.round((niveauCuve/(consoLh*8))*10)/10:null;
 
       var groupeMap={};groupes.forEach(function(g){groupeMap[g.id]=g.nom;});
@@ -406,7 +407,7 @@ function renderHotelView(client,siteId,siteName,opts,containerId){
 
       var typeHtml=buildEquipByType(groupes,saisiesJour,saisies30,pannesOuv,today);
       var presenceHtml=buildPresenceSection(groupes,saisies30,today);
-      var cuveHtml=buildCuveCard(cuve,saisieCuve,niveauCuve,pctCuve,capCuve,autoJours,consoLh,groupes,saisiesJour,today);
+      var cuveHtml=buildCuveCard(cuve,saisieCuve,niveauCuve,pctCuve,capCuve,autoJours,consoLh,groupesGE,saisiesJour,today);
       var pannesHtml=buildPannesSection(pannesOuv,showFull?pannesRes:[],groupes,groupeMap,panneLabels,showFull);
       var ravitHtml=(showFull&&ravits.length)?buildRavitsSection(ravits,litres30,coutCarb30,prixLitre):'';
       var saisiesLogHtml=buildSaisiesLog(saisies30,groupeMap);

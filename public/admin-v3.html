@@ -485,18 +485,25 @@ function renderTabSites(client, sites, allEquip, groupes) {
 
   // Ancien modèle : groupes
   if (groupes.length > 0) {
-    html += `<div class="info-box">📦 <strong>Ancien modèle (groupes)</strong> — ${groupes.length} groupe(s) existant(s) sur ce client.</div>`;
+    const typeIcons = {ge:'⚡',geg:'❄️',cf:'🧊',autre:'⚙️'};
+    const typeLabels = {ge:'Groupe électrogène',geg:'Groupe eau glacée',cf:'Chambre froide',autre:'Autre'};
+    html += `<div class="info-box">📦 <strong>Équipements</strong> — ${groupes.length} unité(s) · <span style="color:var(--green)">${groupes.filter(g=>g.actif).length} actif(s)</span></div>`;
     groupes.forEach(g => {
-      const cuve = S.cuves.find(c=>c.id===g.cuve_id);
-      html += `<div class="equip-item" style="margin-bottom:8px">
+      const icon = typeIcons[g.type_equipement]||'⚙️';
+      const typeLabel = typeLabels[g.type_equipement]||g.type_equipement||'Équipement';
+      html += `<div class="equip-item" style="margin-bottom:8px;opacity:${g.actif?1:0.45}">
         <div class="equip-item-left">
-          <div class="equip-icon">⚡</div>
+          <div class="equip-icon" style="background:${g.actif?'#f0ede8':'#e2e8f0'}">${icon}</div>
           <div>
-            <div class="equip-name">${esc(g.nom)}</div>
-            <div class="equip-meta">${g.puissance_kva?g.puissance_kva+' kVA':''} ${g.marque?'· '+esc(g.marque):''} ${g.reference?'· '+esc(g.reference):''} · Conso: ${g.conso_theorique_lh||1.5}L/h · Réservoir: ${g.capacite_reservoir_litres||500}L</div>
+            <div class="equip-name">${esc(g.nom)} <span style="font-size:10px;color:var(--text-muted);font-weight:400">· ${typeLabel}</span></div>
+            <div class="equip-meta">${g.puissance_kva?g.puissance_kva+' kVA · ':''} ${g.marque?esc(g.marque)+' · ':''} ${g.actif?'<span style="color:var(--green);font-weight:600">Actif</span>':'<span style="color:var(--text-muted)">Inactif</span>'}</div>
           </div>
         </div>
-        <div style="display:flex;gap:6px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <label class="toggle" title="${g.actif?'Désactiver':'Activer'}" onclick="event.stopPropagation()">
+            <input type="checkbox" ${g.actif?'checked':''} onchange="toggleGroupeActif('${g.id}',this.checked,'${client.id}')">
+            <span class="toggle-slider"></span>
+          </label>
           <button class="btn btn-outline btn-xs" onclick="editGroupe('${g.id}','${client.id}')">✏️</button>
         </div>
       </div>`;
@@ -722,6 +729,17 @@ async function deleteSite(siteId,clientId) {
 }
 
 // ── GROUPES (ancien modèle) ────────────────────────────────
+async function toggleGroupeActif(gId, actif, clientId) {
+  await fetch(`${SUPA_URL}/rest/v1/groupes?id=eq.${gId}`, {
+    method: 'PATCH',
+    headers: {'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body: JSON.stringify({ actif })
+  });
+  toast(actif ? '✅ Équipement activé — visible sur le dashboard client' : '⏸ Équipement désactivé — masqué du dashboard client');
+  S.groupes = S.groupes.map(g => g.id === gId ? {...g, actif} : g);
+  openClient(clientId);
+}
+
 function editGroupe(gId, clientId) {
   const g=S.groupes.find(x=>x.id===gId); if(!g) return;
   showModal('modal-grp',`<div class="modal modal-md">
