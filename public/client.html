@@ -176,6 +176,7 @@ table.data tr:hover td{background:var(--surface2)}
 var SUPA_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
 var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
 var _chartInst=null, _chartMode='mois';
+var TYPE_ICONS_NEW={ge:'⚡',geg:'💧',cf:'❄️',autre:'⚙️'};
 
 var TYPE_LABELS={
   'ge':{label:'Groupes électrogènes',icon:'⚡'},
@@ -281,7 +282,56 @@ function loadSiteView(clientId,siteIds,access){
 }
 
 // ════════════════════════════════════════
-// VUE HÔTEL
+// NOUVEAU SYSTÈME — helpers
+// ════════════════════════════════════════
+function typeCodeFromNom(nom){
+  var n=(nom||'').toLowerCase();
+  if(n.indexOf('lectrog')>=0)return 'ge';
+  if(n.indexOf('eau glac')>=0)return 'geg';
+  if(n.indexOf('froide')>=0)return 'cf';
+  return 'autre';
+}
+
+function getRepVal(reps,keyword){
+  var kw=(keyword||'').toLowerCase();
+  for(var i=0;i<reps.length;i++){
+    if((reps[i].texte||'').toLowerCase().indexOf(kw)>=0)return reps[i].valeur;
+  }
+  return null;
+}
+
+function huileNorm(v){
+  if(!v)return null;
+  var l=v.toLowerCase();
+  if(l.indexOf('normal')>=0||l.indexOf('bon')>=0||l.indexOf('ok')>=0||l.indexOf('correct')>=0)return 'normal';
+  if(l.indexOf('bas')>=0)return 'bas';
+  if(l.indexOf('critique')>=0||l.indexOf('vide')>=0)return 'critique';
+  return 'autre';
+}
+
+function buildEquipDataMap(rondes,rondesEq,reponses,questions){
+  var qMap={};
+  questions.forEach(function(q){qMap[q.id]=q.texte||'';});
+  var repByRE={};
+  reponses.forEach(function(r){
+    if(!repByRE[r.ronde_equipement_id])repByRE[r.ronde_equipement_id]=[];
+    repByRE[r.ronde_equipement_id].push({texte:qMap[r.question_id]||'',valeur:r.valeur||''});
+  });
+  var rondeDate={};
+  rondes.forEach(function(r){rondeDate[r.id]=r.date_ronde;});
+  var reByEquip={};
+  rondesEq.forEach(function(re){
+    if(!reByEquip[re.equipement_id])reByEquip[re.equipement_id]=[];
+    reByEquip[re.equipement_id].push({date:rondeDate[re.ronde_id]||'',re_id:re.id,reps:repByRE[re.id]||[]});
+  });
+  Object.keys(reByEquip).forEach(function(eid){
+    reByEquip[eid].sort(function(a,b){return b.date.localeCompare(a.date);});
+  });
+  return reByEquip;
+}
+
+// ════════════════════════════════════════
+// VUE HÔTEL — détection système + dispatch
 // ════════════════════════════════════════
 function renderHotelView(client,siteId,siteName,opts,containerId){
   if(!opts)opts={};
@@ -295,180 +345,546 @@ function renderHotelView(client,siteId,siteName,opts,containerId){
   var now=new Date();
   var today=now.toISOString().split('T')[0];
   var debut30=new Date(Date.now()-30*86400000).toISOString().split('T')[0];
-  var debutAn=new Date(now.getFullYear(),0,1).toISOString().split('T')[0];
-  var moisPrec=new Date(now.getFullYear(),now.getMonth()-1,1);
-  var debutMoisPrec=moisPrec.getFullYear()+'-'+(moisPrec.getMonth()<9?'0':'')+(moisPrec.getMonth()+1)+'-01';
-  var finMoisPrec=new Date(now.getFullYear(),now.getMonth(),0).toISOString().split('T')[0];
 
+  // Phase 1 — toujours en parallèle
   Promise.all([
-    api('groupes','&client_id=eq.'+client.id+(siteId?'&site_id=eq.'+siteId:'')+'&actif=eq.true&order=nom'),
-    api('saisies','&client_id=eq.'+client.id+'&date=gte.'+debut30+'&order=date.desc,created_at.desc&limit=500'),
+    siteId?api('equipements','&site_id=eq.'+siteId+'&actif=eq.true&order=ordre_ronde'):Promise.resolve([]),
+    api('types_equipements',''),
     api('alertes','&client_id=eq.'+client.id+'&resolue=eq.false'),
     api('pannes','&client_id=eq.'+client.id+'&resolue=eq.false&order=date_panne.desc'),
-    showFull?api('pannes','&client_id=eq.'+client.id+'&resolue=eq.true&order=date_resolution.desc&limit=20'):Promise.resolve([]),
-    api('cuves','&client_id=eq.'+client.id+(siteId?'&site_id=eq.'+siteId:'')+'&actif=eq.true')
-  ]).then(function(res){
-    var groupes=res[0],saisies30=res[1],alertes=res[2],pannesOuv=res[3],pannesRes=res[4],cuves=res[5];
+    showFull?api('pannes','&client_id=eq.'+client.id+'&resolue=eq.true&order=date_resolution.desc&limit=20'):Promise.resolve([])
+  ]).then(function(r0){
+    var allEquips=r0[0],typesEq=r0[1],alertes=r0[2],pannesOuv=r0[3],pannesRes=r0[4];
 
-    var dernSaisie={};
-    saisies30.forEach(function(s){if(!dernSaisie[s.groupe_id])dernSaisie[s.groupe_id]=s;});
-    var saisiesJour=[];
-    for(var k in dernSaisie)saisiesJour.push(dernSaisie[k]);
+    if(allEquips.length>0){
+      // ═══ NOUVEAU SYSTÈME ═══
+      var typeMap={};
+      typesEq.forEach(function(t){
+        var code=typeCodeFromNom(t.nom);
+        typeMap[t.id]={nom:t.nom,code:code,icon:TYPE_ICONS_NEW[code]||'⚙️'};
+      });
+      var cuveEquip=null;
+      allEquips.forEach(function(e){if(e.capacite_litres!=null&&!cuveEquip)cuveEquip=e;});
+      var equips=allEquips.filter(function(e){return e.capacite_litres==null;});
 
-    var cuve=cuves.length?cuves[0]:null;
-    var fCuve30=cuve?api('saisies_cuve','&cuve_id=eq.'+cuve.id+'&date=gte.'+debut30+'&order=date.asc,created_at.asc'):Promise.resolve([]);
-    var fCuveAn=cuve?api('saisies_cuve','&cuve_id=eq.'+cuve.id+'&date=gte.'+debutAn+'&order=date.asc'):Promise.resolve([]);
-    var fSaisiesMoisPrec=showFull?api('saisies','&client_id=eq.'+client.id+'&date=gte.'+debutMoisPrec+'&date=lte.'+finMoisPrec+'&limit=300'):Promise.resolve([]);
-
-    Promise.all([fCuve30,fCuveAn,fSaisiesMoisPrec]).then(function(cr){
-      var sCuve30=cr[0],sCuveAn=cr[1];
-
-      // Dernière saisie cuve = la plus récente
-      var sCuve30Desc=sCuve30.slice().sort(function(a,b){return (b.date+(b.created_at||'')).localeCompare(a.date+(a.created_at||''));});
-      var saisieCuve=sCuve30Desc.length?sCuve30Desc[0]:null;
-      var ravits=sCuve30.filter(function(s){return(s.litres_ajoutes||0)>0;});
-      var prixLitre=client.prix_litre_fcfa||695;
-      var litres30=ravits.reduce(function(a,s){return a+(s.litres_ajoutes||0);},0);
-      var coutCarb30=Math.round(litres30*prixLitre);
-
-      var ravitsMoisPrec=sCuveAn.filter(function(s){return(s.litres_ajoutes||0)>0&&s.date>=debutMoisPrec&&s.date<=finMoisPrec;});
-      var litresMoisPrec=ravitsMoisPrec.reduce(function(a,s){return a+(s.litres_ajoutes||0);},0);
-      var coutCarbMoisPrec=Math.round(litresMoisPrec*prixLitre);
-      var deltaCarbPct=coutCarbMoisPrec>0?Math.round((coutCarb30-coutCarbMoisPrec)/coutCarbMoisPrec*100):null;
-
-      var coutMaint=showFull?pannesRes.filter(function(p){return p.date_resolution>=debut30;}).reduce(function(a,p){return a+(p.cout_reparation||0);},0):0;
-      var pannMoisPrec=showFull?pannesRes.filter(function(p){return p.date_resolution>=debutMoisPrec&&p.date_resolution<=finMoisPrec;}).length:0;
-      var pannDelta=pannesRes.length-pannMoisPrec;
-
-      var capCuve=cuve?(cuve.capacite_litres||500):500;
-      var niveauCuve=saisieCuve?saisieCuve.niveau_litres:null;
-      var pctCuve=niveauCuve!=null?Math.round(niveauCuve/capCuve*100):null;
-      var groupesGE=groupes.filter(function(g){return(g.type_equipement||'ge')==='ge';});
-      var consoLh=(groupesGE.length&&groupesGE[0].conso_theorique_lh)?parseFloat(groupesGE[0].conso_theorique_lh):65;
-      var autoJours=niveauCuve!=null?Math.round((niveauCuve/(consoLh*8))*10)/10:null;
-
-      var groupeMap={};groupes.forEach(function(g){groupeMap[g.id]=g.nom;});
-      var panneLabels={ne_demarre_pas:'Ne démarre pas',arret_inopin:'Arrêt inopiné',bruit_anormal:'Bruit anormal',surchauffe:'Surchauffe',fuite:'Fuite carburant',autre:'Autre'};
-
-      var nom=siteName||client.nom;
-      var dateStr=now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-      var roleLabel=role==='resp_tech'?'Responsable technique':role==='dir_ops'?'Directeur des opérations':role==='dir_tech'?'Directeur technique':'Technicien';
-
-      var rondesOk=0;
-      groupes.forEach(function(g){
-        var s=null;for(var i=0;i<saisiesJour.length;i++){if(saisiesJour[i].groupe_id===g.id){s=saisiesJour[i];break;}}
-        if(s&&retardLabel(s.date,today).jours===0)rondesOk++;
+      // Phase 2 — rondes + questions en parallèle
+      Promise.all([
+        api('rondes','&site_id=eq.'+siteId+'&date_ronde=gte.'+debut30+'&order=date_ronde.desc&limit=60'),
+        api('questions','')
+      ]).then(function(r1){
+        var rondes=r1[0],questions=r1[1];
+        if(!rondes.length){
+          renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,[],[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull);
+          return;
+        }
+        var rondeIds=rondes.map(function(r){return r.id;});
+        // Phase 3 — rondes_equipements
+        api('rondes_equipements','&ronde_id=in.('+rondeIds.join(',')+')').then(function(rondesEq){
+          if(!rondesEq.length){
+            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull);
+            return;
+          }
+          // Phase 4 — reponses : seulement dernière ronde (état actuel) + toutes entrées cuve (graphique)
+          var latestRondeId=rondes[0].id;
+          var latestREids=rondesEq.filter(function(re){return re.ronde_id===latestRondeId;}).map(function(re){return re.id;});
+          var cuveREids=cuveEquip?rondesEq.filter(function(re){return re.equipement_id===cuveEquip.id;}).map(function(re){return re.id;}):[];
+          var reidSet={};
+          latestREids.forEach(function(id){reidSet[id]=true;});
+          cuveREids.forEach(function(id){reidSet[id]=true;});
+          var allREids=Object.keys(reidSet);
+          if(!allREids.length){
+            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull);
+            return;
+          }
+          api('reponses','&ronde_equipement_id=in.('+allREids.join(',')+')').then(function(reponses){
+            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,reponses,questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull);
+          });
+        });
       });
 
-      // ── DÉTECTION SAUT DE CONSO CUVE ──
-      var sautConsoAlerte=null;
-      if(sCuve30.length>=3){
-        // Dernière lecture par jour (triée asc)
-        var byDay={};
-        sCuve30.forEach(function(s){if(s.niveau_litres!=null)byDay[s.date]=(byDay[s.date]===undefined)?s.niveau_litres:Math.min(byDay[s.date],s.niveau_litres);});
-        var dayKeys=Object.keys(byDay).sort();
-        if(dayKeys.length>=3){
-          var drops=[];
-          for(var di=1;di<dayKeys.length;di++){
-            var drop=byDay[dayKeys[di-1]]-byDay[dayKeys[di]];
-            if(drop>0)drops.push({drop:drop,date:dayKeys[di]});
-          }
-          if(drops.length>=2){
-            var avgDrop=drops.reduce(function(a,d){return a+d.drop;},0)/drops.length;
-            var dernierDrop=drops[drops.length-1];
-            if(dernierDrop.drop>avgDrop*1.5){
-              var pctSaut=Math.round((dernierDrop.drop/avgDrop-1)*100);
-              sautConsoAlerte='Saut de consommation cuve le '+fmtDateShort(dernierDrop.date)+' — '+fmtNum(Math.round(dernierDrop.drop))+'L (×'+Math.round(dernierDrop.drop/avgDrop*10)/10+' la moyenne)';
-            }
-          }
-        }
-      }
-
-      // Alertes bannière
-      var urgences=[];
-      if(autoJours!==null&&autoJours<3)urgences.push('Autonomie cuve critique ('+autoJours+'j)');
-      if(sautConsoAlerte)urgences.push(sautConsoAlerte);
-      pannesOuv.forEach(function(p){urgences.push('Panne — '+(groupeMap[p.groupe_id]||'équipement'));});
-      alertes.filter(function(a){return a.severite==='danger';}).forEach(function(a){urgences.push(a.message);});
-      var bannerHtml='';
-      if(urgences.length){
-        bannerHtml='<div class="alert-banner"><div class="alert-icon">⚠️</div><div class="ab-body">'+
-          '<div class="ab-titre">'+(urgences.length===1?'1 action requise':urgences.length+' actions requises aujourd\'hui')+'</div>'+
-          '<div class="ab-sub">'+urgences.join(' · ')+'</div></div></div>';
-      }
-
-      var kRondeColor=rondesOk===groupes.length?'var(--vert)':rondesOk>0?'var(--orange)':'var(--rouge)';
-      var kCarbTrend='';
-      if(deltaCarbPct!==null){
-        var sign=deltaCarbPct>=0?'+':'';
-        kCarbTrend='<span class="kpi-trend-pill" style="'+(deltaCarbPct>0?'background:var(--rouge-pale);color:var(--rouge)':deltaCarbPct<0?'background:var(--vert-pale);color:var(--vert)':'')+'">'+sign+deltaCarbPct+'%</span> vs mois dernier';
-      } else {kCarbTrend='FCFA · '+fmtNum(litres30)+'L';}
-      var kMaintTrend=pannDelta>0?('<span class="kpi-trend-pill" style="background:var(--rouge-pale);color:var(--rouge)">+'+pannDelta+' panne'+(pannDelta>1?'s':'')+' de plus</span>'):(pannesRes.length+' résolue'+(pannesRes.length>1?'s':''));
-
-      var typeHtml=buildEquipByType(groupes,saisiesJour,saisies30,pannesOuv,today);
-      var presenceHtml=buildPresenceSection(groupes,saisies30,today);
-      var cuveHtml=buildCuveCard(cuve,saisieCuve,niveauCuve,pctCuve,capCuve,autoJours,consoLh,groupesGE,saisiesJour,today);
-      var pannesHtml=buildPannesSection(pannesOuv,showFull?pannesRes:[],groupes,groupeMap,panneLabels,showFull);
-      var ravitHtml=(showFull&&ravits.length)?buildRavitsSection(ravits,litres30,coutCarb30,prixLitre):'';
-      var saisiesLogHtml=buildSaisiesLog(saisies30,groupeMap);
-      var moisNom=now.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
-      var rapportHtml=showFull?'<div class="rapport-card"><div><div class="rapport-title">Rapport mensuel — '+moisNom+'</div><div style="font-size:12px;color:var(--texte2)">Comparaison vs mois précédent incluse</div></div><button class="export-btn" onclick="exportPDF()">&#128196; Exporter en PDF</button></div>':'';
-
-      var months=[];
-      for(var mi=5;mi>=0;mi--){var md=new Date(now.getFullYear(),now.getMonth()-mi,1);months.push(md.getFullYear()+'-'+(md.getMonth()<9?'0':'')+(md.getMonth()+1));}
-      var months12=[];
-      for(var mi2=11;mi2>=0;mi2--){var md2=new Date(now.getFullYear(),now.getMonth()-mi2,1);months12.push(md2.getFullYear()+'-'+(md2.getMonth()<9?'0':'')+(md2.getMonth()+1));}
-      function monthAvg(monthStr,cuveData){
-        var entries=cuveData.filter(function(s){return s.date&&s.date.slice(0,7)===monthStr&&s.niveau_litres!=null;});
-        if(!entries.length)return null;
-        var sum=entries.reduce(function(a,s){return a+s.niveau_litres;},0);
-        return Math.round(sum/entries.length/capCuve*100);
-      }
-      var chartData6=months.map(function(m){return monthAvg(m,sCuveAn);});
-      var chartData12=months12.map(function(m){return monthAvg(m,sCuveAn);});
-
-      var switcherHtml='';
-      if(!containerId&&opts.allSites&&opts.allSites.length>1){
-        var tabs=opts.allSites.map(function(s){return '<button class="site-tab'+(s.id===siteId?' active':'')+'" onclick="switchSite(event,\''+s.id+'\')">'+s.nom+'</button>';}).join('');
-        switcherHtml='<div class="site-switcher">'+tabs+'</div>';
-      }
-      var backBtn=(!containerId&&opts.fromConsolidated)?'<button class="back-btn" onclick="goBackConsolidated()">← Vue consolidée</button>':'';
-      var headerHtml=containerId?'':
-        '<div class="header">'+
-          '<div class="header-top">'+
-            '<div><div class="logo">'+(opts.fromConsolidated?client.nom:nom)+'</div>'+
-            '<div class="logo-sub">'+(opts.fromConsolidated?roleLabel+' — '+nom:roleLabel)+'</div></div>'+
-            '<div class="header-right">'+(backBtn||'<div class="header-date">'+dateStr+'</div>')+
-            '<div class="header-title">Tableau de bord</div></div>'+
-          '</div>'+switcherHtml+
-        '</div>';
-      var footerHtml=containerId?'':'<div class="footer">Powered by <strong>GenTrack</strong> · '+nom+'</div>';
-
-      rootEl.innerHTML=headerHtml+
-        '<div class="container">'+
-          bannerHtml+
-          '<div class="kpi-grid">'+
-            '<div class="kpi"><div class="kpi-label">Équipements suivis</div><div class="kpi-value">'+groupes.length+'</div><div class="kpi-trend">'+Object.keys(groupesByType(groupes)).length+' type'+(Object.keys(groupesByType(groupes)).length>1?'s':'')+'</div></div>'+
-            '<div class="kpi"><div class="kpi-label">Rondes à jour</div><div class="kpi-value" style="color:'+kRondeColor+'">'+rondesOk+'/'+groupes.length+'</div><div class="kpi-trend">'+(groupes.length-rondesOk>0?'<span style="color:var(--rouge)">'+(groupes.length-rondesOk)+' en retard</span>':'Tous à jour')+'</div></div>'+
-            '<div class="kpi"><div class="kpi-label">Coût carburant</div><div class="kpi-value">'+(coutCarb30>0?fmtK(coutCarb30):'—')+'</div><div class="kpi-trend">'+kCarbTrend+'</div></div>'+
-            '<div class="kpi"><div class="kpi-label">Coût maintenance</div><div class="kpi-value" style="color:'+(pannesOuv.length?'var(--rouge)':'var(--texte)')+'">'+(coutMaint>0?fmtK(coutMaint):pannesOuv.length?pannesOuv.length+' panne'+(pannesOuv.length>1?'s':''):'OK')+'</div><div class="kpi-trend">'+kMaintTrend+'</div></div>'+
-          '</div>'+
-          '<div class="section-hdr"><div class="section-title">Équipements par type</div><div class="section-sub">'+groupes.length+' unité'+(groupes.length>1?'s':'')+' · cliquer pour détail</div></div>'+
-          '<div class="type-grid">'+typeHtml+'</div>'+
-          presenceHtml+
-          cuveHtml+
-          buildChartCard()+
-          pannesHtml+
-          ravitHtml+
-          rapportHtml+
-          saisiesLogHtml+
-        '</div>'+footerHtml;
-
-      window._chartState={months6:months,months12:months12,data6:chartData6,data12:chartData12,capCuve:capCuve};
-      renderChart('mois');
-    });
+    } else {
+      // ═══ ANCIEN SYSTÈME (Azalaï, ONOMO, etc.) ═══
+      var debutAn=new Date(now.getFullYear(),0,1).toISOString().split('T')[0];
+      var moisPrec=new Date(now.getFullYear(),now.getMonth()-1,1);
+      var debutMoisPrec=moisPrec.getFullYear()+'-'+(moisPrec.getMonth()<9?'0':'')+(moisPrec.getMonth()+1)+'-01';
+      var finMoisPrec=new Date(now.getFullYear(),now.getMonth(),0).toISOString().split('T')[0];
+      Promise.all([
+        api('groupes','&client_id=eq.'+client.id+(siteId?'&site_id=eq.'+siteId:'')+'&actif=eq.true&order=nom'),
+        api('saisies','&client_id=eq.'+client.id+'&date=gte.'+debut30+'&order=date.desc,created_at.desc&limit=500'),
+        api('cuves','&client_id=eq.'+client.id+(siteId?'&site_id=eq.'+siteId:'')+'&actif=eq.true')
+      ]).then(function(r2){
+        var groupes=r2[0],saisies30=r2[1],cuves=r2[2];
+        var cuve=cuves.length?cuves[0]:null;
+        var fCuve30=cuve?api('saisies_cuve','&cuve_id=eq.'+cuve.id+'&date=gte.'+debut30+'&order=date.asc,created_at.asc'):Promise.resolve([]);
+        var fCuveAn=cuve?api('saisies_cuve','&cuve_id=eq.'+cuve.id+'&date=gte.'+debutAn+'&order=date.asc'):Promise.resolve([]);
+        var fSaisiesMoisPrec=showFull?api('saisies','&client_id=eq.'+client.id+'&date=gte.'+debutMoisPrec+'&date=lte.'+finMoisPrec+'&limit=300'):Promise.resolve([]);
+        Promise.all([fCuve30,fCuveAn,fSaisiesMoisPrec]).then(function(cr){
+          renderHotelViewOldDom(client,siteId,siteName,opts,containerId,groupes,saisies30,cuve,cr[0],cr[1],alertes,pannesOuv,pannesRes,today,now,debut30,debutAn,debutMoisPrec,finMoisPrec,showFull);
+        });
+      });
+    }
   });
 }
+
+// ════════════════════════════════════════
+// NOUVEAU SYSTÈME — rendu DOM
+// ════════════════════════════════════════
+function renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,reponses,questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull){
+  var rootEl=containerId?document.getElementById(containerId):document.getElementById('app');
+  if(!rootEl)return;
+  var role=opts.role||'resp_tech';
+
+  var reByEquip=buildEquipDataMap(rondes,rondesEq,reponses,questions);
+
+  // Saisie set pour heatmap (présence par ronde_equipement)
+  var rondeDate={};
+  rondes.forEach(function(r){rondeDate[r.id]=r.date_ronde;});
+  var saisieSetN={};
+  rondesEq.forEach(function(re){
+    var d=rondeDate[re.ronde_id];
+    if(d)saisieSetN[re.equipement_id+'|'+d]=true;
+  });
+
+  // KPIs
+  var rondesOk=0;
+  equips.forEach(function(e){if(saisieSetN[e.id+'|'+today])rondesOk++;});
+
+  // Données cuve
+  var geEquips=equips.filter(function(e){return typeMap[e.type_id]&&typeMap[e.type_id].code==='ge';});
+  var consoLh=geEquips.length&&geEquips[0].conso_theorique_lh?parseFloat(geEquips[0].conso_theorique_lh):65;
+  var cuveEntries=cuveEquip?(reByEquip[cuveEquip.id]||[]):[];
+  var dernCuveEntry=cuveEntries.length?cuveEntries[0]:null;
+  var niveauCuveStr=dernCuveEntry?getRepVal(dernCuveEntry.reps,'niveau actuel'):null;
+  var niveauCuve=niveauCuveStr?parseFloat(niveauCuveStr):null;
+  var capCuve=cuveEquip?(cuveEquip.capacite_litres||8000):8000;
+  var pctCuve=niveauCuve!=null?Math.round(niveauCuve/capCuve*100):null;
+  var autoJours=niveauCuve!=null?Math.round((niveauCuve/(consoLh*8))*10)/10:null;
+
+  // Saut de conso cuve
+  var sautConsoAlerte=null;
+  if(cuveEquip&&cuveEntries.length>=3){
+    var byDay={};
+    cuveEntries.forEach(function(entry){
+      var niv=getRepVal(entry.reps,'niveau actuel');
+      if(niv!=null){var n=parseFloat(niv);if(byDay[entry.date]===undefined||n<byDay[entry.date])byDay[entry.date]=n;}
+    });
+    var dayKeys=Object.keys(byDay).sort();
+    if(dayKeys.length>=3){
+      var drops=[];
+      for(var di=1;di<dayKeys.length;di++){var drop=byDay[dayKeys[di-1]]-byDay[dayKeys[di]];if(drop>0)drops.push({drop:drop,date:dayKeys[di]});}
+      if(drops.length>=2){
+        var avgDrop=drops.reduce(function(a,d){return a+d.drop;},0)/drops.length;
+        var dernierDrop=drops[drops.length-1];
+        if(dernierDrop.drop>avgDrop*1.5)
+          sautConsoAlerte='Saut de consommation cuve le '+fmtDateShort(dernierDrop.date)+' — '+fmtNum(Math.round(dernierDrop.drop))+'L (×'+Math.round(dernierDrop.drop/avgDrop*10)/10+' la moyenne)';
+      }
+    }
+  }
+
+  // Bannière alertes
+  var urgences=[];
+  if(autoJours!==null&&autoJours<3)urgences.push('Autonomie cuve critique ('+autoJours+'j)');
+  if(sautConsoAlerte)urgences.push(sautConsoAlerte);
+  pannesOuv.forEach(function(p){urgences.push('Panne — '+(p.description||'équipement'));});
+  alertes.filter(function(a){return a.severite==='danger';}).forEach(function(a){urgences.push(a.message);});
+  var bannerHtml='';
+  if(urgences.length){
+    bannerHtml='<div class="alert-banner"><div class="alert-icon">⚠️</div><div class="ab-body">'+
+      '<div class="ab-titre">'+(urgences.length===1?'1 action requise':urgences.length+' actions requises aujourd\'hui')+'</div>'+
+      '<div class="ab-sub">'+urgences.join(' · ')+'</div></div></div>';
+  }
+
+  var nom=siteName||client.nom;
+  var dateStr=now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var roleLabel=role==='resp_tech'?'Responsable technique':role==='dir_ops'?'Directeur des opérations':role==='dir_tech'?'Directeur technique':'Technicien';
+  var kRondeColor=rondesOk===equips.length?'var(--vert)':rondesOk>0?'var(--orange)':'var(--rouge)';
+  var coutMaint=showFull?pannesRes.filter(function(p){return p.date_resolution>=debut30;}).reduce(function(a,p){return a+(p.cout_reparation||0);},0):0;
+
+  var equipMap={};allEquips.forEach(function(e){equipMap[e.id]=e.nom;});
+  var panneLabels={ne_demarre_pas:'Ne démarre pas',arret_inopin:'Arrêt inopiné',bruit_anormal:'Bruit anormal',surchauffe:'Surchauffe',fuite:'Fuite carburant',autre:'Autre'};
+
+  var typeHtml=buildEquipByTypeNew(equips,typeMap,reByEquip,pannesOuv,today);
+  var presenceHtml=buildPresenceSectionNew(equips,typeMap,saisieSetN,today);
+  var cuveHtml=buildCuveCardNew(cuveEquip,reByEquip,geEquips,consoLh,today);
+  var pannesHtml=buildPannesSection(pannesOuv,showFull?pannesRes:[],[],{},panneLabels,showFull);
+  var rondesLogHtml=buildRondesLog(rondes,allEquips,rondesEq);
+  var moisNom=now.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  var rapportHtml=showFull?'<div class="rapport-card"><div><div class="rapport-title">Rapport mensuel — '+moisNom+'</div><div style="font-size:12px;color:var(--texte2)">Rondes des 30 derniers jours</div></div><button class="export-btn" onclick="exportPDF()">&#128196; Exporter en PDF</button></div>':'';
+
+  var switcherHtml='';
+  if(!containerId&&opts.allSites&&opts.allSites.length>1){
+    var tabs=opts.allSites.map(function(s){return '<button class="site-tab'+(s.id===siteId?' active':'')+'" onclick="switchSite(event,\''+s.id+'\')">'+s.nom+'</button>';}).join('');
+    switcherHtml='<div class="site-switcher">'+tabs+'</div>';
+  }
+  var backBtn=(!containerId&&opts.fromConsolidated)?'<button class="back-btn" onclick="goBackConsolidated()">← Vue consolidée</button>':'';
+  var headerHtml=containerId?'':
+    '<div class="header"><div class="header-top">'+
+      '<div><div class="logo">'+(opts.fromConsolidated?client.nom:nom)+'</div>'+
+      '<div class="logo-sub">'+(opts.fromConsolidated?roleLabel+' — '+nom:roleLabel)+'</div></div>'+
+      '<div class="header-right">'+(backBtn||'<div class="header-date">'+dateStr+'</div>')+
+      '<div class="header-title">Tableau de bord</div></div>'+
+    '</div>'+switcherHtml+'</div>';
+  var footerHtml=containerId?'':'<div class="footer">Powered by <strong>GenTrack</strong> · '+nom+'</div>';
+
+  rootEl.innerHTML=headerHtml+
+    '<div class="container">'+
+      bannerHtml+
+      '<div class="kpi-grid">'+
+        '<div class="kpi"><div class="kpi-label">Équipements suivis</div><div class="kpi-value">'+equips.length+'</div><div class="kpi-trend">'+allEquips.length+' total (cuve incluse)</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Rondes aujourd\'hui</div><div class="kpi-value" style="color:'+kRondeColor+'">'+rondesOk+'/'+equips.length+'</div><div class="kpi-trend">'+(equips.length-rondesOk>0?'<span style="color:var(--rouge)">'+(equips.length-rondesOk)+' en retard</span>':'Tous à jour')+'</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Niveau cuve</div><div class="kpi-value" style="color:'+(pctCuve!=null?carbColor(pctCuve):'var(--texte2)')+'">'+(pctCuve!=null?pctCuve+'%':'—')+'</div><div class="kpi-trend">'+(niveauCuve!=null?fmtNum(niveauCuve)+'L · '+autoJours+'j autonomie':'Aucune donnée')+'</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Pannes en cours</div><div class="kpi-value" style="color:'+(pannesOuv.length?'var(--rouge)':'var(--texte)')+'">'+(pannesOuv.length||'✓')+'</div><div class="kpi-trend">'+(coutMaint>0?fmtK(coutMaint)+' FCFA maint.':pannesRes.length+' résolue'+(pannesRes.length!==1?'s':''))+'</div></div>'+
+      '</div>'+
+      '<div class="section-hdr"><div class="section-title">Équipements par type</div><div class="section-sub">'+equips.length+' unité'+(equips.length!==1?'s':'')+' · cliquer pour détail</div></div>'+
+      '<div class="type-grid">'+typeHtml+'</div>'+
+      presenceHtml+
+      cuveHtml+
+      buildChartCardNew()+
+      pannesHtml+
+      rapportHtml+
+      rondesLogHtml+
+    '</div>'+footerHtml;
+
+  window._chartStateNew={cuveEquip:cuveEquip,reByEquip:reByEquip,capCuve:capCuve};
+  renderChartNew();
+}
+
+// ════════════════════════════════════════
+// ANCIEN SYSTÈME — rendu DOM
+// ════════════════════════════════════════
+function renderHotelViewOldDom(client,siteId,siteName,opts,containerId,groupes,saisies30,cuve,sCuve30,sCuveAn,alertes,pannesOuv,pannesRes,today,now,debut30,debutAn,debutMoisPrec,finMoisPrec,showFull){
+  var rootEl=containerId?document.getElementById(containerId):document.getElementById('app');
+  if(!rootEl)return;
+  var role=opts.role||'resp_tech';
+
+  var dernSaisie={};
+  saisies30.forEach(function(s){if(!dernSaisie[s.groupe_id])dernSaisie[s.groupe_id]=s;});
+  var saisiesJour=[];
+  for(var k in dernSaisie)saisiesJour.push(dernSaisie[k]);
+
+  var sCuve30Desc=sCuve30.slice().sort(function(a,b){return (b.date+(b.created_at||'')).localeCompare(a.date+(a.created_at||''));});
+  var saisieCuve=sCuve30Desc.length?sCuve30Desc[0]:null;
+  var ravits=sCuve30.filter(function(s){return(s.litres_ajoutes||0)>0;});
+  var prixLitre=client.prix_litre_fcfa||695;
+  var litres30=ravits.reduce(function(a,s){return a+(s.litres_ajoutes||0);},0);
+  var coutCarb30=Math.round(litres30*prixLitre);
+
+  var moisPrec=new Date(now.getFullYear(),now.getMonth()-1,1);
+  var ravitsMoisPrec=sCuveAn.filter(function(s){return(s.litres_ajoutes||0)>0&&s.date>=debutMoisPrec&&s.date<=finMoisPrec;});
+  var litresMoisPrec=ravitsMoisPrec.reduce(function(a,s){return a+(s.litres_ajoutes||0);},0);
+  var coutCarbMoisPrec=Math.round(litresMoisPrec*prixLitre);
+  var deltaCarbPct=coutCarbMoisPrec>0?Math.round((coutCarb30-coutCarbMoisPrec)/coutCarbMoisPrec*100):null;
+
+  var coutMaint=showFull?pannesRes.filter(function(p){return p.date_resolution>=debut30;}).reduce(function(a,p){return a+(p.cout_reparation||0);},0):0;
+  var pannMoisPrec=showFull?pannesRes.filter(function(p){return p.date_resolution>=debutMoisPrec&&p.date_resolution<=finMoisPrec;}).length:0;
+  var pannDelta=pannesRes.length-pannMoisPrec;
+
+  var capCuve=cuve?(cuve.capacite_litres||500):500;
+  var niveauCuve=saisieCuve?saisieCuve.niveau_litres:null;
+  var pctCuve=niveauCuve!=null?Math.round(niveauCuve/capCuve*100):null;
+  var groupesGE=groupes.filter(function(g){return(g.type_equipement||'ge')==='ge';});
+  var consoLh=(groupesGE.length&&groupesGE[0].conso_theorique_lh)?parseFloat(groupesGE[0].conso_theorique_lh):65;
+  var autoJours=niveauCuve!=null?Math.round((niveauCuve/(consoLh*8))*10)/10:null;
+
+  var groupeMap={};groupes.forEach(function(g){groupeMap[g.id]=g.nom;});
+  var panneLabels={ne_demarre_pas:'Ne démarre pas',arret_inopin:'Arrêt inopiné',bruit_anormal:'Bruit anormal',surchauffe:'Surchauffe',fuite:'Fuite carburant',autre:'Autre'};
+
+  var nom=siteName||client.nom;
+  var dateStr=now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var roleLabel=role==='resp_tech'?'Responsable technique':role==='dir_ops'?'Directeur des opérations':role==='dir_tech'?'Directeur technique':'Technicien';
+
+  var rondesOk=0;
+  groupes.forEach(function(g){
+    var s=null;for(var i=0;i<saisiesJour.length;i++){if(saisiesJour[i].groupe_id===g.id){s=saisiesJour[i];break;}}
+    if(s&&retardLabel(s.date,today).jours===0)rondesOk++;
+  });
+
+  var sautConsoAlerte=null;
+  if(sCuve30.length>=3){
+    var byDay={};
+    sCuve30.forEach(function(s){if(s.niveau_litres!=null)byDay[s.date]=(byDay[s.date]===undefined)?s.niveau_litres:Math.min(byDay[s.date],s.niveau_litres);});
+    var dayKeys=Object.keys(byDay).sort();
+    if(dayKeys.length>=3){
+      var drops=[];
+      for(var di=1;di<dayKeys.length;di++){var drop=byDay[dayKeys[di-1]]-byDay[dayKeys[di]];if(drop>0)drops.push({drop:drop,date:dayKeys[di]});}
+      if(drops.length>=2){
+        var avgDrop=drops.reduce(function(a,d){return a+d.drop;},0)/drops.length;
+        var dernierDrop=drops[drops.length-1];
+        if(dernierDrop.drop>avgDrop*1.5)
+          sautConsoAlerte='Saut de consommation cuve le '+fmtDateShort(dernierDrop.date)+' — '+fmtNum(Math.round(dernierDrop.drop))+'L (×'+Math.round(dernierDrop.drop/avgDrop*10)/10+' la moyenne)';
+      }
+    }
+  }
+
+  var urgences=[];
+  if(autoJours!==null&&autoJours<3)urgences.push('Autonomie cuve critique ('+autoJours+'j)');
+  if(sautConsoAlerte)urgences.push(sautConsoAlerte);
+  pannesOuv.forEach(function(p){urgences.push('Panne — '+(groupeMap[p.groupe_id]||'équipement'));});
+  alertes.filter(function(a){return a.severite==='danger';}).forEach(function(a){urgences.push(a.message);});
+  var bannerHtml='';
+  if(urgences.length){
+    bannerHtml='<div class="alert-banner"><div class="alert-icon">⚠️</div><div class="ab-body">'+
+      '<div class="ab-titre">'+(urgences.length===1?'1 action requise':urgences.length+' actions requises aujourd\'hui')+'</div>'+
+      '<div class="ab-sub">'+urgences.join(' · ')+'</div></div></div>';
+  }
+
+  var kRondeColor=rondesOk===groupes.length?'var(--vert)':rondesOk>0?'var(--orange)':'var(--rouge)';
+  var kCarbTrend='';
+  if(deltaCarbPct!==null){
+    var sign=deltaCarbPct>=0?'+':'';
+    kCarbTrend='<span class="kpi-trend-pill" style="'+(deltaCarbPct>0?'background:var(--rouge-pale);color:var(--rouge)':deltaCarbPct<0?'background:var(--vert-pale);color:var(--vert)':'')+'">'+sign+deltaCarbPct+'%</span> vs mois dernier';
+  }else{kCarbTrend='FCFA · '+fmtNum(litres30)+'L';}
+  var kMaintTrend=pannDelta>0?('<span class="kpi-trend-pill" style="background:var(--rouge-pale);color:var(--rouge)">+'+pannDelta+' panne'+(pannDelta>1?'s':'')+' de plus</span>'):(pannesRes.length+' résolue'+(pannesRes.length>1?'s':''));
+
+  var months=[];
+  for(var mi=5;mi>=0;mi--){var md=new Date(now.getFullYear(),now.getMonth()-mi,1);months.push(md.getFullYear()+'-'+(md.getMonth()<9?'0':'')+(md.getMonth()+1));}
+  var months12=[];
+  for(var mi2=11;mi2>=0;mi2--){var md2=new Date(now.getFullYear(),now.getMonth()-mi2,1);months12.push(md2.getFullYear()+'-'+(md2.getMonth()<9?'0':'')+(md2.getMonth()+1));}
+  function monthAvg(monthStr,cuveData){
+    var entries=cuveData.filter(function(s){return s.date&&s.date.slice(0,7)===monthStr&&s.niveau_litres!=null;});
+    if(!entries.length)return null;
+    var sum=entries.reduce(function(a,s){return a+s.niveau_litres;},0);
+    return Math.round(sum/entries.length/capCuve*100);
+  }
+  var chartData6=months.map(function(m){return monthAvg(m,sCuveAn);});
+  var chartData12=months12.map(function(m){return monthAvg(m,sCuveAn);});
+
+  var switcherHtml='';
+  if(!containerId&&opts.allSites&&opts.allSites.length>1){
+    var tabs=opts.allSites.map(function(s){return '<button class="site-tab'+(s.id===siteId?' active':'')+'" onclick="switchSite(event,\''+s.id+'\')">'+s.nom+'</button>';}).join('');
+    switcherHtml='<div class="site-switcher">'+tabs+'</div>';
+  }
+  var backBtn=(!containerId&&opts.fromConsolidated)?'<button class="back-btn" onclick="goBackConsolidated()">← Vue consolidée</button>':'';
+  var headerHtml=containerId?'':
+    '<div class="header"><div class="header-top">'+
+      '<div><div class="logo">'+(opts.fromConsolidated?client.nom:nom)+'</div>'+
+      '<div class="logo-sub">'+(opts.fromConsolidated?roleLabel+' — '+nom:roleLabel)+'</div></div>'+
+      '<div class="header-right">'+(backBtn||'<div class="header-date">'+dateStr+'</div>')+
+      '<div class="header-title">Tableau de bord</div></div>'+
+    '</div>'+switcherHtml+'</div>';
+  var footerHtml=containerId?'':'<div class="footer">Powered by <strong>GenTrack</strong> · '+nom+'</div>';
+
+  rootEl.innerHTML=headerHtml+
+    '<div class="container">'+
+      bannerHtml+
+      '<div class="kpi-grid">'+
+        '<div class="kpi"><div class="kpi-label">Équipements suivis</div><div class="kpi-value">'+groupes.length+'</div><div class="kpi-trend">'+Object.keys(groupesByType(groupes)).length+' type'+(Object.keys(groupesByType(groupes)).length>1?'s':'')+'</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Rondes à jour</div><div class="kpi-value" style="color:'+kRondeColor+'">'+rondesOk+'/'+groupes.length+'</div><div class="kpi-trend">'+(groupes.length-rondesOk>0?'<span style="color:var(--rouge)">'+(groupes.length-rondesOk)+' en retard</span>':'Tous à jour')+'</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Coût carburant</div><div class="kpi-value">'+(coutCarb30>0?fmtK(coutCarb30):'—')+'</div><div class="kpi-trend">'+kCarbTrend+'</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Coût maintenance</div><div class="kpi-value" style="color:'+(pannesOuv.length?'var(--rouge)':'var(--texte)')+'">'+(coutMaint>0?fmtK(coutMaint):pannesOuv.length?pannesOuv.length+' panne'+(pannesOuv.length>1?'s':''):'OK')+'</div><div class="kpi-trend">'+kMaintTrend+'</div></div>'+
+      '</div>'+
+      '<div class="section-hdr"><div class="section-title">Équipements par type</div><div class="section-sub">'+groupes.length+' unité'+(groupes.length>1?'s':'')+' · cliquer pour détail</div></div>'+
+      '<div class="type-grid">'+buildEquipByType(groupes,saisiesJour,saisies30,pannesOuv,today)+'</div>'+
+      buildPresenceSection(groupes,saisies30,today)+
+      buildCuveCard(cuve,saisieCuve,niveauCuve,pctCuve,capCuve,autoJours,consoLh,groupesGE,saisiesJour,today)+
+      buildChartCard()+
+      buildPannesSection(pannesOuv,showFull?pannesRes:[],groupes,groupeMap,panneLabels,showFull)+
+      (showFull&&ravits.length?buildRavitsSection(ravits,litres30,coutCarb30,prixLitre):'')+
+      (showFull?'<div class="rapport-card"><div><div class="rapport-title">Rapport mensuel — '+now.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})+'</div><div style="font-size:12px;color:var(--texte2)">Comparaison vs mois précédent incluse</div></div><button class="export-btn" onclick="exportPDF()">&#128196; Exporter en PDF</button></div>':'')+
+      buildSaisiesLog(saisies30,groupeMap)+
+    '</div>'+footerHtml;
+
+  window._chartState={months6:months,months12:months12,data6:chartData6,data12:chartData12,capCuve:capCuve};
+  renderChart('mois');
+}
+
+// ════════════════════════════════════════
+// NOUVEAU SYSTÈME — sections de rendu
+// ════════════════════════════════════════
+
+function buildEquipByTypeNew(equips,typeMap,reByEquip,pannesOuv,today){
+  if(!equips.length)return '<div class="empty" style="grid-column:1/-1">Aucun équipement configuré</div>';
+  var byCode={};
+  equips.forEach(function(e){
+    var tm=typeMap[e.type_id]||{nom:'Autre',code:'autre',icon:'⚙️'};
+    if(!byCode[tm.code])byCode[tm.code]={equips:[],icon:tm.icon,label:tm.nom};
+    byCode[tm.code].equips.push(e);
+  });
+  var html='';
+  ['ge','cf','geg','autre'].forEach(function(tc){
+    if(!byCode[tc])return;
+    var gs=byCode[tc].equips,info=byCode[tc];
+    var retards=0,pannes=0;
+    gs.forEach(function(e){
+      var entries=reByEquip[e.id]||[];
+      var rd=retardLabel(entries.length?entries[0].date:null,today);
+      if(rd.jours!==0&&rd.jours!==null)retards++;
+      if(rd.jours===null)retards++;
+      if(pannesOuv.some(function(p){return p.groupe_id===e.id;}))pannes++;
+    });
+    var statusColor=pannes?'var(--rouge)':retards?'var(--orange)':'var(--vert)';
+    var statusTxt=pannes?pannes+' panne'+(pannes>1?'s en cours':''):retards?retards+' en retard':'Tous à jour';
+    var cardId='tc-new-'+tc;
+    var drillHtml='';
+    gs.forEach(function(e){
+      var entries=reByEquip[e.id]||[];
+      var dern=entries.length?entries[0]:null;
+      var rd=retardLabel(dern?dern.date:null,today);
+      var hasPanne=pannesOuv.some(function(p){return p.groupe_id===e.id;});
+      var pillClass=hasPanne?'pill-danger':rd.jours===null?'pill-warn':rd.jours===0?'pill-ok':rd.jours===1?'pill-warn':'pill-danger';
+      var pillTxt=hasPanne?'Panne':rd.jours===null?'Aucune ronde':rd.jours===0?'OK ✓':'J-'+rd.jours;
+      var metaHtml='';
+      if(dern){
+        if(tc==='ge'){
+          var hMarche=getRepVal(dern.reps,'compteur');
+          var huile=getRepVal(dern.reps,'huile');
+          var hNorm=huile?huileNorm(huile):null;
+          metaHtml='Compteur '+(hMarche||'—')+'h · Huile <span style="color:'+huileColor(hNorm)+'">'+(huile||'—')+'</span>';
+        }else if(tc==='cf'){
+          var temp=getRepVal(dern.reps,'temp');
+          metaHtml='Température '+(temp!=null?temp+'°C':'—');
+        }else if(tc==='geg'){
+          var consigne=getRepVal(dern.reps,'consigne');
+          var entree=getRepVal(dern.reps,'entr');
+          var sortie=getRepVal(dern.reps,'sortie');
+          metaHtml='Consigne '+(consigne||'—')+'°C · E:'+(entree||'—')+'°C S:'+(sortie||'—')+'°C';
+        }
+      }
+      drillHtml+='<div class="drill-item"><div><div class="drill-nom">'+e.nom+'</div>'+
+        '<div class="drill-meta">'+metaHtml+'</div></div>'+
+        '<div class="drill-right"><span class="pill '+pillClass+'">'+pillTxt+'</span>'+
+        '<div class="drill-meta" style="margin-top:4px">'+entries.length+' ronde'+(entries.length!==1?'s':'')+'/30j</div></div></div>';
+    });
+    html+='<div class="type-card open" id="'+cardId+'" onclick="toggleTypeCard(\''+cardId+'\')">'+
+      '<div class="type-card-hdr"><div class="type-icon">'+info.icon+'</div><div class="type-name">'+info.label+'</div></div>'+
+      '<div class="type-card-body"><div class="type-count">'+gs.length+'</div><div class="type-status" style="color:'+statusColor+'">'+statusTxt+'</div></div>'+
+      '<div class="type-drill">'+drillHtml+'</div></div>';
+  });
+  return html;
+}
+
+function buildPresenceSectionNew(equips,typeMap,saisieSetN,today){
+  if(!equips.length)return '';
+  var days=[];
+  for(var i=29;i>=0;i--){days.push(new Date(Date.now()-i*86400000).toISOString().split('T')[0]);}
+  var rows='';
+  equips.forEach(function(e){
+    var tc=typeMap[e.type_id]?typeMap[e.type_id].code:'autre';
+    var icon=TYPE_ICONS_NEW[tc]||'⚙️';
+    var manquants=0,cells='';
+    days.forEach(function(d){
+      var has=saisieSetN[e.id+'|'+d];
+      var isToday=(d===today);
+      var bg,border,title;
+      if(has){bg='rgba(45,122,79,0.15)';border='rgba(45,122,79,0.5)';title='OK — '+d;}
+      else if(isToday){bg='var(--surface3)';border='var(--bordure)';title="Aujourd'hui";}
+      else{manquants++;bg='rgba(192,57,43,0.1)';border='rgba(192,57,43,0.4)';title='Manquant — '+d;}
+      var isMon=(new Date(d).getDay()===1);
+      cells+='<div class="pday" style="background:'+bg+';border:1px solid '+border+';'+(isMon?'margin-left:4px':'')+'" title="'+title+'"></div>';
+    });
+    var pillClass=manquants===0?'pill-ok':manquants<=4?'pill-warn':'pill-danger';
+    var pillTxt=manquants===0?'Complet ✓':manquants+' manquant'+(manquants>1?'s':'');
+    rows+='<div class="presence-row">'+
+      '<div class="presence-hdr"><div><span class="presence-nom">'+icon+' '+e.nom+'</span></div>'+
+      '<span class="pill '+pillClass+'">'+pillTxt+'</span></div>'+
+      '<div class="presence-grid">'+cells+'</div></div>';
+  });
+  return '<div class="section-hdr" style="margin-top:4px"><div class="section-title">Présence des rondes — 30 jours</div><div class="section-sub">par équipement</div></div>'+
+    '<div class="presence-card">'+rows+
+      '<div class="presence-legend">'+
+        '<span><span class="leg-dot" style="background:rgba(45,122,79,0.15);border:1px solid rgba(45,122,79,0.5)"></span>Ronde effectuée</span>'+
+        '<span><span class="leg-dot" style="background:rgba(192,57,43,0.1);border:1px solid rgba(192,57,43,0.4)"></span>Manquante</span>'+
+        '<span><span class="leg-dot" style="background:var(--surface3);border:1px solid var(--bordure)"></span>Aujourd\'hui</span>'+
+        '<span style="margin-left:auto;color:var(--texte3);font-style:italic">Trait vertical = début de semaine</span>'+
+      '</div></div>';
+}
+
+function buildCuveCardNew(cuveEquip,reByEquip,geEquips,consoLh,today){
+  if(!cuveEquip)return '';
+  var cuveEntries=reByEquip[cuveEquip.id]||[];
+  var dern=cuveEntries.length?cuveEntries[0]:null;
+  var niveauStr=dern?getRepVal(dern.reps,'niveau actuel'):null;
+  var niveauCuve=niveauStr!=null?parseFloat(niveauStr):null;
+  var capCuve=cuveEquip.capacite_litres||8000;
+  var pctCuve=niveauCuve!=null?Math.round(niveauCuve/capCuve*100):null;
+  var autoJours=niveauCuve!=null?Math.round((niveauCuve/(consoLh*8))*10)/10:null;
+  var barColor=pctCuve!=null?(pctCuve<25?'var(--rouge)':pctCuve<50?'var(--orange)':'var(--or)'):'var(--or)';
+  var autoC=autoJours!=null?autoColor(autoJours):'var(--texte2)';
+  var rd=retardLabel(dern?dern.date:null,today);
+  var barHtml=pctCuve!=null?'<div class="cuve-bar"><div class="cuve-bar-fill" style="width:'+pctCuve+'%;background:'+barColor+'"></div></div>':'';
+  var chips='';
+  geEquips.forEach(function(e){chips+='<span class="ge-chip">'+e.nom+'</span>';});
+  var note=geEquips.length>=1?'<div class="cuve-note">Autonomie calculée sur '+consoLh+' L/h × 8h/j.</div>':'';
+  return '<div class="cuve-card"><div class="cuve-header"><div>'+
+    '<div class="cuve-title">🪣 Cuve commune'+(cuveEquip.nom&&cuveEquip.nom!=='Cuve carburant'?' — '+cuveEquip.nom:'')+'</div>'+
+    '<div class="cuve-sub">Capacité '+fmtNum(capCuve)+'L · '+rd.label+'</div></div><div>'+
+    '<div class="auto-val" style="color:'+autoC+'">'+(autoJours!=null?autoJours+'j':'—')+'</div>'+
+    '<div class="auto-unit">autonomie estimée</div></div></div>'+
+    barHtml+
+    '<div class="cuve-meta">'+
+      '<span><strong>'+(niveauCuve!=null?fmtNum(niveauCuve)+'L':'—')+'</strong> niveau</span>'+
+      '<span><strong>'+(pctCuve!=null?pctCuve+'%':'—')+'</strong> du réservoir</span>'+
+      '<span><strong>'+consoLh+' L/h</strong> conso théorique</span>'+
+      (dern?'<span><strong>'+fmtDate(dern.date)+'</strong> dernier relevé</span>':'')+'</div>'+
+    (chips?'<div class="ge-chips">'+chips+'</div>':'')+note+'</div>';
+}
+
+function buildChartCardNew(){
+  return '<div class="chart-card"><div class="chart-hdr" style="background:var(--surface2)">'+
+    '<div class="chart-hdr-title">Niveau cuve — 30 derniers jours</div></div>'+
+    '<div class="chart-body"><canvas id="cuve-chart" height="130"></canvas>'+
+    '<div class="chart-insight" id="chart-insight"></div></div></div>';
+}
+
+function renderChartNew(){
+  var st=window._chartStateNew;if(!st)return;
+  var ctx=document.getElementById('cuve-chart');if(!ctx)return;
+  if(_chartInst)_chartInst.destroy();
+  var cuveEquip=st.cuveEquip,reByEquip=st.reByEquip,capCuve=st.capCuve||8000;
+  var days30=[],data30=[];
+  var dayPct={};
+  if(cuveEquip){
+    var cuveEntries=reByEquip[cuveEquip.id]||[];
+    cuveEntries.forEach(function(entry){
+      var niv=getRepVal(entry.reps,'niveau actuel');
+      if(niv!=null){var p=Math.round(parseFloat(niv)/capCuve*100);if(dayPct[entry.date]===undefined||p<dayPct[entry.date])dayPct[entry.date]=p;}
+    });
+  }
+  for(var i=29;i>=0;i--){
+    var d=new Date(Date.now()-i*86400000).toISOString().split('T')[0];
+    days30.push(fmtDateShort(d));
+    data30.push(dayPct[d]!==undefined?dayPct[d]:null);
+  }
+  var bx=getComputedStyle(document.documentElement).getPropertyValue('--bx').trim()||'#8B1A2E';
+  var valides=data30.filter(function(v){return v!==null;});
+  var insight='';
+  if(valides.length>=2){var last=valides[valides.length-1],prev=valides[valides.length-2];insight=(last-prev)<0?'Baisse de '+Math.abs(last-prev)+' pts vs ronde précédente.':'Niveau stable ('+last+'%).';
+  }else if(!cuveEquip){insight='Aucune cuve configurée.';}
+  else{insight='Données insuffisantes — pas encore de rondes sur 30j.';}
+  var ins=document.getElementById('chart-insight');if(ins)ins.textContent=insight;
+  _chartInst=new Chart(ctx.getContext('2d'),{
+    type:'bar',
+    data:{labels:days30,datasets:[{data:data30,
+      backgroundColor:data30.map(function(v){return v===null?'rgba(200,200,200,0.2)':v<25?'rgba(192,57,43,0.4)':v<50?'rgba(212,118,30,0.4)':bx+'33';}),
+      borderColor:data30.map(function(v){return v===null?'rgba(200,200,200,0.4)':v<25?'var(--rouge)':v<50?'var(--orange)':bx;}),
+      borderWidth:1.5,borderRadius:4}]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return ctx.raw!==null?ctx.raw+'%':'Pas de données';}}}},
+      scales:{x:{grid:{display:false},ticks:{color:'#7A6855',font:{size:9},maxTicksLimit:10}},y:{grid:{color:'#EDE3D4'},ticks:{color:'#7A6855',font:{size:10},callback:function(v){return v+'%';}},min:0,max:100}}}
+  });
+}
+
+function buildRondesLog(rondes,equips,rondesEq){
+  if(!rondes.length)return '';
+  var equipMap={};equips.forEach(function(e){equipMap[e.id]=e.nom;});
+  var reByRonde={};
+  rondesEq.forEach(function(re){if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=0;reByRonde[re.ronde_id]++;});
+  var sorted=rondes.slice().sort(function(a,b){return b.date_ronde.localeCompare(a.date_ronde);}).slice(0,30);
+  var rows='';
+  sorted.forEach(function(r){
+    var nbEq=reByRonde[r.id]||0;
+    rows+='<tr><td>'+fmtDate(r.date_ronde)+'</td>'+
+      '<td style="color:var(--texte2)">'+(r.technicien_id||'—')+'</td>'+
+      '<td>'+nbEq+' équipement'+(nbEq!==1?'s':'')+'</td>'+
+      '<td><span class="pill '+(nbEq>0?'pill-ok':'pill-warn')+'">'+(nbEq>0?'Complète':'Vide')+'</span></td></tr>';
+  });
+  return '<button class="saisies-toggle" onclick="toggleSaisies(this)"><span>Journal des rondes ('+sorted.length+')</span><span>▾</span></button>'+
+    '<div class="saisies-body" id="saisies-body"><div class="table-card" style="margin-top:6px">'+
+    '<table class="data"><thead><tr><th>Date</th><th>Technicien</th><th>Équipements</th><th>Statut</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+}
+
+// ════════════════════════════════════════
+// ANCIEN SYSTÈME — fonctions helpers
+// ════════════════════════════════════════
 
 // ── GROUPER PAR TYPE ──
 function groupesByType(groupes){
