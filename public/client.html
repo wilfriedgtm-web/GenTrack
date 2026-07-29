@@ -386,17 +386,8 @@ function renderHotelView(client,siteId,siteName,opts,containerId){
             renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap);
             return;
           }
-          // Phase 4 — reponses : dernière ronde + toutes entrées cuve + tous GE (pour le journal)
-          var latestRondeId=rondes[0].id;
-          var latestREids=rondesEq.filter(function(re){return re.ronde_id===latestRondeId;}).map(function(re){return re.id;});
-          var cuveREids=cuveEquip?rondesEq.filter(function(re){return re.equipement_id===cuveEquip.id;}).map(function(re){return re.id;}):[];
-          var geEquipIds={};equips.forEach(function(e){if(typeMap[e.type_id]&&typeMap[e.type_id].code==='ge')geEquipIds[e.id]=true;});
-          var geREids=rondesEq.filter(function(re){return geEquipIds[re.equipement_id];}).map(function(re){return re.id;});
-          var reidSet={};
-          latestREids.forEach(function(id){reidSet[id]=true;});
-          cuveREids.forEach(function(id){reidSet[id]=true;});
-          geREids.forEach(function(id){reidSet[id]=true;});
-          var allREids=Object.keys(reidSet);
+          // Phase 4 — toutes les réponses de toutes les rondes (journal complet)
+          var allREids=rondesEq.map(function(re){return re.id;});
           if(!allREids.length){
             renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap);
             return;
@@ -875,56 +866,85 @@ function buildRondesLog(rondes,equips,rondesEq,reponses,questions,contactMap){
   if(!reponses)reponses=[];
   if(!questions)questions=[];
   var equipMap={};equips.forEach(function(e){equipMap[e.id]=e;});
-  // index reponses par ronde_equipement_id
   var repByRE={};
   reponses.forEach(function(rep){
     if(!repByRE[rep.ronde_equipement_id])repByRE[rep.ronde_equipement_id]=[];
     repByRE[rep.ronde_equipement_id].push(rep);
   });
-  // index questions par id
   var qById={};questions.forEach(function(q){qById[q.id]=q;});
-  // groupe les rondes_equipements par ronde_id
   var reByRonde={};
   rondesEq.forEach(function(re){
     if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];
     reByRonde[re.ronde_id].push(re);
   });
   var sorted=rondes.slice().sort(function(a,b){return b.date_ronde.localeCompare(a.date_ronde);}).slice(0,30);
+  var freqLabel={journalier:'Journalière',hebdo:'Hebdomadaire',mensuel:'Mensuelle'};
   var rows='';
-  sorted.forEach(function(r){
+  sorted.forEach(function(r,ri){
     var res=reByRonde[r.id]||[];
     var nbEq=res.length;
-    var techNom=contactMap[r.technicien_id]||'—';
-    // Construire les détails GE : compteur + huile
-    var geDetails=[];
+    var techNom=(contactMap[r.technicien_id]||'—').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    var freq=freqLabel[r.frequence]||r.frequence||'—';
+
+    // Résumé rapide : compteur GE + niveau cuve dans la ligne
+    var summaryParts=[];
     res.forEach(function(re){
-      var eq=equipMap[re.equipement_id];
-      if(!eq||eq.capacite_litres!=null)return; // skip cuve
+      var eq=equipMap[re.equipement_id];if(!eq)return;
       var reps=repByRE[re.id]||[];
-      var compteur=null,huile=null;
-      reps.forEach(function(rep){
-        var q=qById[rep.question_id];
-        if(!q)return;
-        var txt=q.texte.toLowerCase();
-        if(txt.includes('compteur'))compteur=rep.valeur;
-        if(txt.includes('huile'))huile=rep.valeur;
-      });
-      if(compteur||huile){
-        var detail=eq.nom;
-        if(compteur)detail+=' <span style="color:var(--texte2)">'+compteur+'h</span>';
-        if(huile&&huile!=='Normal')detail+=' <span style="color:var(--orange)">'+huile+'</span>';
-        geDetails.push(detail);
+      if(eq.capacite_litres!=null){
+        reps.forEach(function(rep){var q=qById[rep.question_id];if(q&&q.texte.toLowerCase().includes('niveau'))summaryParts.push('⛽ '+rep.valeur+'L');});
+      } else {
+        reps.forEach(function(rep){var q=qById[rep.question_id];if(q&&q.texte.toLowerCase().includes('compteur'))summaryParts.push(eq.nom+' '+rep.valeur+'h');});
       }
     });
-    var detailHtml=geDetails.length?'<div style="font-size:11px;color:var(--texte2);margin-top:2px">'+geDetails.join(' · ')+'</div>':'';
-    rows+='<tr><td>'+fmtDate(r.date_ronde)+'</td>'+
-      '<td>'+(techNom||'—').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</td>'+
-      '<td>'+nbEq+' équipement'+(nbEq!==1?'s':'')+detailHtml+'</td>'+
-      '<td><span class="pill '+(nbEq>0?'pill-ok':'pill-warn')+'">'+(nbEq>0?'Complète':'Vide')+'</span></td></tr>';
+    var summaryHtml=summaryParts.length?'<div style="font-size:11px;color:var(--texte2);margin-top:2px">'+summaryParts.join(' · ')+'</div>':'';
+
+    // Détail complet par équipement (expandable)
+    var detailId='ronde-detail-'+ri;
+    var equipBlocs='';
+    res.forEach(function(re){
+      var eq=equipMap[re.equipement_id];if(!eq)return;
+      var reps=repByRE[re.id]||[];
+      if(!reps.length)return;
+      var lignes='';
+      reps.forEach(function(rep){
+        var q=qById[rep.question_id];if(!q)return;
+        var val=rep.valeur||'—';
+        var unite=q.unite?' '+q.unite:'';
+        var ko=(q.seuil_min!=null&&parseFloat(val)<q.seuil_min)||(q.seuil_max!=null&&parseFloat(val)>q.seuil_max);
+        var em=ko?' <span style="color:var(--rouge)">⚠️</span>':
+                  (val==='Normal'||val==='oui'||val==='Bon')?'<span style="color:var(--vert);margin-left:2px">✓</span>':'';
+        lignes+='<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--surface3)">'+
+          '<span style="color:var(--texte2)">'+q.texte+'</span>'+
+          '<span style="font-weight:600">'+val+unite+em+'</span></div>';
+      });
+      equipBlocs+='<div style="margin-bottom:10px">'+
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--texte);margin-bottom:4px">'+eq.nom+'</div>'+
+        lignes+'</div>';
+    });
+    var hasDetail=equipBlocs.length>0;
+    var detailSection=hasDetail?
+      '<tr id="'+detailId+'" style="display:none"><td colspan="4" style="padding:0">'+
+        '<div style="padding:12px 16px;background:var(--surface2);border-top:1px solid var(--bordure)">'+equipBlocs+'</div>'+
+      '</td></tr>':'';
+
+    rows+='<tr style="cursor:'+(hasDetail?'pointer':'default')+'"'+(hasDetail?' onclick="toggleRondeDetail(\''+detailId+'\')"':'')+'>'+
+      '<td><div>'+fmtDate(r.date_ronde)+'</div><div style="font-size:10px;color:var(--texte3)">'+freq+'</div></td>'+
+      '<td>'+techNom+'</td>'+
+      '<td>'+nbEq+' équipement'+(nbEq!==1?'s':'')+summaryHtml+'</td>'+
+      '<td><span class="pill '+(nbEq>0?'pill-ok':'pill-warn')+'">'+(nbEq>0?'Complète':'Vide')+'</span>'+(hasDetail?'<div style="font-size:10px;color:var(--texte3);margin-top:3px">→ Voir détail</div>':'')+'</td></tr>'+
+      detailSection;
   });
   return '<button class="saisies-toggle" onclick="toggleSaisies(this)"><span>Journal des rondes ('+sorted.length+')</span><span>▾</span></button>'+
     '<div class="saisies-body" id="saisies-body"><div class="table-card" style="margin-top:6px">'+
-    '<table class="data"><thead><tr><th>Date</th><th>Technicien</th><th>Équipements</th><th>Statut</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+    '<table class="data"><thead><tr><th>Date</th><th>Technicien</th><th>Équipements</th><th>Statut</th></tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div></div>';
+}
+
+function toggleRondeDetail(id){
+  var el=document.getElementById(id);
+  if(!el)return;
+  el.style.display=el.style.display==='none'?'table-row':'none';
 }
 
 // ════════════════════════════════════════
