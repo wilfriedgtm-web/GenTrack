@@ -918,7 +918,7 @@ function buildRondesLog(rondes,equips,rondesEq,reponses,questions,contactMap){
     });
     var detailHtml=geDetails.length?'<div style="font-size:11px;color:var(--texte2);margin-top:2px">'+geDetails.join(' · ')+'</div>':'';
     rows+='<tr><td>'+fmtDate(r.date_ronde)+'</td>'+
-      '<td>'+esc(techNom)+'</td>'+
+      '<td>'+(techNom||'—').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</td>'+
       '<td>'+nbEq+' équipement'+(nbEq!==1?'s':'')+detailHtml+'</td>'+
       '<td><span class="pill '+(nbEq>0?'pill-ok':'pill-warn')+'">'+(nbEq>0?'Complète':'Vide')+'</span></td></tr>';
   });
