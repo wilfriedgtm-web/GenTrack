@@ -1080,8 +1080,9 @@ function drillSiteDetail(siteId,siteNom,evt){
 // ── PANNES ──
 function buildPannesSection(pannesOuv,pannesRes,groupes,groupeMap,panneLabels,showFull){
   var gids={};groupes.forEach(function(g){gids[g.id]=true;});
-  var panneFilt=pannesOuv.filter(function(p){return gids[p.groupe_id];});
-  var resFilt=pannesRes.filter(function(p){return gids[p.groupe_id];});
+  var hasFilter=groupes.length>0;
+  var panneFilt=hasFilter?pannesOuv.filter(function(p){return gids[p.groupe_id];}):pannesOuv;
+  var resFilt=hasFilter?pannesRes.filter(function(p){return gids[p.groupe_id];}):pannesRes;
   var ouvertesHtml='';
   if(panneFilt.length){
     panneFilt.forEach(function(p){
