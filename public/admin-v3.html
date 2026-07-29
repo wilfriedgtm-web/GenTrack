@@ -489,9 +489,10 @@ function renderTabSites(client, sites, allEquip, groupes) {
     const equips = allEquip.filter(e=>e.site_id===site.id);
     html += `<div class="card" style="margin-bottom:14px">
       <div class="card-header">
-        <div><strong style="font-size:14px">${esc(site.nom)}</strong>${site.ville?`<div style="font-size:11px;color:var(--text-muted)">${esc(site.ville)}</div>`:''}</div>
+        <div><strong style="font-size:14px">${esc(site.nom)}</strong>${site.ville?`<div style="font-size:11px;color:var(--text-muted)">${esc(site.ville)}</div>`:''}<div style="font-size:11px;color:var(--text-muted)">⏰ Rappel ${site.heure_rappel??8}h UTC</div></div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-outline btn-xs" onclick="openAddEquipement('${site.id}','${client.id}')">+ Équipement</button>
+          <button class="btn btn-outline btn-xs" onclick="openEditSite('${site.id}','${client.id}')">✏️</button>
           <button class="btn btn-danger btn-xs" onclick="deleteSite('${site.id}','${client.id}')">🗑️</button>
         </div>
       </div>`;
@@ -681,6 +682,17 @@ function openAddSite(clientId) {
         <div class="form-group"><label class="form-label">Référence interne</label><input class="form-input" id="s-ref" placeholder="SITE-01" /></div>
       </div>
       <div class="form-group"><label class="form-label">WhatsApp responsable site</label><input class="form-input" id="s-wa" placeholder="+2250700000000" /></div>
+      <div class="form-group"><label class="form-label">Heure du rappel (UTC)</label>
+        <select class="form-input" id="s-heure-rappel">
+          <option value="6">6h UTC (7h Dakar)</option>
+          <option value="7">7h UTC (8h Dakar)</option>
+          <option value="8" selected>8h UTC (9h Dakar) — défaut</option>
+          <option value="9">9h UTC (10h Dakar)</option>
+          <option value="10">10h UTC (11h Dakar)</option>
+          <option value="11">11h UTC (12h Dakar)</option>
+          <option value="12">12h UTC (13h Dakar)</option>
+        </select>
+      </div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-site')">Annuler</button><button class="btn btn-primary" onclick="createSite('${clientId}')">Créer le site</button></div>
   </div>`);
@@ -695,8 +707,47 @@ async function createSite(clientId) {
     pays:document.getElementById('s-pays').value||null,
     reference:document.getElementById('s-ref').value||null,
     whatsapp_responsable:document.getElementById('s-wa').value||null,
+    heure_rappel:parseInt(document.getElementById('s-heure-rappel').value)||8,
   });
   closeModal('modal-site'); toast('Site ajouté'); await loadAll(); openClient(clientId,'sites');
+}
+function openEditSite(siteId, clientId) {
+  const site = (S.sites||[]).find(s=>s.id===siteId)||{};
+  const hr = site.heure_rappel ?? 8;
+  const opts = [6,7,8,9,10,11,12].map(h=>`<option value="${h}"${h===hr?' selected':''}>${h}h UTC (${h+1}h Dakar)</option>`).join('');
+  showModal('modal-edit-site',`<div class="modal modal-md">
+    <div class="modal-header"><h3>Modifier le site</h3><button class="close-btn" onclick="closeModal('modal-edit-site')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Nom du site *</label><input class="form-input" id="es-nom" value="${esc(site.nom||'')}" /></div>
+      <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="es-desc" value="${esc(site.description||'')}" /></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group"><label class="form-label">Ville</label><input class="form-input" id="es-ville" value="${esc(site.ville||'')}" /></div>
+        <div class="form-group"><label class="form-label">Pays</label><input class="form-input" id="es-pays" value="${esc(site.pays||'')}" /></div>
+        <div class="form-group"><label class="form-label">Adresse</label><input class="form-input" id="es-adresse" value="${esc(site.adresse||'')}" /></div>
+        <div class="form-group"><label class="form-label">Référence</label><input class="form-input" id="es-ref" value="${esc(site.reference||'')}" /></div>
+      </div>
+      <div class="form-group"><label class="form-label">WhatsApp responsable</label><input class="form-input" id="es-wa" value="${esc(site.whatsapp_responsable||'')}" /></div>
+      <div class="form-group"><label class="form-label">Heure du rappel (UTC)</label>
+        <select class="form-input" id="es-heure-rappel">${opts}</select>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-edit-site')">Annuler</button><button class="btn btn-primary" onclick="saveSite('${siteId}','${clientId}')">Enregistrer</button></div>
+  </div>`);
+}
+async function saveSite(siteId, clientId) {
+  const nom = document.getElementById('es-nom').value.trim();
+  if (!nom) { toast('Nom requis'); return; }
+  await api('sites', `id=eq.${siteId}`, '*', 'PATCH', {
+    nom,
+    description: document.getElementById('es-desc').value||null,
+    adresse: document.getElementById('es-adresse').value||null,
+    ville: document.getElementById('es-ville').value||null,
+    pays: document.getElementById('es-pays').value||null,
+    reference: document.getElementById('es-ref').value||null,
+    whatsapp_responsable: document.getElementById('es-wa').value||null,
+    heure_rappel: parseInt(document.getElementById('es-heure-rappel').value)||8,
+  });
+  closeModal('modal-edit-site'); toast('Site mis à jour'); await loadAll(); openClient(clientId,'sites');
 }
 async function deleteSite(siteId,clientId) {
   if(!confirm('Supprimer ce site ?')) return;
