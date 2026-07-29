@@ -368,7 +368,7 @@ function renderClientRows(clients) {
       <td style="font-size:12px">${esc(c.groupe_hotelier||'—')}</td>
       <td><span class="kpi-badge badge-gray">${c.plan||'—'}</span></td>
       <td>${sites.length}</td>
-      <td>${equips.length+groupes.length}</td>
+      <td>${equips.length}</td>
       <td>${fmtCFA(c.prix_mensuel||0)}</td>
       <td><span class="kpi-badge ${c.actif?'badge-green':'badge-gray'}">${c.actif?'Actif':'Inactif'}</span></td>
       <td onclick="event.stopPropagation()"><button class="btn btn-outline btn-xs" onclick="openClient('${c.id}')">Gérer →</button></td>
@@ -483,35 +483,7 @@ async function deleteClient(id) {
 function renderTabSites(client, sites, allEquip, groupes) {
   let html = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="openAddSite('${client.id}')">+ Ajouter un site</button></div>`;
 
-  // Ancien modèle : groupes
-  if (groupes.length > 0) {
-    const typeIcons = {ge:'⚡',geg:'❄️',cf:'🧊',autre:'⚙️'};
-    const typeLabels = {ge:'Groupe électrogène',geg:'Groupe eau glacée',cf:'Chambre froide',autre:'Autre'};
-    html += `<div class="info-box">📦 <strong>Équipements</strong> — ${groupes.length} unité(s) · <span style="color:var(--green)">${groupes.filter(g=>g.actif).length} actif(s)</span></div>`;
-    groupes.forEach(g => {
-      const icon = typeIcons[g.type_equipement]||'⚙️';
-      const typeLabel = typeLabels[g.type_equipement]||g.type_equipement||'Équipement';
-      html += `<div class="equip-item" style="margin-bottom:8px;opacity:${g.actif?1:0.45}">
-        <div class="equip-item-left">
-          <div class="equip-icon" style="background:${g.actif?'#f0ede8':'#e2e8f0'}">${icon}</div>
-          <div>
-            <div class="equip-name">${esc(g.nom)} <span style="font-size:10px;color:var(--text-muted);font-weight:400">· ${typeLabel}</span></div>
-            <div class="equip-meta">${g.puissance_kva?g.puissance_kva+' kVA · ':''} ${g.marque?esc(g.marque)+' · ':''} ${g.actif?'<span style="color:var(--green);font-weight:600">Actif</span>':'<span style="color:var(--text-muted)">Inactif</span>'}</div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <label class="toggle" title="${g.actif?'Désactiver':'Activer'}" onclick="event.stopPropagation()">
-            <input type="checkbox" ${g.actif?'checked':''} onchange="toggleGroupeActif('${g.id}',this.checked,'${client.id}')">
-            <span class="toggle-slider"></span>
-          </label>
-          <button class="btn btn-outline btn-xs" onclick="editGroupe('${g.id}','${client.id}')">✏️</button>
-        </div>
-      </div>`;
-    });
-    html += '<hr class="section-sep">';
-  }
-
-  if (!sites.length && !groupes.length) html += '<p style="color:var(--text-muted);font-size:13px">Aucun site ni équipement.</p>';
+  if (!sites.length) html += '<p style="color:var(--text-muted);font-size:13px">Aucun site configuré.</p>';
 
   sites.forEach(site => {
     const equips = allEquip.filter(e=>e.site_id===site.id);
