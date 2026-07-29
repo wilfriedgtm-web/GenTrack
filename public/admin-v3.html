@@ -499,15 +499,19 @@ function renderTabSites(client, sites, allEquip, groupes) {
     else {
       equips.forEach(eq => {
         const t = typeById(eq.type_id);
-        html += `<div class="equip-item">
+        html += `<div class="equip-item" style="opacity:${eq.actif?1:0.45}">
           <div class="equip-item-left">
             <div class="equip-icon">${t.icon}</div>
             <div>
-              <div class="equip-name">${esc(eq.nom)}</div>
-              <div class="equip-meta">${t.label}${eq.conso_theorique_lh?` · ${eq.conso_theorique_lh}L/h`:''}${eq.capacite_litres?` · ${eq.capacite_litres}L`:''}${eq.seuil_vidange_heures?` · Vidange: ${eq.seuil_vidange_heures}h`:''}</div>
+              <div class="equip-name">${esc(eq.nom)} <span style="font-size:10px;color:var(--text-muted);font-weight:400">· ${t.label}</span></div>
+              <div class="equip-meta">${eq.conso_theorique_lh?`${eq.conso_theorique_lh}L/h · `:''}${eq.capacite_litres?`${eq.capacite_litres}L · `:''}${eq.seuil_vidange_heures?`Vidange: ${eq.seuil_vidange_heures}h · `:''}${eq.actif?'<span style="color:var(--green);font-weight:600">Actif</span>':'<span style="color:var(--text-muted)">Inactif</span>'}</div>
             </div>
           </div>
-          <div style="display:flex;gap:6px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <label class="toggle" title="${eq.actif?'Désactiver':'Activer'}" onclick="event.stopPropagation()">
+              <input type="checkbox" ${eq.actif?'checked':''} onchange="toggleEquipActif('${eq.id}',this.checked,'${client.id}')">
+              <span class="toggle-slider"></span>
+            </label>
             <button class="btn btn-outline btn-xs" onclick="openEditEquipement('${eq.id}','${client.id}')">✏️</button>
             <button class="btn btn-danger btn-xs" onclick="deleteEquipement('${eq.id}','${client.id}')">🗑️</button>
           </div>
@@ -698,6 +702,14 @@ async function deleteSite(siteId,clientId) {
   if(!confirm('Supprimer ce site ?')) return;
   await apiDelete('sites',`id=eq.${siteId}`);
   toast('Site supprimé'); await loadAll(); openClient(clientId,'sites');
+}
+
+// ── ÉQUIPEMENTS (nouveau système) ────────────────────────────
+async function toggleEquipActif(eqId, actif, clientId) {
+  await api('equipements', `&id=eq.${eqId}`, '*', 'PATCH', { actif });
+  toast(actif ? '✅ Équipement activé — visible sur le dashboard client' : '⏸ Équipement désactivé — masqué du dashboard client');
+  S.equipements = S.equipements.map(e => e.id === eqId ? {...e, actif} : e);
+  openClient(clientId, 'sites');
 }
 
 // ── GROUPES (ancien modèle) ────────────────────────────────

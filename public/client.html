@@ -352,9 +352,11 @@ function renderHotelView(client,siteId,siteName,opts,containerId){
     api('types_equipements',''),
     api('alertes','&client_id=eq.'+client.id+'&resolue=eq.false'),
     api('pannes','&client_id=eq.'+client.id+'&resolue=eq.false&order=date_panne.desc'),
-    showFull?api('pannes','&client_id=eq.'+client.id+'&resolue=eq.true&order=date_resolution.desc&limit=20'):Promise.resolve([])
+    showFull?api('pannes','&client_id=eq.'+client.id+'&resolue=eq.true&order=date_resolution.desc&limit=20'):Promise.resolve([]),
+    api('contacts','&client_id=eq.'+client.id+'&actif=eq.true&select=id,nom,role')
   ]).then(function(r0){
-    var allEquips=r0[0],typesEq=r0[1],alertes=r0[2],pannesOuv=r0[3],pannesRes=r0[4];
+    var allEquips=r0[0],typesEq=r0[1],alertes=r0[2],pannesOuv=r0[3],pannesRes=r0[4],contacts=r0[5]||[];
+    var contactMap={};contacts.forEach(function(c){contactMap[c.id]=c.nom;});
 
     if(allEquips.length>0){
       // ═══ NOUVEAU SYSTÈME ═══
@@ -374,30 +376,33 @@ function renderHotelView(client,siteId,siteName,opts,containerId){
       ]).then(function(r1){
         var rondes=r1[0],questions=r1[1];
         if(!rondes.length){
-          renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,[],[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull);
+          renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,[],[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap);
           return;
         }
         var rondeIds=rondes.map(function(r){return r.id;});
         // Phase 3 — rondes_equipements
         api('rondes_equipements','&ronde_id=in.('+rondeIds.join(',')+')').then(function(rondesEq){
           if(!rondesEq.length){
-            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull);
+            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap);
             return;
           }
-          // Phase 4 — reponses : seulement dernière ronde (état actuel) + toutes entrées cuve (graphique)
+          // Phase 4 — reponses : dernière ronde + toutes entrées cuve + tous GE (pour le journal)
           var latestRondeId=rondes[0].id;
           var latestREids=rondesEq.filter(function(re){return re.ronde_id===latestRondeId;}).map(function(re){return re.id;});
           var cuveREids=cuveEquip?rondesEq.filter(function(re){return re.equipement_id===cuveEquip.id;}).map(function(re){return re.id;}):[];
+          var geEquipIds={};equips.forEach(function(e){if(typeMap[e.type_id]&&typeMap[e.type_id].code==='ge')geEquipIds[e.id]=true;});
+          var geREids=rondesEq.filter(function(re){return geEquipIds[re.equipement_id];}).map(function(re){return re.id;});
           var reidSet={};
           latestREids.forEach(function(id){reidSet[id]=true;});
           cuveREids.forEach(function(id){reidSet[id]=true;});
+          geREids.forEach(function(id){reidSet[id]=true;});
           var allREids=Object.keys(reidSet);
           if(!allREids.length){
-            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull);
+            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap);
             return;
           }
           api('reponses','&ronde_equipement_id=in.('+allREids.join(',')+')').then(function(reponses){
-            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,reponses,questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull);
+            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,reponses,questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap);
           });
         });
       });
@@ -429,7 +434,8 @@ function renderHotelView(client,siteId,siteName,opts,containerId){
 // ════════════════════════════════════════
 // NOUVEAU SYSTÈME — rendu DOM
 // ════════════════════════════════════════
-function renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,reponses,questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull){
+function renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,reponses,questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap){
+  if(!contactMap)contactMap={};
   var rootEl=containerId?document.getElementById(containerId):document.getElementById('app');
   if(!rootEl)return;
   var role=opts.role||'resp_tech';
@@ -507,7 +513,7 @@ function renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips
   var presenceHtml=buildPresenceSectionNew(equips,typeMap,saisieSetN,today);
   var cuveHtml=buildCuveCardNew(cuveEquip,reByEquip,geEquips,consoLh,today);
   var pannesHtml=buildPannesSection(pannesOuv,showFull?pannesRes:[],[],{},panneLabels,showFull);
-  var rondesLogHtml=buildRondesLog(rondes,allEquips,rondesEq);
+  var rondesLogHtml=buildRondesLog(rondes,allEquips,rondesEq,reponses,questions,contactMap);
   var moisNom=now.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
   var rapportHtml=showFull?'<div class="rapport-card"><div><div class="rapport-title">Rapport mensuel — '+moisNom+'</div><div style="font-size:12px;color:var(--texte2)">Rondes des 30 derniers jours</div></div><button class="export-btn" onclick="exportPDF()">&#128196; Exporter en PDF</button></div>':'';
 
@@ -863,18 +869,57 @@ function renderChartNew(){
   });
 }
 
-function buildRondesLog(rondes,equips,rondesEq){
+function buildRondesLog(rondes,equips,rondesEq,reponses,questions,contactMap){
   if(!rondes.length)return '';
-  var equipMap={};equips.forEach(function(e){equipMap[e.id]=e.nom;});
+  if(!contactMap)contactMap={};
+  if(!reponses)reponses=[];
+  if(!questions)questions=[];
+  var equipMap={};equips.forEach(function(e){equipMap[e.id]=e;});
+  // index reponses par ronde_equipement_id
+  var repByRE={};
+  reponses.forEach(function(rep){
+    if(!repByRE[rep.ronde_equipement_id])repByRE[rep.ronde_equipement_id]=[];
+    repByRE[rep.ronde_equipement_id].push(rep);
+  });
+  // index questions par id
+  var qById={};questions.forEach(function(q){qById[q.id]=q;});
+  // groupe les rondes_equipements par ronde_id
   var reByRonde={};
-  rondesEq.forEach(function(re){if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=0;reByRonde[re.ronde_id]++;});
+  rondesEq.forEach(function(re){
+    if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];
+    reByRonde[re.ronde_id].push(re);
+  });
   var sorted=rondes.slice().sort(function(a,b){return b.date_ronde.localeCompare(a.date_ronde);}).slice(0,30);
   var rows='';
   sorted.forEach(function(r){
-    var nbEq=reByRonde[r.id]||0;
+    var res=reByRonde[r.id]||[];
+    var nbEq=res.length;
+    var techNom=contactMap[r.technicien_id]||'—';
+    // Construire les détails GE : compteur + huile
+    var geDetails=[];
+    res.forEach(function(re){
+      var eq=equipMap[re.equipement_id];
+      if(!eq||eq.capacite_litres!=null)return; // skip cuve
+      var reps=repByRE[re.id]||[];
+      var compteur=null,huile=null;
+      reps.forEach(function(rep){
+        var q=qById[rep.question_id];
+        if(!q)return;
+        var txt=q.texte.toLowerCase();
+        if(txt.includes('compteur'))compteur=rep.valeur;
+        if(txt.includes('huile'))huile=rep.valeur;
+      });
+      if(compteur||huile){
+        var detail=eq.nom;
+        if(compteur)detail+=' <span style="color:var(--texte2)">'+compteur+'h</span>';
+        if(huile&&huile!=='Normal')detail+=' <span style="color:var(--orange)">'+huile+'</span>';
+        geDetails.push(detail);
+      }
+    });
+    var detailHtml=geDetails.length?'<div style="font-size:11px;color:var(--texte2);margin-top:2px">'+geDetails.join(' · ')+'</div>':'';
     rows+='<tr><td>'+fmtDate(r.date_ronde)+'</td>'+
-      '<td style="color:var(--texte2)">'+(r.technicien_id||'—')+'</td>'+
-      '<td>'+nbEq+' équipement'+(nbEq!==1?'s':'')+'</td>'+
+      '<td>'+esc(techNom)+'</td>'+
+      '<td>'+nbEq+' équipement'+(nbEq!==1?'s':'')+detailHtml+'</td>'+
       '<td><span class="pill '+(nbEq>0?'pill-ok':'pill-warn')+'">'+(nbEq>0?'Complète':'Vide')+'</span></td></tr>';
   });
   return '<button class="saisies-toggle" onclick="toggleSaisies(this)"><span>Journal des rondes ('+sorted.length+')</span><span>▾</span></button>'+
