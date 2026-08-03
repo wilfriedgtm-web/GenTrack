@@ -803,6 +803,28 @@ function buildCuveCardNew(cuveEquip,reByEquip,geEquips,consoLh,today){
   var chips='';
   geEquips.forEach(function(e){chips+='<span class="ge-chip">'+e.nom+'</span>';});
   var note=geEquips.length>=1?'<div class="cuve-note">Autonomie calculée sur '+consoLh+' L/h × 8h/j.</div>':'';
+  // Détection ravitaillements : saut de niveau > 300L entre deux entrées consécutives
+  var debut30=new Date(Date.now()-30*86400000).toISOString().split('T')[0];
+  var sorted=cuveEntries.slice().sort(function(a,b){return a.date.localeCompare(b.date);});
+  var ravits30=[],totalRavitL=0;
+  for(var i=1;i<sorted.length;i++){
+    var nPrev=parseFloat(getRepVal(sorted[i-1].reps,'niveau actuel'));
+    var nCur=parseFloat(getRepVal(sorted[i].reps,'niveau actuel'));
+    if(!isNaN(nPrev)&&!isNaN(nCur)&&nCur>nPrev+300&&sorted[i].date>=debut30){
+      var litres=Math.round(nCur-nPrev);
+      ravits30.push({date:sorted[i].date,litres:litres});
+      totalRavitL+=litres;
+    }
+  }
+  ravits30.reverse();
+  var ravitRows=ravits30.map(function(rv){
+    return '<tr><td>'+fmtDate(rv.date)+'</td><td><strong>+'+fmtNum(rv.litres)+' L</strong></td></tr>';
+  }).join('');
+  var ravitHtml=ravits30.length?
+    '<div style="margin-top:10px;border-top:1px solid var(--surface2);padding-top:10px">'+
+    '<div style="font-size:11px;font-weight:600;color:var(--texte2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Ravitaillements — 30 jours · '+fmtNum(totalRavitL)+' L</div>'+
+    '<table class="data" style="font-size:12px"><thead><tr><th>Date</th><th>Litres ajoutés</th></tr></thead><tbody>'+ravitRows+'</tbody></table></div>':
+    '<div style="margin-top:10px;border-top:1px solid var(--surface2);padding-top:8px;font-size:12px;color:var(--texte3)">Aucun ravitaillement sur 30 jours</div>';
   return '<div class="cuve-card"><div class="cuve-header"><div>'+
     '<div class="cuve-title">🪣 Cuve commune'+(cuveEquip.nom&&cuveEquip.nom!=='Cuve carburant'?' — '+cuveEquip.nom:'')+'</div>'+
     '<div class="cuve-sub">Capacité '+fmtNum(capCuve)+'L · '+rd.label+'</div></div><div>'+
@@ -814,7 +836,9 @@ function buildCuveCardNew(cuveEquip,reByEquip,geEquips,consoLh,today){
       '<span><strong>'+(pctCuve!=null?pctCuve+'%':'—')+'</strong> du réservoir</span>'+
       '<span><strong>'+consoLh+' L/h</strong> conso théorique</span>'+
       (dern?'<span><strong>'+fmtDate(dern.date)+'</strong> dernier relevé</span>':'')+'</div>'+
-    (chips?'<div class="ge-chips">'+chips+'</div>':'')+note+'</div>';
+    (chips?'<div class="ge-chips">'+chips+'</div>':'')+note+
+    ravitHtml+
+    '</div>';
 }
 
 function buildChartCardNew(){
