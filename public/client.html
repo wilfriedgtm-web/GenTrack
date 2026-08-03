@@ -506,6 +506,9 @@ function renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips
   var cuveHtml=buildCuveCardNew(cuveEquip,reByEquip,geEquips,consoLh,today);
   var pannesHtml=buildPannesSection(pannesOuv,showFull?pannesRes:[],[],{},panneLabels,showFull);
   var rondesLogHtml=buildRondesLog(rondes,allEquips,rondesEq,reponses,questions,contactMap);
+  var recommandationsHtml=buildRecommandationsNew(alertes);
+  var vidangesHtml=buildVidangesNew(geEquips,reByEquip);
+  var anomaliesHtml=buildAnomaliesNew(reponses,questions,rondesEq,rondes,allEquips,debut30);
   var moisNom=now.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
   var rapportHtml=showFull?'<div class="rapport-card"><div><div class="rapport-title">Rapport mensuel — '+moisNom+'</div><div style="font-size:12px;color:var(--texte2)">Rondes des 30 derniers jours</div></div><button class="export-btn" onclick="exportPDF()">&#128196; Exporter en PDF</button></div>':'';
 
@@ -533,12 +536,15 @@ function renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips
         '<div class="kpi"><div class="kpi-label">Niveau cuve</div><div class="kpi-value" style="color:'+(pctCuve!=null?carbColor(pctCuve):'var(--texte2)')+'">'+(pctCuve!=null?pctCuve+'%':'—')+'</div><div class="kpi-trend">'+(niveauCuve!=null?fmtNum(niveauCuve)+'L · '+autoJours+'j autonomie':'Aucune donnée')+'</div></div>'+
         '<div class="kpi"><div class="kpi-label">Pannes en cours</div><div class="kpi-value" style="color:'+(pannesOuv.length?'var(--rouge)':'var(--texte)')+'">'+(pannesOuv.length||'✓')+'</div><div class="kpi-trend">'+(coutMaint>0?fmtK(coutMaint)+' FCFA maint.':pannesRes.length+' résolue'+(pannesRes.length!==1?'s':''))+'</div></div>'+
       '</div>'+
+      recommandationsHtml+
       '<div class="section-hdr"><div class="section-title">Équipements par type</div><div class="section-sub">'+equips.length+' unité'+(equips.length!==1?'s':'')+' · cliquer pour détail</div></div>'+
       '<div class="type-grid">'+typeHtml+'</div>'+
+      vidangesHtml+
       presenceHtml+
       cuveHtml+
       buildChartCardNew()+
       pannesHtml+
+      anomaliesHtml+
       rapportHtml+
       rondesLogHtml+
     '</div>'+footerHtml;
@@ -785,6 +791,91 @@ function buildPresenceSectionNew(equips,typeMap,saisieSetN,today){
         '<span><span class="leg-dot" style="background:var(--surface3);border:1px solid var(--bordure)"></span>Aujourd\'hui</span>'+
         '<span style="margin-left:auto;color:var(--texte3);font-style:italic">Trait vertical = début de semaine</span>'+
       '</div></div>';
+}
+
+// ── RECOMMANDATIONS (alertes actives) ──
+function buildRecommandationsNew(alertes){
+  if(!alertes||!alertes.length)return '';
+  var actives=alertes.filter(function(a){return !a.resolue;});
+  if(!actives.length)return '';
+  actives.sort(function(a,b){return (b.created_at||'').localeCompare(a.created_at||'');});
+  var rows=actives.slice(0,5).map(function(a){
+    var ico=a.severite==='critique'?'🔴':'🟡';
+    var d=a.created_at?a.created_at.split('T')[0]:'';
+    return '<tr><td style="font-size:15px;width:28px">'+ico+'</td><td>'+(a.message||'—')+'</td><td style="color:var(--texte2);white-space:nowrap">'+fmtDate(d)+'</td></tr>';
+  }).join('');
+  return '<div class="table-card" style="margin-bottom:16px;border-left:3px solid var(--orange)">'+
+    '<div class="table-hdr"><div class="table-hdr-title">⚠️ Recommandations</div>'+
+    '<div class="table-hdr-sub">'+actives.length+' active'+(actives.length>1?'s':'')+'</div></div>'+
+    '<table class="data"><thead><tr><th></th><th>Message</th><th>Date</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+// ── VIDANGES GE (heures restantes) ──
+function buildVidangesNew(geEquips,reByEquip){
+  if(!geEquips.length)return '';
+  var hasData=false;
+  var rows=geEquips.map(function(e){
+    var entries=reByEquip[e.id]||[];
+    var dern=entries.length?entries[0]:null;
+    var cStr=dern?getRepVal(dern.reps,'compteur'):null;
+    var compteur=cStr!==null?parseFloat(cStr):null;
+    var seuil=e.seuil_vidange_heures||250;
+    if(compteur===null)return '<tr><td>'+(e.nom)+'</td><td colspan="3" style="color:var(--texte2)">Pas de données</td></tr>';
+    hasData=true;
+    var depuis=Math.round(compteur%seuil);
+    var restant=seuil-depuis;
+    var pct=Math.round(depuis/seuil*100);
+    var col=restant<50?'var(--rouge)':restant<100?'var(--orange)':'var(--vert,#2e7d32)';
+    var barCol=restant<50?'var(--rouge)':restant<100?'var(--orange)':'var(--or)';
+    return '<tr><td>'+(e.nom)+'</td>'+
+      '<td><strong>'+fmtNum(Math.round(compteur))+'h</strong></td>'+
+      '<td><div style="display:flex;align-items:center;gap:6px">'+
+        '<div style="flex:1;background:var(--surface2);border-radius:4px;height:5px">'+
+          '<div style="width:'+Math.min(pct,100)+'%;height:100%;background:'+barCol+';border-radius:4px"></div>'+
+        '</div>'+
+        '<span style="font-size:11px;color:var(--texte2);white-space:nowrap">'+depuis+'/'+seuil+'h</span>'+
+      '</div></td>'+
+      '<td style="color:'+col+';font-weight:500;white-space:nowrap">'+restant+'h restantes</td></tr>';
+  }).join('');
+  if(!hasData)return '';
+  return '<div class="table-card" style="margin-bottom:16px">'+
+    '<div class="table-hdr"><div class="table-hdr-title">🔧 Prochaines vidanges</div>'+
+    '<div class="table-hdr-sub">Estimation sur cycle '+geEquips[0].seuil_vidange_heures+'h · compteur cumulé</div></div>'+
+    '<table class="data"><thead><tr><th>Groupe électrogène</th><th>Compteur</th><th>Progression</th><th>Restant</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+
+// ── ANOMALIES SIGNALÉES (30 jours) ──
+function buildAnomaliesNew(reponses,questions,rondesEq,rondes,allEquips,debut30){
+  if(!reponses||!reponses.length)return '';
+  var qMap={};questions.forEach(function(q){qMap[q.id]=q;});
+  var reMap={};rondesEq.forEach(function(re){reMap[re.id]=re;});
+  var rondeMap={};rondes.forEach(function(r){rondeMap[r.id]=r;});
+  var eqMap={};allEquips.forEach(function(e){eqMap[e.id]=e.nom;});
+  var anomalies=[];
+  reponses.forEach(function(r){
+    var q=qMap[r.question_id];if(!q)return;
+    var re=reMap[r.ronde_equipement_id];if(!re)return;
+    var ronde=rondeMap[re.ronde_id];if(!ronde||ronde.date_ronde<debut30)return;
+    var val=r.valeur;var valN=parseFloat(val);
+    var ok=true,detail='';
+    if(q.type_reponse==='numerique'){
+      if(q.seuil_max!==null&&q.seuil_max!==undefined&&!isNaN(valN)&&valN>parseFloat(q.seuil_max)){ok=false;detail=val+(q.unite?' '+q.unite:'')+' (max '+q.seuil_max+')';}
+      else if(q.seuil_min!==null&&q.seuil_min!==undefined&&!isNaN(valN)&&valN<parseFloat(q.seuil_min)){ok=false;detail=val+(q.unite?' '+q.unite:'')+' (min '+q.seuil_min+')';}
+    } else if(q.type_reponse==='choix'&&q.options){
+      var opts=Array.isArray(q.options)?q.options:[];
+      if(opts.length&&val&&val!==opts[0]){ok=false;detail=val;}
+    }
+    if(!ok){anomalies.push({date:ronde.date_ronde,equip:eqMap[re.equipement_id]||'?',question:q.texte,detail:detail});}
+  });
+  if(!anomalies.length)return '';
+  anomalies.sort(function(a,b){return b.date.localeCompare(a.date);});
+  var rows=anomalies.slice(0,5).map(function(a){
+    return '<tr><td style="white-space:nowrap">'+fmtDate(a.date)+'</td><td>'+(a.equip)+'</td><td>'+(a.question)+'</td><td style="color:var(--orange)">'+(a.detail)+'</td></tr>';
+  }).join('');
+  return '<div class="table-card" style="margin-bottom:16px">'+
+    '<div class="table-hdr"><div class="table-hdr-title">⚡ Anomalies signalées</div>'+
+    '<div class="table-hdr-sub">30 derniers jours · '+anomalies.length+' détectée'+(anomalies.length>1?'s':'')+'</div></div>'+
+    '<table class="data"><thead><tr><th>Date</th><th>Équipement</th><th>Mesure</th><th>Valeur</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 
 function buildCuveCardNew(cuveEquip,reByEquip,geEquips,consoLh,today){
