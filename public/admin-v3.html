@@ -170,6 +170,7 @@ const TYPES = {
   groupe_electrogene: { id: '98849793-9201-4adf-aec2-a4a08587c4e2', label: 'Groupe électrogène', icon: '⚡', modele_id: 'a1000000-0000-0000-0000-000000000001' },
   groupe_eau_glacee:  { id: '656f0ac2-a6b3-42ed-8c50-bc3d1e16086f', label: 'Groupe eau glacée',  icon: '💧', modele_id: 'a1000000-0000-0000-0000-000000000002' },
   chambre_froide:     { id: 'e2c7e882-71dd-4a01-ac4e-d7bfc5954fff', label: 'Chambre froide',     icon: '❄️', modele_id: 'a1000000-0000-0000-0000-000000000003' },
+  cuve_fioul:         { id: 'de5519d0-363b-4628-b872-2dcf01859002', label: 'Cuve fioul',          icon: '🛢️', modele_id: 'a1000000-0000-0000-0000-000000000004' },
 };
 
 function typeById(id) { return Object.values(TYPES).find(t => t.id === id) || { label: 'Autre', icon: '🔩' }; }
@@ -672,16 +673,10 @@ function openAddSite(clientId) {
     <div class="modal-header"><h3>Nouveau site</h3><button class="close-btn" onclick="closeModal('modal-site')">×</button></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Nom du site *</label><input class="form-input" id="s-nom" placeholder="Bâtiment principal, Annexe Nord…" /></div>
-      <div class="form-group"><label class="form-label">Description / Emplacement</label><input class="form-input" id="s-desc" placeholder="ex: Bâtiment A, côté piscine" /></div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Adresse</label><input class="form-input" id="s-adresse" placeholder="123 rue du Port" /></div>
         <div class="form-group"><label class="form-label">Ville</label><input class="form-input" id="s-ville" value="${esc(client.ville||'')}" /></div>
-      </div>
-      <div class="form-row">
         <div class="form-group"><label class="form-label">Pays</label><input class="form-input" id="s-pays" value="${esc(client.pays||'Sénégal')}" /></div>
-        <div class="form-group"><label class="form-label">Référence interne</label><input class="form-input" id="s-ref" placeholder="SITE-01" /></div>
       </div>
-      <div class="form-group"><label class="form-label">WhatsApp responsable site</label><input class="form-input" id="s-wa" placeholder="+2250700000000" /></div>
       <div class="form-group"><label class="form-label">Heure du rappel (UTC)</label>
         <select class="form-input" id="s-heure-rappel">
           <option value="6">6h UTC (7h Dakar)</option>
@@ -699,16 +694,14 @@ function openAddSite(clientId) {
 }
 async function createSite(clientId) {
   const nom=document.getElementById('s-nom').value.trim(); if(!nom){toast('Nom requis');return;}
-  await api('sites','','*','POST',{
+  const result = await api('sites','','*','POST',{
     nom, client_id:clientId,
-    description:document.getElementById('s-desc').value||null,
-    adresse:document.getElementById('s-adresse').value||null,
     ville:document.getElementById('s-ville').value||null,
     pays:document.getElementById('s-pays').value||null,
-    reference:document.getElementById('s-ref').value||null,
-    whatsapp_responsable:document.getElementById('s-wa').value||null,
     heure_rappel:parseInt(document.getElementById('s-heure-rappel').value)||8,
+    actif:true,
   });
+  if(!result||!result[0]){toast('Erreur lors de la création du site','error');return;}
   closeModal('modal-site'); toast('Site ajouté'); await loadAll(); openClient(clientId,'sites');
 }
 function openEditSite(siteId, clientId) {
@@ -833,6 +826,7 @@ function renderEqTypeFields() {
   const typeId = document.getElementById('eq-type')?.value;
   const isGE = typeId === TYPES.groupe_electrogene.id;
   const isGEG = typeId === TYPES.groupe_eau_glacee.id;
+  const isCuve = typeId === TYPES.cuve_fioul.id;
   document.getElementById('eq-type-fields').innerHTML = isGE ? `
     <div class="form-row">
       <div class="form-group"><label class="form-label">Conso théorique (L/h)</label><input class="form-input" id="eq-conso" type="number" step="0.1" value="1.5" /></div>
@@ -841,6 +835,10 @@ function renderEqTypeFields() {
     <div class="form-row">
       <div class="form-group"><label class="form-label">Seuil vidange (heures)</label><input class="form-input" id="eq-vidange" type="number" value="250" /></div>
       <div class="form-group"></div>
+    </div>` : isCuve ? `
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Capacité totale (L)</label><input class="form-input" id="eq-capa" type="number" value="10000" /></div>
+      <div class="form-group"><label class="form-label">Conso estimée GEs (L/h)</label><input class="form-input" id="eq-conso" type="number" step="0.1" value="65" /></div>
     </div>` : '';
 }
 
@@ -864,6 +862,7 @@ function openEditEquipement(eqId, clientId) {
   const eq=S.equipements.find(e=>e.id===eqId); if(!eq) return;
   const t=typeById(eq.type_id);
   const isGE = eq.type_id===TYPES.groupe_electrogene.id;
+  const isCuve = eq.type_id===TYPES.cuve_fioul.id;
   showModal('modal-eq-edit',`<div class="modal modal-md">
     <div class="modal-header"><h3>Modifier l'équipement</h3><button class="close-btn" onclick="closeModal('modal-eq-edit')">×</button></div>
     <div class="modal-body">
@@ -878,6 +877,9 @@ function openEditEquipement(eqId, clientId) {
       <div class="form-row">
         <div class="form-group"><label class="form-label">Seuil vidange (heures)</label><input class="form-input" id="eqe-vidange" type="number" value="${eq.seuil_vidange_heures||250}" /></div>
         <div class="form-group"></div>
+      </div>`:isCuve?`<div class="form-row">
+        <div class="form-group"><label class="form-label">Capacité totale (L)</label><input class="form-input" id="eqe-capa" type="number" value="${eq.capacite_litres||10000}" /></div>
+        <div class="form-group"><label class="form-label">Conso estimée GEs (L/h)</label><input class="form-input" id="eqe-conso" type="number" step="0.1" value="${eq.conso_theorique_lh||65}" /></div>
       </div>`:''}
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-eq-edit')">Annuler</button><button class="btn btn-primary" onclick="saveEquipement('${eqId}','${clientId}')">Enregistrer</button></div>

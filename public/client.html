@@ -365,9 +365,10 @@ function renderHotelView(client,siteId,siteName,opts,containerId){
         var code=typeCodeFromNom(t.nom);
         typeMap[t.id]={nom:t.nom,code:code,icon:TYPE_ICONS_NEW[code]||'⚙️'};
       });
+      var CUVE_TYPE_ID='de5519d0-363b-4628-b872-2dcf01859002';
       var cuveEquip=null;
-      allEquips.forEach(function(e){if(e.capacite_litres!=null&&!cuveEquip)cuveEquip=e;});
-      var equips=allEquips.filter(function(e){return e.capacite_litres==null;});
+      allEquips.forEach(function(e){if(e.type_id===CUVE_TYPE_ID&&!cuveEquip)cuveEquip=e;});
+      var equips=allEquips.filter(function(e){return e.type_id!==CUVE_TYPE_ID;});
 
       // Phase 2 — rondes + questions en parallèle
       Promise.all([
