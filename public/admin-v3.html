@@ -474,8 +474,37 @@ async function saveClientInfos(id) {
   await api('clients',`&id=eq.${id}`,'*','PATCH',body);
   toast('Client mis à jour'); await loadAll(); openClient(id,'infos');
 }
+// ── HELPERS CASCADE ────────────────────────────────────────
+async function _cascadeDeleteEquipement(eqId) {
+  const rEqs = await api('rondes_equipements',`&equipement_id=eq.${eqId}`,'id');
+  if (rEqs && rEqs.length) {
+    const ids = rEqs.map(r=>r.id).join(',');
+    await apiDelete('reponses',`ronde_equipement_id=in.(${ids})`);
+    await apiDelete('rondes_equipements',`equipement_id=eq.${eqId}`);
+  }
+  await apiDelete('questions',`equipement_id=eq.${eqId}`);
+  await apiDelete('equipements',`id=eq.${eqId}`);
+}
+async function _cascadeDeleteSite(siteId) {
+  const equips = await api('equipements',`&site_id=eq.${siteId}`,'id');
+  if (equips) for (const eq of equips) await _cascadeDeleteEquipement(eq.id);
+  await apiDelete('rondes',`site_id=eq.${siteId}`);
+  await apiDelete('pannes',`site_id=eq.${siteId}`);
+  const contacts = await api('contacts',`&site_id=eq.${siteId}`,'id');
+  if (contacts) for (const ct of contacts) await api('rondes',`&technicien_id=eq.${ct.id}`,'id','PATCH',{technicien_id:null});
+  await apiDelete('contacts',`site_id=eq.${siteId}`);
+  await apiDelete('tokens',`site_id=eq.${siteId}`);
+  await apiDelete('user_sites',`site_id=eq.${siteId}`);
+  await apiDelete('groupes',`site_id=eq.${siteId}`);
+  await apiDelete('cuves',`site_id=eq.${siteId}`);
+}
+
 async function deleteClient(id) {
-  if(!confirm('Supprimer ce client ?')) return;
+  if(!confirm('Supprimer ce client et toutes ses données ? Action irréversible.')) return;
+  const sites = await api('sites',`&client_id=eq.${id}`,'id');
+  if (sites) for (const s of sites) await _cascadeDeleteSite(s.id);
+  await apiDelete('vidanges',`client_id=eq.${id}`);
+  await apiDelete('sites',`client_id=eq.${id}`);
   await apiDelete('clients',`id=eq.${id}`);
   closeModal('modal-client'); toast('Client supprimé'); await loadAll();
 }
@@ -743,7 +772,8 @@ async function saveSite(siteId, clientId) {
   closeModal('modal-edit-site'); toast('Site mis à jour'); await loadAll(); openClient(clientId,'sites');
 }
 async function deleteSite(siteId,clientId) {
-  if(!confirm('Supprimer ce site ?')) return;
+  if(!confirm('Supprimer ce site et toutes ses données ? Action irréversible.')) return;
+  await _cascadeDeleteSite(siteId);
   await apiDelete('sites',`id=eq.${siteId}`);
   toast('Site supprimé'); await loadAll(); openClient(clientId,'sites');
 }
@@ -894,8 +924,8 @@ async function saveEquipement(eqId, clientId) {
   closeModal('modal-eq-edit'); toast('Équipement mis à jour'); await loadAll(); openClient(clientId,'sites');
 }
 async function deleteEquipement(eqId,clientId) {
-  if(!confirm('Supprimer cet équipement ?')) return;
-  await apiDelete('equipements',`id=eq.${eqId}`);
+  if(!confirm('Supprimer cet équipement et toutes ses données ?')) return;
+  await _cascadeDeleteEquipement(eqId);
   toast('Équipement supprimé'); await loadAll(); openClient(clientId,'sites');
 }
 
@@ -1030,6 +1060,7 @@ async function saveContact(id,clientId,isEdit) {
 }
 async function deleteContact(id,clientId) {
   if(!confirm('Supprimer ce contact ?')) return;
+  await api('rondes',`&technicien_id=eq.${id}`,'id','PATCH',{technicien_id:null});
   await apiDelete('contacts',`id=eq.${id}`);
   toast('Contact supprimé'); await loadAll(); openClient(clientId,'contacts');
 }
