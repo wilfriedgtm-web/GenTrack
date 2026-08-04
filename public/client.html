@@ -137,6 +137,19 @@ table.data tr:last-child td{border-bottom:none}
 table.data tr:hover td{background:var(--surface2)}
 
 .rapport-card{background:white;border:1px solid var(--bordure);border-radius:10px;padding:18px;margin-bottom:28px;display:flex;justify-content:space-between;align-items:center}
+
+@media print{
+  @page{size:A4;margin:15mm 12mm}
+  body{background:white!important}
+  .header-top,.site-switcher,.back-btn,.voir-detail-btn,.export-btn,.chart-toggles,.resolve-btn,.type-card:hover{display:none!important}
+  .header{background:var(--bx)!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .container{max-width:100%;padding:12px 0}
+  .kpi-grid{grid-template-columns:repeat(4,1fr)}
+  .type-grid{grid-template-columns:repeat(3,1fr)}
+  .kpi,.type-card,.cuve-card,.chart-card,.table-card,.presence-card,.rapport-card,.panne-open,.alert-banner{break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .cuve-bar-fill,.pill-ok,.pill-warn,.pill-danger,.section-title,.kpi-value,.type-icon,.table-hdr,.chart-hdr{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  canvas{max-width:100%!important}
+}
 .rapport-title{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;margin-bottom:4px}
 .rapport-sub{font-size:12px;color:var(--texte2)}
 .export-btn{background:var(--bx);color:white;border:none;padding:10px 20px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;letter-spacing:0.3px;display:flex;align-items:center;gap:8px;flex-shrink:0}
@@ -377,24 +390,29 @@ function renderHotelView(client,siteId,siteName,opts,containerId){
       ]).then(function(r1){
         var rondes=r1[0],questions=r1[1];
         if(!rondes.length){
-          renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,[],[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap);
+          renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,[],[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap,[]);
           return;
         }
         var rondeIds=rondes.map(function(r){return r.id;});
         // Phase 3 — rondes_equipements
         api('rondes_equipements','&ronde_id=in.('+rondeIds.join(',')+')').then(function(rondesEq){
           if(!rondesEq.length){
-            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap);
+            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap,[]);
             return;
           }
           // Phase 4 — toutes les réponses de toutes les rondes (journal complet)
           var allREids=rondesEq.map(function(re){return re.id;});
           if(!allREids.length){
-            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap);
+            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,[],questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap,[]);
             return;
           }
-          api('reponses','&ronde_equipement_id=in.('+allREids.join(',')+')').then(function(reponses){
-            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,reponses,questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap);
+          var equipIds=allEquips.map(function(e){return e.id;});
+          Promise.all([
+            api('reponses','&ronde_equipement_id=in.('+allREids.join(',')+')'),
+            equipIds.length?api('vidanges','&equipement_id=in.('+equipIds.join(',')+')'+'&order=date.desc'):Promise.resolve([])
+          ]).then(function(rv){
+            var reponses=rv[0],vidanges=rv[1]||[];
+            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,reponses,questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap,vidanges);
           });
         });
       });
@@ -426,13 +444,15 @@ function renderHotelView(client,siteId,siteName,opts,containerId){
 // ════════════════════════════════════════
 // NOUVEAU SYSTÈME — rendu DOM
 // ════════════════════════════════════════
-function renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,reponses,questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap){
+function renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,reponses,questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap,vidanges){
   if(!contactMap)contactMap={};
   var rootEl=containerId?document.getElementById(containerId):document.getElementById('app');
   if(!rootEl)return;
   var role=opts.role||'resp_tech';
 
   var reByEquip=buildEquipDataMap(rondes,rondesEq,reponses,questions);
+  var vidangesMap={};
+  (vidanges||[]).forEach(function(v){if(!vidangesMap[v.equipement_id])vidangesMap[v.equipement_id]=v;});
 
   // Saisie set pour heatmap (présence par ronde_equipement)
   var rondeDate={};
@@ -507,7 +527,7 @@ function renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips
   var pannesHtml=buildPannesSection(pannesOuv,showFull?pannesRes:[],[],{},panneLabels,showFull);
   var rondesLogHtml=buildRondesLog(rondes,allEquips,rondesEq,reponses,questions,contactMap);
   var recommandationsHtml=buildRecommandationsNew(alertes);
-  var vidangesHtml=buildVidangesNew(geEquips,reByEquip);
+  var vidangesHtml=buildVidangesNew(geEquips,reByEquip,vidangesMap);
   var anomaliesHtml=buildAnomaliesNew(reponses,questions,rondesEq,rondes,allEquips,debut30);
   var moisNom=now.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
   var rapportHtml=showFull?'<div class="rapport-card"><div><div class="rapport-title">Rapport mensuel — '+moisNom+'</div><div style="font-size:12px;color:var(--texte2)">Rondes des 30 derniers jours</div></div><button class="export-btn" onclick="exportPDF()">&#128196; Exporter en PDF</button></div>':'';
@@ -811,7 +831,7 @@ function buildRecommandationsNew(alertes){
 }
 
 // ── VIDANGES GE (heures restantes) ──
-function buildVidangesNew(geEquips,reByEquip){
+function buildVidangesNew(geEquips,reByEquip,vidangesMap){
   if(!geEquips.length)return '';
   var hasData=false;
   var rows=geEquips.map(function(e){
@@ -822,7 +842,9 @@ function buildVidangesNew(geEquips,reByEquip){
     var seuil=e.seuil_vidange_heures||250;
     if(compteur===null)return '<tr><td>'+(e.nom)+'</td><td colspan="3" style="color:var(--texte2)">Pas de données</td></tr>';
     hasData=true;
-    var depuis=Math.round(compteur%seuil);
+    var lastVidange=vidangesMap&&vidangesMap[e.id];
+    var baseHours=lastVidange?parseFloat(lastVidange.heures_au_moment||0):0;
+    var depuis=Math.max(0,Math.round(compteur-baseHours));
     var restant=seuil-depuis;
     var pct=Math.round(depuis/seuil*100);
     var col=restant<50?'var(--rouge)':restant<100?'var(--orange)':'var(--vert,#2e7d32)';
@@ -863,7 +885,7 @@ function buildAnomaliesNew(reponses,questions,rondesEq,rondes,allEquips,debut30)
       else if(q.seuil_min!==null&&q.seuil_min!==undefined&&!isNaN(valN)&&valN<parseFloat(q.seuil_min)){ok=false;detail=val+(q.unite?' '+q.unite:'')+' (min '+q.seuil_min+')';}
     } else if(q.type_reponse==='choix'&&q.options){
       var opts=Array.isArray(q.options)?q.options:[];
-      if(opts.length&&val&&val!==opts[0]){ok=false;detail=val;}
+      if(opts.length&&val&&val!==opts[0]){ok=false;detail=val+' (attendu : '+opts[0]+')';}
     }
     if(!ok){anomalies.push({date:ronde.date_ronde,equip:eqMap[re.equipement_id]||'?',question:q.texte,detail:detail});}
   });
@@ -1319,7 +1341,7 @@ function buildSaisiesLog(saisies30,groupeMap){
 }
 
 function toggleSaisies(btn){var body=document.getElementById('saisies-body');if(body)body.classList.toggle('open');}
-function exportPDF(){alert('Export PDF — en cours de développement.');}
+function exportPDF(){window.print();}
 
 // ════════════════════════════════════════
 // VUE CONSOLIDÉE (dir_ops / dir_tech)
