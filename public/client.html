@@ -469,7 +469,7 @@ function renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips
 
   // Données cuve
   var geEquips=equips.filter(function(e){return typeMap[e.type_id]&&typeMap[e.type_id].code==='ge';});
-  var consoLh=geEquips.length&&geEquips[0].conso_theorique_lh?parseFloat(geEquips[0].conso_theorique_lh):65;
+  var consoLh=(cuveEquip&&cuveEquip.conso_theorique_lh)?parseFloat(cuveEquip.conso_theorique_lh):(geEquips.length&&geEquips[0].conso_theorique_lh?parseFloat(geEquips[0].conso_theorique_lh):65);
   var cuveEntries=cuveEquip?(reByEquip[cuveEquip.id]||[]):[];
   var dernCuveEntry=cuveEntries.length?cuveEntries[0]:null;
   var niveauCuveStr=dernCuveEntry?getRepVal(dernCuveEntry.reps,'niveau actuel'):null;
@@ -844,7 +844,7 @@ function buildVidangesNew(geEquips,reByEquip,vidangesMap){
     hasData=true;
     var lastVidange=vidangesMap&&vidangesMap[e.id];
     var baseHours=lastVidange?parseFloat(lastVidange.heures_au_moment||0):0;
-    var depuis=Math.max(0,Math.round(compteur-baseHours));
+    var depuis=lastVidange?Math.max(0,Math.round(compteur-baseHours)):Math.round(compteur%seuil);
     var restant=seuil-depuis;
     var pct=Math.round(depuis/seuil*100);
     var col=restant<50?'var(--rouge)':restant<100?'var(--orange)':'var(--vert,#2e7d32)';
