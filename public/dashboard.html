@@ -115,6 +115,7 @@ var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
 var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
 var _session=null;
 var _dtCurrentSite=null;
+var _doCurrentSite=null;
 
 function $id(id){return document.getElementById(id);}
 function app(){return $id('app');}
@@ -217,7 +218,10 @@ function navTo(id){
     if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,id);
     else renderDirTech(_session,id);
   }
-  else if(_session.role==='dir_ops')renderDirOps(_session,id);
+  else if(_session.role==='dir_ops'){
+    if(_doCurrentSite)renderDirOpsSite(_session,_doCurrentSite.id,_doCurrentSite.nom,id);
+    else renderDirOps(_session,id);
+  }
 }
 function logout(){clearSession();renderInvalidLink();}
 
@@ -453,7 +457,8 @@ async function _marquerTraite(table,id,fromNav){
   if(btn){btn.disabled=true;btn.textContent='...';}
   await supaPatch(table,id,{resolue:true});
   if(!_session)return;
-  if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,fromNav||'alertes');
+  if(_doCurrentSite)renderDirOpsSite(_session,_doCurrentSite.id,_doCurrentSite.nom,fromNav||'alertes');
+  else if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,fromNav||'alertes');
   else renderRespTech(_session,fromNav||'alertes');
 }
 
@@ -798,7 +803,9 @@ async function _marquerTraiteDT(table,id,fromNav){
   var btn=event&&event.target;
   if(btn){btn.disabled=true;btn.textContent='...';}
   await supaPatch(table,id,{resolue:true});
-  if(_session)renderDirTech(_session,fromNav||'alertes');
+  if(!_session)return;
+  if(_session.role==='dir_ops')renderDirOps(_session,fromNav||'alertes');
+  else renderDirTech(_session,fromNav||'alertes');
 }
 
 async function _dtHistorique(sids){
@@ -892,22 +899,307 @@ function _exitSiteDetail(){
   renderDirTech(_session,'accueil');
 }
 
-/* ── VUE DIR OPS ── */
+/* ══════════════════════════════════════
+   VUE DIR OPS — Session D
+══════════════════════════════════════ */
+
 function renderDirOps(session,nav){
-  nav=nav||'accueil';var c='';
-  if(nav==='accueil'){
-    c='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Connecté · '+roleName(session.role)+'</div><div class="ab-sub">Session D en cours de construction</div></div></div>'+
-      '<div class="kpi-grid">'+
-        '<div class="kpi"><div class="kpi-label">Hôtels</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
-        '<div class="kpi"><div class="kpi-label">Actions requises</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
-        '<div class="kpi"><div class="kpi-label">Coûts du mois</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
+  nav=nav||'accueil';
+  _doCurrentSite=null;
+  var skeleton='<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text3);font-size:13px"><span class="spinner"></span>Chargement des données...</div>';
+  app().innerHTML=buildLayout(session,nav,skeleton);
+  _loadDO(session,nav);
+}
+
+async function _loadDO(session,nav){
+  var sids=session.site_ids||[];
+  var cid=session.client_id;
+  var el=document.querySelector('.dash-content');
+  if(!el)return;
+  try{
+    var html='';
+    if(nav==='accueil')html=await _doAccueil(session,sids,cid);
+    else if(nav==='alertes')html=await _dtAlertes(sids,cid);
+    else if(nav==='historique')html=await _doHistorique(sids);
+    el.innerHTML=html;
+  }catch(e){
+    el.innerHTML='<div class="alert-banner" style="margin-top:12px"><div class="ab-icon">⚠️</div><div class="ab-body"><div class="ab-title">Erreur de chargement</div><div class="ab-sub">'+(e.message||'Vérifiez votre connexion')+'</div></div></div>';
+  }
+}
+
+async function _doAccueil(session,sids,cid){
+  if(!sids.length)return '<div class="placeholder-card"><div class="placeholder-icon">🏨</div>Aucun site configuré pour ce compte</div>';
+  var sidStr=sids.join(',');
+  var since7=dateNJours(7);
+  var since14=dateNJours(14);
+  var threeDaysAgo=dateNJours(3);
+
+  var[sites,alertes,pannes,rondes7,pannes14]=await Promise.all([
+    supaGet('sites','id=in.('+sidStr+')&select=id,nom'),
+    supaGet('alertes','client_id=eq.'+cid+'&resolue=eq.false&select=id,type,severite,message,created_at&order=created_at.desc&limit=50'),
+    supaGet('pannes','site_id=in.('+sidStr+')&resolue=eq.false&select=id,site_id,type,description,date_panne,equipements(nom)&order=date_panne.asc&limit=50'),
+    supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+since7+'&select=id,site_id,date_ronde,frequence&order=date_ronde.desc&limit=200'),
+    supaGet('pannes','site_id=in.('+sidStr+')&date_panne=gte.'+since14+'&select=id,site_id,type,description,date_panne,resolue,equipements(nom)&order=date_panne.desc&limit=60')
+  ]);
+
+  var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
+
+  // Rondes 7j → conformité globale + par site
+  var rIds7=rondes7.map(function(r){return r.id;});
+  var rondesEq7=rIds7.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds7.join(',')+')'+'&select=ronde_id,site_id,statut'):[];
+  // attach site_id to rondesEq via rondes7 map
+  var rondeToSite={};
+  rondes7.forEach(function(r){rondeToSite[r.id]=r.site_id;});
+  var reByRonde7={};
+  rondesEq7.forEach(function(re){
+    if(!reByRonde7[re.ronde_id])reByRonde7[re.ronde_id]=[];
+    reByRonde7[re.ronde_id].push(re);
+  });
+
+  var totalVal7=0,totalTot7=0;
+  rondes7.forEach(function(r){
+    var eq=reByRonde7[r.id]||[];
+    totalTot7+=eq.length;
+    totalVal7+=eq.filter(function(re){return re.statut==='valide';}).length;
+  });
+  var confGlobal7=totalTot7>0?Math.round(totalVal7/totalTot7*100):null;
+  var totalAlertes=alertes.length+pannes.length;
+
+  // Banner
+  var banner=totalAlertes>0
+    ?'<div class="alert-banner"><div class="ab-icon">🚨</div><div class="ab-body"><div class="ab-title">'+totalAlertes+' action'+(totalAlertes>1?'s':'')+' requise'+(totalAlertes>1?'s':'')+'</div><div class="ab-sub">Pannes ou alertes nécessitant votre attention</div></div></div>'
+    :'<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Tous les sites opérationnels</div><div class="ab-sub">Aucune alerte active'+(confGlobal7!==null?' · '+confGlobal7+'% de conformité sur 7 jours':'')+'</div></div></div>';
+
+  // KPIs
+  var kpis='<div class="kpi-grid">'+
+    '<div class="kpi"><div class="kpi-label">Hôtels suivis</div><div class="kpi-value">'+sites.length+'</div><div class="kpi-trend">Portefeuille Azalaï</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Actions requises</div><div class="kpi-value" style="color:'+(totalAlertes>0?'var(--rouge)':'var(--vert)')+'">'+totalAlertes+'</div><div class="kpi-trend">'+(totalAlertes>0?'À traiter':'RAS')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Conformité 7 jours</div><div class="kpi-value" style="color:'+(confGlobal7===null?'var(--text2)':confGlobal7===100?'var(--vert)':confGlobal7>=70?'var(--amber)':'var(--rouge)')+'">'+( confGlobal7!==null?confGlobal7+'%':'—')+'</div><div class="kpi-trend">Rondes tous sites</div></div>'+
+  '</div>';
+
+  // Bloc 1 — Vue multi-sites (cartes cliquables)
+  var bloc1='<div class="section-title">Vue d\'ensemble</div><div style="display:flex;flex-direction:column;gap:8px">';
+  sids.forEach(function(sid){
+    var sNom=siteMap[sid]||'Site';
+    var sPannes=pannes.filter(function(p){return p.site_id===sid;});
+    var sPannesCount=sPannes.length;
+    var sRondes7=rondes7.filter(function(r){return r.site_id===sid;});
+    var allEq7=[];
+    sRondes7.forEach(function(r){allEq7=allEq7.concat(reByRonde7[r.id]||[]);});
+    var sVal=allEq7.filter(function(re){return re.statut==='valide';}).length;
+    var sTot=allEq7.length;
+    var sPct7=sTot>0?Math.round(sVal/sTot*100):null;
+    var sNomEsc=escape_html(sNom).replace(/'/g,"\\'");
+    bloc1+='<div class="ronde-card" style="cursor:pointer" onclick="renderDirOpsSite(_session,\''+sid+'\',\''+sNomEsc+'\',\'accueil\')">'+
+      '<div style="display:flex;align-items:center;gap:12px'+(sPct7!==null?';margin-bottom:10px':'')+'">'+
+        '<span style="font-size:20px">'+(sPannesCount>0?'🔴':sPct7===100?'✅':'📋')+'</span>'+
+        '<div style="flex:1">'+
+          '<div style="font-size:13px;font-weight:600">'+escape_html(sNom)+'</div>'+
+          '<div style="font-size:11px;color:var(--text2);margin-top:2px">Conformité 7j : '+(sPct7!==null?'<span style="font-weight:600;color:'+(sPct7===100?'var(--vert)':sPct7>=70?'var(--amber)':'var(--rouge)')+'">'+sPct7+'%</span>':'<span style="color:var(--text3)">—</span>')+'</div>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-shrink:0">'+
+          (sPannesCount>0
+            ?'<span style="font-size:10px;font-weight:600;color:var(--rouge);background:var(--rouge-pale);border:1px solid var(--rouge-border);border-radius:4px;padding:2px 8px">'+sPannesCount+' panne'+(sPannesCount>1?'s':'')+'</span>'
+            :'<span style="font-size:10px;font-weight:600;color:var(--vert)">RAS</span>')+
+          '<span style="font-size:16px;color:var(--text3)">›</span>'+
+        '</div>'+
       '</div>'+
-      '<div class="section-title">Actions requises</div><div class="placeholder-card"><div class="placeholder-icon">🚨</div>Alertes et actions prioritaires · Session D</div>'+
-      '<div class="section-title">Mes hôtels</div><div class="placeholder-card"><div class="placeholder-icon">🏨</div>Grille hôtels · Session D</div>'+
-      '<div class="section-title">Coûts du mois</div><div class="placeholder-card"><div class="placeholder-icon">💰</div>Comparaison vs mois précédent · Session D</div>';
-  }else if(nav==='alertes'){c='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">⚠️</div>Alertes groupe · Session D</div>';}
-  else if(nav==='historique'){c='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">📊</div>Historique · Session E</div>';}
-  app().innerHTML=buildLayout(session,nav,c);
+      (sPct7!==null?'<div class="progress-bar-wrap"><div class="progress-bar" style="width:'+sPct7+'%;background:'+(sPct7===100?'var(--vert)':sPct7>=70?'var(--amber)':'var(--rouge)')+'"></div></div>':'')+
+    '</div>';
+  });
+  bloc1+='</div>';
+
+  // Bloc 2 — Actions requises
+  var bloc2='<div class="section-title">Actions requises</div>';
+  var pannesRetard=pannes.filter(function(p){return p.date_panne&&p.date_panne<=threeDaysAgo;});
+  var alertesCritiques=alertes.filter(function(a){return a.severite==='critical';});
+  var pannesNormales=pannes.filter(function(p){return !p.date_panne||p.date_panne>threeDaysAgo;});
+  var alertesNormales=alertes.filter(function(a){return a.severite!=='critical';});
+
+  if(totalAlertes===0){
+    bloc2+='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Aucune action requise</div><div class="ab-sub">Tous les délais sont respectés</div></div></div>';
+  }else{
+    var items='<div style="display:flex;flex-direction:column;gap:8px">';
+    // Pannes en retard (> 3j) — priorité max
+    pannesRetard.forEach(function(p){
+      var eqNom=p.equipements&&p.equipements.nom?p.equipements.nom:'Équipement';
+      var sNom=siteMap[p.site_id]||'Site';
+      var daysDiff=p.date_panne?Math.floor((new Date()-new Date(p.date_panne))/(1000*60*60*24)):0;
+      var ts=p.date_panne?new Date(p.date_panne).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'';
+      items+='<div class="alerte-card" style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge)">'+
+        '<span style="font-size:16px;margin-top:1px">⏰</span>'+
+        '<div style="flex:1">'+
+          '<div class="alerte-card-titre" style="color:var(--rouge)">Panne en retard · '+escape_html(sNom)+'</div>'+
+          '<div class="alerte-card-msg">'+escape_html(eqNom)+(p.description||p.type?' — '+escape_html(p.description||p.type):'')+'</div>'+
+          '<div style="font-size:10px;color:var(--rouge);margin-top:4px;font-weight:600">'+daysDiff+' jour'+(daysDiff>1?'s':'')+' sans résolution · Signalé le '+ts+'</div>'+
+        '</div>'+
+        '<button class="btn-traite" onclick="_marquerTraiteDO(\'pannes\',\''+p.id+'\',\'accueil\')">✓ Résolu</button>'+
+      '</div>';
+    });
+    // Alertes critiques
+    alertesCritiques.forEach(function(a){
+      var ts=a.created_at?new Date(a.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+      items+='<div class="alerte-card" style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge)">'+
+        '<span style="font-size:16px;margin-top:1px">🔴</span>'+
+        '<div style="flex:1">'+
+          '<div class="alerte-card-titre" style="color:var(--rouge)">'+escape_html(a.type||'Alerte critique')+'</div>'+
+          '<div class="alerte-card-msg">'+escape_html(a.message||'')+'</div>'+
+          (ts?'<div style="font-size:10px;color:var(--text3);margin-top:4px">'+ts+'</div>':'')+
+        '</div>'+
+        '<button class="btn-traite" onclick="_marquerTraiteDO(\'alertes\',\''+a.id+'\',\'accueil\')">✓ Traité</button>'+
+      '</div>';
+    });
+    // Pannes récentes (< 3j)
+    pannesNormales.forEach(function(p){
+      var eqNom=p.equipements&&p.equipements.nom?p.equipements.nom:'Équipement';
+      var sNom=siteMap[p.site_id]||'Site';
+      var ts=p.date_panne?new Date(p.date_panne).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+      items+='<div class="alerte-card" style="background:var(--orange-pale);border:1px solid var(--orange-border);border-left:3px solid var(--orange)">'+
+        '<span style="font-size:16px;margin-top:1px">🟡</span>'+
+        '<div style="flex:1">'+
+          '<div class="alerte-card-titre" style="color:var(--orange)">Panne · '+escape_html(sNom)+'</div>'+
+          '<div class="alerte-card-msg">'+escape_html(eqNom)+(p.description||p.type?' — '+escape_html(p.description||p.type):'')+'</div>'+
+          (ts?'<div style="font-size:10px;color:var(--text3);margin-top:4px">'+ts+'</div>':'')+
+        '</div>'+
+        '<button class="btn-traite" onclick="_marquerTraiteDO(\'pannes\',\''+p.id+'\',\'accueil\')">✓ Résolu</button>'+
+      '</div>';
+    });
+    // Alertes non-critiques
+    alertesNormales.forEach(function(a){
+      var ts=a.created_at?new Date(a.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+      items+='<div class="alerte-card" style="background:var(--amber-pale);border:1px solid var(--amber-border);border-left:3px solid var(--amber)">'+
+        '<span style="font-size:16px;margin-top:1px">🟡</span>'+
+        '<div style="flex:1">'+
+          '<div class="alerte-card-titre" style="color:var(--amber)">'+escape_html(a.type||'Alerte')+'</div>'+
+          '<div class="alerte-card-msg">'+escape_html(a.message||'')+'</div>'+
+          (ts?'<div style="font-size:10px;color:var(--text3);margin-top:4px">'+ts+'</div>':'')+
+        '</div>'+
+        '<button class="btn-traite" onclick="_marquerTraiteDO(\'alertes\',\''+a.id+'\',\'accueil\')">✓ Traité</button>'+
+      '</div>';
+    });
+    bloc2+=items+'</div>';
+  }
+
+  // Bloc 3 — Activité récente 14j
+  var bloc3='<div class="section-title">Activité récente <span style="font-size:12px;font-weight:400;color:var(--text3)">— 14 jours</span></div>';
+  if(pannes14.length===0){
+    bloc3+='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Aucune panne sur 14 jours</div><div class="ab-sub">Tous les sites sont stables</div></div></div>';
+  }else{
+    bloc3+='<div style="display:flex;flex-direction:column;gap:6px">';
+    pannes14.forEach(function(p){
+      var eqNom=p.equipements&&p.equipements.nom?p.equipements.nom:'Équipement';
+      var sNom=siteMap[p.site_id]||'Site';
+      var ts=p.date_panne?new Date(p.date_panne).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+      var resolved=p.resolue;
+      bloc3+='<div class="eq-card" style="padding:12px 14px'+(resolved?';opacity:0.65':'')+'">'+
+        '<span style="font-size:16px">'+(resolved?'✅':'🔴')+'</span>'+
+        '<div style="flex:1">'+
+          '<div class="eq-card-nom">'+escape_html(eqNom)+' <span style="font-weight:400;color:var(--text2)">· '+escape_html(sNom)+'</span></div>'+
+          '<div class="eq-card-type">'+(p.type?escape_html(p.type)+' — ':'')+escape_html(p.description||'')+( ts?' · '+ts:'')+'</div>'+
+        '</div>'+
+        '<span style="font-size:10px;font-weight:600;color:'+(resolved?'var(--vert)':'var(--rouge)')+'">'+( resolved?'Résolu':'En cours')+'</span>'+
+      '</div>';
+    });
+    bloc3+='</div>';
+  }
+
+  return banner+kpis+bloc1+bloc2+bloc3;
+}
+
+async function _marquerTraiteDO(table,id,fromNav){
+  var btn=event&&event.target;
+  if(btn){btn.disabled=true;btn.textContent='...';}
+  await supaPatch(table,id,{resolue:true});
+  if(_session)renderDirOps(_session,fromNav||'alertes');
+}
+
+async function _doHistorique(sids){
+  if(!sids.length)return '<div class="placeholder-card"><div class="placeholder-icon">📊</div>Aucun site configuré</div>';
+  var sidStr=sids.join(',');
+  var since=dateNJours(14);
+  var[sites,rondes]=await Promise.all([
+    supaGet('sites','id=in.('+sidStr+')&select=id,nom'),
+    supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+since+'&select=id,site_id,date_ronde,frequence&order=date_ronde.desc&limit=200')
+  ]);
+  if(rondes.length===0){
+    return '<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">📊</div>Aucune ronde sur les 14 derniers jours</div>';
+  }
+  var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
+  var rIds=rondes.map(function(r){return r.id;});
+  var rondesEq=await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,statut');
+  var reByRonde={};
+  rondesEq.forEach(function(re){if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];reByRonde[re.ronde_id].push(re);});
+
+  var byDate={};
+  rondes.forEach(function(ro){
+    var d=ro.date_ronde;
+    if(!byDate[d])byDate[d]=[];
+    byDate[d].push(ro);
+  });
+  var dates=Object.keys(byDate).sort(function(a,b){return b>a?1:-1;});
+  var h='<div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">';
+  dates.forEach(function(d){
+    var dateDisp=new Date(d).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+    var isToday=d===todayStr();
+    h+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-top:8px;margin-bottom:2px">'+
+      (isToday?'Aujourd\'hui — ':'')+dateDisp+'</div>';
+    var bySite={};
+    byDate[d].forEach(function(ro){if(!bySite[ro.site_id])bySite[ro.site_id]=[];bySite[ro.site_id].push(ro);});
+    Object.keys(bySite).forEach(function(sid){
+      var sNom=siteMap[sid]||'Site';
+      var sRondes=bySite[sid];
+      var allEq=[];
+      sRondes.forEach(function(ro){allEq=allEq.concat(reByRonde[ro.id]||[]);});
+      var val=allEq.filter(function(re){return re.statut==='valide';}).length;
+      var tot=allEq.length;
+      var pct=tot>0?Math.round(val/tot*100):0;
+      var ok=val===tot&&tot>0;
+      h+='<div class="ronde-card">'+
+        '<div style="display:flex;align-items:center;gap:12px'+(tot>0?';margin-bottom:10px':'')+'">'+
+          '<span style="font-size:20px">'+(ok?'✅':tot===0?'📋':pct>0?'🔄':'❌')+'</span>'+
+          '<div style="flex:1">'+
+            '<div style="font-size:13px;font-weight:600">'+escape_html(sNom)+'</div>'+
+            '<div style="font-size:11px;color:var(--text2);margin-top:2px">'+(tot>0?val+'/'+tot+' équipements · '+sRondes.length+' ronde'+(sRondes.length>1?'s':''):'Aucune donnée')+'</div>'+
+          '</div>'+
+          '<span style="font-family:\'Cormorant Garamond\',serif;font-size:22px;font-weight:600;color:'+(ok?'var(--vert)':tot===0?'var(--text3)':'var(--amber)')+'">'+( tot>0?pct+'%':'—')+'</span>'+
+        '</div>'+
+        (tot>0?'<div class="progress-bar-wrap"><div class="progress-bar" style="width:'+pct+'%;background:'+(ok?'var(--vert)':pct>0?'var(--amber)':'var(--rouge)')+'"></div></div>':'')+
+      '</div>';
+    });
+  });
+  return h+'</div>';
+}
+
+/* ── DIR OPS : détail site ── */
+function renderDirOpsSite(session,sid,siteNom,nav){
+  nav=nav||'accueil';
+  _doCurrentSite={id:sid,nom:siteNom};
+  var skeleton='<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text3);font-size:13px"><span class="spinner"></span>Chargement...</div>';
+  app().innerHTML=buildLayout(session,nav,skeleton);
+  var tb=document.querySelector('.dash-topbar-title');
+  if(tb)tb.textContent=siteNom;
+  _loadDOSite(session,sid,siteNom,nav);
+}
+
+async function _loadDOSite(session,sid,siteNom,nav){
+  var cid=session.client_id;
+  var el=document.querySelector('.dash-content');
+  if(!el)return;
+  try{
+    var back='<button onclick="_exitDOSiteDetail()" style="display:inline-flex;align-items:center;gap:6px;background:none;border:1px solid var(--border);border-radius:7px;padding:7px 14px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;margin-bottom:8px;transition:background 0.12s" onmouseover="this.style.background=\'var(--creme)\'" onmouseout="this.style.background=\'none\'">← Tous les hôtels</button>';
+    var html=back;
+    if(nav==='accueil')html+=await _rtAccueil(session,sid,cid);
+    else if(nav==='alertes')html+=await _rtAlertes(sid,cid);
+    else if(nav==='historique')html+=await _rtHistorique(sid);
+    el.innerHTML=html;
+  }catch(e){
+    el.innerHTML='<div class="alert-banner" style="margin-top:12px"><div class="ab-icon">⚠️</div><div class="ab-body"><div class="ab-title">Erreur de chargement</div><div class="ab-sub">'+(e.message||'Vérifiez votre connexion')+'</div></div></div>';
+  }
+}
+
+function _exitDOSiteDetail(){
+  _doCurrentSite=null;
+  renderDirOps(_session,'accueil');
 }
 
 init();
