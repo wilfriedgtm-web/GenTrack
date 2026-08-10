@@ -258,9 +258,23 @@ function buildMobileNav(role,activeNav){
   }).join('')+'</div></div>';
 }
 function buildLayout(session,activeNav,contentHtml){
+  var exportItems=[7,14,30].map(function(n){
+    return '<button onclick="_openReport('+n+')" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap" onmouseover="this.style.background=\'var(--creme)\'" onmouseout="this.style.background=\'none\'">'+n+' derniers jours</button>';
+  }).join('');
+  var exportBtn='<div style="position:relative">'+
+    '<button id="export-btn-trigger" onclick="_toggleExportMenu()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">⬇&#8239;Exporter</button>'+
+    '<div id="export-menu" style="display:none;position:absolute;right:0;top:calc(100% + 8px);background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.1);z-index:200;padding:6px;min-width:180px">'+
+      '<div style="font-size:9px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text3);padding:8px 12px 4px">Période du rapport</div>'+
+      exportItems+
+    '</div></div>';
   return buildSidebar(session,activeNav)+
     '<div class="dash-main">'+buildMobileHeader(session)+
-    '<div class="dash-topbar"><div class="dash-topbar-title">'+navViewTitle(activeNav)+'</div><div class="dash-topbar-date">'+nowStr()+'</div></div>'+
+    '<div class="dash-topbar">'+
+      '<div class="dash-topbar-title">'+navViewTitle(activeNav)+'</div>'+
+      '<div style="display:flex;align-items:center;gap:14px">'+
+        '<div class="dash-topbar-date">'+nowStr()+'</div>'+exportBtn+
+      '</div>'+
+    '</div>'+
     '<div class="dash-content">'+contentHtml+'</div></div>'+buildMobileNav(session.role,activeNav);
 }
 
@@ -1278,6 +1292,325 @@ async function _loadDOSite(session,sid,siteNom,nav){
 function _exitDOSiteDetail(){
   _doCurrentSite=null;
   renderDirOps(_session,'accueil');
+}
+
+/* ══════════════════════════════════════
+   SESSION F — Export PDF / Impression
+══════════════════════════════════════ */
+
+function _toggleExportMenu(){
+  var m=document.getElementById('export-menu');
+  if(!m)return;
+  var isOpen=m.style.display!=='none';
+  m.style.display=isOpen?'none':'block';
+  if(!isOpen){
+    setTimeout(function(){
+      document.addEventListener('click',function _cl(e){
+        if(!m.contains(e.target)&&e.target.id!=='export-btn-trigger'){m.style.display='none';}
+        document.removeEventListener('click',_cl);
+      });
+    },10);
+  }
+}
+
+async function _openReport(period){
+  var m=document.getElementById('export-menu');
+  if(m)m.style.display='none';
+  var btn=document.getElementById('export-btn-trigger');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Chargement...';}
+  try{
+    var cid=_session.client_id;
+    var cutoff=dateNJours(period);
+    var sid=null,siteNom='Tous les sites',sids=null;
+    if(_session.role==='resp_tech'){
+      sid=_session.site_ids&&_session.site_ids[0];
+      var sr=sid?await supaGet('sites','id=eq.'+sid+'&select=nom&limit=1'):[];
+      siteNom=sr.length?sr[0].nom:'Mon site';
+    }else if(_doCurrentSite){sid=_doCurrentSite.id;siteNom=_doCurrentSite.nom;}
+    else if(_dtCurrentSite){sid=_dtCurrentSite.id;siteNom=_dtCurrentSite.nom;}
+    else{sids=_session.site_ids||[];}
+    var reportHtml='';
+    if(sid){
+      var[rondes,pannes,alertes,equips]=await Promise.all([
+        supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+cutoff+'&select=id,date_ronde,frequence&order=date_ronde.desc&limit=90'),
+        supaGet('pannes','site_id=eq.'+sid+'&date_panne=gte.'+cutoff+'&select=id,type,description,date_panne,resolue,equipements(nom)&order=date_panne.desc&limit=60'),
+        supaGet('alertes','client_id=eq.'+cid+'&resolue=eq.false&select=id,type,severite,message,created_at&order=created_at.desc'),
+        supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,types_equipements(nom)&order=ordre_ronde.asc')
+      ]);
+      var rIds=rondes.map(function(r){return r.id;});
+      var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,equipement_id,statut'):[];
+      reportHtml=_buildReportSingle(siteNom,period,rondes,rondesEq,pannes,alertes,equips);
+    }else{
+      var sidStr=(sids||[]).join(',');
+      if(!sidStr){reportHtml='<p>Aucun site configuré</p>';}
+      else{
+        var[sites,rondes,pannes,alertes]=await Promise.all([
+          supaGet('sites','id=in.('+sidStr+')&select=id,nom'),
+          supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+cutoff+'&select=id,site_id,date_ronde,frequence&order=date_ronde.desc&limit=300'),
+          supaGet('pannes','site_id=in.('+sidStr+')&date_panne=gte.'+cutoff+'&select=id,site_id,type,description,date_panne,resolue,equipements(nom)&order=date_panne.desc&limit=120'),
+          supaGet('alertes','client_id=eq.'+cid+'&resolue=eq.false&select=id,type,severite,message,created_at&order=created_at.desc')
+        ]);
+        var rIds=rondes.map(function(r){return r.id;});
+        var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,statut'):[];
+        var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
+        var rondeToSite={};rondes.forEach(function(r){rondeToSite[r.id]=r.site_id;});
+        reportHtml=_buildReportMulti(sites,siteMap,period,rondes,rondesEq,rondeToSite,pannes,alertes);
+      }
+    }
+    var w=window.open('','_blank');
+    if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
+    w.document.write(reportHtml);
+    w.document.close();
+  }catch(e){alert('Erreur lors de la génération du rapport : '+(e.message||e));}
+  finally{if(btn){btn.disabled=false;btn.textContent='⬇ Exporter';}}
+}
+
+function _reportShell(title,bodyHtml){
+  var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  return '<!DOCTYPE html><html lang="fr"><head>'+
+    '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<title>'+title+'</title>'+
+    '<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">'+
+    '<style>'+
+      '*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}'+
+      ':root{--creme:#F5F0E8;--dark:#111110;--amber:#C49A1C;--vert:#2D7A4F;--rouge:#C0392B;--orange:#D4761E;--border:#DDD0BC;--text:#1A1A18;--text2:#6B5E4A;--text3:#A8957E}'+
+      'body{font-family:Inter,sans-serif;background:white;color:var(--text);padding:36px 40px;max-width:920px;margin:0 auto}'+
+      '.report-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid var(--dark);padding-bottom:20px;margin-bottom:28px}'+
+      '.report-logo{font-family:"Cormorant Garamond",serif;font-size:22px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--dark)}'+
+      '.report-sub{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-top:3px}'+
+      '.report-meta{text-align:right;font-size:11px;color:var(--text2);line-height:1.7}'+
+      '.report-site{font-family:"Cormorant Garamond",serif;font-size:20px;font-weight:600;color:var(--dark);margin-bottom:2px}'+
+      'h2{font-family:"Cormorant Garamond",serif;font-size:17px;font-weight:600;color:var(--dark);margin:28px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px}'+
+      '.kpi-row{display:flex;gap:10px;margin-bottom:4px}'+
+      '.kpi{flex:1;background:#F9F6F0;border:1px solid var(--border);border-radius:8px;padding:12px 14px}'+
+      '.kpi-label{font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text2);font-weight:600;margin-bottom:5px}'+
+      '.kpi-value{font-family:"Cormorant Garamond",serif;font-size:24px;font-weight:600;line-height:1}'+
+      'table{width:100%;border-collapse:collapse;font-size:12px}'+
+      'th{background:#F5F0E8;font-size:9px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text2);font-weight:600;padding:7px 11px;text-align:left;border-bottom:1px solid var(--border)}'+
+      'td{padding:8px 11px;border-bottom:1px solid #EDE5D8;vertical-align:middle}'+
+      'tr:last-child td{border-bottom:none}'+
+      '.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600}'+
+      '.badge-ok{background:#E8F5EE;color:#2D7A4F}'+
+      '.badge-ko{background:#FDECEA;color:#C0392B}'+
+      '.badge-warn{background:#FEF3E2;color:#D4761E}'+
+      '.pbar-wrap{height:6px;background:var(--border);border-radius:3px;min-width:60px}'+
+      '.pbar-fill{height:100%;border-radius:3px}'+
+      '.empty-msg{padding:12px 14px;background:#F9F6F0;border-radius:6px;font-size:12px;color:var(--text3)}'+
+      '.print-actions{margin-top:36px;padding-top:20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:center}'+
+      '.btn-print{padding:10px 24px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;letter-spacing:0.3px}'+
+      '.btn-close{padding:10px 24px;background:none;color:var(--text2);border:1px solid var(--border);border-radius:7px;font-size:12px;cursor:pointer}'+
+      '.footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);text-align:center;letter-spacing:0.5px}'+
+      '@media print{'+
+        '@page{margin:15mm 12mm}'+
+        '.print-actions,.footer{display:none}'+
+        'body{padding:0}'+
+        'h2{page-break-after:avoid}'+
+        'tr{page-break-inside:avoid}'+
+      '}'+
+    '</style></head><body>'+bodyHtml+
+    '<scr'+'ipt>setTimeout(function(){window.print();},900);<\/scr'+'ipt>'+
+    '</body></html>';
+}
+
+function _buildReportSingle(siteNom,period,rondes,rondesEq,pannes,alertes,equips){
+  var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var reByRonde={};
+  rondesEq.forEach(function(re){if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];reByRonde[re.ronde_id].push(re);});
+  var totalVal=0,totalTot=0;
+  rondes.forEach(function(r){var eq=reByRonde[r.id]||[];totalTot+=eq.length;totalVal+=eq.filter(function(re){return re.statut==='valide';}).length;});
+  var confPct=totalTot>0?Math.round(totalVal/totalTot*100):null;
+  var nbOuvertes=pannes.filter(function(p){return!p.resolue;}).length;
+
+  var h='<div class="report-header">'+
+    '<div><div class="report-logo">GenTrack</div><div class="report-sub">Rapport technique</div></div>'+
+    '<div class="report-meta"><div class="report-site">'+escape_html(siteNom)+'</div>'+
+      '<div>Période : '+period+' derniers jours</div><div>Généré le '+genDate+'</div></div>'+
+  '</div>';
+
+  h+='<div class="kpi-row">'+
+    '<div class="kpi"><div class="kpi-label">Équipements</div><div class="kpi-value">'+equips.length+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+(confPct===null?'var(--text3)':confPct===100?'var(--vert)':confPct>=70?'var(--amber)':'var(--rouge)')+'">'+( confPct!==null?confPct+'%':'—')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Pannes en cours</div><div class="kpi-value" style="color:'+(nbOuvertes>0?'var(--rouge)':'var(--vert)')+'">'+nbOuvertes+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Alertes actives</div><div class="kpi-value" style="color:'+(alertes.length>0?'var(--rouge)':'var(--vert)')+'">'+alertes.length+'</div></div>'+
+  '</div>';
+
+  h+='<h2>Conformité des rondes</h2>';
+  if(rondes.length===0){
+    h+='<div class="empty-msg">Aucune ronde sur la période</div>';
+  }else{
+    var byDate={};
+    rondes.forEach(function(r){var d=r.date_ronde;if(!byDate[d])byDate[d]=[];byDate[d].push(r);});
+    var dates=Object.keys(byDate).sort(function(a,b){return b>a?1:-1;});
+    h+='<table><thead><tr><th>Date</th><th>Type de ronde</th><th>Progression</th><th>Résultat</th></tr></thead><tbody>';
+    dates.forEach(function(d){
+      var dateDisp=new Date(d).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
+      byDate[d].forEach(function(ro,i){
+        var eqRo=reByRonde[ro.id]||[];
+        var val=eqRo.filter(function(re){return re.statut==='valide';}).length;
+        var tot=eqRo.length;
+        var pct=tot>0?Math.round(val/tot*100):0;
+        var ok=val===tot&&tot>0;
+        var fillCol=ok?'#2D7A4F':pct>0?'#C49A1C':'#C0392B';
+        h+='<tr>'+
+          '<td style="white-space:nowrap;color:var(--text2);font-size:11px">'+(i===0?dateDisp:'')+'</td>'+
+          '<td>'+(_FREQ_LABELS[ro.frequence]||ro.frequence)+'</td>'+
+          '<td style="min-width:120px">'+
+            (tot>0?'<div style="display:flex;align-items:center;gap:8px">'+
+              '<div class="pbar-wrap" style="flex:1"><div class="pbar-fill" style="width:'+pct+'%;background:'+fillCol+'"></div></div>'+
+              '<span style="font-size:11px;color:var(--text2);white-space:nowrap">'+val+'/'+tot+'</span>'+
+            '</div>':'<span style="color:var(--text3)">—</span>')+
+          '</td>'+
+          '<td>'+
+            (tot===0?'<span class="badge badge-warn">Non commencée</span>':ok?'<span class="badge badge-ok">✓ Validée</span>':'<span class="badge badge-warn">'+pct+'%</span>')+
+          '</td>'+
+        '</tr>';
+      });
+    });
+    h+='</tbody></table>';
+  }
+
+  h+='<h2>Pannes <span style="font-size:12px;font-weight:400;color:var(--text3)">— '+period+' jours</span></h2>';
+  if(pannes.length===0){
+    h+='<div class="empty-msg">Aucune panne sur la période</div>';
+  }else{
+    h+='<table><thead><tr><th>Équipement</th><th>Type</th><th>Description</th><th>Date</th><th>Statut</th></tr></thead><tbody>';
+    pannes.forEach(function(p){
+      var eqNom=p.equipements&&p.equipements.nom?p.equipements.nom:'—';
+      var ts=p.date_panne?new Date(p.date_panne).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'—';
+      h+='<tr>'+
+        '<td><strong>'+escape_html(eqNom)+'</strong></td>'+
+        '<td>'+escape_html(p.type||'—')+'</td>'+
+        '<td>'+escape_html(p.description||'—')+'</td>'+
+        '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
+        '<td>'+(p.resolue?'<span class="badge badge-ok">Résolu</span>':'<span class="badge badge-ko">En cours</span>')+'</td>'+
+      '</tr>';
+    });
+    h+='</tbody></table>';
+  }
+
+  h+='<h2>Alertes actives</h2>';
+  if(alertes.length===0){
+    h+='<div class="empty-msg">Aucune alerte active</div>';
+  }else{
+    h+='<table><thead><tr><th>Type</th><th>Message</th><th>Sévérité</th><th>Date</th></tr></thead><tbody>';
+    alertes.forEach(function(a){
+      var ts=a.created_at?new Date(a.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'—';
+      var crit=a.severite==='critical';
+      h+='<tr>'+
+        '<td><strong>'+escape_html(a.type||'Alerte')+'</strong></td>'+
+        '<td>'+escape_html(a.message||'—')+'</td>'+
+        '<td>'+(crit?'<span class="badge badge-ko">Critique</span>':'<span class="badge badge-warn">Standard</span>')+'</td>'+
+        '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
+      '</tr>';
+    });
+    h+='</tbody></table>';
+  }
+
+  h+='<div class="print-actions">'+
+    '<button class="btn-print" onclick="window.print()">🖨&#8239;Imprimer / Enregistrer en PDF</button>'+
+    '<button class="btn-close" onclick="window.close()">Fermer</button>'+
+  '</div>'+
+  '<div class="footer">GenTrack · Gestion technique hôtelière · Dakar, Sénégal</div>';
+
+  return _reportShell('Rapport GenTrack — '+siteNom+' — '+period+'j',h);
+}
+
+function _buildReportMulti(sites,siteMap,period,rondes,rondesEq,rondeToSite,pannes,alertes){
+  var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var reByRonde={};
+  rondesEq.forEach(function(re){if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];reByRonde[re.ronde_id].push(re);});
+  var confBySite={};
+  sites.forEach(function(s){confBySite[s.id]={val:0,tot:0};});
+  rondes.forEach(function(r){
+    var eq=reByRonde[r.id]||[];
+    if(!confBySite[r.site_id])confBySite[r.site_id]={val:0,tot:0};
+    confBySite[r.site_id].tot+=eq.length;
+    confBySite[r.site_id].val+=eq.filter(function(re){return re.statut==='valide';}).length;
+  });
+  var pannesBySite={};pannes.forEach(function(p){pannesBySite[p.site_id]=(pannesBySite[p.site_id]||0)+1;});
+  var totalVal=0,totalTot=0;
+  Object.values(confBySite).forEach(function(c){totalVal+=c.val;totalTot+=c.tot;});
+  var confGlobal=totalTot>0?Math.round(totalVal/totalTot*100):null;
+  var nbOuvertes=pannes.filter(function(p){return!p.resolue;}).length;
+
+  var h='<div class="report-header">'+
+    '<div><div class="report-logo">GenTrack</div><div class="report-sub">Rapport multi-sites</div></div>'+
+    '<div class="report-meta"><div class="report-site">Tous les hôtels</div>'+
+      '<div>Période : '+period+' derniers jours</div><div>Généré le '+genDate+'</div></div>'+
+  '</div>';
+
+  h+='<div class="kpi-row">'+
+    '<div class="kpi"><div class="kpi-label">Hôtels</div><div class="kpi-value">'+sites.length+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Conformité globale</div><div class="kpi-value" style="color:'+(confGlobal===null?'var(--text3)':confGlobal===100?'var(--vert)':confGlobal>=70?'var(--amber)':'var(--rouge)')+'">'+( confGlobal!==null?confGlobal+'%':'—')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Pannes en cours</div><div class="kpi-value" style="color:'+(nbOuvertes>0?'var(--rouge)':'var(--vert)')+'">'+nbOuvertes+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Alertes actives</div><div class="kpi-value" style="color:'+(alertes.length>0?'var(--rouge)':'var(--vert)')+'">'+alertes.length+'</div></div>'+
+  '</div>';
+
+  h+='<h2>Vue d\'ensemble par hôtel</h2>'+
+    '<table><thead><tr><th>Hôtel</th><th>Conformité rondes</th><th>Pannes</th></tr></thead><tbody>';
+  sites.forEach(function(s){
+    var c=confBySite[s.id]||{val:0,tot:0};
+    var pct=c.tot>0?Math.round(c.val/c.tot*100):null;
+    var sp=pannesBySite[s.id]||0;
+    var fillCol=pct===null?'var(--border)':pct===100?'#2D7A4F':pct>=70?'#C49A1C':'#C0392B';
+    h+='<tr>'+
+      '<td><strong>'+escape_html(s.nom)+'</strong></td>'+
+      '<td style="min-width:150px">'+
+        (pct!==null?'<div style="display:flex;align-items:center;gap:8px">'+
+          '<div class="pbar-wrap" style="flex:1"><div class="pbar-fill" style="width:'+pct+'%;background:'+fillCol+'"></div></div>'+
+          '<span style="font-size:11px">'+pct+'%</span></div>':
+          '<span style="color:var(--text3)">—</span>')+
+      '</td>'+
+      '<td>'+(sp>0?'<span class="badge badge-ko">'+sp+' panne'+(sp>1?'s':'')+'</span>':'<span class="badge badge-ok">RAS</span>')+'</td>'+
+    '</tr>';
+  });
+  h+='</tbody></table>';
+
+  h+='<h2>Pannes <span style="font-size:12px;font-weight:400;color:var(--text3)">— '+period+' jours</span></h2>';
+  if(pannes.length===0){
+    h+='<div class="empty-msg">Aucune panne sur la période</div>';
+  }else{
+    h+='<table><thead><tr><th>Hôtel</th><th>Équipement</th><th>Type</th><th>Date</th><th>Statut</th></tr></thead><tbody>';
+    pannes.forEach(function(p){
+      var eqNom=p.equipements&&p.equipements.nom?p.equipements.nom:'—';
+      var sNom=siteMap[p.site_id]||'—';
+      var ts=p.date_panne?new Date(p.date_panne).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'—';
+      h+='<tr>'+
+        '<td>'+escape_html(sNom)+'</td>'+
+        '<td><strong>'+escape_html(eqNom)+'</strong></td>'+
+        '<td>'+escape_html(p.type||'—')+'</td>'+
+        '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
+        '<td>'+(p.resolue?'<span class="badge badge-ok">Résolu</span>':'<span class="badge badge-ko">En cours</span>')+'</td>'+
+      '</tr>';
+    });
+    h+='</tbody></table>';
+  }
+
+  h+='<h2>Alertes actives</h2>';
+  if(alertes.length===0){
+    h+='<div class="empty-msg">Aucune alerte active</div>';
+  }else{
+    h+='<table><thead><tr><th>Type</th><th>Message</th><th>Sévérité</th><th>Date</th></tr></thead><tbody>';
+    alertes.forEach(function(a){
+      var ts=a.created_at?new Date(a.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'—';
+      var crit=a.severite==='critical';
+      h+='<tr>'+
+        '<td><strong>'+escape_html(a.type||'Alerte')+'</strong></td>'+
+        '<td>'+escape_html(a.message||'—')+'</td>'+
+        '<td>'+(crit?'<span class="badge badge-ko">Critique</span>':'<span class="badge badge-warn">Standard</span>')+'</td>'+
+        '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
+      '</tr>';
+    });
+    h+='</tbody></table>';
+  }
+
+  h+='<div class="print-actions">'+
+    '<button class="btn-print" onclick="window.print()">🖨&#8239;Imprimer / Enregistrer en PDF</button>'+
+    '<button class="btn-close" onclick="window.close()">Fermer</button>'+
+  '</div>'+
+  '<div class="footer">GenTrack · Gestion technique hôtelière · Dakar, Sénégal</div>';
+
+  return _reportShell('Rapport GenTrack — Tous les hôtels — '+period+'j',h);
 }
 
 /* ══════════════════════════════════════
