@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ── RESET & ROOT ── */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+
+:root{
+  --creme:#F5F0E8;
+  --dark:#111110;
+  --amber:#C49A1C;
+  --amber-pale:rgba(196,154,28,0.12);
+  --amber-border:rgba(196,154,28,0.3);
+  --surface:#FDFAF5;
+  --surface2:#F0EBE0;
+  --border:#DDD0BC;
+  --text:#1A1A18;
+  --text2:#6B5E4A;
+  --text3:#A8957E;
+  --vert:#2D7A4F;
+  --vert-pale:rgba(45,122,79,0.1);
+  --vert-border:rgba(45,122,79,0.25);
+  --rouge:#C0392B;
+  --rouge-pale:rgba(192,57,43,0.08);
+  --rouge-border:rgba(192,57,43,0.22);
+  --orange:#D4761E;
+  --orange-pale:rgba(212,118,30,0.08);
+  --orange-border:rgba(212,118,30,0.25);
+  --nav-h:64px;
+  --sidebar-w:220px;
+}
+
+body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);min-height:100vh}
+
+/* ── SPINNER ── */
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.full-loader{display:flex;align-items:center;justify-content:center;min-height:100vh;font-size:13px;color:var(--text2)}
+
+/* ── LOGIN ── */
+.login-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:var(--creme)}
+.login-logo{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--dark);margin-bottom:4px}
+.login-sub{font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text3);margin-bottom:40px}
+.login-card{background:white;border:1px solid var(--border);border-radius:14px;padding:32px;width:100%;max-width:380px;box-shadow:0 2px 20px rgba(0,0,0,0.06)}
+.login-step-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+.login-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--text);margin-bottom:6px}
+.login-desc{font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:24px}
+.login-input{width:100%;padding:13px 16px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;font-family:'Inter',sans-serif;background:var(--surface);color:var(--text);outline:none;transition:border-color 0.15s;margin-bottom:14px;display:block}
+.login-input:focus{border-color:var(--amber)}
+.login-input::placeholder{color:var(--text3)}
+.otp-input{letter-spacing:8px;font-size:22px;text-align:center;font-weight:600}
+.login-btn{width:100%;padding:13px;background:var(--dark);color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;letter-spacing:0.5px;cursor:pointer;transition:opacity 0.15s;display:flex;align-items:center;justify-content:center;gap:8px}
+.login-btn:hover{opacity:0.85}
+.login-btn:disabled{opacity:0.5;cursor:default}
+.login-back{background:none;border:none;font-size:12px;color:var(--text2);cursor:pointer;margin-top:14px;display:block;text-align:center;text-decoration:underline;width:100%}
+.login-back:hover{color:var(--text)}
+.login-error{font-size:12px;color:var(--rouge);background:var(--rouge-pale);border:1px solid var(--rouge-border);border-radius:6px;padding:10px 12px;margin-bottom:14px;display:none}
+.login-footer{font-size:10px;color:var(--text3);text-align:center;margin-top:32px;letter-spacing:0.5px}
+
+/* Progress dots */
+.login-dots{display:flex;gap:6px;justify-content:center;margin-bottom:24px}
+.login-dot{width:6px;height:6px;border-radius:50%;background:var(--border)}
+.login-dot.active{background:var(--amber)}
+
+/* ── SIDEBAR ── */
+.sidebar{width:var(--sidebar-w);background:var(--dark);min-height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;padding:0 0 24px;z-index:100}
+.sidebar-logo{padding:24px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.07)}
+.sidebar-logo-name{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:white}
+.sidebar-logo-sub{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.28);margin-top:3px}
+.sidebar-nav{padding:16px 10px;flex:1}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:rgba(255,255,255,0.45);font-size:12px;font-weight:500;cursor:pointer;transition:background 0.12s,color 0.12s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.8)}
+.nav-item.active{background:rgba(196,154,28,0.15);color:var(--amber)}
+.nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+.sidebar-user{padding:16px 20px;border-top:1px solid rgba(255,255,255,0.07)}
+.sidebar-user-role{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--amber);margin-bottom:4px}
+.sidebar-user-phone{font-size:11px;color:rgba(255,255,255,0.3)}
+.logout-btn{background:none;border:none;color:rgba(255,255,255,0.25);font-size:11px;cursor:pointer;padding:0;margin-top:8px;text-decoration:underline}
+.logout-btn:hover{color:rgba(255,255,255,0.55)}
+
+/* ── MAIN CONTENT ── */
+.dash-main{margin-left:var(--sidebar-w);flex:1;min-height:100vh;padding-bottom:40px}
+.dash-topbar{background:white;border-bottom:1px solid var(--border);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50}
+.dash-topbar-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600}
+.dash-topbar-date{font-size:11px;color:var(--text2)}
+.dash-content{padding:24px 28px;max-width:1000px}
+
+/* ── MOBILE ── */
+.mobile-header{display:none;background:var(--dark);padding:14px 18px;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.mobile-header-logo{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:white}
+.mobile-header-role{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-top:2px}
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--dark);height:var(--nav-h);z-index:100;border-top:1px solid rgba(255,255,255,0.06)}
+.mobile-nav-inner{display:flex;height:100%}
+.mobile-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:rgba(255,255,255,0.38);font-size:9px;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer;border:none;background:none;transition:color 0.12s}
+.mobile-nav-item.active{color:var(--amber)}
+.mobile-nav-item:hover{color:rgba(255,255,255,0.7)}
+.mobile-nav-icon{font-size:18px}
+
+@media(max-width:768px){
+  .sidebar{display:none}
+  .dash-main{margin-left:0;padding-bottom:calc(var(--nav-h) + 16px)}
+  .mobile-nav{display:flex}
+  .mobile-header{display:flex}
+  .dash-topbar{display:none}
+  .dash-content{padding:16px}
+}
+
+/* ── COMPOSANTS UI ── */
+.section-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;margin:28px 0 12px}
+
+.alert-banner{background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge);border-radius:8px;padding:12px 16px;display:flex;align-items:flex-start;gap:12px;margin-bottom:18px}
+.alert-banner.warn{background:var(--orange-pale);border-color:var(--orange-border);border-left-color:var(--orange)}
+.alert-banner.ok{background:var(--vert-pale);border-color:var(--vert-border);border-left-color:var(--vert)}
+.ab-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.ab-body{flex:1}
+.ab-title{font-size:13px;font-weight:600;color:var(--rouge)}
+.alert-banner.warn .ab-title{color:var(--orange)}
+.alert-banner.ok .ab-title{color:var(--vert)}
+.ab-sub{font-size:12px;color:var(--text2);margin-top:2px}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:4px}
+.kpi{background:white;border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text2);font-weight:600;margin-bottom:8px}
+.kpi-value{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:600;line-height:1}
+.kpi-trend{font-size:11px;color:var(--text2);margin-top:6px}
+
+.placeholder-card{background:white;border:1px solid var(--border);border-radius:10px;padding:32px;margin-bottom:14px;text-align:center;color:var(--text3);font-size:13px;line-height:1.5}
+.placeholder-icon{font-size:32px;margin-bottom:10px}
+
+.pill{padding:3px 9px;border-radius:3px;font-size:10px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase;display:inline-block}
+.pill-ok{background:var(--vert-pale);color:var(--vert)}
+.pill-warn{background:var(--orange-pale);color:var(--orange)}
+.pill-danger{background:var(--rouge-pale);color:var(--rouge)}
+
+@media(max-width:600px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="full-loader"><span class="spinner"></span>Chargement...</div>
+</div>
+
+<script>
+// ────────────────────────────────────────
+// CONFIG
+// ────────────────────────────────────────
+var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+var FN_URL=SUPA_URL+'/functions/v1/auth-otp';
+
+var _session=null;
+var _phone='';
+
+// ────────────────────────────────────────
+// HELPERS
+// ────────────────────────────────────────
+function $id(id){return document.getElementById(id);}
+function app(){return $id('app');}
+
+function nowStr(){
+  return new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+}
+
+function roleName(role){
+  var m={dir_ops:'Directeur des opérations',dir_tech:'Directeur technique',resp_tech:'Responsable technique'};
+  return m[role]||role;
+}
+
+function navViewTitle(id){
+  var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',config:'Configuration'};
+  return m[id]||'Accueil';
+}
+
+function saveSession(s){
+  _session=s;
+  try{localStorage.setItem('gt_session',JSON.stringify(s));}catch(e){}
+}
+
+function loadStored(){
+  try{return JSON.parse(localStorage.getItem('gt_session'));}catch(e){return null;}
+}
+
+function clearSession(){
+  _session=null;
+  try{localStorage.removeItem('gt_session');}catch(e){}
+}
+
+async function callFn(body){
+  var r=await fetch(FN_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},
+    body:JSON.stringify(body)
+  });
+  var data=await r.json();
+  if(!r.ok)throw new Error(data.error||'Erreur serveur');
+  return data;
+}
+
+// ────────────────────────────────────────
+// INIT
+// ────────────────────────────────────────
+async function init(){
+  var stored=loadStored();
+  if(stored&&stored.session_token){
+    try{
+      var res=await callFn({action:'validate',session_token:stored.session_token});
+      if(res.valid){_session=stored;renderDashboard(_session);return;}
+    }catch(e){}
+    clearSession();
+  }
+  renderLogin();
+}
+
+// ────────────────────────────────────────
+// LOGIN — étape 1 : numéro
+// ────────────────────────────────────────
+function renderLogin(){
+  app().innerHTML=`
+    <div class="login-wrap">
+      <div class="login-logo">GenTrack</div>
+      <div class="login-sub">Gestion technique hôtelière</div>
+      <div class="login-card">
+        <div class="login-dots">
+          <div class="login-dot active"></div>
+          <div class="login-dot"></div>
+        </div>
+        <div class="login-step-label">Étape 1 sur 2</div>
+        <div class="login-title">Connexion</div>
+        <div class="login-desc">Entrez votre numéro WhatsApp. Vous recevrez un code à 6 chiffres.</div>
+        <div class="login-error" id="login-err"></div>
+        <input class="login-input" id="phone-input" type="tel"
+          placeholder="+221 77 000 00 00"
+          autocomplete="tel"
+          inputmode="tel" />
+        <button class="login-btn" id="req-btn" onclick="submitPhone()">
+          Recevoir le code WhatsApp
+        </button>
+      </div>
+      <div class="login-footer">GenTrack &middot; Dakar, Sénégal</div>
+    </div>`;
+
+  var inp=$id('phone-input');
+  if(inp){
+    inp.focus();
+    inp.addEventListener('keydown',function(e){if(e.key==='Enter')submitPhone();});
+  }
+}
+
+async function submitPhone(){
+  var inp=$id('phone-input');
+  var btn=$id('req-btn');
+  var err=$id('login-err');
+  if(!inp)return;
+
+  var phone=inp.value.trim().replace(/\s+/g,'');
+  if(!phone){showErr(err,'Entrez votre numéro WhatsApp.');return;}
+  if(!phone.startsWith('+')){showErr(err,'Incluez l\'indicatif pays (ex : +221 77...).');return;}
+
+  _phone=phone;
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span>Envoi en cours...';
+  err.style.display='none';
+
+  try{
+    await callFn({action:'request',phone:phone});
+    renderOTP();
+  }catch(e){
+    btn.disabled=false;
+    btn.innerHTML='Recevoir le code WhatsApp';
+    showErr(err,e.message||'Numéro non reconnu. Vérifiez et réessayez.');
+  }
+}
+
+// ────────────────────────────────────────
+// LOGIN — étape 2 : OTP
+// ────────────────────────────────────────
+function renderOTP(){
+  var disp=_phone.replace(/(\+\d{3})(\d{2})(\d{3})(\d{2})(\d{2})/,'$1 $2 $3 $4 $5');
+  app().innerHTML=`
+    <div class="login-wrap">
+      <div class="login-logo">GenTrack</div>
+      <div class="login-sub">Gestion technique hôtelière</div>
+      <div class="login-card">
+        <div class="login-dots">
+          <div class="login-dot"></div>
+          <div class="login-dot active"></div>
+        </div>
+        <div class="login-step-label">Étape 2 sur 2</div>
+        <div class="login-title">Code reçu ?</div>
+        <div class="login-desc">
+          Code à 6 chiffres envoyé sur WhatsApp au<br>
+          <strong>${disp}</strong>
+        </div>
+        <div class="login-error" id="otp-err"></div>
+        <input class="login-input otp-input" id="otp-input"
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          maxlength="6"
+          placeholder="000000"
+          autocomplete="one-time-code" />
+        <button class="login-btn" id="verify-btn" onclick="submitOTP()">
+          Accéder au dashboard
+        </button>
+        <button class="login-back" onclick="renderLogin()">← Changer de numéro</button>
+      </div>
+      <div class="login-footer">GenTrack &middot; Dakar, Sénégal</div>
+    </div>`;
+
+  var inp=$id('otp-input');
+  if(inp){
+    inp.focus();
+    inp.addEventListener('keydown',function(e){if(e.key==='Enter')submitOTP();});
+    inp.addEventListener('input',function(){
+      var v=inp.value.replace(/\D/g,'');
+      inp.value=v;
+      if(v.length===6)submitOTP();
+    });
+  }
+}
+
+async function submitOTP(){
+  var inp=$id('otp-input');
+  var btn=$id('verify-btn');
+  var err=$id('otp-err');
+  if(!inp||btn&&btn.disabled)return;
+
+  var code=inp.value.trim().replace(/\D/g,'');
+  if(code.length!==6){showErr(err,'Le code doit comporter 6 chiffres.');return;}
+
+  if(btn)btn.disabled=true;
+  if(btn)btn.innerHTML='<span class="spinner"></span>Vérification...';
+  err.style.display='none';
+
+  try{
+    var res=await callFn({action:'verify',phone:_phone,code:code});
+    // res = { session_token, role, site_ids, contact_id, client_id }
+    saveSession(Object.assign({},res,{phone:_phone}));
+    renderDashboard(_session);
+  }catch(e){
+    if(btn){btn.disabled=false;btn.innerHTML='Accéder au dashboard';}
+    showErr(err,e.message||'Code incorrect ou expiré. Réessayez.');
+    inp.value='';
+    inp.focus();
+  }
+}
+
+function showErr(el,msg){
+  if(!el)return;
+  el.textContent=msg;
+  el.style.display='block';
+}
+
+// ────────────────────────────────────────
+// ROUTING
+// ────────────────────────────────────────
+function renderDashboard(s){
+  if(!s){renderLogin();return;}
+  var r=s.role;
+  if(r==='resp_tech')renderRespTech(s,'accueil');
+  else if(r==='dir_tech')renderDirTech(s,'accueil');
+  else if(r==='dir_ops')renderDirOps(s,'accueil');
+  else renderRespTech(s,'accueil');
+}
+
+function navTo(id){
+  if(!_session)return;
+  var r=_session.role;
+  if(r==='resp_tech')renderRespTech(_session,id);
+  else if(r==='dir_tech')renderDirTech(_session,id);
+  else if(r==='dir_ops')renderDirOps(_session,id);
+}
+
+function logout(){clearSession();renderLogin();}
+
+// ────────────────────────────────────────
+// LAYOUT
+// ────────────────────────────────────────
+function buildNavItems(role){
+  var items=[
+    {id:'accueil',icon:'🏠',label:'Accueil'},
+    {id:'alertes',icon:'⚠️',label:'Alertes'},
+    {id:'historique',icon:'📊',label:'Historique'}
+  ];
+  if(role==='resp_tech')items.push({id:'config',icon:'⚙️',label:'Config'});
+  return items;
+}
+
+function buildSidebar(session,activeNav){
+  var items=buildNavItems(session.role);
+  var navHtml=items.map(function(it){
+    return '<button class="nav-item'+(it.id===activeNav?' active':'')+'" onclick="navTo(\''+it.id+'\')">'+
+      '<span class="nav-icon">'+it.icon+'</span>'+it.label+'</button>';
+  }).join('');
+  return '<div class="sidebar">'+
+    '<div class="sidebar-logo">'+
+      '<div class="sidebar-logo-name">GenTrack</div>'+
+      '<div class="sidebar-logo-sub">Tableau de bord</div>'+
+    '</div>'+
+    '<nav class="sidebar-nav">'+navHtml+'</nav>'+
+    '<div class="sidebar-user">'+
+      '<div class="sidebar-user-role">'+roleName(session.role)+'</div>'+
+      '<div class="sidebar-user-phone">'+(session.phone||'')+'</div>'+
+      '<button class="logout-btn" onclick="logout()">Se déconnecter</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function buildMobileHeader(session){
+  return '<div class="mobile-header">'+
+    '<div>'+
+      '<div class="mobile-header-logo">GenTrack</div>'+
+      '<div class="mobile-header-role">'+roleName(session.role)+'</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function buildMobileNav(role,activeNav){
+  var items=buildNavItems(role);
+  var html=items.map(function(it){
+    return '<button class="mobile-nav-item'+(it.id===activeNav?' active':'')+'" onclick="navTo(\''+it.id+'\')">'+
+      '<span class="mobile-nav-icon">'+it.icon+'</span>'+it.label+'</button>';
+  }).join('');
+  return '<div class="mobile-nav"><div class="mobile-nav-inner">'+html+'</div></div>';
+}
+
+function buildLayout(session,activeNav,contentHtml){
+  return buildSidebar(session,activeNav)+
+    '<div class="dash-main">'+
+      buildMobileHeader(session)+
+      '<div class="dash-topbar">'+
+        '<div class="dash-topbar-title">'+navViewTitle(activeNav)+'</div>'+
+        '<div class="dash-topbar-date">'+nowStr()+'</div>'+
+      '</div>'+
+      '<div class="dash-content">'+contentHtml+'</div>'+
+    '</div>'+
+    buildMobileNav(session.role,activeNav);
+}
+
+// ────────────────────────────────────────
+// VUE RESP TECH (shell — Session B)
+// ────────────────────────────────────────
+function renderRespTech(session,nav){
+  nav=nav||'accueil';
+  var content='';
+
+  if(nav==='accueil'){
+    content=
+      '<div class="alert-banner ok">'+
+        '<div class="ab-icon">✅</div>'+
+        '<div class="ab-body">'+
+          '<div class="ab-title">Connecté · '+roleName(session.role)+'</div>'+
+          '<div class="ab-sub">Session B en cours de construction — contenu live bientôt disponible</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="kpi-grid">'+
+        '<div class="kpi"><div class="kpi-label">Équipements</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Rondes aujourd\'hui</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Alertes actives</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
+      '</div>'+
+      '<div class="section-title">Ma journée</div>'+
+      '<div class="placeholder-card"><div class="placeholder-icon">📋</div>Tâches auto-générées · Session B</div>'+
+      '<div class="section-title">Statut équipements</div>'+
+      '<div class="placeholder-card"><div class="placeholder-icon">⚙️</div>Statut temps réel · Session B</div>'+
+      '<div class="section-title">Alertes actives</div>'+
+      '<div class="placeholder-card"><div class="placeholder-icon">⚠️</div>Alertes + actions proposées · Session B</div>';
+  }else if(nav==='alertes'){
+    content='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">⚠️</div>Vue alertes — Session B</div>';
+  }else if(nav==='historique'){
+    content='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">📊</div>Historique 3 jours · Session B</div>';
+  }else if(nav==='config'){
+    content='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">⚙️</div>Configuration équipements, seuils, contacts · Session B</div>';
+  }
+
+  app().innerHTML=buildLayout(session,nav,content);
+}
+
+// ────────────────────────────────────────
+// VUE DIR TECH (shell — Session C)
+// ────────────────────────────────────────
+function renderDirTech(session,nav){
+  nav=nav||'accueil';
+  var content='';
+
+  if(nav==='accueil'){
+    content=
+      '<div class="alert-banner ok">'+
+        '<div class="ab-icon">✅</div>'+
+        '<div class="ab-body">'+
+          '<div class="ab-title">Connecté · '+roleName(session.role)+'</div>'+
+          '<div class="ab-sub">Session C en cours de construction — contenu live bientôt disponible</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="kpi-grid">'+
+        '<div class="kpi"><div class="kpi-label">Hôtels suivis</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Équipements en alerte</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Cette semaine</div></div>'+
+      '</div>'+
+      '<div class="section-title">Recommandations techniques</div>'+
+      '<div class="placeholder-card"><div class="placeholder-icon">🔧</div>Recommandations préventives · Session C</div>'+
+      '<div class="section-title">Mon équipe</div>'+
+      '<div class="placeholder-card"><div class="placeholder-icon">👥</div>Suivi rondes par technicien · Session C</div>'+
+      '<div class="section-title">Maintenances à venir</div>'+
+      '<div class="placeholder-card"><div class="placeholder-icon">🗓️</div>Planning 30 jours · Session C</div>';
+  }else if(nav==='alertes'){
+    content='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">⚠️</div>Alertes multi-sites · Session C</div>';
+  }else if(nav==='historique'){
+    content='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">📊</div>Historique consolidé · Session C</div>';
+  }
+
+  app().innerHTML=buildLayout(session,nav,content);
+}
+
+// ────────────────────────────────────────
+// VUE DIR OPS (shell — Session D)
+// ────────────────────────────────────────
+function renderDirOps(session,nav){
+  nav=nav||'accueil';
+  var content='';
+
+  if(nav==='accueil'){
+    content=
+      '<div class="alert-banner ok">'+
+        '<div class="ab-icon">✅</div>'+
+        '<div class="ab-body">'+
+          '<div class="ab-title">Connecté · '+roleName(session.role)+'</div>'+
+          '<div class="ab-sub">Session D en cours de construction — contenu live bientôt disponible</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="kpi-grid">'+
+        '<div class="kpi"><div class="kpi-label">Hôtels</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Actions requises</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Coûts du mois</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
+      '</div>'+
+      '<div class="section-title">Actions requises</div>'+
+      '<div class="placeholder-card"><div class="placeholder-icon">🚨</div>Alertes et actions prioritaires · Session D</div>'+
+      '<div class="section-title">Mes hôtels</div>'+
+      '<div class="placeholder-card"><div class="placeholder-icon">🏨</div>Grille hôtels avec santé temps réel · Session D</div>'+
+      '<div class="section-title">Coûts du mois</div>'+
+      '<div class="placeholder-card"><div class="placeholder-icon">💰</div>Comparaison vs mois précédent · Session D</div>';
+  }else if(nav==='alertes'){
+    content='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">⚠️</div>Alertes groupe · Session D</div>';
+  }else if(nav==='historique'){
+    content='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">📊</div>Historique et comparaisons · Session E</div>';
+  }
+
+  app().innerHTML=buildLayout(session,nav,content);
+}
+
+// ────────────────────────────────────────
+// START
+// ────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
