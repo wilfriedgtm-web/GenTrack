@@ -312,11 +312,12 @@ async function _loadRT(session,nav){
 /* ── Accueil ── */
 async function _rtAccueil(session,sid,cid){
   var today=todayStr();
-  var[rondes,equips,alertes,pannes]=await Promise.all([
+  var[rondes,equips,alertes,pannes,recoData]=await Promise.all([
     supaGet('rondes','site_id=eq.'+sid+'&date_ronde=eq.'+today+'&select=id,frequence,date_ronde'),
     supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,ordre_ronde,types_equipements(nom)&order=ordre_ronde.asc'),
     supaGet('alertes','client_id=eq.'+cid+'&resolue=eq.false&select=id,type,severite,message,created_at&order=created_at.desc&limit=20'),
-    supaGet('pannes','site_id=eq.'+sid+'&resolue=eq.false&select=id,type,description,date_panne,equipements(nom)&order=date_panne.desc&limit=20')
+    supaGet('pannes','site_id=eq.'+sid+'&resolue=eq.false&select=id,type,description,date_panne,equipements(nom)&order=date_panne.desc&limit=20'),
+    _fetchRecoEquipements(sid)
   ]);
   var rIds=rondes.map(function(r){return r.id;});
   var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=id,ronde_id,equipement_id,statut,valide_at'):[];
@@ -394,16 +395,31 @@ async function _rtAccueil(session,sid,cid){
       else{s='En attente';sc='var(--orange)';dot='🟡';}
       var tNom=(e.types_equipements&&e.types_equipements.nom)||'';
       var tIcon=_TYPE_ICONS[tNom]||'⚙️';
-      statut+='<div class="eq-card">'+
-        '<span style="font-size:18px">'+tIcon+'</span>'+
-        '<div style="flex:1">'+
-          '<div class="eq-card-nom">'+e.nom+'</div>'+
-          (tNom?'<div class="eq-card-type">'+tNom+'</div>':'')+
+      // Recommandations et dernière saisie
+      var eqReco=recoData&&recoData[e.id]?recoData[e.id]:{recos:[],lastSaisie:null};
+      var topReco=eqReco.recos[0]||null;
+      var ls=eqReco.lastSaisie;
+      var lsDiff=ls?Math.round((Date.now()-new Date(ls.t))/60000):null;
+      var lsOld=lsDiff!==null&&lsDiff>360; // >6h sans saisie
+      // Si pas de reco mais inactif >6h → statut orange
+      if(lsOld&&!topReco&&s==='OK'){sc='var(--orange)';dot='🟡';s='Inactif';}
+      statut+='<div class="eq-card" style="flex-direction:column;align-items:stretch;gap:6px">'+
+        '<div style="display:flex;align-items:center;gap:10px">'+
+          '<span style="font-size:18px">'+tIcon+'</span>'+
+          '<div style="flex:1">'+
+            '<div class="eq-card-nom">'+escape_html(e.nom)+'</div>'+
+            (tNom?'<div class="eq-card-type">'+escape_html(tNom)+'</div>':'')+
+          '</div>'+
+          '<div style="display:flex;align-items:center;gap:5px;flex-shrink:0">'+
+            '<span style="font-size:11px">'+dot+'</span>'+
+            '<span style="font-size:10px;font-weight:600;color:'+sc+';text-transform:uppercase;letter-spacing:0.3px">'+s+'</span>'+
+          '</div>'+
         '</div>'+
-        '<div style="display:flex;align-items:center;gap:5px;flex-shrink:0">'+
-          '<span style="font-size:11px">'+dot+'</span>'+
-          '<span style="font-size:10px;font-weight:600;color:'+sc+';text-transform:uppercase;letter-spacing:0.3px">'+s+'</span>'+
-        '</div>'+
+        (ls?'<div style="font-size:11px;color:'+(lsOld?'var(--orange)':'var(--text3)')+';padding-left:28px">'+
+          (lsOld?'⚠ ':'')+
+          'Dernière valeur : '+ls.v+(ls.unite?' '+ls.unite:'')+' · '+_timeAgo(ls.t)+
+        '</div>':'')+
+        (topReco?_buildRecoTag(topReco):'')+
       '</div>';
     });
     statut+='</div>';
@@ -1292,6 +1308,108 @@ async function _loadDOSite(session,sid,siteNom,nav){
 function _exitDOSiteDetail(){
   _doCurrentSite=null;
   renderDirOps(_session,'accueil');
+}
+
+/* ══════════════════════════════════════
+   SESSION H — Recommandations sur équipement
+══════════════════════════════════════ */
+
+function _timeAgo(isoStr){
+  if(!isoStr)return'';
+  var diff=Math.round((Date.now()-new Date(isoStr))/60000);
+  if(diff<1)return'à l\'instant';
+  if(diff<60)return'il y a '+diff+' min';
+  if(diff<1440)return'il y a '+Math.round(diff/60)+'h';
+  return'il y a '+Math.round(diff/1440)+'j';
+}
+
+function _buildRecoTag(reco){
+  var cfgs={
+    immediate:{bg:'var(--rouge-pale)',border:'var(--rouge-border)',color:'var(--rouge)',icon:'🔴'},
+    preventive:{bg:'var(--orange-pale)',border:'var(--orange-border)',color:'var(--orange)',icon:'🟡'},
+    operationnelle:{bg:'var(--amber-pale)',border:'var(--amber-border)',color:'var(--amber)',icon:'🔧'}
+  };
+  var cfg=cfgs[reco.type]||cfgs.operationnelle;
+  return '<div style="display:flex;align-items:flex-start;gap:6px;background:'+cfg.bg+';border:1px solid '+cfg.border+';border-radius:6px;padding:6px 10px">'+
+    '<span style="font-size:13px;flex-shrink:0;margin-top:1px">'+cfg.icon+'</span>'+
+    '<span style="font-size:11px;color:'+cfg.color+';line-height:1.4">'+escape_html(reco.message)+'</span>'+
+  '</div>';
+}
+
+async function _fetchRecoEquipements(sid){
+  var since7=dateNJours(7);
+  var since90=dateNJours(90);
+  var rondes7=await supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+since7+'&select=id&limit=100');
+  if(!rondes7.length)return{};
+  var rIds=rondes7.map(function(r){return r.id;});
+  var rondesEq=await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=id,equipement_id&limit=500');
+  if(!rondesEq.length)return{};
+  var reIds=rondesEq.map(function(re){return re.id;});
+  var reToEq={};rondesEq.forEach(function(re){reToEq[re.id]=re.equipement_id;});
+  var[reponses,pannes90]=await Promise.all([
+    supaGet('reponses','ronde_equipement_id=in.('+reIds.join(',')+')'+'&select=valeur,created_at,ronde_equipement_id,question_id,questions(texte,type_reponse,unite,seuil_min,seuil_max)'+'&order=created_at.desc&limit=600'),
+    supaGet('pannes','site_id=eq.'+sid+'&date_panne=gte.'+since90+'&select=id,equipement_id&limit=200')
+  ]);
+  var pannesByEq={};
+  pannes90.forEach(function(p){pannesByEq[p.equipement_id]=(pannesByEq[p.equipement_id]||0)+1;});
+  // Group reponses numériques (avec seuils) par équipement → question
+  var repByEqQ={};
+  var lastSaisieByEq={};
+  reponses.forEach(function(r){
+    var eqId=reToEq[r.ronde_equipement_id];
+    if(!eqId)return;
+    var q=r.questions;
+    // Dernière saisie numérique (toutes questions)
+    if(q&&q.type_reponse==='numerique'){
+      if(!lastSaisieByEq[eqId]||r.created_at>lastSaisieByEq[eqId].t){
+        lastSaisieByEq[eqId]={v:parseFloat(r.valeur),t:r.created_at,unite:q.unite||''};
+      }
+    }
+    // Pour les recos : numérique + seuils définis
+    if(!q||q.type_reponse!=='numerique'||(q.seuil_min===null&&q.seuil_max===null))return;
+    if(!repByEqQ[eqId])repByEqQ[eqId]={};
+    if(!repByEqQ[eqId][r.question_id])repByEqQ[eqId][r.question_id]=[];
+    repByEqQ[eqId][r.question_id].push({v:parseFloat(r.valeur),t:r.created_at,q:q});
+  });
+  var result={};
+  var allEqIds=Object.keys(Object.assign({},repByEqQ,pannesByEq));
+  allEqIds.forEach(function(eqId){
+    var recos=[];
+    var qMap=repByEqQ[eqId]||{};
+    Object.keys(qMap).forEach(function(qId){
+      var vals=qMap[qId].slice().sort(function(a,b){return b.t.localeCompare(a.t);});
+      var q=vals[0].q;
+      var last=vals[0].v;
+      var sMin=q.seuil_min!==null?parseFloat(q.seuil_min):null;
+      var sMax=q.seuil_max!==null?parseFloat(q.seuil_max):null;
+      var u=q.unite?' '+q.unite:'';
+      // Immédiate : seuil dépassé à la dernière saisie
+      if((sMax!==null&&last>sMax)||(sMin!==null&&last<sMin)){
+        var dir=sMax!==null&&last>sMax?'max':'min';
+        var seuil=dir==='max'?sMax:sMin;
+        recos.push({type:'immediate',message:last+u+' — seuil '+dir+' : '+seuil+u+'. Vérifier l\'équipement.',severite:1});
+      }
+      // Préventive : tendance dégradée mais encore dans seuils (min 4 relevés)
+      else if(vals.length>=4){
+        var n=Math.min(3,Math.floor(vals.length/2));
+        var avgOld=vals.slice(-n).reduce(function(s,x){return s+x.v;},0)/n;
+        var avgNew=vals.slice(0,n).reduce(function(s,x){return s+x.v;},0)/n;
+        var delta=avgNew-avgOld;
+        var pct=avgOld!==0?Math.abs(delta/avgOld*100):0;
+        var degrading=(sMax!==null&&delta>0&&pct>15)||(sMin!==null&&delta<0&&pct>15);
+        if(degrading){
+          var sign=delta>0?'+':'';
+          recos.push({type:'preventive',message:'Dérive '+sign+delta.toFixed(1)+u+' sur '+vals.length+' relevés. Prévoir un contrôle.',severite:2});
+        }
+      }
+    });
+    // Opérationnelle : récurrence pannes 90j
+    var nb=pannesByEq[eqId]||0;
+    if(nb>3)recos.push({type:'operationnelle',message:nb+' interventions en 90 jours. Remplacement à envisager.',severite:3});
+    recos.sort(function(a,b){return a.severite-b.severite;});
+    result[eqId]={recos:recos,lastSaisie:lastSaisieByEq[eqId]||null};
+  });
+  return result;
 }
 
 /* ══════════════════════════════════════
