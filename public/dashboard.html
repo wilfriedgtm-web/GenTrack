@@ -997,7 +997,7 @@ async function _doAccueil(session,sids,cid){
 
   // Rondes 7j → conformité globale + par site
   var rIds7=rondes7.map(function(r){return r.id;});
-  var rondesEq7=rIds7.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds7.join(',')+')'+'&select=ronde_id,site_id,statut'):[];
+  var rondesEq7=rIds7.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds7.join(',')+')'+'&select=ronde_id,statut'):[];
   // attach site_id to rondesEq via rondes7 map
   var rondeToSite={};
   rondes7.forEach(function(r){rondeToSite[r.id]=r.site_id;});
