@@ -465,15 +465,36 @@ async function _loadRT(session,nav){
 /* ── Accueil ── */
 async function _rtAccueil(session,sid,cid){
   var today=todayStr();
+  var CUVE_TYPE='de5519d0-363b-4628-b872-2dcf01859002';
+  var GE_TYPE='98849793-9201-4adf-aec2-a4a08587c4e2';
   var[rondes,equips,alertes,pannes,recoData]=await Promise.all([
     supaGet('rondes','site_id=eq.'+sid+'&date_ronde=eq.'+today+'&select=id,frequence,date_ronde'),
-    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,ordre_ronde,types_equipements(nom)&order=ordre_ronde.asc'),
+    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,ordre_ronde,type_id,conso_theorique_lh,capacite_litres,seuil_vidange_heures,types_equipements(nom)&order=ordre_ronde.asc'),
     supaGet('alertes','client_id=eq.'+cid+'&resolue=eq.false&select=id,type,severite,message,created_at&order=created_at.desc&limit=20'),
     supaGet('pannes','site_id=eq.'+sid+'&resolue=eq.false&select=id,type,description,date_panne,equipements(nom)&order=date_panne.desc&limit=20'),
     _fetchRecoEquipements(sid)
   ]);
   var rIds=rondes.map(function(r){return r.id;});
   var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=id,ronde_id,equipement_id,statut,valide_at'):[];
+
+  // Cuve + GE data
+  var cuveEquips=equips.filter(function(e){return e.type_id===CUVE_TYPE;});
+  var geEquips=equips.filter(function(e){return e.type_id===GE_TYPE;});
+  var cuveSection='',vidangesSection='';
+  var specialIds=cuveEquips.concat(geEquips).map(function(e){return e.id;});
+  if(specialIds.length){
+    var[specialQs,geVidanges]=await Promise.all([
+      supaGet('questions','equipement_id=in.('+specialIds.join(',')+')'+'&actif=eq.true&select=id,texte,unite,seuil_min,seuil_max,equipement_id&order=ordre.asc'),
+      geEquips.length?supaGet('vidanges','equipement_id=in.('+geEquips.map(function(e){return e.id;}).join(',')+')'+'&select=id,equipement_id,date,heures_au_moment&order=date.desc&limit=50'):Promise.resolve([])
+    ]);
+    var qIds=specialQs.map(function(q){return q.id;});
+    var latestReps=qIds.length?await supaGet('reponses','question_id=in.('+qIds.join(',')+')'+'&select=question_id,valeur,created_at&order=created_at.desc&limit=300'):[];
+    var repByQ={};
+    latestReps.forEach(function(r){if(!repByQ[r.question_id]||r.created_at>repByQ[r.question_id].created_at)repByQ[r.question_id]=r;});
+    specialQs.forEach(function(q){q._lastVal=repByQ[q.id]?repByQ[q.id].valeur:null;q._lastAt=repByQ[q.id]?repByQ[q.id].created_at:null;});
+    cuveSection=_buildCuveSection(cuveEquips,specialQs.filter(function(q){return cuveEquips.some(function(e){return e.id===q.equipement_id;});}));
+    vidangesSection=_buildVidangesSection(geEquips,specialQs.filter(function(q){return geEquips.some(function(e){return e.id===q.equipement_id;});}),geVidanges);
+  }
 
   // Ronde journalière
   var rondeJ=rondes.find(function(r){return r.frequence==='journalier';});
@@ -587,7 +608,105 @@ async function _rtAccueil(session,sid,cid){
   }
 
   _updateAlertPill(nbAlertes);
-  return banner+kpis+journee+statut+alertesHtml;
+  return banner+kpis+cuveSection+vidangesSection+journee+statut+alertesHtml;
+}
+
+/* ── Cuve carburant section ── */
+function _buildCuveSection(cuveEquips,cuveQs){
+  if(!cuveEquips.length)return '';
+  var html='<div class="section-title">⛽ Carburant</div>';
+  cuveEquips.forEach(function(e){
+    var niveauQ=cuveQs.find(function(q){
+      return q.equipement_id===e.id&&(q.texte.toLowerCase().indexOf('niveau')>=0||q.texte.toLowerCase().indexOf('cuve')>=0);
+    });
+    var niveau=niveauQ&&niveauQ._lastVal!=null?parseFloat(niveauQ._lastVal):null;
+    var cap=parseFloat(e.capacite_litres)||8000;
+    var pct=niveau!=null?Math.min(100,Math.round(niveau/cap*100)):null;
+    var consoH=parseFloat(e.conso_theorique_lh)||65;
+    var autoJours=niveau!=null?Math.round(niveau/(consoH*8)*10)/10:null;
+    var seuilMin=niveauQ&&niveauQ.seuil_min!=null?parseFloat(niveauQ.seuil_min):null;
+    var col=pct!=null?(pct<=20?'var(--rouge)':pct<=40?'var(--orange)':'var(--vert)'):'var(--text3)';
+    var lastAt=niveauQ&&niveauQ._lastAt?'Relevé '+_timeAgo(niveauQ._lastAt):'Aucun relevé';
+    var autoBg=autoJours!=null?(autoJours<2?'var(--rouge-pale)':autoJours<5?'var(--orange-pale)':'var(--vert-pale)'):'transparent';
+    var autoCol=autoJours!=null?(autoJours<2?'var(--rouge)':autoJours<5?'var(--orange)':'var(--vert)'):'var(--text3)';
+
+    html+='<div class="eq-card" style="flex-direction:column;align-items:stretch;gap:0;padding:16px 18px;border-top:3px solid var(--amber)">'+
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">'+
+        '<div>'+
+          '<div class="eq-card-nom" style="font-size:14px">'+escape_html(e.nom)+'</div>'+
+          '<div class="eq-card-type" style="margin-top:3px">'+lastAt+'</div>'+
+        '</div>'+
+        '<div style="text-align:right">'+
+          '<div style="font-size:32px;font-weight:800;color:'+col+';line-height:1">'+(pct!=null?pct+'%':'—')+'</div>'+
+          '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+(niveau!=null?Math.round(niveau).toLocaleString('fr-FR')+' L / '+Math.round(cap).toLocaleString('fr-FR')+' L':'')+'</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;margin-bottom:10px">'+
+        (pct!=null?'<div style="height:100%;width:'+Math.max(2,pct)+'%;background:'+col+';border-radius:5px;transition:width .5s ease"></div>':'')+
+      '</div>'+
+      '<div style="display:flex;justify-content:space-between;align-items:center">'+
+        (seuilMin!=null?'<div style="font-size:11px;color:var(--text3)">Seuil alerte : <strong>'+Math.round(seuilMin).toLocaleString('fr-FR')+' L</strong></div>':'<div></div>')+
+        (autoJours!=null?'<div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;background:'+autoBg+';color:'+autoCol+'">≈ '+autoJours+' j autonomie</div>':'<div style="font-size:11px;color:var(--text3)">Autonomie : —</div>')+
+      '</div>'+
+    '</div>';
+  });
+  return html;
+}
+
+/* ── Vidanges / maintenance préventive section ── */
+function _buildVidangesSection(geEquips,geQs,vidanges){
+  if(!geEquips.length)return '';
+  var hasVidange=geEquips.some(function(e){return e.seuil_vidange_heures;});
+  if(!hasVidange)return '';
+  var lastVidByEq={};
+  vidanges.forEach(function(v){if(!lastVidByEq[v.equipement_id])lastVidByEq[v.equipement_id]=v;});
+  var html='<div class="section-title">🔧 Maintenance préventive</div>';
+  html+='<div style="display:flex;flex-direction:column;gap:8px">';
+  geEquips.forEach(function(e){
+    if(!e.seuil_vidange_heures)return;
+    var seuil=parseFloat(e.seuil_vidange_heures);
+    var compteurQ=geQs.find(function(q){
+      return q.equipement_id===e.id&&(q.texte.toLowerCase().indexOf('compteur')>=0||q.texte.toLowerCase().indexOf('horaire')>=0);
+    });
+    var currentH=compteurQ&&compteurQ._lastVal!=null?parseFloat(compteurQ._lastVal):null;
+    var lastVid=lastVidByEq[e.id]||null;
+    var heuresDepuis=null;
+    if(currentH!=null){
+      if(lastVid&&lastVid.heures_au_moment!=null){
+        heuresDepuis=Math.max(0,currentH-parseFloat(lastVid.heures_au_moment));
+      } else {
+        heuresDepuis=currentH;
+      }
+    }
+    var pct=heuresDepuis!=null?Math.min(100,Math.round(heuresDepuis/seuil*100)):null;
+    var col=pct!=null?(pct>=100?'var(--rouge)':pct>=80?'var(--orange)':'var(--vert)'):'var(--text3)';
+    var statusTxt=pct!=null?(pct>=100?'⚠️ Vidange due':pct>=80?'Bientôt':'OK ✓'):'—';
+    var statusCol=pct!=null?(pct>=100?'var(--rouge)':pct>=80?'var(--orange)':'var(--vert)'):'var(--text3)';
+    var lastVidStr=lastVid?new Date(lastVid.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'Aucune enregistrée';
+    var restantH=heuresDepuis!=null?Math.max(0,Math.round(seuil-heuresDepuis)):null;
+
+    html+='<div class="eq-card" style="flex-direction:column;align-items:stretch;gap:8px;padding:14px 16px">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between">'+
+        '<div>'+
+          '<div class="eq-card-nom">⚡ '+escape_html(e.nom)+'</div>'+
+          '<div class="eq-card-type" style="margin-top:2px">Dernière vidange : '+lastVidStr+'</div>'+
+        '</div>'+
+        '<span style="font-size:11px;font-weight:700;color:'+statusCol+'">'+statusTxt+'</span>'+
+      '</div>'+
+      (pct!=null?
+        '<div>'+
+          '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:4px">'+
+            '<span>'+(heuresDepuis!=null?Math.round(heuresDepuis)+'h depuis vidange':'')+'</span>'+
+            '<span>Seuil : '+seuil+'h'+(restantH!==null&&restantH>0?' · '+restantH+'h restantes':'')+'</span>'+
+          '</div>'+
+          '<div class="progress-bar-wrap" style="height:6px"><div class="progress-bar" style="width:'+Math.min(100,pct)+'%;background:'+col+'"></div></div>'+
+        '</div>':
+        '<div style="font-size:11px;color:var(--text3)">Pas de données compteur</div>'
+      )+
+    '</div>';
+  });
+  html+='</div>';
+  return html;
 }
 
 /* ── Alertes (vue complète) ── */
@@ -735,11 +854,17 @@ async function _rtConfig(sid){
     return '<button class="config-tab'+(_configCurrentTab===t.key?' active':'')+'" onclick="_switchConfigTab(\''+t.key+'\')">'+t.label+'</button>';
   }).join('');
 
-  if(_configCurrentTab!=='equipements'){
+  if(_configCurrentTab==='seuils'){
     var dc2=document.getElementById('dash-content-main');
-    if(dc2){dc2.style.padding='0';dc2.style.maxWidth='none';}
+    if(dc2){dc2.style.padding='24px';dc2.style.maxWidth='none';}
+    var seuilsHtml=await _buildSeuilsTab(sid);
+    return '<div class="config-tabs">'+tabHtml+'</div>'+seuilsHtml;
+  }
+  if(_configCurrentTab==='contacts'){
+    var dc2b=document.getElementById('dash-content-main');
+    if(dc2b){dc2b.style.padding='40px 24px';dc2b.style.maxWidth='none';}
     return '<div class="config-tabs">'+tabHtml+'</div>'+
-      '<div style="padding:40px 24px;text-align:center;color:var(--text3);font-size:13px"><div style="font-size:48px;margin-bottom:12px;opacity:.3">🔧</div>Section "'+tabs.find(function(t){return t.key===_configCurrentTab;}).label+'" — à venir</div>';
+      '<div style="text-align:center;color:var(--text3);font-size:13px;padding:40px 0"><div style="font-size:48px;margin-bottom:12px;opacity:.3">👥</div>Contacts & alertes — à venir</div>';
   }
 
   // Default selection
@@ -789,6 +914,94 @@ async function _rtConfig(sid){
   if(dc){dc.style.padding='0';dc.style.maxWidth='none';}
   return '<div class="config-tabs">'+tabHtml+'</div>'+
     '<div class="config-layout">'+listHtml+panelHtml+'</div>';
+}
+
+async function _buildSeuilsTab(sid){
+  var equips=await supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,type_id,types_equipements(nom)&order=ordre_ronde.asc');
+  if(!equips.length)return '<div class="placeholder-card" style="margin-top:16px"><div class="placeholder-icon">🎯</div>Aucun équipement configuré</div>';
+  var eqIds=equips.map(function(e){return e.id;});
+  var questions=await supaGet('questions','equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&select=id,texte,type_reponse,unite,seuil_min,seuil_max,equipement_id,frequences&order=ordre.asc');
+  // Only show numeric questions (can have seuils)
+  var numQs=questions.filter(function(q){return q.type_reponse==='numerique'||q.seuil_min!=null||q.seuil_max!=null;});
+  var eqMap={};equips.forEach(function(e){eqMap[e.id]=e;});
+
+  if(!numQs.length){
+    return '<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">'+
+      '<div style="font-size:40px;margin-bottom:12px;opacity:.3">🎯</div>'+
+      'Aucune question numérique configurée.<br>Ajoutez des questions avec seuils dans l\'onglet Équipements.</div>';
+  }
+
+  var byEq={};
+  numQs.forEach(function(q){if(!byEq[q.equipement_id])byEq[q.equipement_id]=[];byEq[q.equipement_id].push(q);});
+
+  var html='<div style="max-width:760px">'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.5">'+
+      'Définissez les seuils d\'alerte pour chaque mesure. Une alerte est déclenchée dès qu\'une valeur sort de la plage autorisée.'+
+    '</div>';
+
+  Object.keys(byEq).forEach(function(eqId){
+    var eq=eqMap[eqId];if(!eq)return;
+    var icon=_TYPE_ICONS[(eq.types_equipements&&eq.types_equipements.nom)]||'⚙️';
+    var qs=byEq[eqId];
+    var rowsHtml=qs.map(function(q,i){
+      var freqStr=Array.isArray(q.frequences)?q.frequences.map(function(f){return f==='journalier'?'J':f==='hebdo'?'H':'M';}).join('/'):'-';
+      return '<tr>'+
+        '<td style="padding:9px 12px;font-size:12px;color:var(--text);border-bottom:1px solid var(--border)">'+(i===0?'':'')+
+          '<span style="display:block">'+escape_html(q.texte)+'</span>'+
+          '<span style="font-size:10px;color:var(--text3)">'+freqStr+(q.unite?' · '+q.unite:'')+'</span>'+
+        '</td>'+
+        '<td style="padding:9px 12px;border-bottom:1px solid var(--border)">'+
+          '<input class="seuil-input" type="number" placeholder="—" value="'+(q.seuil_min!=null?q.seuil_min:'')+'" '+
+            'onblur="_saveSeuil(\''+q.id+'\',\'min\',this.value)" '+
+            'style="width:80px;border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;text-align:center;background:var(--vert-pale);outline:none" '+
+            'title="Seuil minimum — alerte si valeur en dessous" />'+
+        '</td>'+
+        '<td style="padding:9px 12px;border-bottom:1px solid var(--border)">'+
+          '<input class="seuil-input" type="number" placeholder="—" value="'+(q.seuil_max!=null?q.seuil_max:'')+'" '+
+            'onblur="_saveSeuil(\''+q.id+'\',\'max\',this.value)" '+
+            'style="width:80px;border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;text-align:center;background:var(--rouge-pale);outline:none" '+
+            'title="Seuil maximum — alerte si valeur au dessus" />'+
+        '</td>'+
+        '<td style="padding:9px 12px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text3)">'+
+          (q.seuil_min!=null||q.seuil_max!=null?
+            '<span style="color:var(--vert);font-weight:600">Actif</span>':
+            '<span style="color:var(--text3)">Aucun</span>')+
+        '</td>'+
+      '</tr>';
+    }).join('');
+
+    html+='<div style="margin-bottom:20px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+        '<span style="font-size:16px">'+icon+'</span>'+
+        '<span style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(eq.nom)+'</span>'+
+        '<span style="font-size:11px;color:var(--text3)">'+qs.length+' mesure'+(qs.length!==1?'s':'')+'</span>'+
+      '</div>'+
+      '<div style="background:white;border:1.5px solid var(--border);border-radius:10px;overflow:hidden">'+
+        '<table style="width:100%;border-collapse:collapse">'+
+          '<thead><tr style="background:var(--creme)">'+
+            '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2)">Mesure</th>'+
+            '<th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--vert)">Seuil min ↑</th>'+
+            '<th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--rouge)">Seuil max ↓</th>'+
+            '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2)">Statut</th>'+
+          '</tr></thead>'+
+          '<tbody>'+rowsHtml+'</tbody>'+
+        '</table>'+
+      '</div>'+
+    '</div>';
+  });
+
+  html+='<div style="font-size:11px;color:var(--text3);margin-top:4px">💡 Cliquez dans un champ et appuyez sur Tab ou Entrée pour sauvegarder. Laissez vide pour désactiver l\'alerte.</div>';
+  return html+'</div>';
+}
+
+async function _saveSeuil(qId,type,val){
+  var numVal=val!==''&&val!==null?parseFloat(val):null;
+  var patch={};
+  patch['seuil_'+type]=numVal;
+  await supaPatch('questions',qId,patch);
+  // Visual feedback
+  var inputs=document.querySelectorAll('.seuil-input');
+  // find the input that triggered this — flash border green briefly
 }
 
 function _switchConfigTab(tab){
