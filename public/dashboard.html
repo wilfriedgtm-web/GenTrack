@@ -166,6 +166,30 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .config-ronde-trigger{font-size:11px;color:var(--text2)}
 .config-preview-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s}
 .config-preview-btn:hover{border-color:var(--amber);color:var(--amber)}
+.config-add-eq-btn{width:calc(100% - 24px);margin:8px 12px;background:none;border:1.5px dashed var(--border);border-radius:8px;padding:10px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;text-align:center;transition:all .15s}
+.config-add-eq-btn:hover{border-color:var(--amber);color:var(--amber);background:var(--amber-pale)}
+.config-add-q-btn{background:none;border:1px dashed var(--border);border-radius:6px;padding:5px 10px;font-size:11px;color:var(--text2);cursor:pointer;transition:all .15s;margin-top:6px;width:100%;text-align:center}
+.config-add-q-btn:hover{border-color:var(--amber);color:var(--amber)}
+.config-q-actions{display:flex;gap:4px;flex-shrink:0}
+.config-q-act{background:none;border:none;cursor:pointer;padding:2px 4px;font-size:12px;opacity:.4;transition:opacity .15s;line-height:1}
+.config-q-act:hover{opacity:1}
+.config-apply-btn{width:100%;margin-top:8px;background:var(--amber-pale);border:1px solid var(--amber-border);border-radius:8px;padding:10px;font-size:12px;font-weight:600;color:var(--amber-dark);cursor:pointer;transition:all .15s;text-align:center}
+.config-apply-btn:hover{background:var(--amber);color:white}
+/* CONFIG MODAL */
+.cfg-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:8000;display:flex;align-items:center;justify-content:center;animation:fadeIn .12s}
+.cfg-modal-box{background:white;border-radius:16px;padding:28px;width:440px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.cfg-modal-title{font-size:15px;font-weight:700;color:var(--dark);margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.cfg-modal-footer{display:flex;gap:8px;margin-top:20px;justify-content:flex-end}
+.cfg-form-group{margin-bottom:14px}
+.cfg-form-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);display:block;margin-bottom:6px}
+.cfg-form-input,.cfg-form-select{width:100%;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;transition:border-color .15s;background:white;font-family:inherit}
+.cfg-form-input:focus,.cfg-form-select:focus{border-color:var(--amber)}
+.cfg-btn-primary{background:var(--amber);color:white;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s}
+.cfg-btn-primary:hover{opacity:.88}
+.cfg-btn-secondary{background:none;border:1.5px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px;color:var(--text2);cursor:pointer}
+.cfg-freq-check{display:flex;gap:14px;flex-wrap:wrap}
+.cfg-freq-label{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;color:var(--text)}
+.cfg-info{background:var(--amber-pale);border:1px solid var(--amber-border);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--amber-dark);margin-top:6px}
 /* WA PREVIEW OVERLAY */
 .wa-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;animation:fadeIn .15s}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -244,6 +268,27 @@ async function supaPatch(table,id,data){
     });
   }catch(e){}
 }
+async function supaPost(table,data){
+  try{
+    var r=await fetch(SUPA_URL+'/rest/v1/'+table,{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(data)
+    });
+    var rows=await r.json();
+    return Array.isArray(rows)?rows[0]:rows;
+  }catch(e){return null;}
+}
+async function supaDelete(table,filter){
+  try{
+    await fetch(SUPA_URL+'/rest/v1/'+table+'?'+filter,{
+      method:'DELETE',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Prefer':'return=minimal'}
+    });
+  }catch(e){}
+}
+var _configCurrentSid=null;
+var _waCache={};
 
 /* ── INIT : token URL (?token=xxx) ou localStorage ── */
 async function init(){
@@ -678,15 +723,9 @@ async function _rtHistorique(sid){
 
 /* ── Config ── */
 async function _rtConfig(sid){
-  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,ordre_ronde,types_equipements(nom)&order=ordre_ronde.asc');
-  if(equips.length===0){
-    return '<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">⚙️</div>Aucun équipement configuré pour ce site</div>';
-  }
-  // Default selection
-  var actifs=equips.filter(function(e){return e.actif;});
-  if(!_configSelectedEqId||!equips.find(function(e){return e.id===_configSelectedEqId;})){
-    _configSelectedEqId=actifs.length?actifs[0].id:equips[0].id;
-  }
+  _configCurrentSid=sid;
+  var types=await supaGet('types_equipements','select=id,nom&order=nom');
+  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,ordre_ronde,type_id,types_equipements(nom)&order=ordre_ronde.asc');
   var tabs=[
     {key:'equipements',label:'⚙️ Équipements & Rondes'},
     {key:'seuils',label:'🎯 Seuils d\'alerte'},
@@ -703,6 +742,14 @@ async function _rtConfig(sid){
       '<div style="padding:40px 24px;text-align:center;color:var(--text3);font-size:13px"><div style="font-size:48px;margin-bottom:12px;opacity:.3">🔧</div>Section "'+tabs.find(function(t){return t.key===_configCurrentTab;}).label+'" — à venir</div>';
   }
 
+  // Default selection
+  if(equips.length>0){
+    var actifs=equips.filter(function(e){return e.actif;});
+    if(!_configSelectedEqId||!equips.find(function(e){return e.id===_configSelectedEqId;})){
+      _configSelectedEqId=actifs.length?actifs[0].id:equips[0].id;
+    }
+  }
+
   // Group equipements by type
   var byType={};
   equips.forEach(function(e){
@@ -710,24 +757,32 @@ async function _rtConfig(sid){
     if(!byType[tNom])byType[tNom]=[];
     byType[tNom].push(e);
   });
+  var typeOptsHtml=types.map(function(t){return '<option value="'+t.id+'">'+escape_html(t.nom)+'</option>';}).join('');
   var listHtml='<div class="config-equip-list">';
-  Object.keys(byType).forEach(function(tNom){
-    listHtml+='<div class="config-eq-section">'+escape_html(tNom)+'</div>';
-    byType[tNom].forEach(function(e){
-      var icon=_TYPE_ICONS[(e.types_equipements&&e.types_equipements.nom)]||'⚙️';
-      var sel=e.id===_configSelectedEqId;
-      listHtml+='<div class="config-eq-item'+(sel?' selected':'')+'" onclick="_selectConfigEq(\''+e.id+'\')">'+
-        '<span class="config-eq-icon">'+icon+'</span>'+
-        '<div><div class="config-eq-name">'+escape_html(e.nom)+'</div>'+
-        '<div class="config-eq-type">'+(e.actif?'Actif':'Inactif')+'</div></div>'+
-        '<div class="config-eq-dot '+(e.actif?'ok':'')+'"></div>'+
-      '</div>';
+  if(equips.length===0){
+    listHtml+='<div style="padding:24px 16px;text-align:center;color:var(--text3);font-size:12px"><div style="font-size:32px;margin-bottom:8px;opacity:.3">⚙️</div>Aucun équipement configuré</div>';
+  } else {
+    Object.keys(byType).forEach(function(tNom){
+      listHtml+='<div class="config-eq-section">'+escape_html(tNom)+'</div>';
+      byType[tNom].forEach(function(e){
+        var icon=_TYPE_ICONS[(e.types_equipements&&e.types_equipements.nom)]||'⚙️';
+        var sel=e.id===_configSelectedEqId;
+        listHtml+='<div class="config-eq-item'+(sel?' selected':'')+'" onclick="_selectConfigEq(\''+e.id+'\')">'+
+          '<span class="config-eq-icon">'+icon+'</span>'+
+          '<div><div class="config-eq-name">'+escape_html(e.nom)+'</div>'+
+          '<div class="config-eq-type">'+(e.actif?'Actif':'Inactif')+'</div></div>'+
+          '<div class="config-eq-dot '+(e.actif?'ok':'')+'"></div>'+
+        '</div>';
+      });
     });
-  });
+  }
+  listHtml+='<button class="config-add-eq-btn" onclick="_openAddEquipModal()">＋ Ajouter un équipement</button>';
   listHtml+='</div>';
 
-  // Right panel - async ronde plans
-  var panelHtml=await _buildConfigRondePanel(sid,_configSelectedEqId,equips);
+  // Right panel
+  var panelHtml=_configSelectedEqId
+    ? await _buildConfigRondePanel(sid,_configSelectedEqId,equips)
+    : '<div class="config-ronde-panel"><div style="color:var(--text3);font-size:13px;padding:40px;text-align:center">Commencez par ajouter un équipement</div></div>';
 
   // Remove padding from outer dash-content for full-bleed layout
   var dc=document.getElementById('dash-content-main');
@@ -765,24 +820,48 @@ async function _buildConfigRondePanel(sid,eqId,equips){
   });
 
   var _RONDE_CFG=[
-    {freq:'journalier',color:'green',label:'Quotidienne',freqDisp:'Chaque shift · 3×/jour',trigger:'⏰ Rappel si non faite à 8h, 15h, 23h'},
-    {freq:'hebdo',color:'amber',label:'Hebdomadaire',freqDisp:'Chaque lundi · 1×/semaine',trigger:'📅 Déclenchée chaque lundi matin'},
-    {freq:'mensuel',color:'blue',label:'Mensuelle',freqDisp:'1er du mois · 1×/mois',trigger:'📅 Déclenchée le 1er du mois'}
+    {freq:'journalier',color:'green',label:'Quotidienne',freqDisp:'Chaque shift · 3×/jour',trigger:'⏰ 8h, 15h, 23h'},
+    {freq:'hebdo',color:'amber',label:'Hebdomadaire',freqDisp:'Chaque lundi · 1×/semaine',trigger:'📅 Chaque lundi'},
+    {freq:'mensuel',color:'blue',label:'Mensuelle',freqDisp:'1er du mois · 1×/mois',trigger:'📅 1er du mois'}
   ];
 
-  var eqIdSafe=escape_html(eqId);
-  var eqNomSafe=escape_html(eq.nom);
-  var allQJson=escape_html(JSON.stringify(questions));
+  // Fetch available modele for this equipment type
+  var modeles=eq.type_id?await supaGet('modeles_questions','type_id=eq.'+eq.type_id+'&select=id,nom'):[];
 
   var html='<div class="config-ronde-panel">'+
-    '<div class="config-ronde-panel-title">'+icon+' '+eqNomSafe+'</div>'+
-    '<div class="config-ronde-panel-sub">'+escape_html(tNom||'Équipement')+' · Plans de ronde · '+questions.length+' question'+(questions.length!==1?'s':'')+'</div>';
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px">'+
+      '<div class="config-ronde-panel-title">'+icon+' '+escape_html(eq.nom)+'</div>'+
+      '<div style="display:flex;gap:6px">'+
+        (eq.actif
+          ? '<span style="font-size:10px;font-weight:700;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);padding:2px 8px;border-radius:10px">Actif</span>'
+          : '<span style="font-size:10px;font-weight:700;color:var(--rouge);background:var(--rouge-pale);border:1px solid var(--rouge-border);padding:2px 8px;border-radius:10px">Inactif</span>')+
+      '</div>'+
+    '</div>'+
+    '<div class="config-ronde-panel-sub">'+escape_html(tNom||'Équipement')+' · '+questions.length+' question'+(questions.length!==1?'s':'')+' configurée'+(questions.length!==1?'s':'')+'</div>';
+
+  // Apply modele section (if modeles exist and no questions yet, or always as option)
+  if(modeles.length>0){
+    var modeleSelectId='modele-sel-'+eqId.slice(0,8);
+    var modeleOpts=modeles.map(function(m){return '<option value="'+m.id+'">'+escape_html(m.nom)+'</option>';}).join('');
+    html+='<div class="cfg-info" style="margin-bottom:14px">'+
+      '<div style="font-weight:700;margin-bottom:6px">📋 Modèle de ronde</div>'+
+      '<div style="display:flex;gap:8px;align-items:center">'+
+        '<select id="'+modeleSelectId+'" class="cfg-form-select" style="flex:1;padding:6px 10px;font-size:12px">'+modeleOpts+'</select>'+
+        '<button class="cfg-btn-primary" style="padding:6px 12px;font-size:12px;white-space:nowrap" onclick="_applyModele(\''+eqId+'\',\''+modeleSelectId+'\')">'+
+          (questions.length===0?'Appliquer':'Réappliquer')+
+        '</button>'+
+      '</div>'+
+      (questions.length===0?'<div style="font-size:11px;margin-top:6px;opacity:.8">Aucune question — choisissez un modèle ou ajoutez manuellement</div>':'')+
+    '</div>';
+  }
 
   var hasAny=false;
   _RONDE_CFG.forEach(function(rc){
     var qs=qByFreq[rc.freq];
-    if(qs.length===0)return;
-    hasAny=true;
+    // Store in global cache for WA preview (safe, no JSON in onclick)
+    var cacheKey=eqId+'_'+rc.freq;
+    _waCache[cacheKey]={freq:rc.freq,label:rc.label,eqNom:eq.nom,questions:qs.map(function(q){return{texte:q.texte,type:q.type_reponse,unite:q.unite,seuil_min:q.seuil_min,seuil_max:q.seuil_max,exemple:q.exemple};})};
+
     var qHtml=qs.map(function(q){
       var seuilStr='';
       if(q.seuil_max!==null&&q.seuil_max!==undefined)seuilStr='≤ '+q.seuil_max+(q.unite?' '+q.unite:'');
@@ -792,39 +871,46 @@ async function _buildConfigRondePanel(sid,eqId,equips){
         '<span class="config-q-label">'+escape_html(q.texte)+'</span>'+
         '<span class="config-q-type">'+escape_html(q.type_reponse||'texte')+'</span>'+
         (seuilStr?'<span class="config-q-seuil">'+seuilStr+'</span>':'')+
+        '<div class="config-q-actions">'+
+          '<button class="config-q-act" onclick="_openEditQModal(\''+q.id+'\')" title="Modifier">✏️</button>'+
+          '<button class="config-q-act" onclick="_deleteQ(\''+q.id+'\')" title="Supprimer">🗑</button>'+
+        '</div>'+
       '</div>';
     }).join('');
-    // Encode questions for this freq for the preview
-    var freqQs=JSON.stringify(qs.map(function(q){return{id:q.id,texte:q.texte,type:q.type_reponse,unite:q.unite,seuil_min:q.seuil_min,seuil_max:q.seuil_max,exemple:q.exemple};}));
-    html+='<div class="config-ronde-card '+rc.color+'" data-freq="'+rc.freq+'">'+
+
+    if(qs.length>0)hasAny=true;
+
+    html+='<div class="config-ronde-card '+rc.color+'">'+
       '<div class="config-ronde-header">'+
         '<span class="config-ronde-badge">'+rc.label+'</span>'+
-        '<div>'+
+        '<div style="flex:1">'+
           '<div class="config-ronde-title">'+qs.length+' question'+(qs.length!==1?'s':'')+'</div>'+
           '<div class="config-ronde-freq">'+rc.freqDisp+'</div>'+
         '</div>'+
+        (qs.length>0?'<button class="config-preview-btn" onclick="openWaPreview(\''+cacheKey+'\')" title="Aperçu WhatsApp">👁 Aperçu</button>':'')+
       '</div>'+
       '<div class="config-ronde-body">'+
-        qHtml+
-        '<div class="config-ronde-footer">'+
+        (qHtml||'')+
+        '<button class="config-add-q-btn" onclick="_openAddQModal(\''+eqId+'\',\''+rc.freq+'\')">＋ Ajouter une question</button>'+
+        '<div class="config-ronde-footer" style="margin-top:8px">'+
           '<span class="config-ronde-trigger">'+rc.trigger+'</span>'+
-          '<button class="config-preview-btn" onclick="event.stopPropagation();openWaPreview('+JSON.stringify(rc.freq)+','+JSON.stringify(rc.label)+','+JSON.stringify(eq.nom)+','+JSON.stringify(qs.map(function(q){return{texte:q.texte,type:q.type_reponse,unite:q.unite,seuil_min:q.seuil_min,seuil_max:q.seuil_max,exemple:q.exemple};}))+')" title="Voir cette ronde en mode WhatsApp">👁 Aperçu</button>'+
         '</div>'+
       '</div>'+
     '</div>';
   });
 
-  if(!hasAny){
-    html+='<div style="text-align:center;color:var(--text3);font-size:13px;padding:40px 0">'+
-      '<div style="font-size:40px;margin-bottom:12px;opacity:.3">📋</div>'+
-      'Aucune question configurée pour cet équipement.<br>'+
-      '<span style="font-size:12px">Ajoutez des questions depuis l\'interface admin.</span></div>';
+  if(!hasAny&&!modeles.length){
+    html+='<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px 0">'+
+      'Aucune question. Utilisez les boutons "＋" dans chaque fréquence.</div>';
   }
 
   return html+'</div>';
 }
 
-function openWaPreview(freq,freqLabel,eqNom,questions){
+function openWaPreview(cacheKey){
+  var cached=_waCache[cacheKey];
+  if(!cached){console.warn('WA cache miss:',cacheKey);return;}
+  var freq=cached.freq, freqLabel=cached.label, eqNom=cached.eqNom, questions=cached.questions;
   // Remove existing overlay if any
   var old=document.getElementById('wa-overlay');
   if(old)old.remove();
@@ -921,6 +1007,212 @@ function openWaPreview(freq,freqLabel,eqNom,questions){
   document.body.appendChild(overlay);
   // Scroll chat to bottom after render
   setTimeout(function(){var c=overlay.querySelector('.wa-chat');if(c)c.scrollTop=c.scrollHeight;},50);
+}
+
+/* ── Config modal helpers ── */
+function _showCfgModal(html){
+  var old=document.getElementById('cfg-modal');if(old)old.remove();
+  var m=document.createElement('div');
+  m.id='cfg-modal';m.className='cfg-modal-overlay';
+  m.onclick=function(e){if(e.target===m)m.remove();};
+  m.innerHTML='<div class="cfg-modal-box">'+html+'</div>';
+  document.body.appendChild(m);
+}
+function _closeCfgModal(){var m=document.getElementById('cfg-modal');if(m)m.remove();}
+
+function _openAddEquipModal(){
+  if(!_configCurrentSid){return;}
+  supaGet('types_equipements','select=id,nom&order=nom').then(function(types){
+    supaGet('modeles_questions','select=id,nom,type_id&order=nom').then(function(modeles){
+      var typeOpts=types.map(function(t){return '<option value="'+t.id+'">'+escape_html(t.nom)+'</option>';}).join('');
+      _showCfgModal(
+        '<div class="cfg-modal-title">⚙️ Ajouter un équipement</div>'+
+        '<div class="cfg-form-group"><label class="cfg-form-label">Nom *</label>'+
+          '<input id="eq-new-nom" class="cfg-form-input" placeholder="GE Principal, Chambre froide N°1…" /></div>'+
+        '<div class="cfg-form-group"><label class="cfg-form-label">Type</label>'+
+          '<select id="eq-new-type" class="cfg-form-select" onchange="_updateModeleOptions()">'+typeOpts+'</select></div>'+
+        '<div class="cfg-form-group"><label class="cfg-form-label">Marque / Référence</label>'+
+          '<input id="eq-new-marque" class="cfg-form-input" placeholder="SDMO, Cummins, Bitzer…" /></div>'+
+        '<div class="cfg-form-group" id="eq-modele-wrap">'+
+          '<label class="cfg-form-label">Modèle de questions (optionnel)</label>'+
+          '<select id="eq-new-modele" class="cfg-form-select"><option value="">— Aucun modèle —</option></select>'+
+          '<div class="cfg-info" style="margin-top:6px">💡 Les questions du modèle seront copiées automatiquement</div>'+
+        '</div>'+
+        '<div class="cfg-modal-footer">'+
+          '<button class="cfg-btn-secondary" onclick="_closeCfgModal()">Annuler</button>'+
+          '<button class="cfg-btn-primary" onclick="_saveNewEquip()">Créer</button>'+
+        '</div>'
+      );
+      // Store modeles for dynamic filtering
+      window._cfgModeles=modeles;
+      _updateModeleOptions();
+    });
+  });
+}
+
+function _updateModeleOptions(){
+  var typeId=document.getElementById('eq-new-type')&&document.getElementById('eq-new-type').value;
+  var sel=document.getElementById('eq-new-modele');
+  if(!sel||!window._cfgModeles)return;
+  var filtered=(window._cfgModeles||[]).filter(function(m){return !typeId||m.type_id===typeId;});
+  sel.innerHTML='<option value="">— Aucun modèle —</option>'+
+    filtered.map(function(m){return '<option value="'+m.id+'">'+escape_html(m.nom)+'</option>';}).join('');
+}
+
+async function _saveNewEquip(){
+  var nom=(document.getElementById('eq-new-nom')||{}).value;
+  if(!nom||!nom.trim()){alert('Nom requis');return;}
+  var typeId=(document.getElementById('eq-new-type')||{}).value||null;
+  var marque=(document.getElementById('eq-new-marque')||{}).value||null;
+  var modeleId=(document.getElementById('eq-new-modele')||{}).value||null;
+  _closeCfgModal();
+  var created=await supaPost('equipements',{nom:nom.trim(),site_id:_configCurrentSid,type_id:typeId,marque:marque||null,actif:true,ordre_ronde:99});
+  if(created&&created.id&&modeleId){
+    await _applyModeleToEquip(created.id,modeleId);
+  }
+  if(_session)renderRespTech(_session,'config');
+}
+
+async function _applyModele(eqId,selectId){
+  var sel=document.getElementById(selectId);
+  if(!sel||!sel.value)return;
+  if(!confirm('Appliquer le modèle ? Les questions existantes seront conservées.'))return;
+  await _applyModeleToEquip(eqId,sel.value);
+  if(_session)renderRespTech(_session,'config');
+}
+
+async function _applyModeleToEquip(eqId,modeleId){
+  var items=await supaGet('modeles_questions_items','modele_id=eq.'+modeleId+'&order=ordre.asc&select=texte,type_reponse,unite,seuil_min,seuil_max,frequences,exemple,ordre');
+  for(var i=0;i<items.length;i++){
+    var it=items[i];
+    await supaPost('questions',{
+      equipement_id:eqId,texte:it.texte,type_reponse:it.type_reponse||'numerique',
+      unite:it.unite||null,seuil_min:it.seuil_min??null,seuil_max:it.seuil_max??null,
+      frequences:it.frequences||['journalier'],exemple:it.exemple||null,ordre:it.ordre||i+1,actif:true
+    });
+  }
+}
+
+function _openAddQModal(eqId,defaultFreq){
+  _showCfgModal(
+    '<div class="cfg-modal-title">➕ Ajouter une question</div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Question *</label>'+
+      '<input id="q-new-texte" class="cfg-form-input" placeholder="Relevez le compteur d\'heures…" /></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+
+      '<div class="cfg-form-group"><label class="cfg-form-label">Type de réponse</label>'+
+        '<select id="q-new-type" class="cfg-form-select">'+
+          '<option value="numerique">🔢 Numérique</option>'+
+          '<option value="oui_non">✅ Oui / Non</option>'+
+          '<option value="texte">💬 Texte</option>'+
+          '<option value="photo">📷 Photo</option>'+
+          '<option value="choix">📋 Choix</option>'+
+        '</select></div>'+
+      '<div class="cfg-form-group"><label class="cfg-form-label">Unité</label>'+
+        '<input id="q-new-unite" class="cfg-form-input" placeholder="h, L, °C, %" /></div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+
+      '<div class="cfg-form-group"><label class="cfg-form-label">Seuil min (alerte bas)</label>'+
+        '<input id="q-new-min" class="cfg-form-input" type="number" placeholder="ex: 20" /></div>'+
+      '<div class="cfg-form-group"><label class="cfg-form-label">Seuil max (alerte haut)</label>'+
+        '<input id="q-new-max" class="cfg-form-input" type="number" placeholder="ex: 95" /></div>'+
+    '</div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Exemple de réponse</label>'+
+      '<input id="q-new-exemple" class="cfg-form-input" placeholder="ex: 2340" /></div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Fréquences</label>'+
+      '<div class="cfg-freq-check">'+
+        '<label class="cfg-freq-label"><input type="checkbox" id="qf-j" value="journalier"'+(defaultFreq==='journalier'?' checked':'')+'>Journalier</label>'+
+        '<label class="cfg-freq-label"><input type="checkbox" id="qf-h" value="hebdo"'+(defaultFreq==='hebdo'?' checked':'')+'>Hebdomadaire</label>'+
+        '<label class="cfg-freq-label"><input type="checkbox" id="qf-m" value="mensuel"'+(defaultFreq==='mensuel'?' checked':'')+'>Mensuel</label>'+
+      '</div></div>'+
+    '<div class="cfg-modal-footer">'+
+      '<button class="cfg-btn-secondary" onclick="_closeCfgModal()">Annuler</button>'+
+      '<button class="cfg-btn-primary" onclick="_saveNewQ(\''+eqId+'\')">Ajouter</button>'+
+    '</div>'
+  );
+}
+
+async function _saveNewQ(eqId){
+  var texte=(document.getElementById('q-new-texte')||{}).value;
+  if(!texte||!texte.trim()){alert('Question requise');return;}
+  var freqs=['qf-j','qf-h','qf-m'].map(function(id){var el=document.getElementById(id);return el&&el.checked?el.value:null;}).filter(Boolean);
+  if(!freqs.length)freqs=['journalier'];
+  var minVal=document.getElementById('q-new-min').value;
+  var maxVal=document.getElementById('q-new-max').value;
+  _closeCfgModal();
+  await supaPost('questions',{
+    equipement_id:eqId,texte:texte.trim(),
+    type_reponse:document.getElementById('q-new-type').value||'numerique',
+    unite:document.getElementById('q-new-unite').value||null,
+    seuil_min:minVal!==''?parseFloat(minVal):null,
+    seuil_max:maxVal!==''?parseFloat(maxVal):null,
+    exemple:document.getElementById('q-new-exemple').value||null,
+    frequences:freqs,ordre:99,actif:true
+  });
+  if(_session)renderRespTech(_session,'config');
+}
+
+async function _openEditQModal(qId){
+  var rows=await supaGet('questions','id=eq.'+qId+'&select=id,texte,type_reponse,unite,seuil_min,seuil_max,frequences,exemple');
+  if(!rows||!rows.length)return;
+  var q=rows[0];
+  var freqs=Array.isArray(q.frequences)?q.frequences:[];
+  _showCfgModal(
+    '<div class="cfg-modal-title">✏️ Modifier la question</div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Question *</label>'+
+      '<input id="q-edit-texte" class="cfg-form-input" value="'+escape_html(q.texte||'')+'" /></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+
+      '<div class="cfg-form-group"><label class="cfg-form-label">Type</label>'+
+        '<select id="q-edit-type" class="cfg-form-select">'+
+          ['numerique','oui_non','texte','photo','choix'].map(function(t){return '<option value="'+t+'"'+(q.type_reponse===t?' selected':'')+'>'+t+'</option>';}).join('')+
+        '</select></div>'+
+      '<div class="cfg-form-group"><label class="cfg-form-label">Unité</label>'+
+        '<input id="q-edit-unite" class="cfg-form-input" value="'+escape_html(q.unite||'')+'" /></div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+
+      '<div class="cfg-form-group"><label class="cfg-form-label">Seuil min</label>'+
+        '<input id="q-edit-min" class="cfg-form-input" type="number" value="'+(q.seuil_min??'')+'" /></div>'+
+      '<div class="cfg-form-group"><label class="cfg-form-label">Seuil max</label>'+
+        '<input id="q-edit-max" class="cfg-form-input" type="number" value="'+(q.seuil_max??'')+'" /></div>'+
+    '</div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Exemple</label>'+
+      '<input id="q-edit-exemple" class="cfg-form-input" value="'+escape_html(q.exemple||'')+'" /></div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Fréquences</label>'+
+      '<div class="cfg-freq-check">'+
+        '<label class="cfg-freq-label"><input type="checkbox" id="qef-j" value="journalier"'+(freqs.indexOf('journalier')>=0?' checked':'')+'>Journalier</label>'+
+        '<label class="cfg-freq-label"><input type="checkbox" id="qef-h" value="hebdo"'+(freqs.indexOf('hebdo')>=0?' checked':'')+'>Hebdomadaire</label>'+
+        '<label class="cfg-freq-label"><input type="checkbox" id="qef-m" value="mensuel"'+(freqs.indexOf('mensuel')>=0?' checked':'')+'>Mensuel</label>'+
+      '</div></div>'+
+    '<div class="cfg-modal-footer">'+
+      '<button class="cfg-btn-secondary" onclick="_closeCfgModal()">Annuler</button>'+
+      '<button class="cfg-btn-primary" onclick="_saveEditQ(\''+qId+'\')">Enregistrer</button>'+
+    '</div>'
+  );
+}
+
+async function _saveEditQ(qId){
+  var texte=(document.getElementById('q-edit-texte')||{}).value;
+  if(!texte||!texte.trim()){alert('Question requise');return;}
+  var freqs=['qef-j','qef-h','qef-m'].map(function(id){var el=document.getElementById(id);return el&&el.checked?el.value:null;}).filter(Boolean);
+  if(!freqs.length)freqs=['journalier'];
+  var minVal=document.getElementById('q-edit-min').value;
+  var maxVal=document.getElementById('q-edit-max').value;
+  _closeCfgModal();
+  await supaPatch('questions',qId,{
+    texte:texte.trim(),
+    type_reponse:document.getElementById('q-edit-type').value||'numerique',
+    unite:document.getElementById('q-edit-unite').value||null,
+    seuil_min:minVal!==''?parseFloat(minVal):null,
+    seuil_max:maxVal!==''?parseFloat(maxVal):null,
+    exemple:document.getElementById('q-edit-exemple').value||null,
+    frequences:freqs
+  });
+  if(_session)renderRespTech(_session,'config');
+}
+
+async function _deleteQ(qId){
+  if(!confirm('Supprimer cette question ?'))return;
+  await supaDelete('questions','id=eq.'+qId);
+  if(_session)renderRespTech(_session,'config');
 }
 
 function escape_html(s){
