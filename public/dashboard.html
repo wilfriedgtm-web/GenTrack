@@ -164,6 +164,34 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .config-ronde-card.blue .config-q-seuil{color:var(--bleu)}
 .config-ronde-footer{display:flex;align-items:center;justify-content:space-between;margin-top:10px}
 .config-ronde-trigger{font-size:11px;color:var(--text2)}
+.config-preview-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .15s}
+.config-preview-btn:hover{border-color:var(--amber);color:var(--amber)}
+/* WA PREVIEW OVERLAY */
+.wa-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;animation:fadeIn .15s}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.wa-phone{width:360px;max-height:88vh;border-radius:24px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,.45)}
+.wa-phone-bar{background:#075E54;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.wa-phone-avatar{width:36px;height:36px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.wa-phone-info{flex:1}
+.wa-phone-name{font-size:13px;font-weight:700;color:white}
+.wa-phone-status{font-size:11px;color:rgba(255,255,255,.65)}
+.wa-phone-close{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.12);border:none;color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.wa-freq-tabs{background:#128C7E;display:flex;flex-shrink:0}
+.wa-freq-tab{flex:1;padding:8px 4px;text-align:center;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.55);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.wa-freq-tab.active{color:white;border-bottom-color:white}
+.wa-chat{flex:1;overflow-y:auto;background:#ECE5DD;padding:12px 10px;display:flex;flex-direction:column;gap:6px}
+.wa-bubble{max-width:82%;padding:8px 10px;border-radius:10px;font-size:12.5px;line-height:1.45;position:relative;word-break:break-word}
+.wa-bubble.bot{background:white;align-self:flex-start;border-top-left-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.wa-bubble.tech{background:#DCF8C6;align-self:flex-end;border-top-right-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,.1)}
+.wa-bubble-time{font-size:10px;color:rgba(0,0,0,.38);margin-top:4px;text-align:right}
+.wa-bubble-type{font-size:10px;color:#128C7E;margin-top:4px;font-weight:600}
+.wa-bubble-seuil{font-size:10px;color:#D4380D;margin-top:3px;font-weight:600}
+.wa-bubble-ack{font-size:11px;color:#075E54;font-weight:600;margin-bottom:2px}
+.wa-bubble-step{font-size:10px;color:rgba(0,0,0,.4);margin-bottom:3px}
+.wa-date-sep{align-self:center;background:rgba(225,215,205,.8);font-size:10px;color:rgba(0,0,0,.45);padding:3px 10px;border-radius:8px;margin:4px 0}
+.wa-phone-footer{background:#F0F0F0;padding:10px 12px;border-top:1px solid #DDD;display:flex;gap:8px;align-items:center;flex-shrink:0}
+.wa-validate-btn{flex:1;background:#25D366;border:none;color:white;border-radius:20px;padding:10px 16px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.02em}
+.wa-edit-btn{background:none;border:1.5px solid #999;color:#555;border-radius:20px;padding:10px 16px;font-size:12px;font-weight:600;cursor:pointer}
 /* SCROLLBAR */
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -726,30 +754,14 @@ async function _buildConfigRondePanel(sid,eqId,equips){
   var tNom=(eq.types_equipements&&eq.types_equipements.nom)||'';
   var icon=_TYPE_ICONS[tNom]||'⚙️';
 
-  // Fetch recent rondes for this equip to get questions
-  var since30=dateNJours(30);
-  var rondes=await supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+since30+'&select=id,frequence&order=date_ronde.desc&limit=60');
-  var rIds=rondes.map(function(r){return r.id;});
-  var rondesEqRows=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&equipement_id=eq.'+eqId+'&select=id,ronde_id,statut&limit=60'):[];
-  var reIds=rondesEqRows.map(function(re){return re.id;});
-  var reponses=reIds.length?await supaGet('reponses','ronde_equipement_id=in.('+reIds.join(',')+')'+'&select=question_id,valeur,created_at,questions(texte,type_reponse,unite,seuil_min,seuil_max)&order=created_at.desc&limit=200'):[];
+  // Query questions directly by equipement_id — source of truth
+  var questions=await supaGet('questions','equipement_id=eq.'+eqId+'&actif=eq.true&order=ordre.asc&select=id,texte,type_reponse,unite,seuil_min,seuil_max,frequences,exemple');
 
-  // Map ronde id → frequence
-  var rondeFreq={};rondes.forEach(function(r){rondeFreq[r.id]=r.frequence;});
-  // Map reId → ronde id → frequence
-  var reToRonde={};rondesEqRows.forEach(function(re){reToRonde[re.id]=re.ronde_id;});
-
-  // Group unique questions by frequency
-  var qByFreq={journalier:{},hebdo:{},mensuel:{}};
-  reponses.forEach(function(r){
-    var rId=reToRonde[r.ronde_equipement_id];
-    var freq=rId?rondeFreq[rId]:null;
-    if(!freq||!qByFreq[freq])return;
-    var q=r.questions;
-    if(!q||!q.texte)return;
-    if(!qByFreq[freq][r.question_id]){
-      qByFreq[freq][r.question_id]={label:q.texte,type:q.type_reponse,unite:q.unite,seuilMin:q.seuil_min,seuilMax:q.seuil_max};
-    }
+  // Group by frequency (each question can appear in multiple frequencies)
+  var qByFreq={journalier:[],hebdo:[],mensuel:[]};
+  questions.forEach(function(q){
+    var freqs=Array.isArray(q.frequences)?q.frequences:(typeof q.frequences==='string'?JSON.parse(q.frequences||'[]'):[]);
+    freqs.forEach(function(f){if(qByFreq[f])qByFreq[f].push(q);});
   });
 
   var _RONDE_CFG=[
@@ -758,48 +770,157 @@ async function _buildConfigRondePanel(sid,eqId,equips){
     {freq:'mensuel',color:'blue',label:'Mensuelle',freqDisp:'1er du mois · 1×/mois',trigger:'📅 Déclenchée le 1er du mois'}
   ];
 
-  var html='<div class="config-ronde-panel">'+
-    '<div class="config-ronde-panel-title">'+icon+' '+escape_html(eq.nom)+'</div>'+
-    '<div class="config-ronde-panel-sub">'+escape_html(tNom||'Équipement')+' · Plans de ronde configurés</div>';
+  var eqIdSafe=escape_html(eqId);
+  var eqNomSafe=escape_html(eq.nom);
+  var allQJson=escape_html(JSON.stringify(questions));
 
+  var html='<div class="config-ronde-panel">'+
+    '<div class="config-ronde-panel-title">'+icon+' '+eqNomSafe+'</div>'+
+    '<div class="config-ronde-panel-sub">'+escape_html(tNom||'Équipement')+' · Plans de ronde · '+questions.length+' question'+(questions.length!==1?'s':'')+'</div>';
+
+  var hasAny=false;
   _RONDE_CFG.forEach(function(rc){
-    var qs=Object.values(qByFreq[rc.freq]);
-    if(qs.length===0)return; // skip frequencies with no data
+    var qs=qByFreq[rc.freq];
+    if(qs.length===0)return;
+    hasAny=true;
     var qHtml=qs.map(function(q){
       var seuilStr='';
-      if(q.seuilMax!==null&&q.seuilMax!==undefined)seuilStr='≤ '+q.seuilMax+(q.unite?' '+q.unite:'');
-      else if(q.seuilMin!==null&&q.seuilMin!==undefined)seuilStr='≥ '+q.seuilMin+(q.unite?' '+q.unite:'');
+      if(q.seuil_max!==null&&q.seuil_max!==undefined)seuilStr='≤ '+q.seuil_max+(q.unite?' '+q.unite:'');
+      else if(q.seuil_min!==null&&q.seuil_min!==undefined)seuilStr='≥ '+q.seuil_min+(q.unite?' '+q.unite:'');
       return '<div class="config-q-item">'+
         '<div class="config-q-dot"></div>'+
-        '<span class="config-q-label">'+escape_html(q.label)+'</span>'+
-        '<span class="config-q-type">'+escape_html(q.type||'texte')+'</span>'+
+        '<span class="config-q-label">'+escape_html(q.texte)+'</span>'+
+        '<span class="config-q-type">'+escape_html(q.type_reponse||'texte')+'</span>'+
         (seuilStr?'<span class="config-q-seuil">'+seuilStr+'</span>':'')+
       '</div>';
     }).join('');
-    html+='<div class="config-ronde-card '+rc.color+'">'+
+    // Encode questions for this freq for the preview
+    var freqQs=JSON.stringify(qs.map(function(q){return{id:q.id,texte:q.texte,type:q.type_reponse,unite:q.unite,seuil_min:q.seuil_min,seuil_max:q.seuil_max,exemple:q.exemple};}));
+    html+='<div class="config-ronde-card '+rc.color+'" data-freq="'+rc.freq+'">'+
       '<div class="config-ronde-header">'+
         '<span class="config-ronde-badge">'+rc.label+'</span>'+
         '<div>'+
-          '<div class="config-ronde-title">'+rc.label+'</div>'+
+          '<div class="config-ronde-title">'+qs.length+' question'+(qs.length!==1?'s':'')+'</div>'+
           '<div class="config-ronde-freq">'+rc.freqDisp+'</div>'+
         '</div>'+
       '</div>'+
       '<div class="config-ronde-body">'+
-        (qHtml||'<div style="font-size:12px;color:var(--text3);padding:8px 0">Aucune question relevée</div>')+
+        qHtml+
         '<div class="config-ronde-footer">'+
           '<span class="config-ronde-trigger">'+rc.trigger+'</span>'+
+          '<button class="config-preview-btn" onclick="event.stopPropagation();openWaPreview('+JSON.stringify(rc.freq)+','+JSON.stringify(rc.label)+','+JSON.stringify(eq.nom)+','+JSON.stringify(qs.map(function(q){return{texte:q.texte,type:q.type_reponse,unite:q.unite,seuil_min:q.seuil_min,seuil_max:q.seuil_max,exemple:q.exemple};}))+')" title="Voir cette ronde en mode WhatsApp">👁 Aperçu</button>'+
         '</div>'+
       '</div>'+
     '</div>';
   });
 
-  if(_RONDE_CFG.every(function(rc){return Object.keys(qByFreq[rc.freq]).length===0;})){
+  if(!hasAny){
     html+='<div style="text-align:center;color:var(--text3);font-size:13px;padding:40px 0">'+
       '<div style="font-size:40px;margin-bottom:12px;opacity:.3">📋</div>'+
-      'Aucune ronde relevée pour cet équipement sur 30 jours</div>';
+      'Aucune question configurée pour cet équipement.<br>'+
+      '<span style="font-size:12px">Ajoutez des questions depuis l\'interface admin.</span></div>';
   }
 
   return html+'</div>';
+}
+
+function openWaPreview(freq,freqLabel,eqNom,questions){
+  // Remove existing overlay if any
+  var old=document.getElementById('wa-overlay');
+  if(old)old.remove();
+
+  var typeIcon={numerique:'🔢',texte:'💬',oui_non:'✅',photo:'📷',choix:'📋'};
+  var typeLabel={numerique:'Valeur numérique',texte:'Texte libre',oui_non:'Oui / Non',photo:'Photo requise',choix:'Choix multiple'};
+  var exampleFallback={numerique:'42',texte:'RAS',oui_non:'Oui',photo:'[Photo envoyée]',choix:'Option 1'};
+
+  var now=new Date();
+  var hh=String(now.getHours()).padStart(2,'0');
+  var mm=String(now.getMinutes()).padStart(2,'0');
+  var baseTime=now.getHours()*60+now.getMinutes();
+  function simTime(offset){var t=baseTime+offset;var h=Math.floor(t/60)%24;var m=t%60;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');}
+
+  var freqColor={journalier:'#2D6A4F',hebdo:'#9A780E',mensuel:'#2B5BA8'};
+  var headerBg=freqColor[freq]||'#075E54';
+
+  // Build chat bubbles
+  var bubbles='<div class="wa-date-sep">'+now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div>';
+
+  // Opening bot message
+  var freqEmoji={journalier:'📋',hebdo:'📅',mensuel:'🗓️'};
+  bubbles+='<div class="wa-bubble bot">'+
+    '<div style="font-weight:700;color:#075E54;margin-bottom:3px">'+(freqEmoji[freq]||'📋')+' Ronde '+freqLabel.toLowerCase()+'</div>'+
+    escape_html(eqNom)+'<br>'+
+    '<span style="font-size:11px;color:rgba(0,0,0,.45)">Bonjour 👋 Voici votre ronde du jour</span>'+
+    '<div class="wa-bubble-time">'+simTime(0)+'</div>'+
+  '</div>';
+
+  questions.forEach(function(q,i){
+    var tIcon=typeIcon[q.type]||'💬';
+    var tLabel=typeLabel[q.type]||q.type||'texte';
+    var example=q.exemple||(exampleFallback[q.type]||'—');
+    var uniteStr=q.unite?' ('+q.unite+')':'';
+    var seuilStr='';
+    if(q.seuil_max!==null&&q.seuil_max!==undefined)seuilStr='⚠️ Seuil critique > '+q.seuil_max+(q.unite?' '+q.unite:'');
+    else if(q.seuil_min!==null&&q.seuil_min!==undefined)seuilStr='⚠️ Seuil critique < '+q.seuil_min+(q.unite?' '+q.unite:'');
+
+    // Question bubble (bot)
+    bubbles+='<div class="wa-bubble bot">'+
+      '<div class="wa-bubble-step">'+(i+1)+'/'+questions.length+'</div>'+
+      '<div style="font-weight:600;margin-bottom:4px">'+escape_html(q.texte)+'</div>'+
+      '<div class="wa-bubble-type">'+tIcon+' '+tLabel+uniteStr+'</div>'+
+      (seuilStr?'<div class="wa-bubble-seuil">'+seuilStr+'</div>':'')+
+      '<div class="wa-bubble-time">'+simTime(i*2+1)+'</div>'+
+    '</div>';
+
+    // Tech response bubble
+    bubbles+='<div class="wa-bubble tech">'+
+      escape_html(String(example))+
+      '<div class="wa-bubble-time">'+simTime(i*2+2)+' ✓✓</div>'+
+    '</div>';
+
+    // Bot acknowledgment (except after last question)
+    if(i<questions.length-1){
+      bubbles+='<div class="wa-bubble bot">'+
+        '<div class="wa-bubble-ack">✅ Noté</div>'+
+        '<div class="wa-bubble-time">'+simTime(i*2+2)+'</div>'+
+      '</div>';
+    }
+  });
+
+  // Closing bot message
+  if(questions.length>0){
+    bubbles+='<div class="wa-bubble bot">'+
+      '<div style="font-weight:700;color:#25D366;margin-bottom:3px">✅ Ronde complète !</div>'+
+      questions.length+'/'+questions.length+' questions · Merci 👍<br>'+
+      '<span style="font-size:11px;color:rgba(0,0,0,.45)">Données enregistrées dans GenTrack</span>'+
+      '<div class="wa-bubble-time">'+simTime(questions.length*2+2)+'</div>'+
+    '</div>';
+  }
+
+  var overlay=document.createElement('div');
+  overlay.className='wa-overlay';
+  overlay.id='wa-overlay';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML=
+    '<div class="wa-phone">'+
+      '<div class="wa-phone-bar" style="background:'+headerBg+'">'+
+        '<div class="wa-phone-avatar">🤖</div>'+
+        '<div class="wa-phone-info">'+
+          '<div class="wa-phone-name">GenTrack Bot</div>'+
+          '<div class="wa-phone-status">Ronde '+escape_html(freqLabel.toLowerCase())+' · '+escape_html(eqNom)+'</div>'+
+        '</div>'+
+        '<button class="wa-phone-close" onclick="document.getElementById(\'wa-overlay\').remove()">×</button>'+
+      '</div>'+
+      '<div class="wa-chat">'+bubbles+'</div>'+
+      '<div class="wa-phone-footer">'+
+        '<button class="wa-edit-btn" onclick="document.getElementById(\'wa-overlay\').remove()">Fermer</button>'+
+        '<button class="wa-validate-btn" onclick="document.getElementById(\'wa-overlay\').remove()">✅ Ronde validée</button>'+
+      '</div>'+
+    '</div>';
+
+  document.body.appendChild(overlay);
+  // Scroll chat to bottom after render
+  setTimeout(function(){var c=overlay.querySelector('.wa-chat');if(c)c.scrollTop=c.scrollHeight;},50);
 }
 
 function escape_html(s){
