@@ -592,22 +592,305 @@ function escape_html(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-/* ── VUE DIR TECH ── */
+/* ══════════════════════════════════════
+   VUE DIR TECH — Session C
+══════════════════════════════════════ */
+
 function renderDirTech(session,nav){
-  nav=nav||'accueil';var c='';
-  if(nav==='accueil'){
-    c='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Connecté · '+roleName(session.role)+'</div><div class="ab-sub">Session C en cours de construction</div></div></div>'+
-      '<div class="kpi-grid">'+
-        '<div class="kpi"><div class="kpi-label">Hôtels suivis</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
-        '<div class="kpi"><div class="kpi-label">Équipements en alerte</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
-        '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Cette semaine</div></div>'+
+  nav=nav||'accueil';
+  var skeleton='<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text3);font-size:13px"><span class="spinner"></span>Chargement des données...</div>';
+  app().innerHTML=buildLayout(session,nav,skeleton);
+  _loadDT(session,nav);
+}
+
+async function _loadDT(session,nav){
+  var sids=session.site_ids||[];
+  var cid=session.client_id;
+  var el=document.querySelector('.dash-content');
+  if(!el)return;
+  try{
+    var html='';
+    if(nav==='accueil')html=await _dtAccueil(session,sids,cid);
+    else if(nav==='alertes')html=await _dtAlertes(sids,cid);
+    else if(nav==='historique')html=await _dtHistorique(sids);
+    el.innerHTML=html;
+  }catch(e){
+    el.innerHTML='<div class="alert-banner" style="margin-top:12px"><div class="ab-icon">⚠️</div><div class="ab-body"><div class="ab-title">Erreur de chargement</div><div class="ab-sub">'+(e.message||'Vérifiez votre connexion')+'</div></div></div>';
+  }
+}
+
+async function _dtAccueil(session,sids,cid){
+  if(!sids.length)return '<div class="placeholder-card"><div class="placeholder-icon">🏨</div>Aucun site configuré pour ce compte</div>';
+  var sidStr=sids.join(',');
+  var today=todayStr();
+  var since7=dateNJours(7);
+
+  var[sites,equips,rondes,alertes,pannes,pannes7]=await Promise.all([
+    supaGet('sites','id=in.('+sidStr+')&select=id,nom'),
+    supaGet('equipements','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id'),
+    supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=eq.'+today+'&select=id,site_id,frequence,technicien_id'),
+    supaGet('alertes','client_id=eq.'+cid+'&resolue=eq.false&select=id,type,severite,message,created_at&order=created_at.desc&limit=50'),
+    supaGet('pannes','site_id=in.('+sidStr+')&resolue=eq.false&select=id,site_id,type,description,date_panne,equipements(nom)&order=date_panne.desc&limit=50'),
+    supaGet('pannes','site_id=in.('+sidStr+')&date_panne=gte.'+since7+'&select=id,site_id,type,description,date_panne,resolue,equipements(nom)&order=date_panne.desc&limit=30')
+  ]);
+
+  var rIds=rondes.map(function(r){return r.id;});
+  var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,equipement_id,statut'):[];
+
+  var techIds=[...new Set(rondes.filter(function(r){return r.technicien_id;}).map(function(r){return r.technicien_id;}))];
+  var contacts=techIds.length?await supaGet('contacts','id=in.('+techIds.join(',')+')'+'&select=id,nom,site_id'):[];
+  var contactMap={};contacts.forEach(function(c){contactMap[c.id]=c.nom;});
+
+  var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
+  var eqBySite={};equips.forEach(function(e){eqBySite[e.site_id]=(eqBySite[e.site_id]||0)+1;});
+  var pannesBySite={};pannes.forEach(function(p){pannesBySite[p.site_id]=(pannesBySite[p.site_id]||0)+1;});
+  var rondesBySite={};
+  rondes.forEach(function(r){if(!rondesBySite[r.site_id])rondesBySite[r.site_id]=[];rondesBySite[r.site_id].push(r);});
+  var reByRonde={};
+  rondesEq.forEach(function(re){if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];reByRonde[re.ronde_id].push(re);});
+
+  // KPI globaux
+  var totalAlertes=alertes.length+pannes.length;
+  var totalVal=0,totalTot=0;
+  rondes.forEach(function(r){
+    var eq=reByRonde[r.id]||[];
+    totalTot+=eq.length;
+    totalVal+=eq.filter(function(re){return re.statut==='valide';}).length;
+  });
+  var confPct=totalTot>0?Math.round(totalVal/totalTot*100):null;
+
+  // Banner
+  var banner=totalAlertes>0
+    ?'<div class="alert-banner"><div class="ab-icon">🚨</div><div class="ab-body"><div class="ab-title">'+totalAlertes+' alerte'+(totalAlertes>1?'s':'')+' active'+(totalAlertes>1?'s':'')+'</div><div class="ab-sub">Pannes ou alertes à traiter sur vos sites</div></div></div>'
+    :'<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Tous les sites opérationnels</div><div class="ab-sub">Aucune alerte active'+(confPct!==null?' · '+confPct+'% de conformité rondes':'')+'</div></div></div>';
+
+  // KPIs
+  var kpis='<div class="kpi-grid">'+
+    '<div class="kpi"><div class="kpi-label">Sites suivis</div><div class="kpi-value">'+sites.length+'</div><div class="kpi-trend">Hôtels du portefeuille</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Alertes actives</div><div class="kpi-value" style="color:'+(totalAlertes>0?'var(--rouge)':'var(--vert)')+'">'+totalAlertes+'</div><div class="kpi-trend">'+(totalAlertes>0?'À traiter':'RAS')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+(confPct===null?'var(--text2)':confPct===100?'var(--vert)':confPct>=70?'var(--amber)':'var(--rouge)')+'">'+( confPct!==null?confPct+'%':'—')+'</div><div class="kpi-trend">Aujourd\'hui</div></div>'+
+  '</div>';
+
+  // Bloc 1 — Vue multi-sites
+  var bloc1='<div class="section-title">Vue d\'ensemble multi-sites</div><div style="display:flex;flex-direction:column;gap:8px">';
+  sids.forEach(function(sid){
+    var sNom=siteMap[sid]||'Site';
+    var sEqCount=eqBySite[sid]||0;
+    var sPannesCount=pannesBySite[sid]||0;
+    var sRondes=rondesBySite[sid]||[];
+    var rondeJ=sRondes.find(function(r){return r.frequence==='journalier';});
+    var eqRJ=rondeJ?(reByRonde[rondeJ.id]||[]):[];
+    var val=eqRJ.filter(function(re){return re.statut==='valide';}).length;
+    var tot=eqRJ.length;
+    var pct=tot>0?Math.round(val/tot*100):null;
+    var ok=tot>0&&val===tot;
+    var rondeDisp,rondeCol;
+    if(!rondeJ){rondeDisp='Pas de ronde';rondeCol='var(--text3)';}
+    else if(tot===0){rondeDisp='Non commencée';rondeCol='var(--text3)';}
+    else if(ok){rondeDisp='Complète';rondeCol='var(--vert)';}
+    else{rondeDisp=val+'/'+tot+' · '+pct+'%';rondeCol='var(--amber)';}
+    bloc1+='<div class="ronde-card">'+
+      '<div style="display:flex;align-items:center;gap:12px'+(pct!==null?';margin-bottom:10px':'')+'">'+
+        '<span style="font-size:20px">'+(ok?'✅':!rondeJ||tot===0?'📋':'🔄')+'</span>'+
+        '<div style="flex:1">'+
+          '<div style="font-size:13px;font-weight:600">'+escape_html(sNom)+'</div>'+
+          '<div style="font-size:11px;color:var(--text2);margin-top:2px">'+sEqCount+' équipements · Ronde : <span style="color:'+rondeCol+'">'+rondeDisp+'</span></div>'+
+        '</div>'+
+        (sPannesCount>0
+          ?'<span style="font-size:10px;font-weight:600;color:var(--rouge);background:var(--rouge-pale);border:1px solid var(--rouge-border);border-radius:4px;padding:2px 8px">'+sPannesCount+' panne'+(sPannesCount>1?'s':'')+'</span>'
+          :'<span style="font-size:10px;font-weight:600;color:var(--vert)">RAS</span>')+
       '</div>'+
-      '<div class="section-title">Recommandations techniques</div><div class="placeholder-card"><div class="placeholder-icon">🔧</div>Recommandations préventives · Session C</div>'+
-      '<div class="section-title">Mon équipe</div><div class="placeholder-card"><div class="placeholder-icon">👥</div>Suivi rondes par technicien · Session C</div>'+
-      '<div class="section-title">Maintenances à venir</div><div class="placeholder-card"><div class="placeholder-icon">🗓️</div>Planning 30 jours · Session C</div>';
-  }else if(nav==='alertes'){c='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">⚠️</div>Alertes multi-sites · Session C</div>';}
-  else if(nav==='historique'){c='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">📊</div>Historique consolidé · Session C</div>';}
-  app().innerHTML=buildLayout(session,nav,c);
+      (pct!==null?'<div class="progress-bar-wrap"><div class="progress-bar" style="width:'+pct+'%;background:'+(ok?'var(--vert)':'var(--amber)')+'"></div></div>':'')+
+    '</div>';
+  });
+  bloc1+='</div>';
+
+  // Bloc 2 — Équipements en alerte
+  var bloc2='<div class="section-title">Équipements en alerte</div>';
+  if(totalAlertes===0){
+    bloc2+='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Aucune alerte active</div><div class="ab-sub">Tous les équipements fonctionnent normalement</div></div></div>';
+  }else{
+    bloc2+=_buildAlerteCardsDT(alertes,pannes,'accueil',siteMap);
+  }
+
+  // Bloc 3 — Suivi équipe
+  var bloc3='<div class="section-title">Suivi équipe</div>';
+  var byTech={};
+  rondes.forEach(function(r){
+    var tId=r.technicien_id||'_inconnu';
+    if(!byTech[tId])byTech[tId]={nom:r.technicien_id?(contactMap[r.technicien_id]||'Technicien'):'Non assigné',rondes:[]};
+    byTech[tId].rondes.push(r);
+  });
+  var techKeys=Object.keys(byTech);
+  if(techKeys.length===0){
+    bloc3+='<div class="placeholder-card"><div class="placeholder-icon">👥</div>Aucune ronde assignée aujourd\'hui</div>';
+  }else{
+    bloc3+='<div style="display:flex;flex-direction:column;gap:6px">';
+    techKeys.forEach(function(tId){
+      var t=byTech[tId];
+      var allEq=[];
+      t.rondes.forEach(function(r){allEq=allEq.concat(reByRonde[r.id]||[]);});
+      var tVal=allEq.filter(function(re){return re.statut==='valide';}).length;
+      var tTot=allEq.length;
+      var tPct=tTot>0?Math.round(tVal/tTot*100):0;
+      var tOk=tTot>0&&tVal===tTot;
+      var techSiteIds=[...new Set(t.rondes.map(function(r){return r.site_id;}))];
+      var techSiteNames=techSiteIds.map(function(s){return siteMap[s]||s;}).join(', ');
+      bloc3+='<div class="eq-card" style="padding:12px 14px">'+
+        '<span style="font-size:20px">'+(tOk?'✅':tTot===0?'⏳':'🔄')+'</span>'+
+        '<div style="flex:1">'+
+          '<div class="eq-card-nom">'+escape_html(t.nom)+'</div>'+
+          '<div class="eq-card-type">'+escape_html(techSiteNames)+'</div>'+
+        '</div>'+
+        '<div style="text-align:right;flex-shrink:0">'+
+          '<div style="font-family:\'Cormorant Garamond\',serif;font-size:20px;font-weight:600;color:'+(tOk?'var(--vert)':tTot===0?'var(--text3)':'var(--amber)')+'">'+( tTot>0?tPct+'%':'—')+'</div>'+
+          '<div style="font-size:10px;color:var(--text2)">'+tVal+'/'+tTot+'</div>'+
+        '</div>'+
+      '</div>';
+    });
+    bloc3+='</div>';
+  }
+
+  // Bloc 4 — Pannes 7 jours
+  var bloc4='<div class="section-title">Pannes récentes <span style="font-size:12px;font-weight:400;color:var(--text3)">— 7 jours</span></div>';
+  if(pannes7.length===0){
+    bloc4+='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Aucune panne sur 7 jours</div><div class="ab-sub">Tous les sites sont stables</div></div></div>';
+  }else{
+    bloc4+='<div style="display:flex;flex-direction:column;gap:6px">';
+    pannes7.forEach(function(p){
+      var eqNom=p.equipements&&p.equipements.nom?p.equipements.nom:'Équipement';
+      var sNom=siteMap[p.site_id]||'Site';
+      var ts=p.date_panne?new Date(p.date_panne).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+      var resolved=p.resolue;
+      bloc4+='<div class="eq-card" style="padding:12px 14px'+(resolved?';opacity:0.65':'')+'">'+
+        '<span style="font-size:16px">'+(resolved?'✅':'🔴')+'</span>'+
+        '<div style="flex:1">'+
+          '<div class="eq-card-nom">'+escape_html(eqNom)+' <span style="font-weight:400;color:var(--text2)">· '+escape_html(sNom)+'</span></div>'+
+          '<div class="eq-card-type">'+(p.type?escape_html(p.type)+' — ':'')+escape_html(p.description||'')+( ts?' · '+ts:'')+'</div>'+
+        '</div>'+
+        '<span style="font-size:10px;font-weight:600;color:'+(resolved?'var(--vert)':'var(--rouge)')+'">'+( resolved?'Résolu':'En cours')+'</span>'+
+      '</div>';
+    });
+    bloc4+='</div>';
+  }
+
+  return banner+kpis+bloc1+bloc2+bloc3+bloc4;
+}
+
+async function _dtAlertes(sids,cid){
+  var sidStr=sids.join(',');
+  var[sites,alertes,pannes]=await Promise.all([
+    supaGet('sites','id=in.('+sidStr+')&select=id,nom'),
+    supaGet('alertes','client_id=eq.'+cid+'&resolue=eq.false&select=id,type,severite,message,created_at&order=created_at.desc'),
+    supaGet('pannes','site_id=in.('+sidStr+')&resolue=eq.false&select=id,site_id,type,description,date_panne,equipements(nom)&order=date_panne.desc')
+  ]);
+  var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
+  if(alertes.length===0&&pannes.length===0){
+    return '<div class="alert-banner ok" style="margin-top:12px"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Aucune alerte active</div><div class="ab-sub">Tous les systèmes fonctionnent normalement</div></div></div>';
+  }
+  return '<div style="margin-top:4px">'+_buildAlerteCardsDT(alertes,pannes,'alertes',siteMap)+'</div>';
+}
+
+function _buildAlerteCardsDT(alertes,pannes,fromNav,siteMap){
+  var h='<div style="display:flex;flex-direction:column;gap:8px">';
+  alertes.forEach(function(a){
+    var crit=a.severite==='critical';
+    var bg=crit?'var(--rouge-pale)':'var(--orange-pale)';
+    var bd=crit?'var(--rouge-border)':'var(--orange-border)';
+    var bl=crit?'var(--rouge)':'var(--orange)';
+    var dot=crit?'🔴':'🟡';
+    var ts=a.created_at?new Date(a.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+    h+='<div class="alerte-card" style="background:'+bg+';border:1px solid '+bd+';border-left:3px solid '+bl+'">'+
+      '<span style="font-size:16px;margin-top:1px">'+dot+'</span>'+
+      '<div style="flex:1">'+
+        '<div class="alerte-card-titre" style="color:'+bl+'">'+escape_html(a.type||'Alerte')+'</div>'+
+        '<div class="alerte-card-msg">'+escape_html(a.message||'')+'</div>'+
+        (ts?'<div style="font-size:10px;color:var(--text3);margin-top:4px">'+ts+'</div>':'')+
+      '</div>'+
+      '<button class="btn-traite" onclick="_marquerTraiteDT(\'alertes\',\''+a.id+'\',\''+fromNav+'\')">✓ Traité</button>'+
+    '</div>';
+  });
+  pannes.forEach(function(p){
+    var eqNom=p.equipements&&p.equipements.nom?' · '+p.equipements.nom:'';
+    var sNom=siteMap&&p.site_id&&siteMap[p.site_id]?' · '+siteMap[p.site_id]:'';
+    var ts=p.date_panne?new Date(p.date_panne).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+    h+='<div class="alerte-card" style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge)">'+
+      '<span style="font-size:16px;margin-top:1px">🔴</span>'+
+      '<div style="flex:1">'+
+        '<div class="alerte-card-titre" style="color:var(--rouge)">Panne'+escape_html(eqNom)+escape_html(sNom)+'</div>'+
+        '<div class="alerte-card-msg">'+escape_html((p.type?p.type+' — ':'')+( p.description||''))+'</div>'+
+        (ts?'<div style="font-size:10px;color:var(--text3);margin-top:4px">'+ts+'</div>':'')+
+      '</div>'+
+      '<button class="btn-traite" onclick="_marquerTraiteDT(\'pannes\',\''+p.id+'\',\''+fromNav+'\')">✓ Résolu</button>'+
+    '</div>';
+  });
+  return h+'</div>';
+}
+
+async function _marquerTraiteDT(table,id,fromNav){
+  var btn=event&&event.target;
+  if(btn){btn.disabled=true;btn.textContent='...';}
+  await supaPatch(table,id,{resolue:true});
+  if(_session)renderDirTech(_session,fromNav||'alertes');
+}
+
+async function _dtHistorique(sids){
+  if(!sids.length)return '<div class="placeholder-card"><div class="placeholder-icon">📊</div>Aucun site configuré</div>';
+  var sidStr=sids.join(',');
+  var since=dateNJours(7);
+  var[sites,rondes]=await Promise.all([
+    supaGet('sites','id=in.('+sidStr+')&select=id,nom'),
+    supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+since+'&select=id,site_id,date_ronde,frequence&order=date_ronde.desc&limit=100')
+  ]);
+  if(rondes.length===0){
+    return '<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">📊</div>Aucune ronde sur les 7 derniers jours</div>';
+  }
+  var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
+  var rIds=rondes.map(function(r){return r.id;});
+  var rondesEq=await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,statut');
+  var reByRonde={};
+  rondesEq.forEach(function(re){if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];reByRonde[re.ronde_id].push(re);});
+
+  // Group by date
+  var byDate={};
+  rondes.forEach(function(ro){
+    var d=ro.date_ronde;
+    if(!byDate[d])byDate[d]=[];
+    byDate[d].push(ro);
+  });
+  var dates=Object.keys(byDate).sort(function(a,b){return b>a?1:-1;});
+  var h='<div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">';
+  dates.forEach(function(d){
+    var dateDisp=new Date(d).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+    var isToday=d===todayStr();
+    h+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-top:8px;margin-bottom:2px">'+
+      (isToday?'Aujourd\'hui — ':'')+dateDisp+'</div>';
+    // Group by site within date
+    var bySite={};
+    byDate[d].forEach(function(ro){if(!bySite[ro.site_id])bySite[ro.site_id]=[];bySite[ro.site_id].push(ro);});
+    Object.keys(bySite).forEach(function(sid){
+      var sNom=siteMap[sid]||'Site';
+      var sRondes=bySite[sid];
+      var allEq=[];
+      sRondes.forEach(function(ro){allEq=allEq.concat(reByRonde[ro.id]||[]);});
+      var val=allEq.filter(function(re){return re.statut==='valide';}).length;
+      var tot=allEq.length;
+      var pct=tot>0?Math.round(val/tot*100):0;
+      var ok=val===tot&&tot>0;
+      h+='<div class="ronde-card">'+
+        '<div style="display:flex;align-items:center;gap:12px'+(tot>0?';margin-bottom:10px':'')+'">'+
+          '<span style="font-size:20px">'+(ok?'✅':tot===0?'📋':pct>0?'🔄':'❌')+'</span>'+
+          '<div style="flex:1">'+
+            '<div style="font-size:13px;font-weight:600">'+escape_html(sNom)+'</div>'+
+            '<div style="font-size:11px;color:var(--text2);margin-top:2px">'+(tot>0?val+'/'+tot+' équipements · '+sRondes.length+' ronde'+(sRondes.length>1?'s':''):'Aucune donnée')+'</div>'+
+          '</div>'+
+          '<span style="font-family:\'Cormorant Garamond\',serif;font-size:22px;font-weight:600;color:'+(ok?'var(--vert)':tot===0?'var(--text3)':'var(--amber)')+'">'+( tot>0?pct+'%':'—')+'</span>'+
+        '</div>'+
+        (tot>0?'<div class="progress-bar-wrap"><div class="progress-bar" style="width:'+pct+'%;background:'+(ok?'var(--vert)':pct>0?'var(--amber)':'var(--rouge)')+'"></div></div>':'')+
+      '</div>';
+    });
+  });
+  return h+'</div>';
 }
 
 /* ── VUE DIR OPS ── */
