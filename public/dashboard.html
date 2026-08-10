@@ -11,7 +11,7 @@
 :root{
   --creme:#F5F0E8;--dark:#111110;--amber:#C49A1C;
   --amber-pale:rgba(196,154,28,0.12);--amber-border:rgba(196,154,28,0.3);
-  --surface:#FDFAF5;--surface2:#F0EBE0;--border:#DDD0BC;
+  --surface:#FDFAF5;--border:#DDD0BC;
   --text:#1A1A18;--text2:#6B5E4A;--text3:#A8957E;
   --vert:#2D7A4F;--vert-pale:rgba(45,122,79,0.1);--vert-border:rgba(45,122,79,0.25);
   --rouge:#C0392B;--rouge-pale:rgba(192,57,43,0.08);--rouge-border:rgba(192,57,43,0.22);
@@ -33,17 +33,15 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .login-input{width:100%;padding:13px 16px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;font-family:'Inter',sans-serif;background:var(--surface);color:var(--text);outline:none;transition:border-color 0.15s;margin-bottom:14px;display:block}
 .login-input:focus{border-color:var(--amber)}
 .login-input::placeholder{color:var(--text3)}
-.otp-input{letter-spacing:8px;font-size:22px;text-align:center;font-weight:600}
 .login-btn{width:100%;padding:13px;background:var(--dark);color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;letter-spacing:0.5px;cursor:pointer;transition:opacity 0.15s;display:flex;align-items:center;justify-content:center;gap:8px}
 .login-btn:hover{opacity:0.85}
 .login-btn:disabled{opacity:0.5;cursor:default}
 .login-back{background:none;border:none;font-size:12px;color:var(--text2);cursor:pointer;margin-top:14px;display:block;text-align:center;text-decoration:underline;width:100%}
 .login-back:hover{color:var(--text)}
 .login-error{font-size:12px;color:var(--rouge);background:var(--rouge-pale);border:1px solid var(--rouge-border);border-radius:6px;padding:10px 12px;margin-bottom:14px;display:none}
+.login-success{font-size:13px;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);border-radius:6px;padding:14px 16px;margin-bottom:14px;line-height:1.6}
 .login-footer{font-size:10px;color:var(--text3);text-align:center;margin-top:32px;letter-spacing:0.5px}
-.login-dots{display:flex;gap:6px;justify-content:center;margin-bottom:24px}
-.login-dot{width:6px;height:6px;border-radius:50%;background:var(--border)}
-.login-dot.active{background:var(--amber)}
+.login-icon-big{font-size:40px;text-align:center;margin-bottom:16px}
 /* SIDEBAR */
 .sidebar{width:var(--sidebar-w);background:var(--dark);min-height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;padding:0 0 24px;z-index:100}
 .sidebar-logo{padding:24px 20px 20px;border-bottom:1px solid rgba(255,255,255,0.07)}
@@ -74,26 +72,17 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .mobile-nav-inner{display:flex;height:100%}
 .mobile-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:rgba(255,255,255,0.38);font-size:9px;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer;border:none;background:none;transition:color 0.12s}
 .mobile-nav-item.active{color:var(--amber)}
-.mobile-nav-item:hover{color:rgba(255,255,255,0.7)}
 .mobile-nav-icon{font-size:18px}
 @media(max-width:768px){
-  .sidebar{display:none}
-  .dash-main{margin-left:0;padding-bottom:calc(var(--nav-h) + 16px)}
-  .mobile-nav{display:flex}
-  .mobile-header{display:flex}
-  .dash-topbar{display:none}
-  .dash-content{padding:16px}
+  .sidebar{display:none}.dash-main{margin-left:0;padding-bottom:calc(var(--nav-h) + 16px)}
+  .mobile-nav{display:flex}.mobile-header{display:flex}.dash-topbar{display:none}.dash-content{padding:16px}
 }
 /* UI */
 .section-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;margin:28px 0 12px}
 .alert-banner{background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge);border-radius:8px;padding:12px 16px;display:flex;align-items:flex-start;gap:12px;margin-bottom:18px}
-.alert-banner.warn{background:var(--orange-pale);border-color:var(--orange-border);border-left-color:var(--orange)}
 .alert-banner.ok{background:var(--vert-pale);border-color:var(--vert-border);border-left-color:var(--vert)}
-.ab-icon{font-size:16px;flex-shrink:0;margin-top:1px}
-.ab-body{flex:1}
-.ab-title{font-size:13px;font-weight:600;color:var(--rouge)}
-.alert-banner.warn .ab-title{color:var(--orange)}
-.alert-banner.ok .ab-title{color:var(--vert)}
+.ab-icon{font-size:16px;flex-shrink:0;margin-top:1px}.ab-body{flex:1}
+.ab-title{font-size:13px;font-weight:600;color:var(--rouge)}.alert-banner.ok .ab-title{color:var(--vert)}
 .ab-sub{font-size:12px;color:var(--text2);margin-top:2px}
 .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:4px}
 .kpi{background:white;border:1px solid var(--border);border-radius:10px;padding:16px 18px}
@@ -102,10 +91,6 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .kpi-trend{font-size:11px;color:var(--text2);margin-top:6px}
 .placeholder-card{background:white;border:1px solid var(--border);border-radius:10px;padding:32px;margin-bottom:14px;text-align:center;color:var(--text3);font-size:13px;line-height:1.5}
 .placeholder-icon{font-size:32px;margin-bottom:10px}
-.pill{padding:3px 9px;border-radius:3px;font-size:10px;font-weight:600;letter-spacing:0.3px;text-transform:uppercase;display:inline-block}
-.pill-ok{background:var(--vert-pale);color:var(--vert)}
-.pill-warn{background:var(--orange-pale);color:var(--orange)}
-.pill-danger{background:var(--rouge-pale);color:var(--rouge)}
 @media(max-width:600px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
@@ -137,32 +122,59 @@ async function callFn(body){
   return data;
 }
 
+/* ── INIT : détecte magic link OU session existante ── */
 async function init(){
+  // 1. Magic link callback ? (hash contient access_token)
+  var hash=window.location.hash;
+  if(hash&&hash.includes('access_token=')){
+    var params=new URLSearchParams(hash.replace(/^#/,''));
+    var token=params.get('access_token');
+    if(token){
+      history.replaceState(null,'',window.location.pathname);
+      app().innerHTML='<div class="full-loader"><span class="spinner"></span>Connexion en cours...</div>';
+      try{
+        var res=await callFn({action:'magic_callback',access_token:token});
+        saveSession(Object.assign({},res));
+        renderDashboard(_session);
+        return;
+      }catch(e){
+        renderLogin();
+        // montrer l'erreur après render
+        setTimeout(function(){
+          var err=$id('login-err');
+          if(err)showErr(err,e.message||'Lien invalide ou expiré.');
+        },100);
+        return;
+      }
+    }
+  }
+
+  // 2. Session stockée valide ?
   var stored=loadStored();
   if(stored&&stored.session_token){
     try{
-      var res=await callFn({action:'validate',session_token:stored.session_token});
-      if(res.valid){_session=stored;renderDashboard(_session);return;}
+      var r2=await callFn({action:'validate',session_token:stored.session_token});
+      if(r2.valid){_session=stored;renderDashboard(_session);return;}
     }catch(e){}
     clearSession();
   }
+
   renderLogin();
 }
 
-/* ── LOGIN étape 1 : email ── */
+/* ── LOGIN : saisie email ── */
 function renderLogin(){
   app().innerHTML=`
     <div class="login-wrap">
       <div class="login-logo">GenTrack</div>
       <div class="login-sub">Gestion technique hôtelière</div>
       <div class="login-card">
-        <div class="login-dots"><div class="login-dot active"></div><div class="login-dot"></div></div>
-        <div class="login-step-label">Étape 1 sur 2</div>
-        <div class="login-title">Connexion</div>
-        <div class="login-desc">Entrez votre adresse email. Vous recevrez un code à 6 chiffres.</div>
+        <div class="login-step-label">Connexion</div>
+        <div class="login-title">Accès sécurisé</div>
+        <div class="login-desc">Entrez votre adresse email. Vous recevrez un lien de connexion.</div>
         <div class="login-error" id="login-err"></div>
         <input class="login-input" id="email-input" type="email" placeholder="votre@email.com" autocomplete="email" inputmode="email" />
-        <button class="login-btn" id="req-btn" onclick="submitEmail()">Recevoir le code par email</button>
+        <button class="login-btn" id="req-btn" onclick="submitEmail()">Recevoir le lien de connexion</button>
       </div>
       <div class="login-footer">GenTrack · Dakar, Sénégal</div>
     </div>`;
@@ -181,58 +193,34 @@ async function submitEmail(){
   err.style.display='none';
   try{
     await callFn({action:'request',email:email});
-    renderOTP();
+    renderEmailSent();
   }catch(e){
     btn.disabled=false;
-    btn.innerHTML='Recevoir le code par email';
+    btn.innerHTML='Recevoir le lien de connexion';
     showErr(err,e.message||'Email non reconnu. Vérifiez et réessayez.');
   }
 }
 
-/* ── LOGIN étape 2 : OTP ── */
-function renderOTP(){
+/* ── ÉCRAN "lien envoyé" ── */
+function renderEmailSent(){
   app().innerHTML=`
     <div class="login-wrap">
       <div class="login-logo">GenTrack</div>
       <div class="login-sub">Gestion technique hôtelière</div>
       <div class="login-card">
-        <div class="login-dots"><div class="login-dot"></div><div class="login-dot active"></div></div>
-        <div class="login-step-label">Étape 2 sur 2</div>
-        <div class="login-title">Code reçu ?</div>
-        <div class="login-desc">Code à 6 chiffres envoyé à<br><strong>${_email}</strong></div>
-        <div class="login-error" id="otp-err"></div>
-        <input class="login-input otp-input" id="otp-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="000000" autocomplete="one-time-code" />
-        <button class="login-btn" id="verify-btn" onclick="submitOTP()">Accéder au dashboard</button>
-        <button class="login-back" onclick="renderLogin()">← Changer d'adresse</button>
+        <div class="login-icon-big">📬</div>
+        <div class="login-title">Vérifiez votre boîte mail</div>
+        <div class="login-success">
+          Un lien de connexion a été envoyé à<br><strong>${_email}</strong><br><br>
+          Cliquez le lien dans l'email pour accéder au dashboard.
+        </div>
+        <button class="login-back" onclick="renderLogin()">← Utiliser une autre adresse</button>
       </div>
       <div class="login-footer">GenTrack · Dakar, Sénégal</div>
     </div>`;
-  var inp=$id('otp-input');
-  if(inp){
-    inp.focus();
-    inp.addEventListener('keydown',function(e){if(e.key==='Enter')submitOTP();});
-    inp.addEventListener('input',function(){var v=inp.value.replace(/\D/g,'');inp.value=v;if(v.length===6)submitOTP();});
-  }
 }
 
-async function submitOTP(){
-  var inp=$id('otp-input'),btn=$id('verify-btn'),err=$id('otp-err');
-  if(!inp||btn&&btn.disabled)return;
-  var code=inp.value.trim().replace(/\D/g,'');
-  if(code.length!==6){showErr(err,'Le code doit comporter 6 chiffres.');return;}
-  if(btn)btn.disabled=true;
-  if(btn)btn.innerHTML='<span class="spinner"></span>Vérification...';
-  err.style.display='none';
-  try{
-    var res=await callFn({action:'verify',email:_email,code:code});
-    saveSession(Object.assign({},res,{email:_email}));
-    renderDashboard(_session);
-  }catch(e){
-    if(btn){btn.disabled=false;btn.innerHTML='Accéder au dashboard';}
-    showErr(err,e.message||'Code incorrect ou expiré. Réessayez.');
-    inp.value='';inp.focus();
-  }
-}
+function showErr(el,msg){if(!el)return;el.textContent=msg;el.style.display='block';}
 
 /* ── ROUTING ── */
 function renderDashboard(s){
@@ -272,8 +260,8 @@ function buildSidebar(session,activeNav){
       '<button class="logout-btn" onclick="logout()">Se déconnecter</button>'+
     '</div></div>';
 }
-function buildMobileHeader(session){
-  return '<div class="mobile-header"><div><div class="mobile-header-logo">GenTrack</div><div class="mobile-header-role">'+roleName(session.role)+'</div></div></div>';
+function buildMobileHeader(s){
+  return '<div class="mobile-header"><div><div class="mobile-header-logo">GenTrack</div><div class="mobile-header-role">'+roleName(s.role)+'</div></div></div>';
 }
 function buildMobileNav(role,activeNav){
   var items=buildNavItems(role);
@@ -285,14 +273,12 @@ function buildLayout(session,activeNav,contentHtml){
   return buildSidebar(session,activeNav)+
     '<div class="dash-main">'+buildMobileHeader(session)+
     '<div class="dash-topbar"><div class="dash-topbar-title">'+navViewTitle(activeNav)+'</div><div class="dash-topbar-date">'+nowStr()+'</div></div>'+
-    '<div class="dash-content">'+contentHtml+'</div></div>'+
-    buildMobileNav(session.role,activeNav);
+    '<div class="dash-content">'+contentHtml+'</div></div>'+buildMobileNav(session.role,activeNav);
 }
 
 /* ── VUE RESP TECH ── */
 function renderRespTech(session,nav){
-  nav=nav||'accueil';
-  var c='';
+  nav=nav||'accueil';var c='';
   if(nav==='accueil'){
     c='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Connecté · '+roleName(session.role)+'</div><div class="ab-sub">Session B en cours de construction</div></div></div>'+
       '<div class="kpi-grid">'+
@@ -311,8 +297,7 @@ function renderRespTech(session,nav){
 
 /* ── VUE DIR TECH ── */
 function renderDirTech(session,nav){
-  nav=nav||'accueil';
-  var c='';
+  nav=nav||'accueil';var c='';
   if(nav==='accueil'){
     c='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Connecté · '+roleName(session.role)+'</div><div class="ab-sub">Session C en cours de construction</div></div></div>'+
       '<div class="kpi-grid">'+
@@ -330,8 +315,7 @@ function renderDirTech(session,nav){
 
 /* ── VUE DIR OPS ── */
 function renderDirOps(session,nav){
-  nav=nav||'accueil';
-  var c='';
+  nav=nav||'accueil';var c='';
   if(nav==='accueil'){
     c='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Connecté · '+roleName(session.role)+'</div><div class="ab-sub">Session D en cours de construction</div></div></div>'+
       '<div class="kpi-grid">'+
@@ -343,7 +327,7 @@ function renderDirOps(session,nav){
       '<div class="section-title">Mes hôtels</div><div class="placeholder-card"><div class="placeholder-icon">🏨</div>Grille hôtels · Session D</div>'+
       '<div class="section-title">Coûts du mois</div><div class="placeholder-card"><div class="placeholder-icon">💰</div>Comparaison vs mois précédent · Session D</div>';
   }else if(nav==='alertes'){c='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">⚠️</div>Alertes groupe · Session D</div>';}
-  else if(nav==='historique'){c='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">📊</div>Historique et comparaisons · Session E</div>';}
+  else if(nav==='historique'){c='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">📊</div>Historique · Session E</div>';}
   app().innerHTML=buildLayout(session,nav,c);
 }
 
