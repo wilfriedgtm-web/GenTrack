@@ -81,8 +81,9 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .section-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;margin:28px 0 12px}
 .alert-banner{background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge);border-radius:8px;padding:12px 16px;display:flex;align-items:flex-start;gap:12px;margin-bottom:18px}
 .alert-banner.ok{background:var(--vert-pale);border-color:var(--vert-border);border-left-color:var(--vert)}
+.alert-banner.warn{background:var(--orange-pale);border-color:var(--orange-border);border-left-color:var(--orange)}
 .ab-icon{font-size:16px;flex-shrink:0;margin-top:1px}.ab-body{flex:1}
-.ab-title{font-size:13px;font-weight:600;color:var(--rouge)}.alert-banner.ok .ab-title{color:var(--vert)}
+.ab-title{font-size:13px;font-weight:600;color:var(--rouge)}.alert-banner.ok .ab-title{color:var(--vert)}.alert-banner.warn .ab-title{color:var(--orange)}
 .ab-sub{font-size:12px;color:var(--text2);margin-top:2px}
 .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:4px}
 .kpi{background:white;border:1px solid var(--border);border-radius:10px;padding:16px 18px}
@@ -91,6 +92,17 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .kpi-trend{font-size:11px;color:var(--text2);margin-top:6px}
 .placeholder-card{background:white;border:1px solid var(--border);border-radius:10px;padding:32px;margin-bottom:14px;text-align:center;color:var(--text3);font-size:13px;line-height:1.5}
 .placeholder-icon{font-size:32px;margin-bottom:10px}
+.eq-card{background:white;border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px}
+.eq-card-nom{font-size:12px;font-weight:600;color:var(--text)}
+.eq-card-type{font-size:10px;color:var(--text3);margin-top:1px}
+.ronde-card{background:white;border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.alerte-card{border-radius:8px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px}
+.alerte-card-titre{font-size:12px;font-weight:600}
+.alerte-card-msg{font-size:12px;color:var(--text2);margin-top:3px;line-height:1.4}
+.btn-traite{flex-shrink:0;background:var(--dark);color:white;border:none;border-radius:6px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer;letter-spacing:0.3px;white-space:nowrap;transition:opacity 0.15s}
+.btn-traite:hover{opacity:0.75}
+.progress-bar-wrap{height:4px;background:var(--border);border-radius:2px;margin-top:10px}
+.progress-bar{height:100%;border-radius:2px;transition:width 0.4s}
 @media(max-width:600px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
@@ -108,12 +120,14 @@ var _email='';
 function $id(id){return document.getElementById(id);}
 function app(){return $id('app');}
 function nowStr(){return new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
-function roleName(r){var m={dir_ops:'Directeur des opérations',dir_tech:'Directeur technique',resp_tech:'Responsable technique'};return m[r]||r;}
+function roleName(r){var m={dir_ops:'Directeur des opérations',dir_tech:'Directeur technique',resp_tech:'Responsable technique',technicien:'Technicien'};return m[r]||r;}
 function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',config:'Configuration'};return m[id]||'Accueil';}
 function saveSession(s){_session=s;try{localStorage.setItem('gt_session',JSON.stringify(s));}catch(e){}}
 function loadStored(){try{return JSON.parse(localStorage.getItem('gt_session'));}catch(e){return null;}}
 function clearSession(){_session=null;try{localStorage.removeItem('gt_session');}catch(e){}}
 function showErr(el,msg){if(!el)return;el.textContent=msg;el.style.display='block';}
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function dateNJours(n){var d=new Date();d.setDate(d.getDate()-n);return d.toISOString().split('T')[0];}
 
 async function callFn(body){
   var r=await fetch(FN_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SUPA_KEY},body:JSON.stringify(body)});
@@ -122,9 +136,28 @@ async function callFn(body){
   return data;
 }
 
+/* ── SUPABASE REST ── */
+async function supaGet(table,qs){
+  try{
+    var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+qs,{
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Accept':'application/json'}
+    });
+    if(!r.ok)return[];
+    return await r.json();
+  }catch(e){return[];}
+}
+async function supaPatch(table,id,data){
+  try{
+    await fetch(SUPA_URL+'/rest/v1/'+table+'?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(data)
+    });
+  }catch(e){}
+}
+
 /* ── INIT : détecte magic link OU session existante ── */
 async function init(){
-  // 1. Magic link callback ? (hash contient access_token)
   var hash=window.location.hash;
   if(hash&&hash.includes('access_token=')){
     var params=new URLSearchParams(hash.replace(/^#/,''));
@@ -139,17 +172,11 @@ async function init(){
         return;
       }catch(e){
         renderLogin();
-        // montrer l'erreur après render
-        setTimeout(function(){
-          var err=$id('login-err');
-          if(err)showErr(err,e.message||'Lien invalide ou expiré.');
-        },100);
+        setTimeout(function(){var err=$id('login-err');if(err)showErr(err,e.message||'Lien invalide ou expiré.');},100);
         return;
       }
     }
   }
-
-  // 2. Session stockée valide ?
   var stored=loadStored();
   if(stored&&stored.session_token){
     try{
@@ -158,11 +185,10 @@ async function init(){
     }catch(e){}
     clearSession();
   }
-
   renderLogin();
 }
 
-/* ── LOGIN : saisie email ── */
+/* ── LOGIN ── */
 function renderLogin(){
   app().innerHTML=`
     <div class="login-wrap">
@@ -201,7 +227,6 @@ async function submitEmail(){
   }
 }
 
-/* ── ÉCRAN "lien envoyé" ── */
 function renderEmailSent(){
   app().innerHTML=`
     <div class="login-wrap">
@@ -219,8 +244,6 @@ function renderEmailSent(){
       <div class="login-footer">GenTrack · Dakar, Sénégal</div>
     </div>`;
 }
-
-function showErr(el,msg){if(!el)return;el.textContent=msg;el.style.display='block';}
 
 /* ── ROUTING ── */
 function renderDashboard(s){
@@ -276,23 +299,297 @@ function buildLayout(session,activeNav,contentHtml){
     '<div class="dash-content">'+contentHtml+'</div></div>'+buildMobileNav(session.role,activeNav);
 }
 
-/* ── VUE RESP TECH ── */
+/* ══════════════════════════════════════
+   VUE RESP TECH — Session B
+══════════════════════════════════════ */
+
+var _TYPE_ICONS={'Groupe électrogène':'⚡','Cuve fioul':'🛢️','Chambre froide':'❄️','Groupe eau glacée':'💧'};
+var _FREQ_LABELS={journalier:'Ronde journalière',hebdo:'Ronde hebdomadaire',mensuel:'Ronde mensuelle',releve_horaire:'Relevé horaire'};
+
 function renderRespTech(session,nav){
-  nav=nav||'accueil';var c='';
-  if(nav==='accueil'){
-    c='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Connecté · '+roleName(session.role)+'</div><div class="ab-sub">Session B en cours de construction</div></div></div>'+
-      '<div class="kpi-grid">'+
-        '<div class="kpi"><div class="kpi-label">Équipements</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
-        '<div class="kpi"><div class="kpi-label">Rondes aujourd\'hui</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
-        '<div class="kpi"><div class="kpi-label">Alertes actives</div><div class="kpi-value" style="color:var(--text2)">—</div><div class="kpi-trend">Bientôt</div></div>'+
+  nav=nav||'accueil';
+  var skeleton='<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text3);font-size:13px"><span class="spinner"></span>Chargement des données...</div>';
+  app().innerHTML=buildLayout(session,nav,skeleton);
+  _loadRT(session,nav);
+}
+
+async function _loadRT(session,nav){
+  var sid=session.site_ids&&session.site_ids[0];
+  var cid=session.client_id;
+  var el=document.querySelector('.dash-content');
+  if(!el)return;
+  try{
+    var html='';
+    if(nav==='accueil')html=await _rtAccueil(session,sid,cid);
+    else if(nav==='alertes')html=await _rtAlertes(sid,cid);
+    else if(nav==='historique')html=await _rtHistorique(sid);
+    else if(nav==='config')html=await _rtConfig(sid);
+    el.innerHTML=html;
+  }catch(e){
+    el.innerHTML='<div class="alert-banner" style="margin-top:12px"><div class="ab-icon">⚠️</div><div class="ab-body"><div class="ab-title">Erreur de chargement</div><div class="ab-sub">'+(e.message||'Vérifiez votre connexion')+'</div></div></div>';
+  }
+}
+
+/* ── Accueil ── */
+async function _rtAccueil(session,sid,cid){
+  var today=todayStr();
+  var[rondes,equips,alertes,pannes]=await Promise.all([
+    supaGet('rondes','site_id=eq.'+sid+'&date_ronde=eq.'+today+'&select=id,frequence,date_ronde'),
+    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,ordre_ronde,types_equipements(nom)&order=ordre_ronde.asc'),
+    supaGet('alertes','client_id=eq.'+cid+'&resolue=eq.false&select=id,type,severite,message,created_at&order=created_at.desc&limit=20'),
+    supaGet('pannes','site_id=eq.'+sid+'&resolue=eq.false&select=id,type,description,date_panne,equipements(nom)&order=date_panne.desc&limit=20')
+  ]);
+  var rIds=rondes.map(function(r){return r.id;});
+  var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=id,ronde_id,equipement_id,statut,valide_at'):[];
+
+  // Ronde journalière
+  var rondeJ=rondes.find(function(r){return r.frequence==='journalier';});
+  var eqRJ=rondeJ?rondesEq.filter(function(re){return re.ronde_id===rondeJ.id;}):[];
+  var nbVal=eqRJ.filter(function(re){return re.statut==='valide';}).length;
+  var nbTot=eqRJ.length;
+  var rondeOk=nbTot>0&&nbVal===nbTot;
+  var nbAlertes=alertes.length+pannes.length;
+
+  // Banner
+  var banner='';
+  if(nbAlertes>0){
+    banner='<div class="alert-banner"><div class="ab-icon">🚨</div><div class="ab-body"><div class="ab-title">'+nbAlertes+' alerte'+(nbAlertes>1?'s':'')+' active'+(nbAlertes>1?'s':'')+'</div><div class="ab-sub">Voir le détail ci-dessous</div></div></div>';
+  }else if(rondeOk){
+    banner='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Tout est OK</div><div class="ab-sub">Ronde journalière validée · '+equips.length+' équipements</div></div></div>';
+  }else if(nbTot>0){
+    banner='<div class="alert-banner warn"><div class="ab-icon">⏳</div><div class="ab-body"><div class="ab-title">Ronde en cours</div><div class="ab-sub">'+nbVal+'/'+nbTot+' équipements validés</div></div></div>';
+  }else{
+    banner='<div class="alert-banner warn"><div class="ab-icon">📋</div><div class="ab-body"><div class="ab-title">Ronde journalière à démarrer</div><div class="ab-sub">Aucun relevé aujourd\'hui pour ce site</div></div></div>';
+  }
+
+  // KPIs
+  var rondeDisp=nbTot>0?(nbVal+'/'+nbTot):'—';
+  var kpis='<div class="kpi-grid">'+
+    '<div class="kpi"><div class="kpi-label">Équipements</div><div class="kpi-value">'+equips.length+'</div><div class="kpi-trend">Ce site</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Ronde du jour</div><div class="kpi-value" style="color:'+(rondeOk?'var(--vert)':nbTot===0?'var(--text2)':'var(--orange)')+'">'+rondeDisp+'</div><div class="kpi-trend">'+(rondeOk?'Validée':nbTot===0?'Non commencée':'En cours')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Alertes actives</div><div class="kpi-value" style="color:'+(nbAlertes>0?'var(--rouge)':'var(--vert)')+'">'+nbAlertes+'</div><div class="kpi-trend">'+(nbAlertes>0?'À traiter':'RAS')+'</div></div>'+
+  '</div>';
+
+  // Ma journée
+  var journee='<div class="section-title">Ma journée</div>';
+  if(rondes.length===0){
+    journee+='<div class="placeholder-card"><div class="placeholder-icon">📋</div>Aucune ronde programmée aujourd\'hui</div>';
+  }else{
+    journee+='<div style="display:flex;flex-direction:column;gap:8px">';
+    rondes.forEach(function(ro){
+      var eqRo=rondesEq.filter(function(re){return re.ronde_id===ro.id;});
+      var val=eqRo.filter(function(re){return re.statut==='valide';}).length;
+      var tot=eqRo.length;
+      var pct=tot>0?Math.round(val/tot*100):0;
+      var ok=val===tot&&tot>0;
+      journee+='<div class="ronde-card">'+
+        '<div style="display:flex;align-items:center;gap:12px'+(tot>0?';margin-bottom:10px':'')+'">'+
+          '<span style="font-size:20px">'+(ok?'✅':tot===0?'📋':'🔄')+'</span>'+
+          '<div style="flex:1">'+
+            '<div style="font-size:13px;font-weight:600">'+(_FREQ_LABELS[ro.frequence]||ro.frequence)+'</div>'+
+            '<div style="font-size:11px;color:var(--text2);margin-top:2px">'+(tot>0?val+' / '+tot+' équipements · '+pct+'%':'Pas encore commencée')+'</div>'+
+          '</div>'+
+          '<span style="font-size:11px;font-weight:600;color:'+(ok?'var(--vert)':tot===0?'var(--text3)':'var(--amber)')+'">'+
+            (ok?'Validée':tot===0?'En attente':'En cours')+
+          '</span>'+
+        '</div>'+
+        (tot>0?'<div class="progress-bar-wrap"><div class="progress-bar" style="width:'+pct+'%;background:'+(ok?'var(--vert)':'var(--amber)')+'"></div></div>':'')+
+      '</div>';
+    });
+    journee+='</div>';
+  }
+
+  // Statut équipements
+  var statut='<div class="section-title">Statut équipements</div>';
+  if(equips.length===0){
+    statut+='<div class="placeholder-card"><div class="placeholder-icon">⚙️</div>Aucun équipement trouvé pour ce site</div>';
+  }else{
+    statut+='<div style="display:flex;flex-direction:column;gap:6px">';
+    equips.forEach(function(e){
+      var re=rondeJ&&rondesEq.find(function(r){return r.ronde_id===rondeJ.id&&r.equipement_id===e.id;});
+      var s,sc,dot;
+      if(!rondeJ){s='Pas de ronde';sc='var(--text3)';dot='⚪';}
+      else if(!re){s='—';sc='var(--text3)';dot='⚫';}
+      else if(re.statut==='valide'){s='OK';sc='var(--vert)';dot='🟢';}
+      else if(re.statut==='en_cours'){s='En cours';sc='var(--orange)';dot='🟡';}
+      else{s='En attente';sc='var(--orange)';dot='🟡';}
+      var tNom=(e.types_equipements&&e.types_equipements.nom)||'';
+      var tIcon=_TYPE_ICONS[tNom]||'⚙️';
+      statut+='<div class="eq-card">'+
+        '<span style="font-size:18px">'+tIcon+'</span>'+
+        '<div style="flex:1">'+
+          '<div class="eq-card-nom">'+e.nom+'</div>'+
+          (tNom?'<div class="eq-card-type">'+tNom+'</div>':'')+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:5px;flex-shrink:0">'+
+          '<span style="font-size:11px">'+dot+'</span>'+
+          '<span style="font-size:10px;font-weight:600;color:'+sc+';text-transform:uppercase;letter-spacing:0.3px">'+s+'</span>'+
+        '</div>'+
+      '</div>';
+    });
+    statut+='</div>';
+  }
+
+  // Alertes actives
+  var alertesHtml='<div class="section-title">Alertes actives</div>';
+  if(nbAlertes===0){
+    alertesHtml+='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Aucune alerte</div><div class="ab-sub">Tous les systèmes sont opérationnels</div></div></div>';
+  }else{
+    alertesHtml+=_buildAlerteCards(alertes,pannes,'accueil');
+  }
+
+  return banner+kpis+journee+statut+alertesHtml;
+}
+
+/* ── Alertes (vue complète) ── */
+async function _rtAlertes(sid,cid){
+  var[alertes,pannes]=await Promise.all([
+    supaGet('alertes','client_id=eq.'+cid+'&resolue=eq.false&select=id,type,severite,message,created_at&order=created_at.desc'),
+    supaGet('pannes','site_id=eq.'+sid+'&resolue=eq.false&select=id,type,description,date_panne,equipements(nom)&order=date_panne.desc')
+  ]);
+  if(alertes.length===0&&pannes.length===0){
+    return '<div class="alert-banner ok" style="margin-top:12px"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Aucune alerte active</div><div class="ab-sub">Tous les systèmes fonctionnent normalement</div></div></div>';
+  }
+  return '<div style="margin-top:4px">'+_buildAlerteCards(alertes,pannes,'alertes')+'</div>';
+}
+
+function _buildAlerteCards(alertes,pannes,fromNav){
+  var h='<div style="display:flex;flex-direction:column;gap:8px">';
+  alertes.forEach(function(a){
+    var crit=a.severite==='critical';
+    var bg=crit?'var(--rouge-pale)':'var(--orange-pale)';
+    var bd=crit?'var(--rouge-border)':'var(--orange-border)';
+    var bl=crit?'var(--rouge)':'var(--orange)';
+    var dot=crit?'🔴':'🟡';
+    var ts=a.created_at?new Date(a.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+    h+='<div class="alerte-card" style="background:'+bg+';border:1px solid '+bd+';border-left:3px solid '+bl+'">'+
+      '<span style="font-size:16px;margin-top:1px">'+dot+'</span>'+
+      '<div style="flex:1">'+
+        '<div class="alerte-card-titre" style="color:'+bl+'">'+escape_html(a.type||'Alerte')+'</div>'+
+        '<div class="alerte-card-msg">'+escape_html(a.message||'')+'</div>'+
+        (ts?'<div style="font-size:10px;color:var(--text3);margin-top:4px">'+ts+'</div>':'')+
       '</div>'+
-      '<div class="section-title">Ma journée</div><div class="placeholder-card"><div class="placeholder-icon">📋</div>Tâches auto-générées · Session B</div>'+
-      '<div class="section-title">Statut équipements</div><div class="placeholder-card"><div class="placeholder-icon">⚙️</div>Statut temps réel · Session B</div>'+
-      '<div class="section-title">Alertes actives</div><div class="placeholder-card"><div class="placeholder-icon">⚠️</div>Alertes + actions proposées · Session B</div>';
-  }else if(nav==='alertes'){c='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">⚠️</div>Vue alertes — Session B</div>';}
-  else if(nav==='historique'){c='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">📊</div>Historique 3 jours · Session B</div>';}
-  else if(nav==='config'){c='<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">⚙️</div>Configuration · Session B</div>';}
-  app().innerHTML=buildLayout(session,nav,c);
+      '<button class="btn-traite" onclick="_marquerTraite(\'alertes\',\''+a.id+'\',\''+fromNav+'\')">✓ Traité</button>'+
+    '</div>';
+  });
+  pannes.forEach(function(p){
+    var eqNom=p.equipements&&p.equipements.nom?' · '+p.equipements.nom:'';
+    var ts=p.date_panne?new Date(p.date_panne).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+    h+='<div class="alerte-card" style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge)">'+
+      '<span style="font-size:16px;margin-top:1px">🔴</span>'+
+      '<div style="flex:1">'+
+        '<div class="alerte-card-titre" style="color:var(--rouge)">Panne'+escape_html(eqNom)+'</div>'+
+        '<div class="alerte-card-msg">'+escape_html((p.type?p.type+' — ':'')+( p.description||''))+'</div>'+
+        (ts?'<div style="font-size:10px;color:var(--text3);margin-top:4px">'+ts+'</div>':'')+
+      '</div>'+
+      '<button class="btn-traite" onclick="_marquerTraite(\'pannes\',\''+p.id+'\',\''+fromNav+'\')">✓ Résolu</button>'+
+    '</div>';
+  });
+  return h+'</div>';
+}
+
+async function _marquerTraite(table,id,fromNav){
+  var btn=event&&event.target;
+  if(btn){btn.disabled=true;btn.textContent='...';}
+  await supaPatch(table,id,{resolue:true});
+  if(_session)renderRespTech(_session,fromNav||'alertes');
+}
+
+/* ── Historique (3 jours) ── */
+async function _rtHistorique(sid){
+  var since=dateNJours(3);
+  var rondes=await supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+since+'&select=id,date_ronde,frequence&order=date_ronde.desc&limit=30');
+  if(rondes.length===0){
+    return '<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">📊</div>Aucune ronde sur les 3 derniers jours</div>';
+  }
+  var rIds=rondes.map(function(r){return r.id;});
+  var rondesEq=await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,statut');
+
+  // Group by date
+  var byDate={};
+  rondes.forEach(function(ro){
+    var d=ro.date_ronde;
+    if(!byDate[d])byDate[d]=[];
+    byDate[d].push(ro);
+  });
+  var dates=Object.keys(byDate).sort(function(a,b){return b>a?1:-1;});
+  var h='<div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">';
+  dates.forEach(function(d){
+    var dateDisp=new Date(d).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+    var isToday=d===todayStr();
+    h+='<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-top:8px;margin-bottom:2px">'+
+      (isToday?'Aujourd\'hui — ':'')+dateDisp+
+    '</div>';
+    byDate[d].forEach(function(ro){
+      var eqRo=rondesEq.filter(function(re){return re.ronde_id===ro.id;});
+      var val=eqRo.filter(function(re){return re.statut==='valide';}).length;
+      var tot=eqRo.length;
+      var pct=tot>0?Math.round(val/tot*100):0;
+      var ok=val===tot&&tot>0;
+      h+='<div class="ronde-card">'+
+        '<div style="display:flex;align-items:center;gap:12px'+(tot>0?';margin-bottom:10px':'')+'">'+
+          '<span style="font-size:20px">'+(ok?'✅':tot===0?'📋':pct>0?'🔄':'❌')+'</span>'+
+          '<div style="flex:1">'+
+            '<div style="font-size:13px;font-weight:600">'+(_FREQ_LABELS[ro.frequence]||ro.frequence)+'</div>'+
+            '<div style="font-size:11px;color:var(--text2);margin-top:2px">'+(tot>0?val+'/'+tot+' équipements validés':'Aucune donnée')+'</div>'+
+          '</div>'+
+          '<span style="font-family:Cormorant Garamond,serif;font-size:22px;font-weight:600;color:'+(ok?'var(--vert)':tot===0?'var(--text3)':'var(--orange)')+'">'+
+            (tot>0?pct+'%':'—')+
+          '</span>'+
+        '</div>'+
+        (tot>0?'<div class="progress-bar-wrap"><div class="progress-bar" style="width:'+pct+'%;background:'+(ok?'var(--vert)':pct>0?'var(--amber)':'var(--rouge)')+'"></div></div>':'')+
+      '</div>';
+    });
+  });
+  return h+'</div>';
+}
+
+/* ── Config ── */
+async function _rtConfig(sid){
+  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,ordre_ronde,types_equipements(nom)&order=ordre_ronde.asc');
+  if(equips.length===0){
+    return '<div class="placeholder-card" style="margin-top:12px"><div class="placeholder-icon">⚙️</div>Aucun équipement configuré pour ce site</div>';
+  }
+  var actifs=equips.filter(function(e){return e.actif;});
+  var inactifs=equips.filter(function(e){return !e.actif;});
+  var h='<div class="section-title" style="margin-top:8px">Équipements actifs ('+actifs.length+')</div>'+
+    '<div style="display:flex;flex-direction:column;gap:6px">';
+  actifs.forEach(function(e){
+    var tNom=(e.types_equipements&&e.types_equipements.nom)||'—';
+    var tIcon=_TYPE_ICONS[tNom]||'⚙️';
+    h+='<div class="eq-card">'+
+      '<span style="font-size:18px">'+tIcon+'</span>'+
+      '<div style="flex:1">'+
+        '<div class="eq-card-nom">'+escape_html(e.nom)+'</div>'+
+        '<div class="eq-card-type">'+escape_html(tNom)+' · Ordre '+e.ordre_ronde+'</div>'+
+      '</div>'+
+      '<span style="font-size:10px;font-weight:600;color:var(--vert)">● ACTIF</span>'+
+    '</div>';
+  });
+  h+='</div>';
+  if(inactifs.length>0){
+    h+='<div class="section-title">Équipements inactifs ('+inactifs.length+')</div>'+
+      '<div style="display:flex;flex-direction:column;gap:6px">';
+    inactifs.forEach(function(e){
+      var tNom=(e.types_equipements&&e.types_equipements.nom)||'—';
+      var tIcon=_TYPE_ICONS[tNom]||'⚙️';
+      h+='<div class="eq-card" style="opacity:0.55">'+
+        '<span style="font-size:18px">'+tIcon+'</span>'+
+        '<div style="flex:1">'+
+          '<div class="eq-card-nom">'+escape_html(e.nom)+'</div>'+
+          '<div class="eq-card-type">'+escape_html(tNom)+'</div>'+
+        '</div>'+
+        '<span style="font-size:10px;font-weight:600;color:var(--text3)">○ INACTIF</span>'+
+      '</div>';
+    });
+    h+='</div>';
+  }
+  return h;
+}
+
+function escape_html(s){
+  if(!s)return'';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 /* ── VUE DIR TECH ── */
