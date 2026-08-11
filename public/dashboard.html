@@ -3772,7 +3772,7 @@ async function _openRapportHebdo(period){
     ]);
     var siteNom=siteRow.length?siteRow[0].nom:'Mon site';
     var rIds=rondes.map(function(r){return r.id;});
-    var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,equipement_id,statut'):[];
+    var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=id,ronde_id,equipement_id,statut'):[];
 
     var eqIds=equips.map(function(e){return e.id;});
     // questions dict (used for both rondes + relevés)
@@ -3861,20 +3861,29 @@ async function _openRapportHebdo(period){
       });
     }
 
-    // prépare export CSV rondes
-    var rondeEqNom={};equips.forEach(function(e){rondeEqNom[e.id]=e.nom;});
+    // prépare export CSV rondes — détaillé (une ligne par réponse)
     var rondeExportRows=[];
-    rondes.forEach(function(ro){
-      var reqs=rondesEq.filter(function(re){return re.ronde_id===ro.id;});
-      var val=reqs.filter(function(re){return re.statut==='valide';}).length;
-      rondeExportRows.push([
-        ro.date_ronde,
-        _FREQ_LABELS[ro.frequence]||ro.frequence,
-        val,
-        reqs.length,
-        reqs.length>0?Math.round(val/reqs.length*100)+'%':'—'
-      ]);
-    });
+    var reIds=rondesEq.map(function(re){return re.id;}).filter(Boolean);
+    if(reIds.length){
+      var rondeMap={};rondes.forEach(function(ro){rondeMap[ro.id]=ro;});
+      var reMap={};rondesEq.forEach(function(re){reMap[re.id]=re;});
+      var repsRondeExp=await supaGet('reponses','ronde_equipement_id=in.('+reIds.join(',')+')'+'&select=ronde_equipement_id,question_id,valeur&order=ronde_equipement_id.asc');
+      repsRondeExp.forEach(function(r){
+        var re=reMap[r.ronde_equipement_id];if(!re)return;
+        var ro=rondeMap[re.ronde_id];if(!ro)return;
+        var q=qMap[r.question_id];if(!q)return;
+        var eq=eqMap[re.equipement_id];
+        rondeExportRows.push([
+          ro.date_ronde,
+          _FREQ_LABELS[ro.frequence]||ro.frequence,
+          eq?eq.nom:'',
+          q.texte,
+          r.valeur,
+          q.unite||'',
+          re.statut||''
+        ]);
+      });
+    }
 
     var html=_buildRapportPro(siteNom,periodeStr,period,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows);
     var w=window.open('','_blank');
@@ -4016,7 +4025,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
       'var csv=[headers.join(",")].concat(rows.map(function(r){return r.map(function(v){return "\\""+String(v).replace(/"/g,"\'\'")+"\\"";}).join(",")})).join("\\n");'+
       'var a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent("\\uFEFF"+csv);a.download=filename;a.click();'+
     '}'+
-    'function _exportRondesCSV(){_dlCSV(_exportRondes,["Date","Type","Validés","Total","Conformité"],_exportSiteNom+"_rondes.csv");}'+
+    'function _exportRondesCSV(){_dlCSV(_exportRondes,["Date","Type de ronde","Equipement","Question","Valeur","Unité","Statut"],_exportSiteNom+"_rondes.csv");}'+
     'function _exportRelevesCSV(){_dlCSV(_exportReleves,["Date","Equipement","Question","Valeur","Unité"],_exportSiteNom+"_releves.csv");}'+
   '<\/scr'+'ipt>';
 
