@@ -547,6 +547,12 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
   const siteNom = site?.nom || sd.site_nom || '';
   const today = getToday();
 
+  // ── Annuler — prioritaire sur tout autre état ─────────────
+  if (['annuler', 'annule', 'retour', 'stop', 'cancel', '0'].includes(msg)) {
+    await setSession(phone, 'idle', {});
+    return sendWA(phone, `❌ Action annulée.\n\nTapez *aide* pour les commandes.`);
+  }
+
   // ── Choix fréquence ───────────────────────────────────────
   if (state === 'saisie_choix_freq') {
     const freqs: string[] = sd.freqs || [];
