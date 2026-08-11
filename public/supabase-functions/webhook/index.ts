@@ -998,9 +998,15 @@ async function handleMessage(from: string, bodyText: string) {
       return handleStates(phone, msg, bodyText, contact, site, state, sd);
     }
 
+    // Annuler / retour — disponible à tout moment dans n'importe quel flux
+    if (['annuler', 'annule', 'retour', 'stop', 'cancel', '0'].includes(msg)) {
+      await setSession(phone, 'idle', {});
+      return sendWA(phone, `❌ Action annulée.\n\nTapez *aide* pour les commandes.`);
+    }
+
     // Commandes principales
     if (msg === 'aide' || msg === 'help') {
-      return sendWA(phone, `🔧 *GenTrack — Commandes*\n\n• *saisie* — Ronde / Relevé horaire\n• *panne* — Signaler une urgence\n• *resolu* — Clôturer un signalement\n• *plein* — Ravitaillement cuve\n• *vidange* — Déclarer une vidange\n• *rapport* — Dernier rapport\n• *aide* — Ce menu`);
+      return sendWA(phone, `🔧 *GenTrack — Commandes*\n\n• *saisie* — Ronde / Relevé horaire\n• *panne* — Signaler une urgence\n• *resolu* — Clôturer un signalement\n• *plein* — Ravitaillement cuve\n• *vidange* — Déclarer une vidange\n• *rapport* — Dernier rapport\n• *annuler* — Annuler l'action en cours\n• *aide* — Ce menu`);
     }
     if (msg === 'saisie' || msg === 'bonjour') {
       if (!site) return sendWA(phone, `⚠️ Votre compte n'est pas associé à un site. Contactez votre responsable.`);
