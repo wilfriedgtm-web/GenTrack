@@ -904,7 +904,6 @@ async function _rtReleves(session,sid){
     '&select=id,site_id,contact_id,token,statut,expires_at,validated_at,nb_valeurs,nb_alertes,created_at'+
     '&order=created_at.desc'
   );
-  console.log('[releves] sid='+sid+' count='+releves.length);
 
   // Fetch contact names for display
   var cIds=[...new Set(releves.filter(function(r){return r.contact_id;}).map(function(r){return r.contact_id;}))];
@@ -953,7 +952,7 @@ async function _rtReleves(session,sid){
 
   var todayHtml=todayReleves.length?
     todayReleves.map(relevéRow).join(''):
-    '<div style="padding:20px 16px;text-align:center;color:var(--text3);font-size:12px">Aucun relevé aujourd\'hui'+(releves.length?' ('+releves.length+' au total sur 7j)':'')+'</div>';
+    '<div style="padding:20px 16px;text-align:center;color:var(--text3);font-size:12px">Aucun relevé aujourd\'hui</div>';
 
   var histHtml='';
   if(histReleves.length){
