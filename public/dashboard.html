@@ -249,7 +249,7 @@ function app(){return $id('app');}
 function nowStr(){return new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
 function _updateAlertPill(n){var p=$id('topbar-alert-pill');if(!p)return;if(n>0){p.style.display='flex';p.textContent='⚠️ '+n+' alerte'+(n>1?'s':'');}else{p.style.display='none';}}
 function roleName(r){var m={dir_ops:'Directeur des opérations',dir_tech:'Directeur technique',resp_tech:'Responsable technique',technicien:'Technicien'};return m[r]||r;}
-function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',config:'Configuration'};return m[id]||'Accueil';}
+function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',releves:'Relevés horaires',config:'Configuration'};return m[id]||'Accueil';}
 function saveSession(s){_session=s;try{localStorage.setItem('gt_session',JSON.stringify(s));}catch(e){}}
 function loadStored(){try{return JSON.parse(localStorage.getItem('gt_session'));}catch(e){return null;}}
 function clearSession(){_session=null;try{localStorage.removeItem('gt_session');}catch(e){}}
@@ -382,7 +382,10 @@ function logout(){clearSession();renderInvalidLink();}
 /* ── LAYOUT ── */
 function buildNavItems(role){
   var items=[{id:'accueil',icon:'🏠',label:'Accueil'},{id:'alertes',icon:'🔔',label:'Alertes',badge:true},{id:'historique',icon:'📊',label:'Historique'}];
-  if(role==='resp_tech')items.push({id:'config',icon:'⚙️',label:'Configuration'});
+  if(role==='resp_tech'){
+    items.push({id:'releves',icon:'📋',label:'Relevés'});
+    items.push({id:'config',icon:'⚙️',label:'Configuration'});
+  }
   return items;
 }
 function buildSidebar(session,activeNav){
@@ -462,6 +465,7 @@ async function _loadRT(session,nav){
     if(nav==='accueil')html=await _rtAccueil(session,sid,cid);
     else if(nav==='alertes')html=await _rtAlertes(sid,cid);
     else if(nav==='historique')html=await _rtHistorique(sid);
+    else if(nav==='releves')html=await _rtReleves(session,sid);
     else if(nav==='config')html=await _rtConfig(sid);
     el.innerHTML=html;
   }catch(e){
@@ -848,6 +852,150 @@ async function _rtHistorique(sid){
 }
 
 /* ── Config ── */
+async function _rtReleves(session,sid){
+  var BASE_URL=location.origin+location.pathname.replace('dashboard.html','');
+
+  // Fetch today's relevés + last 7 days
+  var since=new Date();since.setDate(since.getDate()-7);since.setHours(0,0,0,0);
+  var releves=await supaGet('releves_horaires',
+    'site_id=eq.'+sid+'&created_at=gte.'+since.toISOString()+'&select=*&order=created_at.desc'
+  );
+
+  // Fetch contact names for display
+  var cIds=[...new Set(releves.filter(function(r){return r.contact_id;}).map(function(r){return r.contact_id;}))];
+  var contactMap={};
+  if(cIds.length){
+    var cts=await supaGet('contacts','id=in.('+cIds.join(',')+')'+'&select=id,nom');
+    cts.forEach(function(c){contactMap[c.id]=c.nom;});
+  }
+
+  var today=new Date().toDateString();
+  var todayReleves=releves.filter(function(r){return new Date(r.created_at).toDateString()===today;});
+  var histReleves=releves.filter(function(r){return new Date(r.created_at).toDateString()!==today;});
+
+  function statusBadge(r){
+    if(r.statut==='validé') return '<span style="font-size:10px;font-weight:700;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);padding:2px 8px;border-radius:10px">✅ Validé</span>';
+    if(r.statut==='expiré') return '<span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--creme);border:1px solid var(--border);padding:2px 8px;border-radius:10px">⏰ Expiré</span>';
+    var exp=new Date(r.expires_at);
+    var isExp=exp<new Date();
+    if(isExp) return '<span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--creme);border:1px solid var(--border);padding:2px 8px;border-radius:10px">⏰ Expiré</span>';
+    return '<span style="font-size:10px;font-weight:700;color:var(--orange);background:var(--orange-pale);border:1px solid var(--orange-border);padding:2px 8px;border-radius:10px">🔄 En cours</span>';
+  }
+
+  function relevéRow(r){
+    var heure=new Date(r.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    var heureVal=r.validated_at?new Date(r.validated_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):null;
+    var nom=r.contact_id&&contactMap[r.contact_id]?contactMap[r.contact_id]:'—';
+    var alertBadge=r.nb_alertes>0?'<span style="font-size:10px;font-weight:700;color:var(--rouge);background:var(--rouge-pale);border:1px solid var(--rouge-border);padding:2px 8px;border-radius:10px;margin-left:6px">⚠️ '+r.nb_alertes+' alerte'+(r.nb_alertes>1?'s':'')+'</span>':'';
+    var linkBtn=r.statut==='ouvert'&&new Date(r.expires_at)>new Date()?
+      '<a href="'+BASE_URL+'releve.html?token='+r.token+'" target="_blank" style="font-size:11px;color:var(--bleu);text-decoration:none;font-weight:600;white-space:nowrap">🔗 Ouvrir</a>':
+      '';
+    return '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);last-child:border-none">'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+          statusBadge(r)+alertBadge+
+          '<span style="font-size:11px;color:var(--text3)">'+heure+(heureVal?' → '+heureVal:'')+'</span>'+
+        '</div>'+
+        '<div style="font-size:11px;color:var(--text3);margin-top:3px">'+nom+(r.nb_valeurs?' · '+r.nb_valeurs+' valeur'+(r.nb_valeurs>1?'s':''):'')+'</div>'+
+      '</div>'+
+      linkBtn+
+    '</div>';
+  }
+
+  var todayHtml=todayReleves.length?
+    todayReleves.map(relevéRow).join(''):
+    '<div style="padding:20px 16px;text-align:center;color:var(--text3);font-size:12px">Aucun relevé aujourd\'hui</div>';
+
+  var histHtml='';
+  if(histReleves.length){
+    var byDay={};
+    histReleves.forEach(function(r){
+      var d=new Date(r.created_at).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+      if(!byDay[d])byDay[d]=[];
+      byDay[d].push(r);
+    });
+    Object.keys(byDay).forEach(function(d){
+      histHtml+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);padding:10px 16px 4px">'+d+'</div>'+
+        byDay[d].map(relevéRow).join('');
+    });
+  }
+
+  var html='<div style="max-width:640px">'+
+    // CTA déclencher
+    '<div style="background:var(--dark);border-radius:14px;padding:20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;gap:16px">'+
+      '<div>'+
+        '<div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:4px">📋 Déclencher un relevé</div>'+
+        '<div style="font-size:12px;color:rgba(255,255,255,.55)">Génère un lien sécurisé valable 4h à envoyer au technicien</div>'+
+      '</div>'+
+      '<button class="cfg-btn-primary" style="white-space:nowrap;padding:10px 18px;flex-shrink:0" onclick="_triggerReleve()">Nouveau relevé</button>'+
+    '</div>'+
+
+    // Aujourd'hui
+    '<div style="margin-bottom:24px">'+
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">Aujourd\'hui</div>'+
+      '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden">'+
+        todayHtml+
+      '</div>'+
+    '</div>'+
+
+    // Historique 7j
+    (histReleves.length?
+      '<div>'+
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">7 derniers jours</div>'+
+        '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden">'+histHtml+'</div>'+
+      '</div>':'')
+
+  +'</div>';
+
+  // Reset padding
+  var dc=document.getElementById('dash-content-main');
+  if(dc){dc.style.padding='24px';dc.style.maxWidth='none';}
+  return html;
+}
+
+async function _triggerReleve(){
+  var session=_session;
+  if(!session)return;
+  var sid=session.site_ids&&session.site_ids[0];
+  var cid=session.contact&&session.contact.id;
+
+  var btn=event&&event.target;
+  if(btn){btn.disabled=true;btn.textContent='Création…';}
+
+  var releve=await supaPost('releves_horaires',{
+    site_id:sid,
+    contact_id:cid||null,
+    statut:'ouvert',
+    expires_at:new Date(Date.now()+4*3600*1000).toISOString()
+  });
+
+  if(btn){btn.disabled=false;btn.textContent='Nouveau relevé';}
+
+  if(!releve||!releve.token){alert('Erreur lors de la création du relevé');return;}
+
+  var BASE_URL=location.origin+location.pathname.replace('dashboard.html','');
+  var url=BASE_URL+'releve.html?token='+releve.token;
+
+  // Show link modal
+  var modal=document.createElement('div');
+  modal.className='cfg-modal-overlay';
+  modal.id='releve-link-modal';
+  modal.onclick=function(e){if(e.target===modal)modal.remove();};
+  modal.innerHTML='<div class="cfg-modal-box">'+
+    '<div class="cfg-modal-title">📋 Relevé créé</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">Partagez ce lien avec le technicien. Il est valable 4h.</div>'+
+    '<div style="background:var(--creme);border:1.5px solid var(--border);border-radius:8px;padding:12px;word-break:break-all;font-size:11px;font-family:monospace;color:var(--dark);margin-bottom:12px">'+url+'</div>'+
+    '<div class="cfg-modal-footer">'+
+      '<button class="cfg-btn-secondary" onclick="document.getElementById(\'releve-link-modal\').remove()">Fermer</button>'+
+      '<button class="cfg-btn-primary" onclick="navigator.clipboard.writeText(\''+url+'\').then(function(){var b=document.querySelector(\'#releve-link-modal .cfg-btn-primary\');if(b){b.textContent=\'✅ Copié !\';setTimeout(function(){b.textContent=\'Copier le lien\';},2000);}})">Copier le lien</button>'+
+    '</div>'+
+    '</div>';
+  document.body.appendChild(modal);
+
+  // Refresh the view in background
+  if(_session)renderRespTech(_session,'releves');
+}
+
 async function _rtConfig(sid){
   _configCurrentSid=sid;
   var types=await supaGet('types_equipements','select=id,nom&order=nom');
