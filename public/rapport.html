@@ -224,7 +224,7 @@ async function init(){
   // Fetch signalement + site
   var rows=await supa('signalements',
     'id=eq.'+sgId+
-    '&select=id,type,description,lieu,statut,assigne_a,groupe_id,equipement_id,created_at,equipements(nom),sites(nom)'
+    '&select=id,type,description,lieu,statut,assigne_a,groupe_id,equipement_id,created_at,equipements(nom)'
   );
   if(!rows||!rows[0]){_showInvalid();return;}
   _sg=rows[0];
@@ -236,8 +236,12 @@ async function init(){
     return;
   }
 
-  // Site name
-  var siteNom=(_sg.sites&&_sg.sites.nom)||'';
+  // Site name (fetch separately since no FK on groupe_id→sites)
+  var siteNom='';
+  if(_sg.groupe_id){
+    var siteRows=await supa('sites','id=eq.'+_sg.groupe_id+'&select=nom');
+    if(siteRows&&siteRows[0])siteNom=siteRows[0].nom||'';
+  }
   document.getElementById('rp-site-name').textContent=siteNom;
 
   // Context card
