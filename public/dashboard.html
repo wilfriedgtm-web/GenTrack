@@ -460,7 +460,10 @@ function buildMobileNav(role,activeNav){
 function buildLayout(session,activeNav,contentHtml){
   var exportBtn='<div style="display:flex;align-items:center;gap:8px">'+
     (session.role==='resp_tech'?
-      '<button id="rapport-btn" onclick="_openRapportHebdo()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">📄&#8239;Rapport hebdo</button>':
+      '<button id="rapport-btn" onclick="_toggleRapportMenu()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">📄&#8239;Rapport ▾</button>'+
+      '<div id="rapport-menu" style="display:none;position:absolute;right:40px;top:60px;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:200;padding:6px;min-width:180px">'+
+        [7,14,30].map(function(n){return '<button onclick="_openRapportHebdo('+n+')" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">📋&#8239;'+n+' derniers jours</button>';}).join('')+
+      '</div>':
       '<button id="export-btn-trigger" onclick="_toggleExportMenu()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">⬇&#8239;Exporter</button>'+
       '<div id="export-menu" style="display:none;position:absolute;right:40px;top:60px;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.1);z-index:200;padding:6px;min-width:180px">'+
         [7,14,30].map(function(n){return '<button onclick="_openReport('+n+')" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">'+n+' derniers jours</button>';}).join('')+
@@ -3718,6 +3721,7 @@ function _reportShell(title,bodyHtml,autoPrint){
       '.print-bar{position:sticky;top:0;background:white;border-bottom:1px solid var(--border);padding:10px 0;display:flex;gap:10px;justify-content:center;z-index:100;margin:-36px -40px 24px;padding-left:40px;padding-right:40px}'+
       '.btn-print{padding:9px 22px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer}'+
       '.btn-close{padding:9px 22px;background:none;color:var(--text2);border:1px solid var(--border);border-radius:7px;font-size:12px;cursor:pointer}'+
+      '.btn-export{padding:9px 16px;background:#F5F0E8;color:var(--text2);border:1px solid var(--border);border-radius:7px;font-size:11px;font-weight:600;cursor:pointer}'+
       '.print-note{font-size:11px;color:var(--text3);align-self:center}'+
       '.footer-doc{margin-top:48px;padding-top:14px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);display:flex;justify-content:space-between}'+
       '@media print{'+
@@ -3735,21 +3739,34 @@ function _reportShell(title,bodyHtml,autoPrint){
 }
 
 // ── Rapport hebdomadaire professionnel (resp_tech) ─────────────────────────────
-async function _openRapportHebdo(){
+function _toggleRapportMenu(){
+  var m=document.getElementById('rapport-menu');
+  if(!m)return;
+  var open=m.style.display==='none';
+  m.style.display=open?'block':'none';
+  if(open){
+    var close=function(e){if(!m.contains(e.target)&&e.target.id!=='rapport-btn'){m.style.display='none';document.removeEventListener('click',close);}};
+    setTimeout(function(){document.addEventListener('click',close);},0);
+  }
+}
+
+async function _openRapportHebdo(period){
+  period=period||7;
+  var m=document.getElementById('rapport-menu');if(m)m.style.display='none';
   var btn=document.getElementById('rapport-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳ Chargement...';}
   try{
     var sid=_session.site_ids&&_session.site_ids[0];
     if(!sid){alert('Aucun site configuré.');return;}
-    var cutoff=dateNJours(7);
-    var dateDebut=new Date();dateDebut.setDate(dateDebut.getDate()-7);
+    var cutoff=dateNJours(period);
+    var dateDebut=new Date();dateDebut.setDate(dateDebut.getDate()-period);
     var dateFin=new Date();
     var periodeStr=dateDebut.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})+' – '+dateFin.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
 
     var[siteRow,equips,rondes,signalements,maintenances]=await Promise.all([
       supaGet('sites','id=eq.'+sid+'&select=nom&limit=1'),
       supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,capacite_litres,conso_theorique_lh,types_equipements(nom)&order=ordre_ronde.asc'),
-      supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+cutoff+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=90'),
+      supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+cutoff+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=200'),
       supaGet('signalements','groupe_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,type,description,statut,signale_par,equipement_id,cout_intervention,created_at,resolved_at&order=created_at.desc&limit=60'),
       supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+cutoff+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id&order=date_intervention.desc&limit=40')
     ]);
@@ -3757,37 +3774,117 @@ async function _openRapportHebdo(){
     var rIds=rondes.map(function(r){return r.id;});
     var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,equipement_id,statut'):[];
 
-    // Dernières réponses pour les équipements (niveau cuve, compteur GE)
     var eqIds=equips.map(function(e){return e.id;});
+    // questions dict (used for both rondes + relevés)
+    var questions=eqIds.length?await supaGet('questions','equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&select=id,equipement_id,texte,unite'):[];
+    var qMap={};questions.forEach(function(q){qMap[q.id]=q;});
+    var eqMap={};equips.forEach(function(e){eqMap[e.id]=e;});
+
     var lastRepsByEq={};
+
+    // ── Source 1 : rondes (ronde_equipement_id) ──
     if(eqIds.length){
-      var allLastRE=await supaGet('rondes_equipements','equipement_id=in.('+eqIds.join(',')+')'+'&statut=eq.valide&select=id,equipement_id,valide_at&order=valide_at.desc&limit='+eqIds.length*3);
-      var seenEq=new Set();
-      var topREIds=[];
-      allLastRE.forEach(function(re){if(!seenEq.has(re.equipement_id)){seenEq.add(re.equipement_id);topREIds.push(re.id);lastRepsByEq[re.equipement_id]={re_id:re.id,valide_at:re.valide_at};}});
+      var allLastRE=await supaGet('rondes_equipements','equipement_id=in.('+eqIds.join(',')+')'+'&statut=eq.valide&select=id,equipement_id,valide_at&order=valide_at.desc&limit='+eqIds.length*5);
+      var seenEq=new Set();var topREIds=[];
+      allLastRE.forEach(function(re){if(!seenEq.has(re.equipement_id)){seenEq.add(re.equipement_id);topREIds.push(re.id);lastRepsByEq[re.equipement_id]={valide_at:re.valide_at,re_id:re.id,vals:[]};}});
       if(topREIds.length){
-        var reponses=await supaGet('reponses','ronde_equipement_id=in.('+topREIds.join(',')+')'+'&select=ronde_equipement_id,question_id,valeur');
-        var questions=await supaGet('questions','equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&select=id,equipement_id,texte,unite');
-        var qMap={};questions.forEach(function(q){qMap[q.id]=q;});
-        reponses.forEach(function(r){
+        var repsRonde=await supaGet('reponses','ronde_equipement_id=in.('+topREIds.join(',')+')'+'&select=ronde_equipement_id,question_id,valeur');
+        repsRonde.forEach(function(r){
           var q=qMap[r.question_id];if(!q)return;
-          var eqId=Object.keys(lastRepsByEq).find(function(k){return lastRepsByEq[k].re_id===r.ronde_equipement_id;});
-          if(!eqId)return;
-          if(!lastRepsByEq[eqId].vals)lastRepsByEq[eqId].vals=[];
+          var eqId=q.equipement_id;
+          if(!lastRepsByEq[eqId]||lastRepsByEq[eqId].re_id!==r.ronde_equipement_id)return;
           lastRepsByEq[eqId].vals.push({texte:q.texte,valeur:r.valeur,unite:q.unite||''});
         });
       }
     }
 
-    var html=_buildRapportPro(siteNom,periodeStr,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq);
+    // ── Source 2 : relevés horaires (releve_id) ──
+    var cuveHistory={};// {eqId:{nom,cap,points:[{t,v}]}}
+    var releveExportRows=[];// pour CSV
+    var relevesH=await supaGet('releves_horaires','site_id=eq.'+sid+'&statut=eq.validé&created_at=gte.'+cutoff+'T00:00:00&select=id,created_at&order=created_at.asc&limit=500');
+    if(relevesH.length){
+      var relDateMap={};relevesH.forEach(function(r){relDateMap[r.id]=r.created_at;});
+      var relIds=relevesH.map(function(r){return r.id;});
+      var repsReleve=await supaGet('reponses','releve_id=in.('+relIds.join(',')+')'+'&select=releve_id,question_id,valeur,created_at&order=created_at.asc');
+
+      // groupe par releve_id+equipement → dernière lecture par équipement
+      var latestRelByEq={};// {eqId: releve_id avec ts le plus récent}
+      repsReleve.forEach(function(r){
+        var q=qMap[r.question_id];if(!q)return;
+        var eqId=q.equipement_id;if(!eqId)return;
+        var ts=relDateMap[r.releve_id]||r.created_at||'';
+        if(!latestRelByEq[eqId]||ts>(relDateMap[latestRelByEq[eqId]]||'')){latestRelByEq[eqId]=r.releve_id;}
+      });
+      // collecte vals pour le dernier relevé de chaque équipement
+      var releveVals={};// {eqId:[{texte,valeur,unite}]}
+      repsReleve.forEach(function(r){
+        var q=qMap[r.question_id];if(!q)return;
+        var eqId=q.equipement_id;if(!eqId)return;
+        if(r.releve_id!==latestRelByEq[eqId])return;
+        if(!releveVals[eqId])releveVals[eqId]=[];
+        releveVals[eqId].push({texte:q.texte,valeur:r.valeur,unite:q.unite||''});
+      });
+      // Merge : remplace lastRepsByEq si plus récent
+      Object.keys(latestRelByEq).forEach(function(eqId){
+        var ts=relDateMap[latestRelByEq[eqId]]||'';
+        if(!lastRepsByEq[eqId]||(ts&&ts>(lastRepsByEq[eqId].valide_at||''))){
+          lastRepsByEq[eqId]={valide_at:ts,vals:releveVals[eqId]||[]};
+        }
+      });
+
+      // historique cuve : toutes les lectures niveau dans la période
+      repsReleve.forEach(function(r){
+        var q=qMap[r.question_id];if(!q)return;
+        if(!q.texte.toLowerCase().includes('niveau'))return;
+        var eqId=q.equipement_id;if(!eqId)return;
+        var eq=eqMap[eqId];if(!eq||!eq.capacite_litres)return;
+        var niveau=parseFloat(r.valeur);if(isNaN(niveau))return;
+        var ts=relDateMap[r.releve_id]||r.created_at||'';
+        if(!cuveHistory[eqId])cuveHistory[eqId]={nom:eq.nom,cap:parseFloat(eq.capacite_litres),points:[]};
+        if(!cuveHistory[eqId].points.some(function(p){return p.t===ts;}))
+          cuveHistory[eqId].points.push({t:ts,v:niveau});
+      });
+      Object.values(cuveHistory).forEach(function(h){h.points.sort(function(a,b){return a.t<b.t?-1:1;});});
+
+      // prépare export CSV relevés
+      repsReleve.forEach(function(r){
+        var q=qMap[r.question_id];if(!q)return;
+        var ts=relDateMap[r.releve_id]||r.created_at||'';
+        var eq=eqMap[q.equipement_id];
+        releveExportRows.push([
+          ts.replace('T',' ').substring(0,16),
+          eq?eq.nom:'',
+          q.texte,
+          r.valeur,
+          q.unite||''
+        ]);
+      });
+    }
+
+    // prépare export CSV rondes
+    var rondeEqNom={};equips.forEach(function(e){rondeEqNom[e.id]=e.nom;});
+    var rondeExportRows=[];
+    rondes.forEach(function(ro){
+      var reqs=rondesEq.filter(function(re){return re.ronde_id===ro.id;});
+      var val=reqs.filter(function(re){return re.statut==='valide';}).length;
+      rondeExportRows.push([
+        ro.date_ronde,
+        _FREQ_LABELS[ro.frequence]||ro.frequence,
+        val,
+        reqs.length,
+        reqs.length>0?Math.round(val/reqs.length*100)+'%':'—'
+      ]);
+    });
+
+    var html=_buildRapportPro(siteNom,periodeStr,period,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows);
     var w=window.open('','_blank');
     if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
     w.document.write(html);w.document.close();
   }catch(e){console.error(e);alert('Erreur : '+(e.message||e));}
-  finally{if(btn){btn.disabled=false;btn.textContent='📄 Rapport hebdo';}}
+  finally{if(btn){btn.disabled=false;btn.textContent='📄 Rapport ▾';}}
 }
 
-function _buildRapportPro(siteNom,periodeStr,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq){
+function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows){
   var respNom=(session.contact&&session.contact.nom)||'Responsable technique';
   var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -3809,7 +3906,7 @@ function _buildRapportPro(siteNom,periodeStr,session,equips,rondes,rondesEq,sign
 
   // ── Narratives auto-générées ──
   // Résumé global
-  var narResume='Semaine du '+periodeStr+'. ';
+  var narResume=(period===7?'Semaine':period===14?'Quinzaine':'Mois')+' du '+periodeStr+'. ';
   if(tauxRondes!==null)narResume+='Taux de conformité des rondes : '+tauxRondes+'%. ';
   if(signalements.length===0)narResume+='Aucun signalement enregistré sur la période. ';
   else narResume+=(signalements.length)+' signalement'+(signalements.length>1?'s':'')+' enregistré'+(signalements.length>1?'s':'')+' dont '+nbSgOuverts+' en cours et '+nbSgResolus+' résolu'+(nbSgResolus>1?'s':'')+'. ';
@@ -3880,12 +3977,57 @@ function _buildRapportPro(siteNom,periodeStr,session,equips,rondes,rondesEq,sign
     return val>=seuil2?'var(--vert)':val>=seuil1?'var(--amber)':'var(--rouge)';
   }
 
+  // ── SVG cuve chart ──
+  function svgCuveChart(points,cap){
+    if(!points||points.length<2)return '';
+    var W=500,H=90,PL=8,PR=8,PT=8,PB=20;
+    var xMin=new Date(points[0].t).getTime();
+    var xMax=new Date(points[points.length-1].t).getTime();
+    var xR=xMax-xMin||1;
+    function px(t){return PL+(new Date(t).getTime()-xMin)/xR*(W-PL-PR);}
+    function py(v){return PT+(1-v/cap)*(H-PT-PB);}
+    var y20=py(cap*0.2),y40=py(cap*0.4);
+    var pathD=points.map(function(p,i){return (i?'L':'M')+px(p.t).toFixed(1)+','+py(p.v).toFixed(1);}).join(' ');
+    var areaD=pathD+' L'+px(points[points.length-1].t).toFixed(1)+','+(H-PB)+' L'+PL+','+(H-PB)+' Z';
+    return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-height:110px;margin:6px 0 2px" xmlns="http://www.w3.org/2000/svg">'+
+      '<rect x="'+PL+'" y="'+y20.toFixed(1)+'" width="'+(W-PL-PR)+'" height="'+(H-PB-y20).toFixed(1)+'" fill="#FDECEA" opacity="0.45"/>'+
+      '<rect x="'+PL+'" y="'+y40.toFixed(1)+'" width="'+(W-PL-PR)+'" height="'+(y20-y40).toFixed(1)+'" fill="#FEF3E2" opacity="0.45"/>'+
+      '<rect x="'+PL+'" y="'+PT+'" width="'+(W-PL-PR)+'" height="'+(y40-PT).toFixed(1)+'" fill="#E8F5EE" opacity="0.45"/>'+
+      '<line x1="'+PL+'" y1="'+y20.toFixed(1)+'" x2="'+(W-PR)+'" y2="'+y20.toFixed(1)+'" stroke="#C0392B" stroke-width="0.5" stroke-dasharray="3,2" opacity="0.6"/>'+
+      '<line x1="'+PL+'" y1="'+y40.toFixed(1)+'" x2="'+(W-PR)+'" y2="'+y40.toFixed(1)+'" stroke="#D4761E" stroke-width="0.5" stroke-dasharray="3,2" opacity="0.6"/>'+
+      '<defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C49A1C" stop-opacity="0.25"/><stop offset="100%" stop-color="#C49A1C" stop-opacity="0.02"/></linearGradient></defs>'+
+      '<path d="'+areaD+'" fill="url(#cg)"/>'+
+      '<path d="'+pathD+'" fill="none" stroke="#C49A1C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
+      points.map(function(p){var col=p.v/cap<0.2?'#C0392B':p.v/cap<0.4?'#D4761E':'#2D7A4F';return '<circle cx="'+px(p.t).toFixed(1)+'" cy="'+py(p.v).toFixed(1)+'" r="3" fill="'+col+'" stroke="white" stroke-width="1"/>';}).join('')+
+      '<text x="'+PL+'" y="'+(H-4)+'" font-size="8" fill="#A8957E" font-family="Inter,sans-serif">'+new Date(points[0].t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</text>'+
+      '<text x="'+(W-PR)+'" y="'+(H-4)+'" font-size="8" fill="#A8957E" font-family="Inter,sans-serif" text-anchor="end">'+new Date(points[points.length-1].t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</text>'+
+      '<text x="'+(PL+2)+'" y="'+(y20-2).toFixed(1)+'" font-size="7.5" fill="#C0392B" font-family="Inter,sans-serif" opacity="0.8">20%</text>'+
+      '<text x="'+(PL+2)+'" y="'+(y40-2).toFixed(1)+'" font-size="7.5" fill="#D4761E" font-family="Inter,sans-serif" opacity="0.8">40%</text>'+
+    '</svg>';
+  }
+
+  // ── Données export JSON embeddées ──
+  var exportScript='<scr'+'ipt>'+
+    'var _exportRondes='+JSON.stringify(rondeExportRows||[])+';'+
+    'var _exportReleves='+JSON.stringify(releveExportRows||[])+';'+
+    'var _exportSiteNom='+JSON.stringify(siteNom)+';'+
+    'var _exportPeriode='+JSON.stringify(periodeStr)+';'+
+    'function _dlCSV(rows,headers,filename){'+
+      'var csv=[headers.join(",")].concat(rows.map(function(r){return r.map(function(v){return "\\""+String(v).replace(/"/g,"\'\'")+"\\"";}).join(",")})).join("\\n");'+
+      'var a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent("\\uFEFF"+csv);a.download=filename;a.click();'+
+    '}'+
+    'function _exportRondesCSV(){_dlCSV(_exportRondes,["Date","Type","Validés","Total","Conformité"],_exportSiteNom+"_rondes.csv");}'+
+    'function _exportRelevesCSV(){_dlCSV(_exportReleves,["Date","Equipement","Question","Valeur","Unité"],_exportSiteNom+"_releves.csv");}'+
+  '<\/scr'+'ipt>';
+
   // ── HTML ──
   var h='';
 
   // Barre d'action (non imprimée)
   h+='<div class="print-bar">'+
     '<span class="print-note">✏️ Cliquez sur les zones de texte pour les modifier avant impression</span>'+
+    (rondeExportRows&&rondeExportRows.length?'<button class="btn-export" onclick="_exportRondesCSV()">⬇ Rondes CSV</button>':'')+
+    (releveExportRows&&releveExportRows.length?'<button class="btn-export" onclick="_exportRelevesCSV()">⬇ Relevés CSV</button>':'')+
     '<button class="btn-print" onclick="window.print()">🖨 Imprimer / PDF</button>'+
     '<button class="btn-close" onclick="window.close()">Fermer</button>'+
   '</div>';
@@ -3922,21 +4064,42 @@ function _buildRapportPro(siteNom,periodeStr,session,equips,rondes,rondesEq,sign
     '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
     '<p class="narrative" contenteditable="true">'+escape_html(narEquip)+'</p>';
   if(equips.length>0){
-    h+='<table><thead><tr><th>Équipement</th><th>Type</th><th>Dernier relevé</th><th>État</th></tr></thead><tbody>';
+    h+='<table><thead><tr><th>Équipement</th><th>Type</th><th>Dernier relevé</th><th>Date</th><th>État</th></tr></thead><tbody>';
     equips.forEach(function(e){
       var lr=lastRepsByEq[e.id];
       var vals=lr&&lr.vals?lr.vals:[];
-      var valStr=vals.length>0?vals.map(function(v){return v.texte+' : '+v.valeur+(v.unite?' '+v.unite:'');}).join(' / '):'—';
-      var quand=lr&&lr.valide_at?new Date(lr.valide_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
+      var valStr=vals.length>0?vals.map(function(v){return escape_html(v.texte)+' : <strong>'+escape_html(String(v.valeur))+'</strong>'+(v.unite?' '+escape_html(v.unite):'');}).join('<br>'):'—';
+      var quand=lr&&lr.valide_at?new Date(lr.valide_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'—';
       var typeNom=e.types_equipements&&e.types_equipements.nom?e.types_equipements.nom:(e.capacite_litres?'Cuve':e.conso_theorique_lh?'Groupe électrogène':'Équipement');
       h+='<tr>'+
         '<td><strong>'+escape_html(e.nom)+'</strong></td>'+
         '<td style="font-size:11px;color:var(--text2)">'+escape_html(typeNom)+'</td>'+
-        '<td style="font-size:11px">'+escape_html(valStr)+'<span style="color:var(--text3);font-size:10px"> · '+quand+'</span></td>'+
-        '<td><span class="badge '+(lr?'badge-ok':'badge-warn')+'">'+(lr?'✓ Relevé disponible':'En attente')+'</span></td>'+
+        '<td style="font-size:11px;line-height:1.6">'+valStr+'</td>'+
+        '<td style="font-size:10px;color:var(--text3);white-space:nowrap">'+quand+'</td>'+
+        '<td><span class="badge '+(lr&&lr.vals&&lr.vals.length?'badge-ok':'badge-warn')+'">'+(lr&&lr.vals&&lr.vals.length?'✓ Disponible':'En attente')+'</span></td>'+
       '</tr>';
     });
     h+='</tbody></table>';
+  }
+  // ── Graphiques cuves ──
+  var cuveKeys=Object.keys(cuveHistory||{});
+  if(cuveKeys.length){
+    h+='<h2>Évolution niveau cuves</h2>';
+    cuveKeys.forEach(function(eqId){
+      var ch=cuveHistory[eqId];
+      if(!ch.points.length)return;
+      var lastPct=Math.round(ch.points[ch.points.length-1].v/ch.cap*100);
+      var trend=ch.points.length>1?(ch.points[ch.points.length-1].v-ch.points[0].v):0;
+      var trendStr=trend<0?'↓ '+Math.abs(trend).toFixed(0)+' L consommés sur la période':trend>0?'↑ +'+trend.toFixed(0)+' L (ravitaillement)':'stable';
+      h+='<div style="margin:12px 0 20px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">'+
+          '<span style="font-size:13px;font-weight:600">'+escape_html(ch.nom)+'</span>'+
+          '<span style="font-size:11px;color:var(--text2)">'+lastPct+'% · Capacité '+ch.cap.toLocaleString('fr-FR')+' L</span>'+
+        '</div>'+
+        '<div style="font-size:10px;color:var(--text3);margin-bottom:2px">'+escape_html(trendStr)+'</div>'+
+        svgCuveChart(ch.points,ch.cap)+
+      '</div>';
+    });
   }
 
   // Rondes
@@ -4024,7 +4187,7 @@ function _buildRapportPro(siteNom,periodeStr,session,equips,rondes,rondesEq,sign
     '<span>Rapport généré le '+new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+'</span>'+
   '</div>';
 
-  return _reportShell('Rapport hebdo — '+siteNom,h,false);
+  return _reportShell('Rapport — '+siteNom,h+exportScript,false);
 }
 
 function _buildReportSingle(siteNom,period,rondes,rondesEq,pannes,alertes,equips){
