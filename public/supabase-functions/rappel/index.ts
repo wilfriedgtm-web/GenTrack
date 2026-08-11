@@ -118,11 +118,12 @@ serve(async (_req) => {
       const capacite = parseFloat(cuve.capacite_litres);
       const pct = Math.round((niveauActuel / capacite) * 100);
       const consoH = cuve.conso_theorique_lh ? parseFloat(cuve.conso_theorique_lh) : consoTotaleParHeure;
-      const joursAutonomie = consoH > 0 ? Math.round((niveauActuel / consoH) / 24) : null;
+      // Autonomie = niveau / (conso_par_heure * 8h_de_marche_par_jour) — aligné avec le dashboard
+      const joursAutonomie = consoH > 0 ? Math.round(niveauActuel / (consoH * 8) * 10) / 10 : null;
 
       let severite: "critique" | "attention" | null = null;
-      if (pct < 20) severite = "critique";
-      else if (pct < 40) severite = "attention";
+      if (pct <= 20) severite = "critique";
+      else if (pct <= 40) severite = "attention";
 
       if (!severite) continue;
 

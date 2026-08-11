@@ -207,7 +207,7 @@ async function buildAndSendReport(
 
           const consoTotaleH = ges.reduce((s, g) => s + (parseFloat(g.conso_theorique_lh) || 0), 0);
           if (consoTotaleH > 0) {
-            const autoJ = Math.round((niveauActuel / consoTotaleH) / 24);
+            const autoJ = Math.round(niveauActuel / (consoTotaleH * 8) * 10) / 10;
             msg += `   ⏱️ Autonomie estimée : *~${autoJ} jour${autoJ > 1 ? "s" : ""}*\n`;
           }
           msg += "\n";
