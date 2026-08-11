@@ -100,6 +100,12 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 @media(max-width:768px){
   .sidebar{display:none}.dash-main{margin-left:0;padding-bottom:calc(var(--nav-h) + 16px)}
   .mobile-nav{display:flex}.mobile-header{display:flex}.dash-topbar{display:none}.dash-content{padding:16px}
+  .plus-overlay,.plus-panel{display:none}
+  .plus-overlay.open{display:block}
+  .plus-panel{display:block}
+}
+@media(min-width:769px){
+  .plus-overlay,.plus-panel{display:none!important}
 }
 /* UI */
 .section-title{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);margin:24px 0 10px}
@@ -475,10 +481,10 @@ function buildMobileNav(role,activeNav,alerteBadge){
   var fixed=[
     {id:'accueil',icon:'🏠',label:'Accueil'},
     {id:'alertes',icon:'🔔',label:'Alertes',badge:alerteBadge},
-    {id:'historique',icon:'📊',label:'Rondes'},
-    {id:'__plus__',icon:'⋯',label:'Plus'}
+    {id:'releves',icon:'📋',label:'Relevés'},
+    {id:'__plus__',icon:'☰',label:'Plus'}
   ];
-  var plusIds=['releves','signalements','maintenances','config'];
+  var plusIds=['historique','signalements','maintenances','config'];
   var plusItems=allItems.filter(function(it){return plusIds.indexOf(it.id)!==-1;});
   var plusActive=plusItems.some(function(it){return it.id===activeNav;});
 
