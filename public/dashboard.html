@@ -1504,60 +1504,106 @@ async function _buildSeuilsTab(sid){
   return html+'</div>';
 }
 
+var _relevePreviewData={}; // sid → [{eqNom, icon, questions:[{texte,type_reponse,unite,options}]}]
+
 async function _buildReleveConfigTab(sid){
   var equips=await supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,types_equipements(nom)&order=ordre_ronde.asc');
   if(!equips.length)return '<div class="placeholder-card" style="margin-top:16px"><div class="placeholder-icon">📋</div>Aucun équipement configuré</div>';
   var eqIds=equips.map(function(e){return e.id;});
-  var questions=await supaGet('questions','equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&select=id,texte,type_reponse,unite,frequences,equipement_id&order=ordre.asc');
+  var questions=await supaGet('questions','equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&select=id,texte,type_reponse,unite,frequences,equipement_id,options&order=ordre.asc');
   var eqMap={};equips.forEach(function(e){eqMap[e.id]=e;});
   var byEq={};
   questions.forEach(function(q){if(!byEq[q.equipement_id])byEq[q.equipement_id]=[];byEq[q.equipement_id].push(q);});
 
+  // Build preview data cache
+  var previewGroups=[];
+  Object.keys(byEq).forEach(function(eqId){
+    var eq=eqMap[eqId];if(!eq)return;
+    var activeQs=byEq[eqId].filter(function(q){return Array.isArray(q.frequences)&&q.frequences.indexOf('journalier')!==-1;});
+    if(activeQs.length){
+      previewGroups.push({
+        eqNom:eq.nom,
+        icon:_TYPE_ICONS[(eq.types_equipements&&eq.types_equipements.nom)]||'⚙️',
+        questions:activeQs.map(function(q){return{texte:q.texte,type_reponse:q.type_reponse,unite:q.unite,options:q.options};})
+      });
+    }
+  });
+  _relevePreviewData[sid]=previewGroups;
+
+  var totalActive=questions.filter(function(q){return Array.isArray(q.frequences)&&q.frequences.indexOf('journalier')!==-1;}).length;
+
   var html='<div style="max-width:680px">'+
-    '<div style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.5">'+
-      'Activez les questions à inclure dans le relevé horaire. Les questions activées apparaîtront dans le formulaire envoyé aux techniciens chaque jour.'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'+
+      '<div style="font-size:12px;color:var(--text2);line-height:1.5;flex:1">'+
+        'Activez les équipements et questions à inclure dans le relevé horaire.'+
+        (totalActive?' <strong style="color:var(--dark)">'+totalActive+' question'+(totalActive>1?'s':'')+' active'+(totalActive>1?'s':'')+'</strong>.':'')+
+      '</div>'+
+      (previewGroups.length?'<button class="config-preview-btn" onclick="_openRelevePreview(\''+sid+'\')" style="margin-left:16px;white-space:nowrap">👁 Aperçu relevé</button>':'')+
     '</div>';
 
   Object.keys(byEq).forEach(function(eqId){
     var eq=eqMap[eqId];if(!eq)return;
     var icon=_TYPE_ICONS[(eq.types_equipements&&eq.types_equipements.nom)]||'⚙️';
     var qs=byEq[eqId];
+    var eqActive=qs.some(function(q){return Array.isArray(q.frequences)&&q.frequences.indexOf('journalier')!==-1;});
+    var activeCount=qs.filter(function(q){return Array.isArray(q.frequences)&&q.frequences.indexOf('journalier')!==-1;}).length;
+
     var rowsHtml=qs.map(function(q){
       var freqs=Array.isArray(q.frequences)?q.frequences:[];
       var active=freqs.indexOf('journalier')!==-1;
       var typeLabel={numerique:'123',oui_non:'✓/✗',choix:'choix',texte:'texte',photo:'📷'}[q.type_reponse]||q.type_reponse;
-      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:'+(active?'var(--vert-pale)':'white')+'">'+
-        '<label class="releve-toggle" style="position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0">'+
-          '<input type="checkbox" '+(active?'checked':'')+' onchange="_toggleReleveQuestion(\''+q.id+'\',this.checked,this)" '+
+      return '<div style="display:flex;align-items:center;gap:12px;padding:9px 14px 9px 36px;border-bottom:1px solid var(--border);background:'+(active?'var(--vert-pale)':'white')+'">'+ // indent under eq toggle
+        '<label style="position:relative;display:inline-block;width:32px;height:18px;flex-shrink:0">'+
+          '<input type="checkbox" '+(active?'checked':'')+' onchange="_toggleReleveQuestion(\''+q.id+'\',this.checked)" '+
             'style="opacity:0;width:0;height:0;position:absolute" />'+
-          '<span style="position:absolute;inset:0;background:'+(active?'var(--amber)':'#ccc')+';border-radius:20px;transition:.2s;cursor:pointer"></span>'+
-          '<span style="position:absolute;left:'+(active?'18px':'2px')+';top:2px;width:16px;height:16px;background:white;border-radius:50%;transition:.2s"></span>'+
+          '<span style="position:absolute;inset:0;background:'+(active?'var(--amber)':'#ccc')+';border-radius:18px;transition:.2s;cursor:pointer"></span>'+
+          '<span style="position:absolute;left:'+(active?'15px':'2px')+';top:2px;width:14px;height:14px;background:white;border-radius:50%;transition:.2s"></span>'+
         '</label>'+
         '<div style="flex:1;min-width:0">'+
-          '<div style="font-size:13px;color:'+(active?'var(--dark)':'var(--text2)')+'">'+escape_html(q.texte)+(q.unite?' <span style="color:var(--text3);font-size:11px">('+escape_html(q.unite)+')</span>':'')+'</div>'+
+          '<div style="font-size:12px;color:'+(active?'var(--dark)':'var(--text3)')+'">'+escape_html(q.texte)+(q.unite?' <span style="color:var(--text3);font-size:10px">('+escape_html(q.unite)+')</span>':'')+'</div>'+
           '<div style="font-size:10px;color:var(--text3);margin-top:1px">'+typeLabel+'</div>'+
-        '</div>'+
-        '<div style="font-size:11px;font-weight:600;color:'+(active?'var(--vert)':'var(--text3)')+'">'+
-          (active?'Inclus':'Non inclus')+
         '</div>'+
       '</div>';
     }).join('');
+
     html+=
-      '<div style="margin-bottom:20px;border:1.5px solid var(--border);border-radius:10px;overflow:hidden">'+
-        '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--border)">'+
+      '<div style="margin-bottom:16px;border:1.5px solid '+(eqActive?'var(--amber)':'var(--border)')+';border-radius:10px;overflow:hidden">'+
+        '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:'+(eqActive?'var(--amber-light)':'var(--bg2)')+';border-bottom:1px solid var(--border)">'+
+          '<label style="position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0">'+
+            '<input type="checkbox" '+(eqActive?'checked':'')+' onchange="_toggleReleveEquipement(\''+eqId+'\',this.checked)" '+
+              'style="opacity:0;width:0;height:0;position:absolute" />'+
+            '<span style="position:absolute;inset:0;background:'+(eqActive?'var(--amber)':'#ccc')+';border-radius:20px;transition:.2s;cursor:pointer"></span>'+
+            '<span style="position:absolute;left:'+(eqActive?'18px':'2px')+';top:2px;width:16px;height:16px;background:white;border-radius:50%;transition:.2s"></span>'+
+          '</label>'+
           '<span style="font-size:16px">'+icon+'</span>'+
-          '<span style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(eq.nom)+'</span>'+
+          '<span style="font-size:13px;font-weight:600;color:var(--dark);flex:1">'+escape_html(eq.nom)+'</span>'+
+          '<span style="font-size:11px;color:'+(eqActive?'var(--amber-dark)':'var(--text3)')+'">'+
+            (eqActive?activeCount+'/'+qs.length+' question'+(qs.length>1?'s':''):'Non inclus')+
+          '</span>'+
         '</div>'+
-        rowsHtml+
+        (eqActive?rowsHtml:'')+
       '</div>';
   });
 
-  html+='<div style="font-size:11px;color:var(--text3);margin-top:4px">💡 Les modifications sont appliquées immédiatement — les prochains relevés refléteront vos changements.</div>';
+  html+='<div style="font-size:11px;color:var(--text3);margin-top:4px">💡 Activez un équipement pour choisir ses questions. Les modifications sont immédiates.</div>';
   return html+'</div>';
 }
 
-async function _toggleReleveQuestion(qId,active,el){
-  // Read current frequences, add or remove 'journalier'
+async function _toggleReleveEquipement(eqId,active){
+  // Toggle ALL questions of this equipment at once
+  var rows=await supaGet('questions','equipement_id=eq.'+eqId+'&actif=eq.true&select=id,frequences');
+  var patches=rows.map(function(q){
+    var freqs=Array.isArray(q.frequences)?q.frequences.slice():[];
+    var idx=freqs.indexOf('journalier');
+    if(active&&idx===-1)freqs.push('journalier');
+    else if(!active&&idx!==-1)freqs.splice(idx,1);
+    return supaPatch('questions',q.id,{frequences:freqs});
+  });
+  await Promise.all(patches);
+  if(_session)renderRespTech(_session,'config');
+}
+
+async function _toggleReleveQuestion(qId,active){
   var rows=await supaGet('questions','id=eq.'+qId+'&select=frequences');
   var cur=rows&&rows[0]?rows[0].frequences:null;
   var freqs=Array.isArray(cur)?cur.slice():[];
@@ -1565,8 +1611,82 @@ async function _toggleReleveQuestion(qId,active,el){
   if(active&&idx===-1)freqs.push('journalier');
   else if(!active&&idx!==-1)freqs.splice(idx,1);
   await supaPatch('questions',qId,{frequences:freqs});
-  // Refresh the tab to reflect colors/labels
   if(_session)renderRespTech(_session,'config');
+}
+
+function _openRelevePreview(sid){
+  var groups=_relevePreviewData[sid]||[];
+  if(!groups.length)return;
+  var old=document.getElementById('releve-preview-overlay');if(old)old.remove();
+
+  var now=new Date();
+  var dateStr=now.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+  var hh=String(now.getHours()).padStart(2,'0');
+  var mm=String(now.getMinutes()).padStart(2,'0');
+
+  var typeLabel={numerique:'Valeur numérique',oui_non:'Oui / Non',choix:'Choix',texte:'Texte libre',photo:'📷 Photo'};
+
+  var sectionsHtml=groups.map(function(g){
+    var qsHtml=g.questions.map(function(q){
+      var inputHtml='';
+      if(q.type_reponse==='numerique'){
+        inputHtml='<input type="number" placeholder="0'+(q.unite?' '+q.unite:'')+'" disabled '+
+          'style="border:1.5px solid #ddd;border-radius:8px;padding:8px 12px;font-size:14px;width:100%;background:#f8f8f8;box-sizing:border-box;margin-top:6px" />';
+      } else if(q.type_reponse==='oui_non'){
+        inputHtml='<div style="display:flex;gap:8px;margin-top:6px">'+
+          '<button disabled style="flex:1;padding:8px;border:1.5px solid #ddd;border-radius:8px;background:#f8f8f8;font-size:13px;font-weight:600;cursor:default">✅ Oui</button>'+
+          '<button disabled style="flex:1;padding:8px;border:1.5px solid #ddd;border-radius:8px;background:#f8f8f8;font-size:13px;font-weight:600;cursor:default">❌ Non</button>'+
+        '</div>';
+      } else if(q.type_reponse==='choix'){
+        var opts=Array.isArray(q.options)?q.options:[];
+        inputHtml='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'+
+          opts.map(function(o){
+            return '<button disabled style="padding:6px 12px;border:1.5px solid #ddd;border-radius:20px;background:#f8f8f8;font-size:12px;cursor:default">'+escape_html(o)+'</button>';
+          }).join('')+
+          (!opts.length?'<span style="font-size:12px;color:#aaa">Options à configurer</span>':'')+
+        '</div>';
+      } else if(q.type_reponse==='texte'){
+        inputHtml='<textarea disabled placeholder="Saisir..." rows="2" '+
+          'style="border:1.5px solid #ddd;border-radius:8px;padding:8px 12px;font-size:13px;width:100%;background:#f8f8f8;box-sizing:border-box;margin-top:6px;resize:none"></textarea>';
+      }
+      return '<div style="padding:10px 0;border-bottom:1px solid #f0f0f0">'+
+        '<div style="font-size:13px;font-weight:500;color:#1a1a1a">'+escape_html(q.texte)+'</div>'+
+        '<div style="font-size:10px;color:#aaa;margin-top:1px">'+(typeLabel[q.type_reponse]||q.type_reponse)+(q.unite?' · '+q.unite:'')+'</div>'+
+        inputHtml+
+      '</div>';
+    }).join('');
+    return '<div style="background:#f8f8f8;border-radius:10px;padding:12px 14px;margin-bottom:12px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+        '<span style="font-size:18px">'+g.icon+'</span>'+
+        '<span style="font-size:13px;font-weight:700;color:#1a1a1a">'+escape_html(g.eqNom)+'</span>'+
+      '</div>'+
+      qsHtml+
+    '</div>';
+  }).join('');
+
+  var totalQ=groups.reduce(function(n,g){return n+g.questions.length;},0);
+
+  var overlay=document.createElement('div');
+  overlay.id='releve-preview-overlay';
+  overlay.className='wa-overlay';
+  overlay.onclick=function(e){if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML=
+    '<div class="wa-phone" style="background:#f5f5f5">'+
+      '<div class="wa-phone-bar" style="background:#1a1a1a;flex-direction:column;align-items:flex-start;padding:14px 16px">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;width:100%">'+
+          '<div style="font-size:15px;font-weight:700;color:white">📋 Relevé horaire</div>'+
+          '<button class="wa-phone-close" onclick="document.getElementById(\'releve-preview-overlay\').remove()">×</button>'+
+        '</div>'+
+        '<div style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px">'+dateStr+' · '+hh+':'+mm+'</div>'+
+        '<div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:1px">'+totalQ+' question'+(totalQ>1?'s':'')+' · '+groups.length+' équipement'+(groups.length>1?'s':'')+'</div>'+
+      '</div>'+
+      '<div class="wa-chat" style="padding:16px;background:#f5f5f5">'+sectionsHtml+'</div>'+
+      '<div class="wa-phone-footer" style="justify-content:center">'+
+        '<button class="wa-validate-btn" style="flex:1;max-width:100%;background:#1a1a1a" onclick="document.getElementById(\'releve-preview-overlay\').remove()">Fermer l\'aperçu</button>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(overlay);
+  setTimeout(function(){var c=overlay.querySelector('.wa-chat');if(c)c.scrollTop=0;},50);
 }
 
 async function _saveAlerte(qId,field,val){
