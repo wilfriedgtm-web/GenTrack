@@ -1682,7 +1682,7 @@ async function _mntCreerSubmit(sid){
 async function _rtConfig(sid){
   _configCurrentSid=sid;
   var types=await supaGet('types_equipements','select=id,nom&order=nom');
-  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,ordre_ronde,type_id,types_equipements(nom)&order=ordre_ronde.asc');
+  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,actif_ronde,actif_releve,ordre_ronde,type_id,types_equipements(nom)&order=ordre_ronde.asc');
   var tabs=[
     {key:'equipements',label:'⚙️ Équipements & Rondes'},
     {key:'seuils',label:'🎯 Seuils d\'alerte'},
@@ -1743,7 +1743,7 @@ async function _rtConfig(sid){
             '<div class="config-eq-name" style="'+(e.actif?'':'color:var(--text3)')+'">'+escape_html(e.nom)+'</div>'+
             '<div class="config-eq-type">'+(e.actif?'Actif':'Inactif')+'</div>'+
           '</div>'+
-          '<button class="config-eq-edit-btn" onclick="event.stopPropagation();_openEditEquipModal(\''+e.id+'\',\''+escape_html(e.nom)+'\','+e.actif+')" title="Modifier">✏️</button>'+
+          '<button class="config-eq-edit-btn" onclick="event.stopPropagation();_openEditEquipModal(\''+e.id+'\',\''+escape_html(e.nom)+'\','+e.actif+','+(e.actif_ronde!==false)+','+(e.actif_releve!==false)+')" title="Modifier">✏️</button>'+
         '</div>';
       });
     });
@@ -2515,7 +2515,9 @@ function _openAddEquipModal(){
   });
 }
 
-function _openEditEquipModal(eqId, nom, actif){
+function _openEditEquipModal(eqId, nom, actif, actifRonde, actifReleve){
+  if(actifRonde===undefined)actifRonde=true;
+  if(actifReleve===undefined)actifReleve=true;
   _showCfgModal(
     '<div class="cfg-modal-title">✏️ Modifier l\'équipement</div>'+
     '<div class="cfg-form-group"><label class="cfg-form-label">Nom *</label>'+
@@ -2527,6 +2529,17 @@ function _openEditEquipModal(eqId, nom, actif){
           '<input type="radio" name="eq-edit-actif" value="true"'+(actif?' checked':'')+' /> Actif</label>'+
         '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">'+
           '<input type="radio" name="eq-edit-actif" value="false"'+(!actif?' checked':'')+' /> Inactif</label>'+
+      '</div>'+
+    '</div>'+
+    '<div class="cfg-form-group">'+
+      '<label class="cfg-form-label">Visible dans</label>'+
+      '<div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">'+
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">'+
+          '<input type="checkbox" id="eq-edit-ronde"'+(actifRonde?' checked':'')+' />'+
+          '<span>🔄 Rondes (journalier / hebdo / mensuel)</span></label>'+
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">'+
+          '<input type="checkbox" id="eq-edit-releve"'+(actifReleve?' checked':'')+' />'+
+          '<span>📋 Relevé horaire</span></label>'+
       '</div>'+
     '</div>'+
     '<div class="cfg-modal-footer">'+
@@ -2542,8 +2555,10 @@ async function _saveEditEquip(eqId){
   if(!nom||!nom.trim()){alert('Nom requis');return;}
   var actifRadio=document.querySelector('input[name="eq-edit-actif"]:checked');
   var actif=actifRadio?actifRadio.value==='true':true;
+  var actifRonde=!!(document.getElementById('eq-edit-ronde')||{}).checked;
+  var actifReleve=!!(document.getElementById('eq-edit-releve')||{}).checked;
   _closeCfgModal();
-  await supaPatch('equipements',eqId,{nom:nom.trim(),actif:actif});
+  await supaPatch('equipements',eqId,{nom:nom.trim(),actif:actif,actif_ronde:actifRonde,actif_releve:actifReleve});
   if(eqId===_configSelectedEqId&&!actif)_configSelectedEqId=null;
   if(_session)renderRespTech(_session,'config');
 }

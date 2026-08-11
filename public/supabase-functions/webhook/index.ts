@@ -88,7 +88,7 @@ async function getReleveLink(siteId: string): Promise<string | null> {
 
 // ── Équipements / questions ───────────────────────────────────────────────────
 async function getEquipementsTechnicien(siteId: string): Promise<any[]> {
-  const raw = await db('equipements', { query: `&site_id=eq.${siteId}&actif=eq.true&order=ordre_ronde.asc` });
+  const raw = await db('equipements', { query: `&site_id=eq.${siteId}&actif=eq.true&actif_ronde=eq.true&order=ordre_ronde.asc` });
   return Array.isArray(raw) ? raw : [];
 }
 async function getQuestions(equipementId: string, frequence: string): Promise<any[]> {
@@ -124,7 +124,7 @@ async function getOrCreateRondeEquipement(rondeId: string, equipementId: string)
   return Array.isArray(created) ? created[0].id : created.id;
 }
 async function getEquipementsRestants(rondeId: string, siteId: string, frequence: string): Promise<any[]> {
-  const equipements = await db('equipements', { query: `&site_id=eq.${siteId}&actif=eq.true&order=ordre_ronde.asc` });
+  const equipements = await db('equipements', { query: `&site_id=eq.${siteId}&actif=eq.true&actif_ronde=eq.true&order=ordre_ronde.asc` });
   if (!Array.isArray(equipements)) return [];
   const valides = await db('rondes_equipements', { query: `&ronde_id=eq.${rondeId}&statut=eq.valide` });
   const validatedIds = new Set((Array.isArray(valides) ? valides : []).map((r: any) => r.equipement_id));
@@ -159,12 +159,14 @@ async function rondeCompleteDepuis(siteId: string, frequence: string, dateFrom: 
 // - mensuel : bloqué si déjà complet ce mois
 async function getFrequencesDisponibles(site: any): Promise<string[]> {
   const freqs: string[] = [];
-  const equipements = await db('equipements', { query: `&site_id=eq.${site.id}&actif=eq.true` });
-  const nbEquip = Array.isArray(equipements) ? equipements.length : 0;
+  // Pour les rondes : compter uniquement les équipements actif_ronde
+  const equipsRonde = await db('equipements', { query: `&site_id=eq.${site.id}&actif=eq.true&actif_ronde=eq.true` });
+  const nbEquip = Array.isArray(equipsRonde) ? equipsRonde.length : 0;
 
-  // Relevé horaire — jamais bloqué
+  // Relevé horaire — jamais bloqué, si au moins un équipement actif_releve
   if (site.releve_horaire_actif !== false) {
-    freqs.push('releve_horaire');
+    const equipsReleve = await db('equipements', { query: `&site_id=eq.${site.id}&actif=eq.true&actif_releve=eq.true&limit=1` });
+    if (Array.isArray(equipsReleve) && equipsReleve.length > 0) freqs.push('releve_horaire');
   }
 
   const periodMap: Record<string, string> = {

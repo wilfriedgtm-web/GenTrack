@@ -328,7 +328,7 @@ async function init(){
   }
 
   _equips=await supa('equipements',
-    'site_id=eq.'+_releve.site_id+'&actif=eq.true&select=id,nom,type_id,types_equipements(nom,icone)&order=ordre_ronde.asc'
+    'site_id=eq.'+_releve.site_id+'&actif=eq.true&actif_releve=eq.true&select=id,nom,type_id,types_equipements(nom,icone)&order=ordre_ronde.asc'
   );
   if(!_equips.length){showState('⚙️','Aucun équipement','Aucun équipement actif sur ce site.');return;}
 
