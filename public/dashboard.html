@@ -262,9 +262,16 @@ async function supaGet(table,qs){
     var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+qs,{
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Accept':'application/json'}
     });
-    if(!r.ok)return[];
+    if(!r.ok){
+      var errBody=await r.text().catch(function(){return'';});
+      console.error('[supaGet] '+table+' → HTTP '+r.status+': '+errBody);
+      return[];
+    }
     return await r.json();
-  }catch(e){return[];}
+  }catch(e){
+    console.error('[supaGet] '+table+' exception: '+e);
+    return[];
+  }
 }
 async function supaPatch(table,id,data){
   try{
@@ -858,8 +865,11 @@ async function _rtReleves(session,sid){
   // Fetch today's relevés + last 7 days
   var since=new Date();since.setDate(since.getDate()-7);since.setHours(0,0,0,0);
   var releves=await supaGet('releves_horaires',
-    'site_id=eq.'+sid+'&created_at=gte.'+since.toISOString()+'&select=*&order=created_at.desc'
+    'site_id=eq.'+sid+'&created_at=gte.'+since.toISOString()+
+    '&select=id,site_id,contact_id,token,statut,expires_at,validated_at,nb_valeurs,nb_alertes,created_at'+
+    '&order=created_at.desc'
   );
+  console.log('[releves] sid='+sid+' count='+releves.length);
 
   // Fetch contact names for display
   var cIds=[...new Set(releves.filter(function(r){return r.contact_id;}).map(function(r){return r.contact_id;}))];
@@ -904,7 +914,7 @@ async function _rtReleves(session,sid){
 
   var todayHtml=todayReleves.length?
     todayReleves.map(relevéRow).join(''):
-    '<div style="padding:20px 16px;text-align:center;color:var(--text3);font-size:12px">Aucun relevé aujourd\'hui</div>';
+    '<div style="padding:20px 16px;text-align:center;color:var(--text3);font-size:12px">Aucun relevé aujourd\'hui'+(releves.length?' ('+releves.length+' au total sur 7j)':'')+'</div>';
 
   var histHtml='';
   if(histReleves.length){
