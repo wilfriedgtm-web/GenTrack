@@ -125,6 +125,9 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .config-eq-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;border-left:3px solid transparent;transition:all .12s}
 .config-eq-item:hover{background:var(--creme)}
 .config-eq-item.selected{background:var(--amber-light);border-left-color:var(--amber)}
+.config-eq-item.cfg-eq-inactive{opacity:.6}
+.config-eq-edit-btn{opacity:0;background:none;border:none;cursor:pointer;padding:2px 4px;font-size:13px;border-radius:4px;transition:opacity .15s;flex-shrink:0}
+.config-eq-item:hover .config-eq-edit-btn{opacity:1}
 .config-eq-icon{font-size:18px;width:28px;text-align:center}
 .config-eq-name{font-size:13px;font-weight:500;color:var(--text);line-height:1.3}
 .config-eq-type{font-size:11px;color:var(--text3)}
@@ -151,6 +154,9 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .config-ronde-freq{font-size:11px;color:var(--text2)}
 .config-ronde-body{padding:12px 16px;background:white}
 .config-q-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)}
+.config-q-move{background:none;border:none;cursor:pointer;font-size:8px;color:var(--text3);padding:0 2px;line-height:1;opacity:.5;transition:opacity .1s}
+.config-q-move:hover:not([disabled]){opacity:1;color:var(--dark)}
+.config-q-move[disabled]{opacity:.2;cursor:default}
 .config-q-item:last-child{border-bottom:none}
 .config-q-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .config-ronde-card.green .config-q-dot{background:var(--vert)}
@@ -187,6 +193,7 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .cfg-btn-primary{background:var(--amber);color:white;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s}
 .cfg-btn-primary:hover{opacity:.88}
 .cfg-btn-secondary{background:none;border:1.5px solid var(--border);border-radius:8px;padding:10px 16px;font-size:13px;color:var(--text2);cursor:pointer}
+.cfg-btn-danger{background:none;border:1.5px solid var(--rouge-border);border-radius:8px;padding:10px 16px;font-size:13px;color:var(--rouge);cursor:pointer}
 .cfg-freq-check{display:flex;gap:14px;flex-wrap:wrap}
 .cfg-freq-label{display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;color:var(--text)}
 .cfg-info{background:var(--amber-pale);border:1px solid var(--amber-border);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--amber-dark);margin-top:6px}
@@ -862,9 +869,9 @@ async function _rtConfig(sid){
   }
   if(_configCurrentTab==='contacts'){
     var dc2b=document.getElementById('dash-content-main');
-    if(dc2b){dc2b.style.padding='40px 24px';dc2b.style.maxWidth='none';}
-    return '<div class="config-tabs">'+tabHtml+'</div>'+
-      '<div style="text-align:center;color:var(--text3);font-size:13px;padding:40px 0"><div style="font-size:48px;margin-bottom:12px;opacity:.3">👥</div>Contacts & alertes — à venir</div>';
+    if(dc2b){dc2b.style.padding='24px';dc2b.style.maxWidth='none';}
+    var contactsHtml=await _buildContactsTab(sid);
+    return '<div class="config-tabs">'+tabHtml+'</div>'+contactsHtml;
   }
 
   // Default selection
@@ -892,11 +899,13 @@ async function _rtConfig(sid){
       byType[tNom].forEach(function(e){
         var icon=_TYPE_ICONS[(e.types_equipements&&e.types_equipements.nom)]||'⚙️';
         var sel=e.id===_configSelectedEqId;
-        listHtml+='<div class="config-eq-item'+(sel?' selected':'')+'" onclick="_selectConfigEq(\''+e.id+'\')">'+
+        listHtml+='<div class="config-eq-item'+(sel?' selected':'')+(!e.actif?' cfg-eq-inactive':'')+'" onclick="_selectConfigEq(\''+e.id+'\')">'+
           '<span class="config-eq-icon">'+icon+'</span>'+
-          '<div><div class="config-eq-name">'+escape_html(e.nom)+'</div>'+
-          '<div class="config-eq-type">'+(e.actif?'Actif':'Inactif')+'</div></div>'+
-          '<div class="config-eq-dot '+(e.actif?'ok':'')+'"></div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div class="config-eq-name" style="'+(e.actif?'':'color:var(--text3)')+'">'+escape_html(e.nom)+'</div>'+
+            '<div class="config-eq-type">'+(e.actif?'Actif':'Inactif')+'</div>'+
+          '</div>'+
+          '<button class="config-eq-edit-btn" onclick="event.stopPropagation();_openEditEquipModal(\''+e.id+'\',\''+escape_html(e.nom)+'\','+e.actif+')" title="Modifier">✏️</button>'+
         '</div>';
       });
     });
@@ -916,11 +925,140 @@ async function _rtConfig(sid){
     '<div class="config-layout">'+listHtml+panelHtml+'</div>';
 }
 
+async function _buildContactsTab(sid){
+  var contacts=await supaGet('contacts','site_id=eq.'+sid+'&select=id,nom,role,whatsapp,email,actif&order=nom.asc');
+  var ROLES={resp_tech:'⚙️ Resp. technique',dir_tech:'🏗️ Dir. technique',dir_ops:'📊 Dir. opérations',technicien:'🔧 Technicien',autre:'👤 Autre'};
+
+  var byRole={};
+  contacts.forEach(function(c){
+    var r=c.role||'autre';
+    if(!byRole[r])byRole[r]=[];
+    byRole[r].push(c);
+  });
+
+  var html='<div style="max-width:680px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'+
+      '<div style="font-size:12px;color:var(--text2);line-height:1.5">'+
+        'Gérez les personnes notifiées lors des alertes. Chaque contact recevra les alertes selon les canaux configurés dans l\'onglet Seuils.'+
+      '</div>'+
+      '<button class="cfg-btn-primary" style="white-space:nowrap;margin-left:16px" onclick="_openAddContactModal()">＋ Ajouter</button>'+
+    '</div>';
+
+  if(!contacts.length){
+    html+='<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">'+
+      '<div style="font-size:40px;margin-bottom:12px;opacity:.3">👥</div>'+
+      'Aucun contact configuré.<br>Ajoutez les personnes à notifier en cas d\'alerte.</div>';
+  } else {
+    Object.keys(byRole).forEach(function(role){
+      var cs=byRole[role];
+      html+='<div style="margin-bottom:20px">'+
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">'+
+          (ROLES[role]||role)+
+        '</div>'+
+        '<div style="background:white;border:1.5px solid var(--border);border-radius:10px;overflow:hidden">';
+      cs.forEach(function(c,ci){
+        html+='<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;'+(ci<cs.length-1?'border-bottom:1px solid var(--border)':'')+(c.actif?'':'opacity:.5')+'">'+
+          '<div style="width:36px;height:36px;border-radius:50%;background:var(--amber-light);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:var(--amber-dark);flex-shrink:0">'+
+            escape_html((c.nom||'?')[0].toUpperCase())+
+          '</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(c.nom)+'</div>'+
+            '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+
+              (c.whatsapp?'💬 '+escape_html(c.whatsapp):'')+(c.whatsapp&&c.email?' · ':'')+
+              (c.email?'✉️ '+escape_html(c.email):'')+
+              (!c.whatsapp&&!c.email?'Aucun contact renseigné':'')+
+            '</div>'+
+          '</div>'+
+          (c.actif?
+            '<span style="font-size:10px;font-weight:700;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);padding:2px 8px;border-radius:10px">Actif</span>':
+            '<span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--creme);border:1px solid var(--border);padding:2px 8px;border-radius:10px">Inactif</span>')+
+          '<button class="config-eq-edit-btn" style="opacity:1" onclick="_openEditContactModal(\''+c.id+'\',\''+escape_html(c.nom)+'\',\''+escape_html(c.role||'')+'\',\''+escape_html(c.whatsapp||'')+'\',\''+escape_html(c.email||'')+'\','+c.actif+')" title="Modifier">✏️</button>'+
+        '</div>';
+      });
+      html+='</div></div>';
+    });
+  }
+
+  html+='</div>';
+  return html;
+}
+
+function _openAddContactModal(){
+  var roleOpts=['resp_tech','dir_tech','dir_ops','technicien','autre'].map(function(r){
+    var labels={resp_tech:'Resp. technique',dir_tech:'Dir. technique',dir_ops:'Dir. opérations',technicien:'Technicien',autre:'Autre'};
+    return '<option value="'+r+'">'+labels[r]+'</option>';
+  }).join('');
+  _showCfgModal(
+    '<div class="cfg-modal-title">👥 Ajouter un contact</div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Nom complet *</label>'+
+      '<input id="ct-new-nom" class="cfg-form-input" placeholder="Ibrahima Diallo" /></div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Rôle</label>'+
+      '<select id="ct-new-role" class="cfg-form-select">'+roleOpts+'</select></div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">WhatsApp</label>'+
+      '<input id="ct-new-wa" class="cfg-form-input" placeholder="+221 77 000 00 00" /></div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Email</label>'+
+      '<input id="ct-new-email" class="cfg-form-input" placeholder="ibrahima@hotel.sn" /></div>'+
+    '<div class="cfg-modal-footer">'+
+      '<button class="cfg-btn-secondary" onclick="_closeCfgModal()">Annuler</button>'+
+      '<button class="cfg-btn-primary" onclick="_saveNewContact()">Ajouter</button>'+
+    '</div>'
+  );
+}
+
+async function _saveNewContact(){
+  var nom=(document.getElementById('ct-new-nom')||{}).value;
+  if(!nom||!nom.trim()){alert('Nom requis');return;}
+  var role=(document.getElementById('ct-new-role')||{}).value||'autre';
+  var wa=(document.getElementById('ct-new-wa')||{}).value||null;
+  var email=(document.getElementById('ct-new-email')||{}).value||null;
+  _closeCfgModal();
+  await supaPost('contacts',{nom:nom.trim(),role:role,whatsapp:wa||null,email:email||null,site_id:_configCurrentSid,actif:true});
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _openEditContactModal(cId,nom,role,wa,email,actif){
+  var roleOpts=['resp_tech','dir_tech','dir_ops','technicien','autre'].map(function(r){
+    var labels={resp_tech:'Resp. technique',dir_tech:'Dir. technique',dir_ops:'Dir. opérations',technicien:'Technicien',autre:'Autre'};
+    return '<option value="'+r+'"'+(r===role?' selected':'')+'>'+labels[r]+'</option>';
+  }).join('');
+  _showCfgModal(
+    '<div class="cfg-modal-title">✏️ Modifier le contact</div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Nom complet *</label>'+
+      '<input id="ct-edit-nom" class="cfg-form-input" value="'+escape_html(nom)+'" /></div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Rôle</label>'+
+      '<select id="ct-edit-role" class="cfg-form-select">'+roleOpts+'</select></div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">WhatsApp</label>'+
+      '<input id="ct-edit-wa" class="cfg-form-input" value="'+escape_html(wa)+'" /></div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Email</label>'+
+      '<input id="ct-edit-email" class="cfg-form-input" value="'+escape_html(email)+'" /></div>'+
+    '<div class="cfg-form-group">'+
+      '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">'+
+        '<input type="checkbox" id="ct-edit-actif" '+(actif?'checked':'')+' /> Actif</label>'+
+    '</div>'+
+    '<div class="cfg-modal-footer">'+
+      '<button class="cfg-btn-secondary" onclick="_closeCfgModal()">Annuler</button>'+
+      '<button class="cfg-btn-primary" onclick="_saveEditContact(\''+cId+'\')">Enregistrer</button>'+
+    '</div>'
+  );
+}
+
+async function _saveEditContact(cId){
+  var nom=(document.getElementById('ct-edit-nom')||{}).value;
+  if(!nom||!nom.trim()){alert('Nom requis');return;}
+  var role=(document.getElementById('ct-edit-role')||{}).value||'autre';
+  var wa=(document.getElementById('ct-edit-wa')||{}).value||null;
+  var email=(document.getElementById('ct-edit-email')||{}).value||null;
+  var actif=!!(document.getElementById('ct-edit-actif')||{}).checked;
+  _closeCfgModal();
+  await supaPatch('contacts',cId,{nom:nom.trim(),role:role,whatsapp:wa||null,email:email||null,actif:actif});
+  if(_session)renderRespTech(_session,'config');
+}
+
 async function _buildSeuilsTab(sid){
   var equips=await supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,type_id,types_equipements(nom)&order=ordre_ronde.asc');
   if(!equips.length)return '<div class="placeholder-card" style="margin-top:16px"><div class="placeholder-icon">🎯</div>Aucun équipement configuré</div>';
   var eqIds=equips.map(function(e){return e.id;});
-  var questions=await supaGet('questions','equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&select=id,texte,type_reponse,unite,seuil_min,seuil_max,equipement_id,frequences&order=ordre.asc');
+  var questions=await supaGet('questions','equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&select=id,texte,type_reponse,unite,seuil_min,seuil_max,equipement_id,frequences,alerte_severite,alerte_canal&order=ordre.asc');
   // Only show numeric questions (can have seuils)
   var numQs=questions.filter(function(q){return q.type_reponse==='numerique'||q.seuil_min!=null||q.seuil_max!=null;});
   var eqMap={};equips.forEach(function(e){eqMap[e.id]=e;});
@@ -945,27 +1083,43 @@ async function _buildSeuilsTab(sid){
     var qs=byEq[eqId];
     var rowsHtml=qs.map(function(q,i){
       var freqStr=Array.isArray(q.frequences)?q.frequences.map(function(f){return f==='journalier'?'J':f==='hebdo'?'H':'M';}).join('/'):'-';
+      var sev=q.alerte_severite||'avertissement';
+      var canal=Array.isArray(q.alerte_canal)?q.alerte_canal:(q.alerte_canal?[q.alerte_canal]:['dashboard']);
+      var sevColors={critique:'var(--rouge)',avertissement:'var(--amber-dark)',info:'var(--bleu)'};
+      var sevLabels={critique:'🔴 Critique',avertissement:'🟠 Avertissement',info:'🔵 Info'};
       return '<tr>'+
-        '<td style="padding:9px 12px;font-size:12px;color:var(--text);border-bottom:1px solid var(--border)">'+(i===0?'':'')+
+        '<td style="padding:9px 12px;font-size:12px;color:var(--text);border-bottom:1px solid var(--border)">'+
           '<span style="display:block">'+escape_html(q.texte)+'</span>'+
           '<span style="font-size:10px;color:var(--text3)">'+freqStr+(q.unite?' · '+q.unite:'')+'</span>'+
         '</td>'+
         '<td style="padding:9px 12px;border-bottom:1px solid var(--border)">'+
           '<input class="seuil-input" type="number" placeholder="—" value="'+(q.seuil_min!=null?q.seuil_min:'')+'" '+
             'onblur="_saveSeuil(\''+q.id+'\',\'min\',this.value)" '+
-            'style="width:80px;border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;text-align:center;background:var(--vert-pale);outline:none" '+
-            'title="Seuil minimum — alerte si valeur en dessous" />'+
+            'style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;text-align:center;background:var(--vert-pale);outline:none" />'+
         '</td>'+
         '<td style="padding:9px 12px;border-bottom:1px solid var(--border)">'+
           '<input class="seuil-input" type="number" placeholder="—" value="'+(q.seuil_max!=null?q.seuil_max:'')+'" '+
             'onblur="_saveSeuil(\''+q.id+'\',\'max\',this.value)" '+
-            'style="width:80px;border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;text-align:center;background:var(--rouge-pale);outline:none" '+
-            'title="Seuil maximum — alerte si valeur au dessus" />'+
+            'style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;text-align:center;background:var(--rouge-pale);outline:none" />'+
         '</td>'+
-        '<td style="padding:9px 12px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text3)">'+
-          (q.seuil_min!=null||q.seuil_max!=null?
-            '<span style="color:var(--vert);font-weight:600">Actif</span>':
-            '<span style="color:var(--text3)">Aucun</span>')+
+        '<td style="padding:9px 12px;border-bottom:1px solid var(--border)">'+
+          '<select onchange="_saveAlerte(\''+q.id+'\',\'severite\',this.value)" '+
+            'style="border:1.5px solid var(--border);border-radius:6px;padding:4px 6px;font-size:11px;color:'+sevColors[sev]+';font-weight:600;background:white;outline:none;cursor:pointer">'+
+            ['critique','avertissement','info'].map(function(s){
+              return '<option value="'+s+'"'+(s===sev?' selected':'')+'>'+sevLabels[s]+'</option>';
+            }).join('')+
+          '</select>'+
+        '</td>'+
+        '<td style="padding:9px 12px;border-bottom:1px solid var(--border)">'+
+          '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+            ['dashboard','wa','email'].map(function(c){
+              var labels={dashboard:'📊 Dashboard',wa:'💬 WA',email:'✉️ Email'};
+              var checked=canal.indexOf(c)>=0;
+              return '<label style="display:flex;align-items:center;gap:3px;font-size:11px;cursor:pointer;white-space:nowrap">'+
+                '<input type="checkbox" '+(checked?'checked':'')+' onchange="_saveAlerteCanal(\''+q.id+'\',\''+c+'\',this.checked)" />'+
+                labels[c]+'</label>';
+            }).join('')+
+          '</div>'+
         '</td>'+
       '</tr>';
     }).join('');
@@ -980,9 +1134,10 @@ async function _buildSeuilsTab(sid){
         '<table style="width:100%;border-collapse:collapse">'+
           '<thead><tr style="background:var(--creme)">'+
             '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2)">Mesure</th>'+
-            '<th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--vert)">Seuil min ↑</th>'+
-            '<th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--rouge)">Seuil max ↓</th>'+
-            '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2)">Statut</th>'+
+            '<th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--vert)">Min ↑</th>'+
+            '<th style="padding:8px 12px;text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--rouge)">Max ↓</th>'+
+            '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2)">Sévérité</th>'+
+            '<th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2)">Notifier via</th>'+
           '</tr></thead>'+
           '<tbody>'+rowsHtml+'</tbody>'+
         '</table>'+
@@ -994,6 +1149,21 @@ async function _buildSeuilsTab(sid){
   return html+'</div>';
 }
 
+async function _saveAlerte(qId,field,val){
+  await supaPatch('questions',qId,{alerte_severite:val});
+}
+
+async function _saveAlerteCanal(qId,canal,checked){
+  // Fetch current canal array, toggle the value
+  var rows=await supaGet('questions','id=eq.'+qId+'&select=alerte_canal');
+  var current=rows&&rows[0]&&Array.isArray(rows[0].alerte_canal)?rows[0].alerte_canal:['dashboard'];
+  var updated=checked?
+    (current.indexOf(canal)<0?current.concat([canal]):current):
+    current.filter(function(c){return c!==canal;});
+  if(!updated.length)updated=['dashboard']; // always at least dashboard
+  await supaPatch('questions',qId,{alerte_canal:updated});
+}
+
 async function _saveSeuil(qId,type,val){
   var numVal=val!==''&&val!==null?parseFloat(val):null;
   var patch={};
@@ -1002,6 +1172,24 @@ async function _saveSeuil(qId,type,val){
   // Visual feedback
   var inputs=document.querySelectorAll('.seuil-input');
   // find the input that triggered this — flash border green briefly
+}
+
+async function _moveQ(qId, freqKey, dir){
+  var list=(window._eqQOrders&&window._eqQOrders[freqKey])||[];
+  var idx=list.findIndex(function(q){return q.id===qId;});
+  if(idx<0)return;
+  var swapIdx=idx+dir;
+  if(swapIdx<0||swapIdx>=list.length)return;
+  // Swap ordre values
+  var a=list[idx], b=list[swapIdx];
+  var tmpOrdre=a.ordre;
+  // If ordres are equal, assign distinct values
+  if(a.ordre===b.ordre){a.ordre=idx+1;b.ordre=swapIdx+1;}
+  await Promise.all([
+    supaPatch('questions',a.id,{ordre:b.ordre}),
+    supaPatch('questions',b.id,{ordre:tmpOrdre})
+  ]);
+  if(_session)renderRespTech(_session,'config');
 }
 
 function _switchConfigTab(tab){
@@ -1023,7 +1211,7 @@ async function _buildConfigRondePanel(sid,eqId,equips){
   var icon=_TYPE_ICONS[tNom]||'⚙️';
 
   // Query questions directly by equipement_id — source of truth
-  var questions=await supaGet('questions','equipement_id=eq.'+eqId+'&actif=eq.true&order=ordre.asc&select=id,texte,type_reponse,unite,seuil_min,seuil_max,frequences,exemple');
+  var questions=await supaGet('questions','equipement_id=eq.'+eqId+'&actif=eq.true&order=ordre.asc&select=id,texte,type_reponse,unite,seuil_min,seuil_max,frequences,exemple,ordre');
 
   // Group by frequency (each question can appear in multiple frequencies)
   var qByFreq={journalier:[],hebdo:[],mensuel:[]};
@@ -1075,11 +1263,21 @@ async function _buildConfigRondePanel(sid,eqId,equips){
     var cacheKey=eqId+'_'+rc.freq;
     _waCache[cacheKey]={freq:rc.freq,label:rc.label,eqNom:eq.nom,questions:qs.map(function(q){return{texte:q.texte,type:q.type_reponse,unite:q.unite,seuil_min:q.seuil_min,seuil_max:q.seuil_max,exemple:q.exemple};})};
 
-    var qHtml=qs.map(function(q){
+    // Store ordered question IDs for this freq in global for _moveQ
+    window._eqQOrders=window._eqQOrders||{};
+    window._eqQOrders[eqId+'_'+rc.freq]=qs.map(function(q){return{id:q.id,ordre:q.ordre};});
+
+    var qHtml=qs.map(function(q,qi){
       var seuilStr='';
       if(q.seuil_max!==null&&q.seuil_max!==undefined)seuilStr='≤ '+q.seuil_max+(q.unite?' '+q.unite:'');
       else if(q.seuil_min!==null&&q.seuil_min!==undefined)seuilStr='≥ '+q.seuil_min+(q.unite?' '+q.unite:'');
+      var isFirst=qi===0, isLast=qi===qs.length-1;
+      var freqKey=eqId+'_'+rc.freq;
       return '<div class="config-q-item">'+
+        '<div style="display:flex;flex-direction:column;gap:1px;margin-right:2px">'+
+          '<button class="config-q-move" '+(isFirst?'disabled':'')+' onclick="_moveQ(\''+q.id+'\',\''+freqKey+'\','+(-1)+')" title="Monter">▲</button>'+
+          '<button class="config-q-move" '+(isLast?'disabled':'')+' onclick="_moveQ(\''+q.id+'\',\''+freqKey+'\',1)" title="Descendre">▼</button>'+
+        '</div>'+
         '<div class="config-q-dot"></div>'+
         '<span class="config-q-label">'+escape_html(q.texte)+'</span>'+
         '<span class="config-q-type">'+escape_html(q.type_reponse||'texte')+'</span>'+
@@ -1261,6 +1459,47 @@ function _openAddEquipModal(){
       _updateModeleOptions();
     });
   });
+}
+
+function _openEditEquipModal(eqId, nom, actif){
+  _showCfgModal(
+    '<div class="cfg-modal-title">✏️ Modifier l\'équipement</div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Nom *</label>'+
+      '<input id="eq-edit-nom" class="cfg-form-input" value="'+escape_html(nom)+'" /></div>'+
+    '<div class="cfg-form-group">'+
+      '<label class="cfg-form-label">Statut</label>'+
+      '<div style="display:flex;gap:10px;margin-top:4px">'+
+        '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">'+
+          '<input type="radio" name="eq-edit-actif" value="true"'+(actif?' checked':'')+' /> Actif</label>'+
+        '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">'+
+          '<input type="radio" name="eq-edit-actif" value="false"'+(!actif?' checked':'')+' /> Inactif</label>'+
+      '</div>'+
+    '</div>'+
+    '<div class="cfg-modal-footer">'+
+      '<button class="cfg-btn-danger" onclick="_confirmDeleteEquip(\''+eqId+'\')" style="margin-right:auto">🗑 Supprimer</button>'+
+      '<button class="cfg-btn-secondary" onclick="_closeCfgModal()">Annuler</button>'+
+      '<button class="cfg-btn-primary" onclick="_saveEditEquip(\''+eqId+'\')">Enregistrer</button>'+
+    '</div>'
+  );
+}
+
+async function _saveEditEquip(eqId){
+  var nom=(document.getElementById('eq-edit-nom')||{}).value;
+  if(!nom||!nom.trim()){alert('Nom requis');return;}
+  var actifRadio=document.querySelector('input[name="eq-edit-actif"]:checked');
+  var actif=actifRadio?actifRadio.value==='true':true;
+  _closeCfgModal();
+  await supaPatch('equipements',eqId,{nom:nom.trim(),actif:actif});
+  if(eqId===_configSelectedEqId&&!actif)_configSelectedEqId=null;
+  if(_session)renderRespTech(_session,'config');
+}
+
+async function _confirmDeleteEquip(eqId){
+  if(!confirm('Supprimer cet équipement ? Toutes ses questions et rondes seront désactivées.'))return;
+  _closeCfgModal();
+  await supaPatch('equipements',eqId,{actif:false});
+  _configSelectedEqId=null;
+  if(_session)renderRespTech(_session,'config');
 }
 
 function _updateModeleOptions(){
