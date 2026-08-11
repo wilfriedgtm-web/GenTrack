@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>GenTrack · Signalement</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --dark:#12151E;--dark2:#1E2332;--dark3:#2A2F42;
+  --text:#1A1D28;--text2:#5A5F78;--text3:#9AA0B8;
+  --border:#E4E6EF;--bg:#F4F5FA;--white:#FFFFFF;
+  --amber:#E8A020;--amber-dark:#B87A10;--amber-pale:#FFF6E0;--amber-border:#F5D080;
+  --vert:#1B7A4A;--vert-pale:#E8F7EE;--vert-border:#A8DEC0;
+  --rouge:#C0392B;--rouge-pale:#FDF0EE;--rouge-border:#F0B8B2;
+  --orange:#D46B0A;--orange-pale:#FEF3E5;
+  --radius:16px;--radius-sm:10px;
+  --shadow:0 2px 12px rgba(18,21,30,.07);
+}
+body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;color:var(--text);min-height:100vh;overflow-x:hidden}
+
+.sg-header{
+  background:linear-gradient(145deg,var(--dark) 0%,var(--dark2) 100%);
+  padding:calc(env(safe-area-inset-top,0px) + 18px) 20px 22px;
+  box-shadow:0 2px 20px rgba(0,0,0,.25);
+}
+.sg-logo{font-size:10px;font-weight:800;letter-spacing:.2em;color:var(--amber);text-transform:uppercase;margin-bottom:14px}
+.sg-title{font-size:22px;font-weight:800;color:#fff;letter-spacing:-.02em;margin-bottom:4px}
+.sg-subtitle{font-size:13px;color:rgba(255,255,255,.55)}
+
+.sg-body{padding:20px 16px;max-width:480px;margin:0 auto}
+
+.sg-section{background:var(--white);border-radius:var(--radius);padding:18px 16px;margin-bottom:14px;box-shadow:var(--shadow)}
+.sg-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text2);margin-bottom:8px}
+.sg-input{width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;font-size:15px;color:var(--text);background:var(--bg);outline:none;transition:border-color .15s;font-family:inherit}
+.sg-input:focus{border-color:var(--amber);background:var(--white)}
+.sg-select{width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;font-size:15px;color:var(--text);background:var(--bg);outline:none;appearance:none;cursor:pointer;font-family:inherit}
+.sg-select:focus{border-color:var(--amber);background:var(--white)}
+.sg-textarea{width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;font-size:15px;color:var(--text);background:var(--bg);outline:none;resize:none;min-height:100px;font-family:inherit;transition:border-color .15s}
+.sg-textarea:focus{border-color:var(--amber);background:var(--white)}
+
+/* Type pills */
+.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.type-pill{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;font-weight:600;color:var(--text2);background:var(--white);cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;transition:all .15s}
+.type-pill.selected{border-color:var(--amber);background:var(--amber-pale);color:var(--dark)}
+.type-pill:active{transform:scale(.97)}
+
+/* Photo */
+.photo-zone{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;transition:border-color .15s;background:var(--bg);position:relative}
+.photo-zone:active{border-color:var(--amber)}
+.photo-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.photo-zone-icon{font-size:28px;margin-bottom:6px}
+.photo-zone-text{font-size:13px;color:var(--text3)}
+.photo-preview{width:100%;border-radius:var(--radius-sm);margin-top:10px;display:none;max-height:200px;object-fit:cover}
+
+/* Submit */
+.sg-submit{
+  width:100%;padding:16px;border:none;border-radius:var(--radius);
+  background:var(--amber);color:var(--dark);font-size:16px;font-weight:800;
+  cursor:pointer;transition:all .15s;letter-spacing:-.01em;
+  box-shadow:0 4px 16px rgba(232,160,32,.35);
+  margin-top:8px;margin-bottom:calc(env(safe-area-inset-bottom,0px) + 24px);
+}
+.sg-submit:active{transform:scale(.98);box-shadow:none}
+.sg-submit:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+/* Footer hint */
+.sg-footer-hint{text-align:center;font-size:12px;color:var(--text3);margin-top:6px;margin-bottom:24px}
+
+/* Confirmation screen */
+.sg-confirm{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:40px 24px;text-align:center}
+.sg-confirm-icon{font-size:64px;margin-bottom:20px;animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+.sg-confirm-title{font-size:22px;font-weight:800;color:var(--dark);margin-bottom:8px}
+.sg-confirm-sub{font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:32px}
+.sg-new-btn{border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 28px;font-size:14px;font-weight:700;color:var(--text);background:var(--white);cursor:pointer}
+
+/* Error banner */
+.sg-error{background:var(--rouge-pale);border:1.5px solid var(--rouge-border);border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:var(--rouge);margin-bottom:14px;display:none}
+
+/* Loading */
+.sg-loading{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:12px;color:var(--text2);font-size:14px}
+.sg-spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<div id="sg-loading" class="sg-loading" style="display:flex">
+  <div class="sg-spinner"></div>
+  <span>Chargement…</span>
+</div>
+
+<div id="sg-invalid" style="display:none;padding:40px 24px;text-align:center">
+  <div style="font-size:48px;margin-bottom:16px">⚠️</div>
+  <div style="font-size:18px;font-weight:700;color:var(--dark);margin-bottom:8px">Lien invalide</div>
+  <div style="font-size:14px;color:var(--text2)">Ce lien de signalement n'est pas valide.<br>Contactez votre responsable technique.</div>
+</div>
+
+<div id="sg-main" style="display:none">
+  <div class="sg-header">
+    <div class="sg-logo">GenTrack</div>
+    <div class="sg-title">📍 Signalement</div>
+    <div class="sg-subtitle" id="sg-site-name">Chargement…</div>
+  </div>
+
+  <div class="sg-body">
+    <div id="sg-error" class="sg-error"></div>
+
+    <!-- Qui signale -->
+    <div class="sg-section">
+      <div class="sg-label">Votre prénom</div>
+      <input id="sg-prenom" class="sg-input" type="text" placeholder="Ex : Fatou, Ibrahima…" autocomplete="given-name"/>
+    </div>
+
+    <!-- Équipement -->
+    <div class="sg-section">
+      <div class="sg-label">Équipement concerné</div>
+      <select id="sg-equip" class="sg-select">
+        <option value="">— Sélectionner —</option>
+      </select>
+    </div>
+
+    <!-- Type de problème -->
+    <div class="sg-section">
+      <div class="sg-label" style="margin-bottom:12px">Type de problème</div>
+      <div class="type-grid" id="sg-type-grid">
+        <button class="type-pill" data-type="panne" onclick="_selectType(this)">⚡ Panne</button>
+        <button class="type-pill" data-type="anomalie" onclick="_selectType(this)">👁 Anomalie visuelle</button>
+        <button class="type-pill" data-type="bruit" onclick="_selectType(this)">🔊 Bruit anormal</button>
+        <button class="type-pill" data-type="odeur" onclick="_selectType(this)">💨 Odeur suspecte</button>
+        <button class="type-pill" data-type="fuite" onclick="_selectType(this)">💧 Fuite</button>
+        <button class="type-pill" data-type="autre" onclick="_selectType(this)">📝 Autre</button>
+      </div>
+    </div>
+
+    <!-- Description -->
+    <div class="sg-section">
+      <div class="sg-label">Description</div>
+      <textarea id="sg-desc" class="sg-textarea" placeholder="Décrivez ce que vous avez observé…"></textarea>
+    </div>
+
+    <!-- Photo -->
+    <div class="sg-section">
+      <div class="sg-label">Photo (optionnelle)</div>
+      <div class="photo-zone" id="sg-photo-zone">
+        <input type="file" accept="image/*" capture="environment" id="sg-photo-input" onchange="_onPhotoChange(this)"/>
+        <div class="photo-zone-icon">📷</div>
+        <div class="photo-zone-text">Appuyer pour prendre une photo</div>
+      </div>
+      <img id="sg-photo-preview" class="photo-preview" alt="Aperçu"/>
+    </div>
+
+    <button id="sg-submit-btn" class="sg-submit" onclick="_submit()">Envoyer le signalement</button>
+    <div class="sg-footer-hint">Votre signalement sera transmis immédiatement à l'équipe technique.</div>
+  </div>
+</div>
+
+<div id="sg-confirm" class="sg-confirm">
+  <div class="sg-confirm-icon">✅</div>
+  <div class="sg-confirm-title">Signalement envoyé</div>
+  <div class="sg-confirm-sub">Merci ! L'équipe technique a été notifiée<br>et va prendre en charge le problème.</div>
+  <button class="sg-new-btn" onclick="_reset()">Faire un nouveau signalement</button>
+</div>
+
+<script>
+var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+
+var _groupeId=null;
+var _equips=[];
+var _selectedType=null;
+var _photoFile=null;
+
+function supa(table,query){
+  return fetch(SUPA_URL+'/rest/v1/'+table+'?'+query,{
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'}
+  }).then(function(r){return r.json();}).catch(function(){return[];});
+}
+
+function supaPost(table,data){
+  return fetch(SUPA_URL+'/rest/v1/'+table,{
+    method:'POST',
+    headers:{
+      'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,
+      'Content-Type':'application/json','Prefer':'return=minimal'
+    },
+    body:JSON.stringify(data)
+  }).then(function(r){
+    if(!r.ok)return r.text().then(function(t){throw new Error(t);});
+  });
+}
+
+async function init(){
+  var params=new URLSearchParams(location.search);
+  var siteId=params.get('site');
+  if(!siteId){_showInvalid();return;}
+
+  // Verify site exists
+  var sites=await supa('sites','id=eq.'+siteId+'&select=nom');
+  if(!sites||!sites[0]){_showInvalid();return;}
+  _groupeId=siteId; // groupe_id in signalements/alertes stores the site UUID
+
+  document.getElementById('sg-site-name').textContent=sites[0].nom||'';
+
+  // Load equipements
+  _equips=await supa('equipements','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,types_equipements(nom)&order=ordre_ronde.asc');
+  var sel=document.getElementById('sg-equip');
+  _equips.forEach(function(e){
+    var opt=document.createElement('option');
+    opt.value=e.id;
+    opt.textContent=(e.types_equipements&&e.types_equipements.nom?e.types_equipements.nom+' — ':'')+e.nom;
+    sel.appendChild(opt);
+  });
+
+  document.getElementById('sg-loading').style.display='none';
+  document.getElementById('sg-main').style.display='block';
+}
+
+function _showInvalid(){
+  document.getElementById('sg-loading').style.display='none';
+  document.getElementById('sg-invalid').style.display='block';
+}
+
+function _selectType(el){
+  document.querySelectorAll('.type-pill').forEach(function(b){b.classList.remove('selected');});
+  el.classList.add('selected');
+  _selectedType=el.getAttribute('data-type');
+}
+
+function _onPhotoChange(input){
+  var file=input.files&&input.files[0];
+  if(!file)return;
+  _photoFile=file;
+  var preview=document.getElementById('sg-photo-preview');
+  preview.src=URL.createObjectURL(file);
+  preview.style.display='block';
+  var zone=document.getElementById('sg-photo-zone');
+  zone.querySelector('.photo-zone-icon').textContent='✅';
+  zone.querySelector('.photo-zone-text').textContent=file.name;
+}
+
+async function _submit(){
+  var prenom=(document.getElementById('sg-prenom').value||'').trim();
+  var equipId=document.getElementById('sg-equip').value;
+  var desc=(document.getElementById('sg-desc').value||'').trim();
+  var errEl=document.getElementById('sg-error');
+
+  if(!desc){
+    errEl.textContent='Veuillez décrire le problème observé.';
+    errEl.style.display='block';
+    document.getElementById('sg-desc').focus();
+    return;
+  }
+  if(!_selectedType){
+    errEl.textContent='Veuillez sélectionner un type de problème.';
+    errEl.style.display='block';
+    return;
+  }
+  errEl.style.display='none';
+
+  var btn=document.getElementById('sg-submit-btn');
+  btn.disabled=true;
+  btn.textContent='Envoi en cours…';
+
+  try{
+    // Upload photo if present (skip if no storage bucket — just omit url)
+    var photoUrl=null;
+    // Photo upload via Supabase Storage would go here if bucket configured
+
+    await supaPost('signalements',{
+      groupe_id:_groupeId,
+      equipement_id:equipId||null,
+      signale_par:prenom||null,
+      type:_selectedType,
+      description:desc,
+      photo_url:photoUrl,
+      statut:'ouvert',
+      source:'formulaire'
+    });
+
+    // Also create alerte for immediate visibility in dashboard
+    await supaPost('alertes',{
+      groupe_id:_groupeId,
+      type:'signalement',
+      severite:'warning',
+      message:(prenom?prenom+' — ':'')+(_typeLabels[_selectedType]||_selectedType)+' : '+desc,
+      type_alerte:'signalement',
+      lue:false,
+      resolue:false
+    });
+
+    document.getElementById('sg-main').style.display='none';
+    document.getElementById('sg-confirm').style.display='flex';
+  }catch(e){
+    errEl.textContent='Erreur lors de l\'envoi. Réessayez ou contactez l\'équipe technique.';
+    errEl.style.display='block';
+    btn.disabled=false;
+    btn.textContent='Envoyer le signalement';
+  }
+}
+
+var _typeLabels={panne:'Panne',anomalie:'Anomalie visuelle',bruit:'Bruit anormal',odeur:'Odeur suspecte',fuite:'Fuite',autre:'Autre'};
+
+function _reset(){
+  document.getElementById('sg-confirm').style.display='none';
+  document.getElementById('sg-main').style.display='block';
+  document.getElementById('sg-prenom').value='';
+  document.getElementById('sg-equip').value='';
+  document.getElementById('sg-desc').value='';
+  document.querySelectorAll('.type-pill').forEach(function(b){b.classList.remove('selected');});
+  _selectedType=null;
+  _photoFile=null;
+  var preview=document.getElementById('sg-photo-preview');
+  preview.src='';preview.style.display='none';
+  var zone=document.getElementById('sg-photo-zone');
+  zone.querySelector('.photo-zone-icon').textContent='📷';
+  zone.querySelector('.photo-zone-text').textContent='Appuyer pour prendre une photo';
+}
+
+init();
+</script>
+</body>
+</html>

@@ -281,7 +281,7 @@ function app(){return $id('app');}
 function nowStr(){return new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
 function _updateAlertPill(n){var p=$id('topbar-alert-pill');if(!p)return;if(n>0){p.style.display='flex';p.textContent='⚠️ '+n+' alerte'+(n>1?'s':'');}else{p.style.display='none';}}
 function roleName(r){var m={dir_ops:'Directeur des opérations',dir_tech:'Directeur technique',resp_tech:'Responsable technique',technicien:'Technicien'};return m[r]||r;}
-function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',releves:'Relevés horaires',config:'Configuration'};return m[id]||'Accueil';}
+function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',releves:'Relevés horaires',signalements:'Signalements',maintenances:'Maintenance',config:'Configuration'};return m[id]||'Accueil';}
 function saveSession(s){_session=s;try{localStorage.setItem('gt_session',JSON.stringify(s));}catch(e){}}
 function loadStored(){try{return JSON.parse(localStorage.getItem('gt_session'));}catch(e){return null;}}
 function clearSession(){_session=null;try{localStorage.removeItem('gt_session');}catch(e){}}
@@ -423,7 +423,9 @@ function buildNavItems(role){
   var items=[{id:'accueil',icon:'🏠',label:'Accueil'},{id:'alertes',icon:'🔔',label:'Alertes',badge:true},{id:'historique',icon:'📊',label:'Historique'}];
   if(role==='resp_tech'){
     items.push({id:'releves',icon:'📋',label:'Relevés'});
-    items.push({id:'config',icon:'⚙️',label:'Configuration'});
+    items.push({id:'signalements',icon:'📍',label:'Signalements'});
+    items.push({id:'maintenances',icon:'🔧',label:'Maintenance'});
+    items.push({id:'config',icon:'⚙️',label:'Config'});
   }
   return items;
 }
@@ -505,6 +507,8 @@ async function _loadRT(session,nav){
     else if(nav==='alertes')html=await _rtAlertes(sid,cid);
     else if(nav==='historique')html=await _rtHistorique(sid);
     else if(nav==='releves')html=await _rtReleves(session,sid);
+    else if(nav==='signalements')html=await _rtSignalements(sid);
+    else if(nav==='maintenances')html=await _rtMaintenances(sid);
     else if(nav==='config')html=await _rtConfig(sid);
     el.innerHTML=html;
   }catch(e){
@@ -643,7 +647,7 @@ async function _rtAccueil(session,sid,cid){
           (lsOld?'⚠ ':'')+
           'Dernière valeur : '+ls.v+(ls.unite?' '+ls.unite:'')+' · '+_timeAgo(ls.t)+
         '</div>':'')+
-        (topReco?_buildRecoTag(topReco):'')+
+        (topReco?_buildRecoTag(topReco,e.id,e.nom,sid):'')+
       '</div>';
     });
     statut+='</div>';
@@ -1196,6 +1200,304 @@ async function _openRondeDetail(rondeId,dateStr,freq){
   document.getElementById('dp-body').innerHTML=html;
 }
 
+/* ══════════════════════════════════════
+   SIGNALEMENTS
+══════════════════════════════════════ */
+var _sgFilter='tous'; // tous | ouvert | en_cours | resolu
+
+var _SG_TYPES={panne:'⚡ Panne',anomalie:'👁 Anomalie',bruit:'🔊 Bruit',odeur:'💨 Odeur',fuite:'💧 Fuite',seuil:'📈 Seuil dépassé',autre:'📝 Autre'};
+var _SG_STATUTS={ouvert:{label:'Ouvert',color:'var(--rouge)',bg:'var(--rouge-pale)'},en_cours:{label:'En cours',color:'var(--orange)',bg:'var(--orange-pale)'},resolu:{label:'Résolu',color:'var(--vert)',bg:'var(--vert-pale)'}};
+
+async function _rtSignalements(sid){
+  var dc=document.getElementById('dash-content-main');
+  if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
+
+  var query='groupe_id=eq.'+sid+'&order=created_at.desc&limit=100&select=id,type,description,statut,signale_par,cout_intervention,note_resolution,resolved_by,resolved_at,created_at,equipement_id,source,equipements(nom)';
+  if(_sgFilter!=='tous')query+='&statut=eq.'+_sgFilter;
+  var rows=await supaGet('signalements',query);
+
+  var counts={tous:0,ouvert:0,en_cours:0,resolu:0};
+  rows.forEach(function(r){counts.tous++;counts[r.statut]=(counts[r.statut]||0)+1;});
+
+  var filterHtml=['tous','ouvert','en_cours','resolu'].map(function(f){
+    var labels={tous:'Tous',ouvert:'Ouverts',en_cours:'En cours',resolu:'Résolus'};
+    var n=counts[f]||0;
+    var active=_sgFilter===f;
+    return '<button onclick="_setSgFilter(\''+f+'\')" style="padding:6px 14px;border-radius:20px;border:1.5px solid '+(active?'var(--amber)':'var(--border)')+';background:'+(active?'var(--amber-pale)':'white')+';font-size:12px;font-weight:'+(active?'700':'500')+';color:'+(active?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+labels[f]+(n?' ('+n+')':'')+'</button>';
+  }).join('');
+
+  var cardsHtml='';
+  if(!rows.length){
+    cardsHtml='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px;opacity:.4">📍</div><div style="font-size:14px">Aucun signalement'+(_sgFilter!=='tous'?' dans cette catégorie':'')+'.</div></div>';
+  } else {
+    cardsHtml=rows.map(function(r){
+      var st=_SG_STATUTS[r.statut]||_SG_STATUTS.ouvert;
+      var typeLabel=_SG_TYPES[r.type]||r.type||'Autre';
+      var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:null;
+      var date=r.created_at?new Date(r.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+      return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:10px;border-left:4px solid '+st.color+'">'+
+        '<div style="display:flex;align-items:flex-start;gap:12px">'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">'+
+              '<span style="font-size:12px;font-weight:700;color:var(--dark)">'+typeLabel+'</span>'+
+              (eqNom?'<span style="font-size:11px;color:var(--text3)">· '+escape_html(eqNom)+'</span>':'')+
+              '<span style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:20px;background:'+st.bg+';color:'+st.color+';font-weight:700">'+st.label+'</span>'+
+            '</div>'+
+            '<div style="font-size:13px;color:var(--text);margin-bottom:6px;line-height:1.5">'+escape_html(r.description)+'</div>'+
+            '<div style="font-size:11px;color:var(--text3)">'+
+              (r.signale_par?'👤 '+escape_html(r.signale_par)+' · ':'')+'🕐 '+date+
+              (r.source==='formulaire'?' · 📱 Formulaire':r.source==='seuil_releve'?' · 📈 Seuil auto':'')+
+            '</div>'+
+            (r.note_resolution?'<div style="margin-top:8px;font-size:12px;background:var(--vert-pale);border-radius:8px;padding:8px 10px;color:var(--vert-text)">✅ '+escape_html(r.note_resolution)+(r.resolved_by?' · '+escape_html(r.resolved_by):'')+'</div>':'')+
+            (r.cout_intervention?'<div style="margin-top:4px;font-size:12px;color:var(--text2)">💰 Coût : '+r.cout_intervention+' FCFA</div>':'')+
+          '</div>'+
+        '</div>'+
+        (r.statut!=='resolu'?
+          '<div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'+
+            (r.statut==='ouvert'?'<button onclick="_sgEnCours(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;color:var(--text2);background:white;cursor:pointer">▶ Prendre en charge</button>':'')+
+            '<button onclick="_sgResoudre(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Marquer résolu</button>'+
+          '</div>':'')+
+      '</div>';
+    }).join('');
+  }
+
+  var siteId=sid; // for QR code / new signalement link
+  var sgUrl=location.origin+location.pathname.replace('dashboard.html','signalement.html')+'?site='+sid;
+
+  return '<div>'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+filterHtml+'</div>'+
+      '<button onclick="_sgCreerManuel(\''+sid+'\')" style="padding:8px 16px;border:none;border-radius:8px;background:var(--dark);color:white;font-size:12px;font-weight:700;cursor:pointer">＋ Nouveau signalement</button>'+
+    '</div>'+
+    cardsHtml+
+  '</div>';
+}
+
+function _setSgFilter(f){
+  _sgFilter=f;
+  if(_session)renderRespTech(_session,'signalements');
+}
+
+async function _sgEnCours(id){
+  await supaPatch('signalements',id,{statut:'en_cours'});
+  if(_session)renderRespTech(_session,'signalements');
+}
+
+async function _sgResoudre(id){
+  var note=prompt('Note de résolution (optionnelle) :');
+  var coutStr=prompt('Coût de l\'intervention en FCFA (laisser vide si gratuit) :');
+  var cout=coutStr&&!isNaN(parseFloat(coutStr))?parseFloat(coutStr):null;
+  var session=_session;
+  var nom=session&&session.contact&&session.contact.nom?session.contact.nom:null;
+  await supaPatch('signalements',id,{
+    statut:'resolu',
+    note_resolution:note||null,
+    cout_intervention:cout,
+    resolved_by:nom,
+    resolved_at:new Date().toISOString()
+  });
+  if(_session)renderRespTech(_session,'signalements');
+}
+
+function _sgCreerManuel(sid){
+  var equips_cache=[];
+  supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc').then(function(equips){
+    equips_cache=equips;
+    var eqOpts='<option value="">— Aucun / Général —</option>'+equips.map(function(e){return '<option value="'+e.id+'">'+escape_html(e.nom)+'</option>';}).join('');
+    var typeOpts=Object.keys(_SG_TYPES).map(function(k){return '<option value="'+k+'">'+_SG_TYPES[k]+'</option>';}).join('');
+    _showCfgModal(
+      '<h3 style="font-size:16px;font-weight:700;margin-bottom:16px">📍 Nouveau signalement</h3>'+
+      '<div style="display:flex;flex-direction:column;gap:12px">'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">ÉQUIPEMENT</label>'+
+        '<select id="sg-m-equip" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px">'+eqOpts+'</select></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">TYPE</label>'+
+        '<select id="sg-m-type" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px">'+typeOpts+'</select></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">DESCRIPTION</label>'+
+        '<textarea id="sg-m-desc" rows="3" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;resize:none" placeholder="Décrivez le problème…"></textarea></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">SIGNALÉ PAR</label>'+
+        '<input id="sg-m-par" type="text" value="'+escape_html((_session&&_session.contact&&_session.contact.nom)||'')+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;margin-top:16px">'+
+        '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
+        '<button onclick="_sgCreerManuelSubmit(\''+sid+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--amber);color:var(--dark);cursor:pointer">Créer</button>'+
+      '</div>'
+    );
+  });
+}
+
+async function _sgCreerManuelSubmit(sid){
+  var desc=(document.getElementById('sg-m-desc').value||'').trim();
+  var type=document.getElementById('sg-m-type').value;
+  var equipId=document.getElementById('sg-m-equip').value||null;
+  var par=(document.getElementById('sg-m-par').value||'').trim()||null;
+  if(!desc)return;
+  await supaPost('signalements',{groupe_id:sid,equipement_id:equipId,type:type,description:desc,signale_par:par,statut:'ouvert',source:'manuel'});
+  _closeCfgModal();
+  if(_session)renderRespTech(_session,'signalements');
+}
+
+/* ══════════════════════════════════════
+   MAINTENANCE
+══════════════════════════════════════ */
+var _mntFilter='tous'; // tous | panne | vidange | ravitaillement | preventive
+
+var _MNT_TYPES={
+  panne:{label:'Panne / Réparation',icon:'🔧',color:'var(--rouge)',bg:'var(--rouge-pale)'},
+  vidange:{label:'Vidange',icon:'🛢️',color:'var(--orange)',bg:'var(--orange-pale)'},
+  ravitaillement:{label:'Ravitaillement',icon:'⛽',color:'var(--bleu)',bg:'var(--bleu-pale)'},
+  preventive:{label:'Maintenance préventive',icon:'📅',color:'var(--vert)',bg:'var(--vert-pale)'}
+};
+
+async function _rtMaintenances(sid){
+  var dc=document.getElementById('dash-content-main');
+  if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
+
+  var since90=dateNJours(90);
+  var query='groupe_id=eq.'+sid+'&order=date_intervention.desc&limit=150&select=id,type,titre,description,date_intervention,date_planifiee,statut,cout,quantite,unite,prestataire,created_by,created_at,equipement_id,equipements(nom)';
+  if(_mntFilter!=='tous')query+='&type=eq.'+_mntFilter;
+  var rows=await supaGet('maintenances',query);
+
+  // Cost summary
+  var totalCout=rows.filter(function(r){return r.statut==='realise';}).reduce(function(s,r){return s+(r.cout||0);},0);
+  var byType={};
+  Object.keys(_MNT_TYPES).forEach(function(t){byType[t]=0;});
+  rows.forEach(function(r){if(r.type&&byType[r.type]!==undefined)byType[r.type]++;});
+
+  var filterHtml=['tous','panne','vidange','ravitaillement','preventive'].map(function(f){
+    var labels={tous:'Tous',panne:'Pannes',vidange:'Vidanges',ravitaillement:'Ravitaillements',preventive:'Préventive'};
+    var active=_mntFilter===f;
+    var n=f==='tous'?rows.length:(byType[f]||0);
+    return '<button onclick="_setMntFilter(\''+f+'\')" style="padding:6px 14px;border-radius:20px;border:1.5px solid '+(active?'var(--amber)':'var(--border)')+';background:'+(active?'var(--amber-pale)':'white')+';font-size:12px;font-weight:'+(active?'700':'500')+';color:'+(active?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+labels[f]+(n?' ('+n+')':'')+'</button>';
+  }).join('');
+
+  var cardsHtml='';
+  if(!rows.length){
+    cardsHtml='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px;opacity:.4">🔧</div><div style="font-size:14px">Aucune opération enregistrée'+(_mntFilter!=='tous'?' dans cette catégorie':'')+'.</div></div>';
+  } else {
+    cardsHtml=rows.map(function(r){
+      var t=_MNT_TYPES[r.type]||{label:r.type,icon:'🔧',color:'var(--text2)',bg:'var(--bg)'};
+      var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:null;
+      var date=r.date_intervention||r.date_planifiee||r.created_at;
+      var dateStr=date?new Date(date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'';
+      var isPlanifie=r.statut==='planifie';
+      return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+t.color+';opacity:'+(r.statut==='annule'?.5:1)+'">'+
+        '<div style="display:flex;align-items:flex-start;gap:12px">'+
+          '<div style="width:36px;height:36px;border-radius:10px;background:'+t.bg+';display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">'+t.icon+'</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">'+
+              '<span style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(r.titre||t.label)+'</span>'+
+              (isPlanifie?'<span style="font-size:10px;padding:2px 8px;border-radius:12px;background:var(--amber-pale);color:var(--amber-dark);font-weight:700">Planifié</span>':'')+
+            '</div>'+
+            (eqNom?'<div style="font-size:12px;color:var(--text2);margin-bottom:4px">'+escape_html(eqNom)+'</div>':'')+
+            (r.description?'<div style="font-size:13px;color:var(--text);margin-bottom:6px;line-height:1.5">'+escape_html(r.description)+'</div>':'')+
+            '<div style="font-size:11px;color:var(--text3);display:flex;flex-wrap:wrap;gap:10px">'+
+              (dateStr?'<span>📅 '+dateStr+'</span>':'')+
+              (r.prestataire?'<span>👷 '+escape_html(r.prestataire)+'</span>':'')+
+              (r.quantite?'<span>📦 '+r.quantite+(r.unite?' '+r.unite:'')+'</span>':'')+
+              (r.cout?'<span>💰 '+r.cout.toLocaleString('fr-FR')+' FCFA</span>':'')+
+              (r.created_by?'<span>👤 '+escape_html(r.created_by)+'</span>':'')+
+            '</div>'+
+          '</div>'+
+        '</div>'+
+        (isPlanifie?
+          '<div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
+            '<button onclick="_mntMarquerRealise(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Marquer réalisé</button>'+
+            '<button onclick="_mntAnnuler(\''+r.id+'\')" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;color:var(--text2);background:white;cursor:pointer">Annuler</button>'+
+          '</div>':'')+'</div>';
+    }).join('');
+  }
+
+  return '<div>'+
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 18px">'+
+      '<div style="font-size:22px">💰</div>'+
+      '<div>'+
+        '<div style="font-size:18px;font-weight:800;color:var(--dark)">'+totalCout.toLocaleString('fr-FR')+' FCFA</div>'+
+        '<div style="font-size:11px;color:var(--text3)">Coût total des opérations réalisées</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+filterHtml+'</div>'+
+      '<button onclick="_mntCreer(\''+sid+'\')" style="padding:8px 16px;border:none;border-radius:8px;background:var(--dark);color:white;font-size:12px;font-weight:700;cursor:pointer">＋ Nouvelle opération</button>'+
+    '</div>'+
+    cardsHtml+
+  '</div>';
+}
+
+function _setMntFilter(f){
+  _mntFilter=f;
+  if(_session)renderRespTech(_session,'maintenances');
+}
+
+async function _mntMarquerRealise(id){
+  var dateStr=prompt('Date de réalisation (AAAA-MM-JJ) :',new Date().toISOString().split('T')[0]);
+  var coutStr=prompt('Coût réel en FCFA :');
+  var cout=coutStr&&!isNaN(parseFloat(coutStr))?parseFloat(coutStr):null;
+  await supaPatch('maintenances',id,{statut:'realise',date_intervention:dateStr||new Date().toISOString().split('T')[0],cout:cout});
+  if(_session)renderRespTech(_session,'maintenances');
+}
+
+async function _mntAnnuler(id){
+  if(!confirm('Annuler cette opération planifiée ?'))return;
+  await supaPatch('maintenances',id,{statut:'annule'});
+  if(_session)renderRespTech(_session,'maintenances');
+}
+
+function _mntCreer(sid){
+  supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc').then(function(equips){
+    var eqOpts='<option value="">— Aucun / Général —</option>'+equips.map(function(e){return '<option value="'+e.id+'">'+escape_html(e.nom)+'</option>';}).join('');
+    var typeOpts=Object.keys(_MNT_TYPES).map(function(k){return '<option value="'+k+'">'+_MNT_TYPES[k].icon+' '+_MNT_TYPES[k].label+'</option>';}).join('');
+    _showCfgModal(
+      '<h3 style="font-size:16px;font-weight:700;margin-bottom:16px">🔧 Nouvelle opération</h3>'+
+      '<div style="display:flex;flex-direction:column;gap:12px">'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">TYPE</label>'+
+        '<select id="mnt-m-type" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px">'+typeOpts+'</select></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">ÉQUIPEMENT</label>'+
+        '<select id="mnt-m-equip" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px">'+eqOpts+'</select></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">TITRE</label>'+
+        '<input id="mnt-m-titre" type="text" placeholder="Ex : Remplacement filtre GE…" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">DATE</label>'+
+        '<input id="mnt-m-date" type="date" value="'+new Date().toISOString().split('T')[0]+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
+        '<div style="display:flex;gap:10px">'+
+          '<div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">COÛT (FCFA)</label>'+
+          '<input id="mnt-m-cout" type="number" placeholder="0" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
+          '<div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">PRESTATAIRE</label>'+
+          '<input id="mnt-m-prest" type="text" placeholder="Nom…" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
+        '</div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">NOTES</label>'+
+        '<textarea id="mnt-m-desc" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;resize:none" placeholder="Détails de l\'opération…"></textarea></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">STATUT</label>'+
+        '<select id="mnt-m-statut" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"><option value="realise">Réalisé</option><option value="planifie">Planifié</option></select></div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;margin-top:16px">'+
+        '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
+        '<button onclick="_mntCreerSubmit(\''+sid+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--amber);color:var(--dark);cursor:pointer">Enregistrer</button>'+
+      '</div>'
+    );
+  });
+}
+
+async function _mntCreerSubmit(sid){
+  var type=document.getElementById('mnt-m-type').value;
+  var equipId=document.getElementById('mnt-m-equip').value||null;
+  var titre=(document.getElementById('mnt-m-titre').value||'').trim();
+  var date=document.getElementById('mnt-m-date').value;
+  var coutStr=document.getElementById('mnt-m-cout').value;
+  var cout=coutStr&&!isNaN(parseFloat(coutStr))?parseFloat(coutStr):null;
+  var prest=(document.getElementById('mnt-m-prest').value||'').trim()||null;
+  var desc=(document.getElementById('mnt-m-desc').value||'').trim()||null;
+  var statut=document.getElementById('mnt-m-statut').value;
+  var nom=_session&&_session.contact&&_session.contact.nom?_session.contact.nom:null;
+  if(!titre&&type){titre=(_MNT_TYPES[type]&&_MNT_TYPES[type].label)||type;}
+  await supaPost('maintenances',{
+    groupe_id:sid,equipement_id:equipId,type:type,titre:titre,
+    description:desc,date_intervention:statut==='realise'?date:null,
+    date_planifiee:statut==='planifie'?date:null,
+    statut:statut,cout:cout,prestataire:prest,created_by:nom
+  });
+  _closeCfgModal();
+  if(_session)renderRespTech(_session,'maintenances');
+}
+
 async function _rtConfig(sid){
   _configCurrentSid=sid;
   var types=await supaGet('types_equipements','select=id,nom&order=nom');
@@ -1334,7 +1636,38 @@ async function _buildContactsTab(sid){
     });
   }
 
+  // QR code signalement
+  var sgUrl=location.origin+location.pathname.replace('dashboard.html','signalement.html')+'?site='+sid;
+  html+='<div style="margin-top:24px;background:white;border:1.5px solid var(--border);border-radius:12px;padding:18px 20px">'+
+    '<div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:6px">📍 Formulaire de signalement</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.5">Partagez ce lien ou ce QR code à la réception pour permettre à quiconque de signaler un problème sans connexion.</div>'+
+    '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+
+      '<div id="sg-qr-'+sid+'"></div>'+
+      '<div style="flex:1;min-width:200px">'+
+        '<div style="font-size:11px;color:var(--text3);margin-bottom:6px">Lien direct :</div>'+
+        '<div style="font-size:11px;font-family:monospace;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;word-break:break-all;color:var(--text)">'+escape_html(sgUrl)+'</div>'+
+        '<div style="display:flex;gap:8px;margin-top:10px">'+
+          '<button onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+sgUrl+'\')" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-weight:600;background:white;cursor:pointer;color:var(--text)">📋 Copier</button>'+
+          '<a href="'+sgUrl+'" target="_blank" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-weight:600;background:white;cursor:pointer;color:var(--text);text-decoration:none">↗ Ouvrir</a>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+
   html+='</div>';
+
+  // Generate QR code using QR server API (no JS lib needed)
+  html+='<script>'+
+    '(function(){'+
+      'var el=document.getElementById("sg-qr-'+sid+'");'+
+      'if(el){'+
+        'var img=document.createElement("img");'+
+        'img.src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data="+encodeURIComponent("'+sgUrl+'");'+
+        'img.style="border-radius:8px;border:1px solid var(--border)";img.width=120;img.height=120;'+
+        'el.appendChild(img);}'+
+    '})();'+
+  '<\/script>';
+
   return html;
 }
 
@@ -2922,17 +3255,47 @@ function _timeAgo(isoStr){
   return'il y a '+Math.round(diff/1440)+'j';
 }
 
-function _buildRecoTag(reco){
+// Store reco data for action buttons (keyed by eqId+index to avoid JSON in onclick)
+var _recoCache={};
+
+function _buildRecoTag(reco,eqId,eqNom,sid){
   var cfgs={
-    immediate:{bg:'var(--rouge-pale)',border:'var(--rouge-border)',color:'var(--rouge)',icon:'🔴'},
-    preventive:{bg:'var(--orange-pale)',border:'var(--orange-border)',color:'var(--orange)',icon:'🟡'},
-    operationnelle:{bg:'var(--amber-pale)',border:'var(--amber-border)',color:'var(--amber)',icon:'🔧'}
+    immediate:{bg:'var(--rouge-pale)',border:'var(--rouge-border)',color:'var(--rouge)',icon:'🔴',btnLabel:'Créer un signalement',btnFn:'_recoSignaler'},
+    preventive:{bg:'var(--orange-pale)',border:'var(--orange-border)',color:'var(--orange)',icon:'🟡',btnLabel:'Planifier une maintenance',btnFn:'_recoPlanifier'},
+    operationnelle:{bg:'var(--amber-pale)',border:'var(--amber-border)',color:'var(--amber)',icon:'🔧',btnLabel:'Signaler vétusté',btnFn:'_recoVetuste'}
   };
   var cfg=cfgs[reco.type]||cfgs.operationnelle;
-  return '<div style="display:flex;align-items:flex-start;gap:6px;background:'+cfg.bg+';border:1px solid '+cfg.border+';border-radius:6px;padding:6px 10px">'+
-    '<span style="font-size:13px;flex-shrink:0;margin-top:1px">'+cfg.icon+'</span>'+
-    '<span style="font-size:11px;color:'+cfg.color+';line-height:1.4">'+escape_html(reco.message)+'</span>'+
+  var cacheKey=(eqId||'x')+'_'+reco.type;
+  _recoCache[cacheKey]={reco:reco,eqId:eqId,eqNom:eqNom,sid:sid};
+  var btnHtml=eqId&&sid?
+    '<button onclick="'+cfg.btnFn+'(\''+cacheKey+'\')" style="margin-top:6px;padding:5px 10px;border:1px solid '+cfg.border+';border-radius:6px;background:white;font-size:11px;font-weight:700;color:'+cfg.color+';cursor:pointer;width:100%">'+cfg.btnLabel+' →</button>':'';
+  return '<div style="background:'+cfg.bg+';border:1px solid '+cfg.border+';border-radius:6px;padding:6px 10px">'+
+    '<div style="display:flex;align-items:flex-start;gap:6px">'+
+      '<span style="font-size:13px;flex-shrink:0;margin-top:1px">'+cfg.icon+'</span>'+
+      '<span style="font-size:11px;color:'+cfg.color+';line-height:1.4">'+escape_html(reco.message)+'</span>'+
+    '</div>'+
+    btnHtml+
   '</div>';
+}
+
+async function _recoSignaler(cacheKey){
+  var d=_recoCache[cacheKey];if(!d)return;
+  await supaPost('signalements',{groupe_id:d.sid,equipement_id:d.eqId,type:'panne',description:d.reco.message,signale_par:(_session&&_session.contact&&_session.contact.nom)||null,statut:'ouvert',source:'manuel'});
+  navTo('signalements');
+}
+
+async function _recoPlanifier(cacheKey){
+  var d=_recoCache[cacheKey];if(!d)return;
+  var date=prompt('Date planifiée (AAAA-MM-JJ) :',new Date(Date.now()+7*86400000).toISOString().split('T')[0]);
+  if(!date)return;
+  await supaPost('maintenances',{groupe_id:d.sid,equipement_id:d.eqId,type:'preventive',titre:'Maintenance préventive — '+escape_html(d.eqNom||''),description:d.reco.message,date_planifiee:date,statut:'planifie',created_by:(_session&&_session.contact&&_session.contact.nom)||null});
+  navTo('maintenances');
+}
+
+async function _recoVetuste(cacheKey){
+  var d=_recoCache[cacheKey];if(!d)return;
+  await supaPost('signalements',{groupe_id:d.sid,equipement_id:d.eqId,type:'autre',description:'Vétusté — '+d.reco.message,signale_par:(_session&&_session.contact&&_session.contact.nom)||null,statut:'ouvert',source:'manuel'});
+  navTo('signalements');
 }
 
 async function _fetchRecoEquipements(sid){
