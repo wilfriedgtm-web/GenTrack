@@ -1212,7 +1212,7 @@ async function _rtSignalements(sid){
   var dc=document.getElementById('dash-content-main');
   if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
 
-  var query='groupe_id=eq.'+sid+'&order=created_at.desc&limit=100&select=id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,created_at,equipement_id,source,equipements(nom)';
+  var query='groupe_id=eq.'+sid+'&order=created_at.desc&limit=100&select=id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,created_at,equipement_id,source,equipements(nom)';
   if(_sgFilter!=='tous')query+='&statut=eq.'+_sgFilter;
   var rows=await supaGet('signalements',query);
 
@@ -1254,13 +1254,14 @@ async function _rtSignalements(sid){
               '🕐 '+date+
               (r.source==='formulaire'?'  📱 Formulaire':r.source==='seuil_releve'?'  📈 Seuil auto':'')+
             '</div>'+
+            (r.assigne_a?'<div style="margin-top:6px;font-size:12px;background:var(--amber-pale);border-radius:6px;padding:5px 10px;color:var(--amber-dark);font-weight:600;display:inline-block">👷 Affecté à '+escape_html(r.assigne_a)+'</div>':'')+
             (r.note_resolution?'<div style="margin-top:8px;font-size:12px;background:var(--vert-pale);border-radius:8px;padding:8px 10px;color:var(--vert)">✅ '+escape_html(r.note_resolution)+(r.resolved_by?' · '+escape_html(r.resolved_by):'')+'</div>':'')+
             (r.cout_intervention?'<div style="margin-top:6px;font-size:12px;font-weight:600;color:var(--text)">💰 '+Number(r.cout_intervention).toLocaleString('fr-FR')+' FCFA</div>':'')+
           '</div>'+
         '</div>'+
-        '<div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'+
+        '<div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);flex-wrap:wrap">'+
           '<button onclick="_sgDetail(\''+r.id+'\')" style="padding:7px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;color:var(--text2);background:white;cursor:pointer">🔍 Détails</button>'+
-          (r.statut==='ouvert'?'<button onclick="_sgEnCours(\''+r.id+'\')" style="flex:1;padding:7px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;color:var(--text2);background:white;cursor:pointer">▶ Prendre en charge</button>':'')+
+          (r.statut!=='resolu'?'<button onclick="_sgAffecter(\''+r.id+'\')" style="padding:7px 12px;border:1.5px solid var(--amber-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--amber-dark);background:var(--amber-pale);cursor:pointer">👷 Affecter</button>':'')+
           (r.statut!=='resolu'?'<button onclick="_sgResoudre(\''+r.id+'\')" style="flex:1;padding:7px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Résoudre</button>':'')+
         '</div>'+
       '</div>';
@@ -1311,6 +1312,51 @@ async function _sgResoudreSubmit(id){
   var cout=coutStr&&!isNaN(parseFloat(coutStr))?parseFloat(coutStr):null;
   var nom=_session&&_session.contact&&_session.contact.nom?_session.contact.nom:null;
   await supaPatch('signalements',id,{statut:'resolu',note_resolution:note,cout_intervention:cout,resolved_by:nom,resolved_at:new Date().toISOString()});
+  _closeCfgModal();
+
+  // Si c'est une panne, proposer de créer l'entrée maintenance
+  var r=window._sgRows&&window._sgRows[id];
+  if(r&&r.type==='panne'){
+    _showCfgModal(
+      '<h3 style="font-size:15px;font-weight:700;margin-bottom:8px">🔧 Enregistrer dans Maintenance ?</h3>'+
+      '<div style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.5">Cette panne a été résolue. Voulez-vous créer une fiche de maintenance pour garder la trace opérationnelle et financière ?</div>'+
+      '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">PRESTATAIRE / TECHNICIEN</label>'+
+        '<input id="sg-mnt-prest" type="text" value="'+escape_html(r.assigne_a||'')+'" placeholder="Nom du technicien" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">COÛT RÉEL (FCFA)</label>'+
+        '<input id="sg-mnt-cout" type="number" value="'+(cout||'')+'" placeholder="0 si gratuit" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px">'+
+        '<button onclick="_closeCfgModal();if(_session)renderRespTech(_session,\'signalements\')" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Non merci</button>'+
+        '<button onclick="_sgCreerMaintenance(\''+id+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--dark);color:white;cursor:pointer">✅ Créer la fiche</button>'+
+      '</div>'
+    );
+  } else {
+    if(_session)renderRespTech(_session,'signalements');
+  }
+}
+
+async function _sgCreerMaintenance(sgId){
+  var r=window._sgRows&&window._sgRows[sgId];
+  if(!r)return;
+  var sid=_session&&_session.site_ids&&_session.site_ids[0];
+  var nom=_session&&_session.contact&&_session.contact.nom?_session.contact.nom:null;
+  var prest=(document.getElementById('sg-mnt-prest').value||'').trim()||r.assigne_a||null;
+  var coutStr=document.getElementById('sg-mnt-cout').value;
+  var cout=coutStr&&!isNaN(parseFloat(coutStr))?parseFloat(coutStr):null;
+  var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
+  await supaPost('maintenances',{
+    groupe_id:sid,
+    equipement_id:r.equipement_id||null,
+    type:'panne',
+    titre:'Panne résolue'+(eqNom?' — '+eqNom:''),
+    description:r.description,
+    date_intervention:new Date().toISOString().split('T')[0],
+    statut:'realise',
+    cout:cout,
+    prestataire:prest,
+    created_by:nom
+  });
   _closeCfgModal();
   if(_session)renderRespTech(_session,'signalements');
 }
@@ -1370,6 +1416,7 @@ function _sgDetail(id){
     row('Lieu',r.lieu?escape_html(r.lieu):null)+
     row('Signalé par',r.signale_par?escape_html(r.signale_par):null)+
     row('Source',r.source==='formulaire'?'📱 Formulaire QR':r.source==='seuil_releve'?'📈 Seuil automatique':'Manuel')+
+    row('Affecté à',r.assigne_a?'👷 '+escape_html(r.assigne_a):null)+
     row('Date',date)+
     (r.note_resolution?row('Note résolution','✅ '+escape_html(r.note_resolution)+(r.resolved_by?' ('+escape_html(r.resolved_by)+')':'')):'')+
     (r.cout_intervention?row('Coût intervention',Number(r.cout_intervention).toLocaleString('fr-FR')+' FCFA'):'')+
@@ -1379,6 +1426,75 @@ function _sgDetail(id){
       '<button onclick="_closeCfgModal()" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Fermer</button>'+
     '</div>';
   _showCfgModal('<h3 style="font-size:15px;font-weight:700;margin-bottom:4px">🔍 Détail du signalement</h3>'+html);
+}
+
+function _sgAffecter(id){
+  var r=window._sgRows&&window._sgRows[id];
+  if(!r)return;
+  var sid=_session&&_session.site_ids&&_session.site_ids[0];
+  if(!sid)return;
+  supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,whatsapp,role&order=nom.asc').then(function(contacts){
+    if(!contacts.length){
+      alert('Aucun contact configuré pour ce site. Ajoutez des contacts dans Config > Contacts.');
+      return;
+    }
+    var contactsHtml=contacts.map(function(c){
+      return '<div onclick="_sgAffecterSelect(\''+id+'\',\''+escape_html(c.nom)+'\',\''+escape_html(c.whatsapp||'')+'\',this)" style="padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:border-color 0.15s" data-id="'+c.id+'">'+
+        '<div style="width:34px;height:34px;border-radius:50%;background:var(--amber-pale);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--amber-dark);flex-shrink:0">'+escape_html(c.nom.charAt(0).toUpperCase())+'</div>'+
+        '<div><div style="font-size:13px;font-weight:600;color:var(--text)">'+escape_html(c.nom)+'</div>'+
+        '<div style="font-size:11px;color:var(--text3)">'+escape_html(c.role||'')+(c.whatsapp?'  📱 '+escape_html(c.whatsapp):'')+'</div></div>'+
+      '</div>';
+    }).join('');
+    var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
+    var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
+    var desc=r.description||'';
+    _showCfgModal(
+      '<h3 style="font-size:15px;font-weight:700;margin-bottom:4px">👷 Affecter le signalement</h3>'+
+      '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">'+escape_html(typeLabel)+(eqNom?' · '+escape_html(eqNom):'')+'</div>'+
+      '<div style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:16px">'+contactsHtml+'</div>'+
+      '<div id="sg-aff-selected" style="display:none;background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:8px;padding:10px 12px;font-size:13px;font-weight:600;color:var(--amber-dark);margin-bottom:12px"></div>'+
+      '<div style="display:flex;gap:8px">'+
+        '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
+        '<button id="sg-aff-btn" onclick="_sgAffecterConfirm(\''+id+'\')" disabled style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--amber);color:var(--dark);cursor:pointer;opacity:0.4">Affecter & WhatsApp →</button>'+
+      '</div>'
+    );
+  });
+}
+
+var _sgAffecterChosen={nom:'',wa:''};
+
+function _sgAffecterSelect(id,nom,wa,el){
+  _sgAffecterChosen={nom:nom,wa:wa};
+  // highlight selected
+  document.querySelectorAll('[data-id]').forEach(function(d){d.style.borderColor='var(--border)';d.style.background='white';});
+  el.style.borderColor='var(--amber)';el.style.background='var(--amber-pale)';
+  var sel=document.getElementById('sg-aff-selected');
+  if(sel){sel.style.display='block';sel.textContent='✓ '+nom+(wa?'  📱 '+wa:'');}
+  var btn=document.getElementById('sg-aff-btn');
+  if(btn){btn.disabled=false;btn.style.opacity='1';}
+}
+
+async function _sgAffecterConfirm(id){
+  var r=window._sgRows&&window._sgRows[id];
+  if(!r||!_sgAffecterChosen.nom)return;
+  // Patch signalement
+  await supaPatch('signalements',id,{assigne_a:_sgAffecterChosen.nom,statut:'en_cours'});
+  // Construire message WhatsApp
+  var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
+  var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
+  var lieu=r.lieu||'';
+  var msg='🔧 *Intervention requise — GenTrack*\n\n'+
+    '📍 *Type :* '+typeLabel+'\n'+
+    (eqNom?'⚙️ *Équipement :* '+eqNom+'\n':'')+
+    (lieu?'📍 *Lieu :* '+lieu+'\n':'')+
+    '📝 *Détail :* '+r.description+'\n\n'+
+    'Merci de prendre en charge et de confirmer.';
+  _closeCfgModal();
+  if(_sgAffecterChosen.wa){
+    var waNum=_sgAffecterChosen.wa.replace(/\D/g,'');
+    window.open('https://wa.me/'+waNum+'?text='+encodeURIComponent(msg),'_blank');
+  }
+  if(_session)renderRespTech(_session,'signalements');
 }
 
 /* ══════════════════════════════════════
