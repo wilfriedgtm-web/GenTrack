@@ -268,6 +268,7 @@ async function supaPost(table,data){
     headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
     body:JSON.stringify(data)
   });
+  if(!r.ok){var err=await r.text();throw new Error('POST /'+table+' → '+r.status+': '+err);}
   var rows=await r.json();
   return Array.isArray(rows)?rows[0]:rows;
 }
@@ -639,36 +640,52 @@ async function _submitReleve(){
   var submit=document.getElementById('rh-submit');
   if(submit){submit.disabled=true;submit.textContent='Envoi en cours…';}
 
-  var nbAlertes=0;
-  var posts=_questions.map(function(q){
-    var val=String(_answers[q.id]!=null?_answers[q.id]:'');
-    if(q.type_reponse==='numerique'){
-      var num=parseFloat(val.replace(',','.'));
-      if(!isNaN(num)){
-        if(q.seuil_min!=null&&num<q.seuil_min)nbAlertes++;
-        else if(q.seuil_max!=null&&num>q.seuil_max)nbAlertes++;
+  try{
+    var nbAlertes=0;
+    var posts=_questions.map(function(q){
+      var val=String(_answers[q.id]!=null?_answers[q.id]:'');
+      if(q.type_reponse==='numerique'){
+        var num=parseFloat(val.replace(',','.'));
+        if(!isNaN(num)){
+          if(q.seuil_min!=null&&num<q.seuil_min)nbAlertes++;
+          else if(q.seuil_max!=null&&num>q.seuil_max)nbAlertes++;
+        }
       }
-    }
-    return supaPost('reponses',{
-      question_id:q.id,valeur:val,
-      releve_id:_releve.id,ronde_equipement_id:null
+      return supaPost('reponses',{
+        question_id:q.id,valeur:val,
+        releve_id:_releve.id,ronde_equipement_id:null
+      });
     });
-  });
-  await Promise.all(posts);
+    await Promise.all(posts);
 
-  // Save observations
-  var obsPosts=Object.keys(_obs).filter(function(eqId){return _obs[eqId];}).map(function(eqId){
-    return supaPost('releve_observations',{releve_id:_releve.id,equipement_id:eqId,texte:_obs[eqId]});
-  });
-  await Promise.all(obsPosts);
+    // Save observations
+    var obsKeys=Object.keys(_obs).filter(function(k){return _obs[k];});
+    await Promise.all(obsKeys.map(function(eqId){
+      return supaPost('releve_observations',{releve_id:_releve.id,equipement_id:eqId,texte:_obs[eqId]});
+    }));
 
-  await supaPatch('releves_horaires',_releve.id,{
-    statut:'validé',validated_at:new Date().toISOString(),
-    nb_valeurs:_questions.length,nb_alertes:nbAlertes
-  });
+    await supaPatch('releves_horaires',_releve.id,{
+      statut:'validé',validated_at:new Date().toISOString(),
+      nb_valeurs:_questions.length,nb_alertes:nbAlertes
+    });
 
-  if(_clock)clearInterval(_clock);
-  showConfirmation(false,nbAlertes,Object.keys(_obs).filter(function(k){return _obs[k];}).length);
+    if(_clock)clearInterval(_clock);
+    showConfirmation(false,nbAlertes,obsKeys.length);
+
+  }catch(err){
+    console.error('Submit error:',err);
+    // Show error inline without losing the form
+    var submit=document.getElementById('rh-submit');
+    if(submit){submit.disabled=false;submit.textContent='Valider le relevé →';}
+    var existing=document.getElementById('rh-submit-err');
+    if(existing)existing.remove();
+    var errDiv=document.createElement('div');
+    errDiv.id='rh-submit-err';
+    errDiv.style.cssText='background:#FDF0EE;border:1.5px solid #F0B8B2;border-radius:10px;padding:10px 14px;margin-top:10px;font-size:12px;color:#9B2D22;font-weight:600;line-height:1.5';
+    errDiv.textContent='❌ Erreur lors de l\'envoi. Vérifiez votre connexion et réessayez. ('+String(err).slice(0,120)+')';
+    var footer=document.querySelector('.rh-footer');
+    if(footer)footer.appendChild(errDiv);
+  }
 }
 
 function showConfirmation(alreadyDone,nbAlertes,nbObs){
