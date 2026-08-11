@@ -82,9 +82,21 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .mobile-header-role{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-top:2px}
 .mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--dark);height:var(--nav-h);z-index:100;border-top:1px solid rgba(255,255,255,0.06)}
 .mobile-nav-inner{display:flex;height:100%}
-.mobile-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:rgba(255,255,255,0.38);font-size:9px;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer;border:none;background:none;transition:color 0.12s;border-bottom:3px solid transparent}
+.mobile-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,0.38);font-size:9px;letter-spacing:0.5px;text-transform:uppercase;cursor:pointer;border:none;background:none;transition:color 0.12s;border-bottom:3px solid transparent;position:relative}
 .mobile-nav-item.active{color:var(--amber);border-bottom-color:var(--amber)}
-.mobile-nav-icon{font-size:18px}
+.mobile-nav-icon{font-size:20px}
+.mobile-nav-badge{position:absolute;top:6px;right:calc(50% - 14px);width:8px;height:8px;border-radius:50%;background:var(--rouge);border:2px solid var(--dark)}
+/* Plus panel */
+.plus-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:150}
+.plus-overlay.open{display:block}
+.plus-panel{position:fixed;bottom:var(--nav-h);left:0;right:0;background:var(--dark);border-radius:20px 20px 0 0;padding:12px 0 8px;z-index:151;transform:translateY(100%);transition:transform 0.22s cubic-bezier(0.4,0,0.2,1)}
+.plus-panel.open{transform:translateY(0)}
+.plus-panel-handle{width:36px;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin:0 auto 14px}
+.plus-panel-item{display:flex;align-items:center;gap:14px;padding:13px 24px;color:rgba(255,255,255,0.8);font-size:13px;cursor:pointer;border:none;background:none;width:100%;text-align:left;transition:background 0.1s}
+.plus-panel-item:hover{background:rgba(255,255,255,0.05)}
+.plus-panel-item.active-item{color:var(--amber)}
+.plus-panel-icon{font-size:18px;width:24px;text-align:center}
+.plus-panel-badge{margin-left:auto;font-size:10px;padding:2px 8px;border-radius:10px;background:var(--rouge);color:white;font-weight:600}
 @media(max-width:768px){
   .sidebar{display:none}.dash-main{margin-left:0;padding-bottom:calc(var(--nav-h) + 16px)}
   .mobile-nav{display:flex}.mobile-header{display:flex}.dash-topbar{display:none}.dash-content{padding:16px}
@@ -279,7 +291,13 @@ var _configCurrentTab='equipements';
 function $id(id){return document.getElementById(id);}
 function app(){return $id('app');}
 function nowStr(){return new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
-function _updateAlertPill(n){var p=$id('topbar-alert-pill');if(!p)return;if(n>0){p.style.display='flex';p.textContent='⚠️ '+n+' alerte'+(n>1?'s':'');}else{p.style.display='none';}}
+function _updateAlertPill(n){
+  var p=$id('topbar-alert-pill');
+  if(p){if(n>0){p.style.display='flex';p.textContent='⚠️ '+n+' alerte'+(n>1?'s':'');}else{p.style.display='none';}}
+  // badge mobile
+  var badges=document.querySelectorAll('.mobile-nav-badge');
+  badges.forEach(function(b){b.style.display=n>0?'block':'none';});
+}
 function roleName(r){var m={dir_ops:'Directeur des opérations',dir_tech:'Directeur technique',resp_tech:'Responsable technique',technicien:'Technicien'};return m[r]||r;}
 function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',releves:'Relevés horaires',signalements:'Signalements',maintenances:'Maintenance',config:'Configuration'};return m[id]||'Accueil';}
 function saveSession(s){_session=s;try{localStorage.setItem('gt_session',JSON.stringify(s));}catch(e){}}
@@ -451,11 +469,52 @@ function buildSidebar(session,activeNav){
 function buildMobileHeader(s){
   return '<div class="mobile-header"><div><div class="mobile-header-logo">GEN<span>TRACK</span></div><div class="mobile-header-role">'+roleName(s.role)+'</div></div></div>';
 }
-function buildMobileNav(role,activeNav){
-  var items=buildNavItems(role);
-  return '<div class="mobile-nav"><div class="mobile-nav-inner">'+items.map(function(it){
-    return '<button class="mobile-nav-item'+(it.id===activeNav?' active':'')+'" onclick="navTo(\''+it.id+'\')"><span class="mobile-nav-icon">'+it.icon+'</span>'+it.label+'</button>';
-  }).join('')+'</div></div>';
+function buildMobileNav(role,activeNav,alerteBadge){
+  var allItems=buildNavItems(role);
+  // 4 fixed: Accueil · Alertes · Rondes · Plus
+  var fixed=[
+    {id:'accueil',icon:'🏠',label:'Accueil'},
+    {id:'alertes',icon:'🔔',label:'Alertes',badge:alerteBadge},
+    {id:'historique',icon:'📊',label:'Rondes'},
+    {id:'__plus__',icon:'⋯',label:'Plus'}
+  ];
+  var plusIds=['releves','signalements','maintenances','config'];
+  var plusItems=allItems.filter(function(it){return plusIds.indexOf(it.id)!==-1;});
+  var plusActive=plusItems.some(function(it){return it.id===activeNav;});
+
+  var navHtml=fixed.map(function(it){
+    var isPlus=it.id==='__plus__';
+    var isActive=isPlus?plusActive:(it.id===activeNav);
+    return '<button class="mobile-nav-item'+(isActive?' active':'')+'" onclick="'+(isPlus?'_togglePlusPanel()':'navTo(\''+it.id+'\')')+'" aria-label="'+it.label+'">'+
+      '<span class="mobile-nav-icon">'+it.icon+'</span>'+
+      (it.badge?'<span class="mobile-nav-badge"></span>':'')+
+      '<span>'+it.label+'</span>'+
+    '</button>';
+  }).join('');
+
+  var plusHtml='<div class="plus-overlay" id="plus-overlay" onclick="_togglePlusPanel()"></div>'+
+    '<div class="plus-panel" id="plus-panel">'+
+      '<div class="plus-panel-handle"></div>'+
+      plusItems.map(function(it){
+        return '<button class="plus-panel-item'+(it.id===activeNav?' active-item':'')+'" onclick="navTo(\''+it.id+'\');_togglePlusPanel()">'+
+          '<span class="plus-panel-icon">'+it.icon+'</span>'+it.label+
+        '</button>';
+      }).join('')+
+      '<button class="plus-panel-item" onclick="_openRapportHebdo(7);_togglePlusPanel()">'+
+        '<span class="plus-panel-icon">📄</span>Rapport hebdo'+
+      '</button>'+
+    '</div>';
+
+  return plusHtml+'<div class="mobile-nav"><div class="mobile-nav-inner">'+navHtml+'</div></div>';
+}
+
+function _togglePlusPanel(){
+  var ov=document.getElementById('plus-overlay');
+  var pn=document.getElementById('plus-panel');
+  if(!ov||!pn)return;
+  var open=pn.classList.contains('open');
+  if(open){pn.classList.remove('open');ov.classList.remove('open');}
+  else{pn.classList.add('open');ov.classList.add('open');}
 }
 function buildLayout(session,activeNav,contentHtml){
   var exportBtn='<div style="display:flex;align-items:center;gap:8px">'+
@@ -481,7 +540,7 @@ function buildLayout(session,activeNav,contentHtml){
         exportBtn+
       '</div>'+
     '</div>'+
-    '<div class="dash-content" id="dash-content-main">'+contentHtml+'</div></div>'+buildMobileNav(session.role,activeNav);
+    '<div class="dash-content" id="dash-content-main">'+contentHtml+'</div></div>'+buildMobileNav(session.role,activeNav,false);
 }
 
 /* ══════════════════════════════════════
@@ -526,8 +585,8 @@ async function _rtAccueil(session,sid,cid){
   var[rondes,equips,alertes,pannes,recoData]=await Promise.all([
     supaGet('rondes','site_id=eq.'+sid+'&date_ronde=eq.'+today+'&select=id,frequence,date_ronde'),
     supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,ordre_ronde,type_id,conso_theorique_lh,capacite_litres,seuil_vidange_heures,types_equipements(nom)&order=ordre_ronde.asc'),
-    supaGet('alertes','client_id=eq.'+cid+'&resolue=eq.false&select=id,type,severite,message,created_at&order=created_at.desc&limit=20'),
-    supaGet('pannes','site_id=eq.'+sid+'&resolue=eq.false&select=id,type,description,date_panne,equipements(nom)&order=date_panne.desc&limit=20'),
+    supaGet('alertes','groupe_id=eq.'+sid+'&resolue=eq.false&select=id,type,severite,type_alerte,message,created_at&order=created_at.desc&limit=20'),
+    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&statut=neq.resolu&select=id,type,description,created_at,equipement_id,equipements(nom)&order=created_at.desc&limit=20'),
     _fetchRecoEquipements(sid)
   ]);
   var rIds=rondes.map(function(r){return r.id;});
@@ -660,7 +719,29 @@ async function _rtAccueil(session,sid,cid){
   if(nbAlertes===0){
     alertesHtml+='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Aucune alerte</div><div class="ab-sub">Tous les systèmes sont opérationnels</div></div></div>';
   }else{
-    alertesHtml+=_buildAlerteCards(alertes,pannes,'accueil');
+    alertesHtml+='<div style="display:flex;flex-direction:column;gap:8px">';
+    alertes.forEach(function(a){
+      var isDanger=a.severite==='danger'||a.severite==='critical';
+      var bl=isDanger?'var(--rouge)':'var(--orange)';
+      var bg=isDanger?'var(--rouge-pale)':'var(--orange-pale)';
+      var bd=isDanger?'var(--rouge-border)':'var(--orange-border)';
+      alertesHtml+='<div class="alerte-card" style="background:'+bg+';border:1px solid '+bd+';border-left:3px solid '+bl+'">'+
+        '<span style="font-size:15px">'+( isDanger?'🔴':'🟡')+'</span>'+
+        '<div style="flex:1"><div class="alerte-card-titre" style="color:'+bl+'">'+escape_html(_alerteTypeLabel(a.type_alerte||a.type))+'</div>'+
+        '<div class="alerte-card-msg">'+escape_html(a.message||'')+'</div></div>'+
+        '<button class="btn-traite" onclick="_resolveAlerte(\''+a.id+'\')">✓ Traité</button>'+
+      '</div>';
+    });
+    pannes.forEach(function(sg){
+      var eqNom=sg.equipements&&sg.equipements.nom?' · '+sg.equipements.nom:'';
+      alertesHtml+='<div class="alerte-card" style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge)">'+
+        '<span style="font-size:15px">🔴</span>'+
+        '<div style="flex:1"><div class="alerte-card-titre" style="color:var(--rouge)">Panne'+escape_html(eqNom)+'</div>'+
+        '<div class="alerte-card-msg">'+escape_html(sg.description||'')+'</div></div>'+
+        '<button class="btn-traite" onclick="navTo(\'alertes\')">Voir →</button>'+
+      '</div>';
+    });
+    alertesHtml+='</div>';
   }
 
   _updateAlertPill(nbAlertes);
@@ -767,49 +848,128 @@ function _buildVidangesSection(geEquips,geQs,vidanges){
 
 /* ── Alertes (vue complète) ── */
 async function _rtAlertes(sid,cid){
-  var[alertes,pannes]=await Promise.all([
-    supaGet('alertes','client_id=eq.'+cid+'&resolue=eq.false&select=id,type,severite,message,created_at&order=created_at.desc'),
-    supaGet('pannes','site_id=eq.'+sid+'&resolue=eq.false&select=id,type,description,date_panne,equipements(nom)&order=date_panne.desc')
+  var cutoff30=dateNJours(30);
+  var[actives,historique,anomalies]=await Promise.all([
+    supaGet('alertes','groupe_id=eq.'+sid+'&resolue=eq.false&select=id,type,severite,type_alerte,message,created_at&order=created_at.desc&limit=50'),
+    supaGet('alertes','groupe_id=eq.'+sid+'&resolue=eq.true&created_at=gte.'+cutoff30+'T00:00:00&select=id,type,severite,type_alerte,message,created_at&order=created_at.desc&limit=30'),
+    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.anomalie&statut=neq.resolu&select=id,description,equipement_id,created_at,equipements(nom)&order=created_at.desc&limit=20')
   ]);
-  if(alertes.length===0&&pannes.length===0){
-    return '<div class="alert-banner ok" style="margin-top:12px"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Aucune alerte active</div><div class="ab-sub">Tous les systèmes fonctionnent normalement</div></div></div>';
+
+  // marquer toutes les alertes actives comme lues
+  if(actives.length){
+    var ids=actives.map(function(a){return a.id;});
+    supaGet('alertes','id=in.('+ids.join(',')+')'+'&select=id').then(function(){});
+    // patch lue=true en arrière-plan
+    ids.forEach(function(id){supaPatch('alertes',id,{lue:true}).catch(function(){});});
   }
-  return '<div style="margin-top:4px">'+_buildAlerteCards(alertes,pannes,'alertes')+'</div>';
+
+  var h='<div style="display:flex;flex-direction:column;gap:16px">';
+
+  // ── Actives ──
+  var totalActif=actives.length+anomalies.length;
+  h+='<div>';
+  h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+    '<div style="font-size:13px;font-weight:600;color:var(--text)">Alertes actives</div>'+
+    (totalActif>0?'<span style="background:var(--rouge);color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">'+totalActif+'</span>':'')+
+  '</div>';
+
+  if(totalActif===0){
+    h+='<div style="background:var(--vert-pale,#E8F5EE);border:1px solid #B6DFC6;border-radius:10px;padding:16px;display:flex;align-items:center;gap:12px">'+
+      '<span style="font-size:22px">✅</span>'+
+      '<div><div style="font-size:13px;font-weight:600;color:var(--vert)">Aucune alerte active</div><div style="font-size:11px;color:var(--text3);margin-top:2px">Tous les systèmes fonctionnent normalement</div></div>'+
+    '</div>';
+  } else {
+    h+='<div style="display:flex;flex-direction:column;gap:8px">';
+    actives.forEach(function(a){
+      var isDanger=a.severite==='danger'||a.severite==='critical';
+      var bg=isDanger?'var(--rouge-pale)':'var(--orange-pale)';
+      var bd=isDanger?'var(--rouge-border)':'var(--orange-border)';
+      var bl=isDanger?'var(--rouge)':'var(--orange)';
+      var typeLabel=_alerteTypeLabel(a.type_alerte||a.type);
+      var ts=a.created_at?_relativeTime(a.created_at):'';
+      h+='<div style="background:'+bg+';border:1px solid '+bd+';border-left:3px solid '+bl+';border-radius:10px;padding:12px 14px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+          '<div style="flex:1">'+
+            '<div style="font-size:11px;font-weight:600;color:'+bl+';text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">'+escape_html(typeLabel)+'</div>'+
+            '<div style="font-size:12px;color:var(--text);line-height:1.4">'+escape_html(a.message||'')+'</div>'+
+            (ts?'<div style="font-size:10px;color:var(--text3);margin-top:5px">'+ts+'</div>':'')+
+          '</div>'+
+        '</div>'+
+        '<div style="display:flex;gap:6px;margin-top:10px">'+
+          (a.type==='signalement'||a.type_alerte==='signalement'?
+            '<button onclick="navTo(\'signalements\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid '+bd+';background:none;font-size:11px;color:'+bl+';cursor:pointer">Voir signalements</button>':'')+
+          '<button onclick="_resolveAlerte(\''+a.id+'\')" style="flex:1;padding:6px;border-radius:6px;border:none;background:'+bl+';color:white;font-size:11px;font-weight:600;cursor:pointer">✓ Résolu</button>'+
+        '</div>'+
+      '</div>';
+    });
+    anomalies.forEach(function(sg){
+      var eqNom=sg.equipements&&sg.equipements.nom?sg.equipements.nom:'';
+      var ts=sg.created_at?_relativeTime(sg.created_at):'';
+      h+='<div style="background:var(--orange-pale);border:1px solid var(--orange-border);border-left:3px solid var(--orange);border-radius:10px;padding:12px 14px">'+
+        '<div style="font-size:11px;font-weight:600;color:var(--orange);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Anomalie ronde'+(eqNom?' · '+escape_html(eqNom):'')+'</div>'+
+        '<div style="font-size:12px;color:var(--text);line-height:1.4">'+escape_html(sg.description||'')+'</div>'+
+        (ts?'<div style="font-size:10px;color:var(--text3);margin-top:5px">'+ts+'</div>':'')+
+        '<div style="display:flex;gap:6px;margin-top:10px">'+
+          '<button onclick="navTo(\'signalements\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--orange-border);background:none;font-size:11px;color:var(--orange);cursor:pointer">Voir signalement</button>'+
+          '<button onclick="_resolveSg(\''+sg.id+'\')" style="flex:1;padding:6px;border-radius:6px;border:none;background:var(--orange);color:white;font-size:11px;font-weight:600;cursor:pointer">✓ Résolu</button>'+
+        '</div>'+
+      '</div>';
+    });
+    h+='</div>';
+  }
+  h+='</div>';
+
+  // ── Historique 30 jours ──
+  if(historique.length>0){
+    h+='<div>';
+    h+='<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">Historique (30 jours)</div>';
+    h+='<div style="display:flex;flex-direction:column;gap:6px">';
+    historique.forEach(function(a){
+      var typeLabel=_alerteTypeLabel(a.type_alerte||a.type);
+      var ts=a.created_at?new Date(a.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+      h+='<div style="background:var(--surface,#F9F6F0);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;opacity:.75">'+
+        '<div style="flex:1">'+
+          '<div style="font-size:11px;font-weight:600;color:var(--text2)">'+escape_html(typeLabel)+'</div>'+
+          '<div style="font-size:11px;color:var(--text3);margin-top:2px;line-height:1.4">'+escape_html((a.message||'').substring(0,80))+'</div>'+
+        '</div>'+
+        '<div style="text-align:right;flex-shrink:0">'+
+          '<span style="font-size:10px;padding:2px 7px;border-radius:8px;background:#E8F5EE;color:var(--vert);font-weight:600">✓ Résolu</span>'+
+          (ts?'<div style="font-size:10px;color:var(--text3);margin-top:4px">'+ts+'</div>':'')+
+        '</div>'+
+      '</div>';
+    });
+    h+='</div></div>';
+  }
+
+  h+='</div>';
+  return h;
 }
 
-function _buildAlerteCards(alertes,pannes,fromNav){
-  var h='<div style="display:flex;flex-direction:column;gap:8px">';
-  alertes.forEach(function(a){
-    var crit=a.severite==='critical';
-    var bg=crit?'var(--rouge-pale)':'var(--orange-pale)';
-    var bd=crit?'var(--rouge-border)':'var(--orange-border)';
-    var bl=crit?'var(--rouge)':'var(--orange)';
-    var dot=crit?'🔴':'🟡';
-    var ts=a.created_at?new Date(a.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-    h+='<div class="alerte-card" style="background:'+bg+';border:1px solid '+bd+';border-left:3px solid '+bl+'">'+
-      '<span style="font-size:16px;margin-top:1px">'+dot+'</span>'+
-      '<div style="flex:1">'+
-        '<div class="alerte-card-titre" style="color:'+bl+'">'+escape_html(a.type||'Alerte')+'</div>'+
-        '<div class="alerte-card-msg">'+escape_html(a.message||'')+'</div>'+
-        (ts?'<div style="font-size:10px;color:var(--text3);margin-top:4px">'+ts+'</div>':'')+
-      '</div>'+
-      '<button class="btn-traite" onclick="_marquerTraite(\'alertes\',\''+a.id+'\',\''+fromNav+'\')">✓ Traité</button>'+
-    '</div>';
-  });
-  pannes.forEach(function(p){
-    var eqNom=p.equipements&&p.equipements.nom?' · '+p.equipements.nom:'';
-    var ts=p.date_panne?new Date(p.date_panne).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-    h+='<div class="alerte-card" style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge)">'+
-      '<span style="font-size:16px;margin-top:1px">🔴</span>'+
-      '<div style="flex:1">'+
-        '<div class="alerte-card-titre" style="color:var(--rouge)">Panne'+escape_html(eqNom)+'</div>'+
-        '<div class="alerte-card-msg">'+escape_html((p.type?p.type+' — ':'')+( p.description||''))+'</div>'+
-        (ts?'<div style="font-size:10px;color:var(--text3);margin-top:4px">'+ts+'</div>':'')+
-      '</div>'+
-      '<button class="btn-traite" onclick="_marquerTraite(\'pannes\',\''+p.id+'\',\''+fromNav+'\')">✓ Résolu</button>'+
-    '</div>';
-  });
-  return h+'</div>';
+function _alerteTypeLabel(type){
+  var map={
+    'panne':'Panne équipement','plein_manque':'Niveau anormal','seuil_depasse':'Seuil dépassé',
+    'signalement':'Signalement','anomalie':'Anomalie','derive':'Dérive température',
+    'maintenance':'Maintenance requise'
+  };
+  return map[type]||type||'Alerte';
+}
+
+function _relativeTime(ts){
+  var diff=Date.now()-new Date(ts).getTime();
+  var m=Math.floor(diff/60000);
+  if(m<60)return 'Il y a '+m+' min';
+  var h=Math.floor(m/60);
+  if(h<24)return 'Il y a '+h+'h';
+  return 'Il y a '+Math.floor(h/24)+' j';
+}
+
+async function _resolveAlerte(id){
+  await supaPatch('alertes',id,{resolue:true});
+  navTo('alertes');
+}
+async function _resolveSg(id){
+  await supaPatch('signalements',id,{statut:'resolu',resolved_at:new Date().toISOString()});
+  navTo('alertes');
 }
 
 async function _marquerTraite(table,id,fromNav){
