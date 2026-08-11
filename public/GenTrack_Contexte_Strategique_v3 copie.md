@@ -7,7 +7,7 @@
 | **Zone géographique** | Afrique francophone subsaharienne |
 | **Siège** | Dakar, Sénégal |
 | **Repo GitHub** | wilfriedgtm-web/GenTrack · branche main |
-| **Version** | v1.5 — Août 2026 |
+| **Version** | v1.4 — Juillet 2026 |
 
 # **Sommaire**
 
@@ -79,52 +79,16 @@ GenTrack est une solution SaaS de gestion opérationnelle des équipements criti
 - Alerte maintenance : rappel vidange basé sur les heures moteur cumulées
 - Alerte anomalie : détection d'une surconsommation ou sous-utilisation
 
-## **Vision produit étendue — Mini-GMAO WhatsApp**
-
-À mesure que GenTrack gagne des clients hôteliers et industriels, le produit évolue naturellement vers une mini-GMAO (Gestion de Maintenance Assistée par Ordinateur) accessible via WhatsApp — sans les complexités et coûts d'un GMAO classique.
-
-### **4 profils utilisateurs**
-
-| **Profil** | **Interface** | **Rôle** |
-| --- | --- | --- |
-| **Technicien** | WhatsApp uniquement | Saisie rondes, signalement pannes, BT terrain |
-| **Réception** | WhatsApp uniquement | Signalement incidents chambres/espaces communs |
-| **Resp. technique** | WhatsApp + Dashboard | Gestion BT, validation rondes, suivi équipements |
-| **Directeur** | Dashboard uniquement | Vue consolidée, consommations, coûts, KPIs |
-
-### **5 modules dashboard**
-
-1. **Opérations** — suivi temps réel des équipements, rondes du jour, statuts
-2. **Consommations** — électricité (kWh), eau (m³), carburant (L) — courbes + estimations
-3. **Maintenance / Bons de travaux** — BT ouverts, historique, coûts, délais d'intervention
-4. **Incidents** — signalements réception + techniciens, traçabilité complète
-5. **Équipements** — fiche technique, historique pannes/vidanges, marque/référence/série
-
-### **Flux bot étendu (futur)**
-
-- Technicien : `saisie`, `saisie 2`, `saisie semaine`, `saisie mois`, `saisie autre`, `panne`, `vidange`, `ravitaillement`, `aide`
-- Réception : `signalement` → description → localisation → photo → BT créé automatiquement
-- Resp. tech. : `rapport` → résumé du jour envoyé par message
-
 ## **Roadmap produit**
 
-### **Court terme — Q4 2026 (Oct–Nov)**
+### **Court terme (Q3 2026)**
 
-- **Rondes complètes** — permettre d'ajouter facilement tous les équipements demandés par le client (plus limité à 3 équipements en démo). Admin : ajout rapide avec marque/référence, ordre de ronde, fréquences. Objectif : Pullman Dakar avec 7 équipements réels opérationnel
-- **Types de saisie multiples** — implémenter dans le webhook les commandes `saisie 2` (2ème shift), `saisie semaine` (ronde hebdo — questions avec `frequences=['hebdo']`), `saisie mois` (ronde mensuelle), `saisie autre` (inspection libre). Une commande = une nouvelle ronde. Plusieurs rondes/jour = normal et supporté
-- **Commande `aide`** — le bot répond avec la liste des commandes disponibles selon le rôle du technicien. Toujours disponible, même en cours de ronde
-- **Configuration Pullman Dakar** — après réception fiche collecte de Ndiaga Diouf : 2 GE SDMO 1 400 kVA, cuve 8 725 L, 3 chambres froides, groupe eau glacée
-- **Seen Abidjan** — activer les contacts WhatsApp techniciens
-- **Export PDF** — rapport mensuel exportable depuis le dashboard client
+- Révision complète du système d'alertes — définir précisément quelles alertes existent, leur fréquence, leurs seuils, et s'assurer qu'elles fonctionnent correctement pour tous les clients
+- Rondes hebdomadaires et mensuelles — certains équipements (chambres froides, groupe eau glacée, etc.) nécessitent des fréquences de saisie différentes de la ronde quotidienne GE. Concevoir et implémenter différents types de rondes : quotidienne, hebdomadaire, mensuelle
+- Export PDF des rapports mensuels pour les directions
+- Seen Abidjan — activer les contacts WhatsApp techniciens
 
-### **Moyen terme — Nov–Déc 2026**
-
-- **Signalements réception** — nouvelle commande `signalement` pour les non-techniciens (réceptionnistes, gardiens). Description libre + localisation + photo facultative → incident créé dans la base → resp_tech notifié → BT généré automatiquement
-- **Bons de travaux (BT)** — module complet : création manuelle ou automatique depuis panne/signalement, assignation technicien, statuts (ouvert / en cours / terminé), durée et coût, historique par équipement
-- **Suivi consommations** — saisie mensuelle ou hebdo électricité (kWh relevé compteur), eau (m³), fioul consommé. Dashboard avec courbes, comparatifs mois/mois, estimations coût
-- **WhatsApp production** — avant le premier client payant : créer compte Facebook Business Manager → soumettre numéro dédié à Meta → passer à 360dialog (~50$/mois) pour lever les limites sandbox Twilio (pas d'opt-in forcé, numéro propre GenTrack, SLA)
-
-### **Long terme (2027)**
+### **Moyen terme (2027)**
 
 - Extension à d'autres équipements : pompes, véhicules de flotte, climatiseurs industriels
 - Intelligence artificielle : prédiction de pannes et recommandations proactives
@@ -180,13 +144,12 @@ Ces tables existent encore en base pour conserver l'historique mais ne sont plus
 | **saisies** | Données historiques conservées — plus alimentées |
 | **saisies_cuve** | Données historiques conservées — plus alimentées |
 
-## **État des clients — Août 2026**
+## **État des clients — Juillet 2026**
 
 | **Client** | **Sites** | **Système** | **Statut** |
 | --- | --- | --- | --- |
 | **Mangalis** | Noom Abidjan, Seen Abidjan | Nouveau ✅ | En production — rondes actives |
 | **Azalaï Dakar** | Azalaï Hotel Dakar | Nouveau ✅ | Migré — G1, G2, Cuve carburant actifs |
-| **Pullman Dakar Teranga** | Pullman Dakar (Accor) | Nouveau ✅ | Prospect actif — démo 04/08/2026, accord de principe pilote |
 | **ONOMO** | — | — | Supprimé (prospect inactif) |
 
 ## **Edge Functions Supabase**
@@ -263,12 +226,6 @@ Déclenchée à la création d'un client — envoie les messages de bienvenue à
 - ✅ Pannes v2 migrées — webhook v64 — panne/résolu/vidange sur `equipements`, notifications vers `contacts`
 - ✅ Dashboard client — journal des rondes avec détail complet cliquable (toutes réponses, tous équipements)
 
-## **Ce qui a été livré — Août 2026**
-
-- ✅ Anomalies self-explanatory — `buildAnomaliesNew` affiche désormais `val (attendu : [valeur_attendue])` pour les questions choix, rendant chaque anomalie compréhensible sans contexte
-- ✅ Vidange fix — compteur restant calculé depuis la dernière vidange (`compteur - heures_au_moment`), GE1 affiche correctement 0/250h post-vidange
-- ✅ Démo Pullman Dakar Teranga (04/08/2026) — première démo groupe hôtelier Accor, accord de principe pilote obtenu avec Ndiaga Diouf (Adjoint RT)
-
 ---
 
 # **4. Commercial**
@@ -315,20 +272,6 @@ Déclenchée à la création d'un client — envoie les messages de bienvenue à
 - Cibler 5 à 10 clients pilotes à Dakar (hôtels, cliniques)
 - Démo sur site personnalisée avec un cas concret chiffré
 - Offre de démarrage gratuite 30 jours pour lever les freins
-
-**Prospects actifs — Août 2026**
-
-| **Prospect** | **Contact** | **Statut** | **Notes** |
-| --- | --- | --- | --- |
-| **Pullman Dakar Teranga** (Accor 5★) | Ndiaga Diouf — Adjoint RT — +221 78 620 07 10 | Démo faite 04/08, accord pilote | 2 GE SDMO 1 400 kVA, cuve 8 725 L, 3 CF, GEG. Rondes toutes les 2-3h. GMAO Itis + Maintenance Hotel actuellement. Follow-up 05/08 avant 16h |
-
-**Profil client hôtelier — enseignements Pullman Dakar**
-
-- Rondes multiples par jour (toutes les 2-3h) — GenTrack supporte plusieurs rondes/jour ✅
-- Équipes structurées avec GMAO existante — GenTrack complète (saisie terrain) sans remplacer
-- Chambres froides et groupe eau glacée = équipements clés à côté des GE
-- Sensibles au professionnalisme de l'outil et à la simplicité d'onboarding
-- Groupe Accor = potentiel de déploiement multi-sites en cas de satisfaction pilote
 
 ### **Phase 2 — Déploiement régional (2027)**
 

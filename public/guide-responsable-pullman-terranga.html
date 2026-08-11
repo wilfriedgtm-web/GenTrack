@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guide Responsable Technique — GenTrack Pullman Dakar Terranga</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #f5f5f0;
+    color: #1a1a1a;
+    padding: 24px 16px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  /* HEADER */
+  .header {
+    background: #1B2A4A;
+    border-radius: 12px;
+    padding: 20px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+  }
+  .header-logo { color: white; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .header-logo span { color: #C9A84C; }
+  .header-right { text-align: right; }
+  .header-right .hotel { color: #C9A84C; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+  .header-right .role { color: rgba(255,255,255,0.7); font-size: 12px; margin-top: 2px; }
+
+  /* DASHBOARD ACCESS */
+  .access-box {
+    background: white;
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-left: 4px solid #1B2A4A;
+  }
+  .access-ico { font-size: 28px; }
+  .access-label { font-size: 11px; font-weight: 600; color: #666; letter-spacing: 0.5px; text-transform: uppercase; }
+  .access-url { font-size: 15px; font-weight: 700; color: #1B2A4A; font-family: monospace; }
+  .access-sub { font-size: 12px; color: #888; margin-top: 2px; }
+
+  /* ACTIVATION */
+  .activation-box {
+    background: #FFF8E7;
+    border: 1px solid #C9A84C;
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .activation-box .ico { font-size: 20px; }
+  .activation-box .title { font-size: 13px; font-weight: 600; color: #8B6914; }
+  .activation-box .sub { font-size: 12px; color: #a07820; margin-top: 2px; }
+  .activation-box .code {
+    display: inline-block;
+    background: #1B2A4A;
+    color: white;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    margin-top: 6px;
+    font-family: monospace;
+    letter-spacing: 0.5px;
+  }
+
+  /* SECTION TITLE */
+  .section-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 22px 0 12px;
+  }
+  .section-divider .label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #888;
+    white-space: nowrap;
+  }
+  .section-divider .line { flex: 1; height: 1px; background: #ddd; }
+
+  /* KPI CARDS */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .kpi-card {
+    background: white;
+    border-radius: 10px;
+    padding: 16px;
+    border: 1px solid #e8e8e8;
+  }
+  .kpi-ico { font-size: 20px; margin-bottom: 8px; }
+  .kpi-title { font-size: 12px; font-weight: 600; color: #1B2A4A; }
+  .kpi-desc { font-size: 12px; color: #666; margin-top: 4px; line-height: 1.5; }
+  .kpi-alert { font-size: 11px; color: #C62828; font-weight: 600; margin-top: 6px; }
+
+  /* ALERT LEVELS */
+  .alert-table {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    border: 1px solid #e8e8e8;
+  }
+  .alert-table table { width: 100%; border-collapse: collapse; }
+  .alert-table thead { background: #1B2A4A; color: white; }
+  .alert-table thead th { padding: 10px 16px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-align: left; }
+  .alert-table tbody tr { border-bottom: 1px solid #f0f0f0; }
+  .alert-table tbody tr:last-child { border-bottom: none; }
+  .alert-table tbody td { padding: 10px 16px; font-size: 13px; vertical-align: top; }
+  .dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+  .dot-red { background: #C62828; }
+  .dot-orange { background: #E65100; }
+  .dot-green { background: #2E7D32; }
+
+  /* FLOW CARD */
+  .flow-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 14px;
+    border: 1px solid #e8e8e8;
+  }
+  .flow-header {
+    background: #1B2A4A;
+    color: white;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .flow-header .ico { font-size: 18px; }
+  .flow-header .title { font-weight: 600; font-size: 14px; }
+  .flow-header .sub { font-size: 12px; color: rgba(255,255,255,0.7); margin-left: auto; }
+  .flow-body { padding: 16px 20px; }
+  .flow-body p { font-size: 13px; color: #444; line-height: 1.6; }
+  .flow-body ul { margin-top: 8px; padding-left: 20px; }
+  .flow-body ul li { font-size: 13px; color: #444; margin-bottom: 4px; line-height: 1.5; }
+
+  /* SCHEDULE */
+  .schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .schedule-card {
+    background: white;
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    border: 1px solid #e8e8e8;
+  }
+  .schedule-time { font-size: 18px; font-weight: 700; color: #1B2A4A; }
+  .schedule-label { font-size: 11px; color: #888; margin-top: 4px; }
+
+  /* BOT COMMANDS (for resp) */
+  .cmd-card {
+    background: white;
+    border-radius: 10px;
+    padding: 14px 16px;
+    border: 1px solid #e8e8e8;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .cmd-ico { font-size: 20px; min-width: 24px; }
+  .cmd-name { font-size: 14px; font-weight: 700; color: #1B2A4A; font-family: monospace; }
+  .cmd-desc { font-size: 12px; color: #555; margin-top: 3px; line-height: 1.5; }
+
+  /* CONTACTS */
+  .contact-box {
+    background: #E8EEF8;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+  }
+  .contact-box .title { font-size: 12px; font-weight: 700; color: #1B2A4A; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .contact-row { font-size: 13px; color: #333; margin-bottom: 4px; }
+  .contact-row strong { color: #1B2A4A; }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    font-size: 11px;
+    color: #aaa;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+  }
+  .footer .brand { font-weight: 700; color: #1B2A4A; }
+
+  @media print {
+    body { background: white; padding: 0; }
+    .flow-card, .kpi-card, .alert-table { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-logo">GEN<span>TRACK</span></div>
+  <div class="header-right">
+    <div class="hotel">Pullman Dakar Terranga</div>
+    <div class="role">Guide Responsable Technique — v1</div>
+  </div>
+</div>
+
+<!-- DASHBOARD ACCESS -->
+<div class="access-box">
+  <div class="access-ico">🖥️</div>
+  <div>
+    <div class="access-label">Tableau de bord</div>
+    <div class="access-url">gen-track.vercel.app/client.html</div>
+    <div class="access-sub">Accès en temps réel depuis navigateur — PC ou mobile</div>
+  </div>
+</div>
+
+<!-- ACTIVATION -->
+<div class="activation-box">
+  <div class="ico">🔑</div>
+  <div>
+    <div class="title">Activation bot — à faire tous les 2 jours</div>
+    <div class="sub">Renvoyez ce message au bot WhatsApp (+1 415 523 8886) pour rester connecté :</div>
+    <div class="code">join breeze-society</div>
+  </div>
+</div>
+
+<!-- KPI SECTION -->
+<div class="section-divider"><div class="line"></div><div class="label">Ce que vous voyez sur le tableau de bord</div><div class="line"></div></div>
+
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-ico">⛽</div>
+    <div class="kpi-title">Niveau cuve GASOIL</div>
+    <div class="kpi-desc">Niveau en litres + autonomie estimée en jours selon la conso journalière.</div>
+    <div class="kpi-alert">⚠ Alerte si &lt; 20% de capacité</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-ico">⏱️</div>
+    <div class="kpi-title">Vidanges GE</div>
+    <div class="kpi-desc">Heures restantes avant la prochaine vidange pour chaque groupe (seuil 250h).</div>
+    <div class="kpi-alert">⚠ Alerte si &lt; 50h restantes</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-ico">🌡️</div>
+    <div class="kpi-title">Chambres froides</div>
+    <div class="kpi-desc">Température relevée vs consigne. État des portes. Historique graphique.</div>
+    <div class="kpi-alert">⚠ Alerte si écart &gt; 3°C</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-ico">📊</div>
+    <div class="kpi-title">Saisies du jour</div>
+    <div class="kpi-desc">Combien d'équipements ont été relevés aujourd'hui sur les 9 configurés.</div>
+    <div class="kpi-alert">⚠ Alerte si saisie manquante à 20h</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-ico">🔴</div>
+    <div class="kpi-title">Pannes en cours</div>
+    <div class="kpi-desc">Incidents ouverts avec équipement concerné, heure de déclaration et durée.</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-ico">📈</div>
+    <div class="kpi-title">Graphiques 7 jours</div>
+    <div class="kpi-desc">Évolution du niveau cuve et des heures GE sur la semaine écoulée.</div>
+  </div>
+</div>
+
+<!-- ALERTES -->
+<div class="section-divider"><div class="line"></div><div class="label">Niveaux d'alerte</div><div class="line"></div></div>
+
+<div class="alert-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Situation</th>
+        <th>Seuil</th>
+        <th>Action recommandée</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="dot dot-red"></span>Niveau cuve critique</td>
+        <td>&lt; 2 000 L</td>
+        <td>Commander un ravitaillement urgent</td>
+      </tr>
+      <tr>
+        <td><span class="dot dot-orange"></span>Niveau cuve faible</td>
+        <td>&lt; 2 000 – 4 000 L</td>
+        <td>Planifier un ravitaillement sous 48h</td>
+      </tr>
+      <tr>
+        <td><span class="dot dot-red"></span>Vidange GE dépassée</td>
+        <td>0h restantes</td>
+        <td>Arrêter le groupe et vidanger</td>
+      </tr>
+      <tr>
+        <td><span class="dot dot-orange"></span>Vidange GE imminente</td>
+        <td>&lt; 50h restantes</td>
+        <td>Planifier la vidange dans la semaine</td>
+      </tr>
+      <tr>
+        <td><span class="dot dot-red"></span>Température CF hors consigne</td>
+        <td>Écart &gt; 3°C</td>
+        <td>Vérifier le compresseur / la porte</td>
+      </tr>
+      <tr>
+        <td><span class="dot dot-orange"></span>Saisie non effectuée</td>
+        <td>Après 20h</td>
+        <td>Relancer le technicien de garde</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- RONDES -->
+<div class="section-divider"><div class="line"></div><div class="label">Rondes quotidiennes</div><div class="line"></div></div>
+
+<div class="schedule-grid">
+  <div class="schedule-card">
+    <div class="schedule-time">00h</div>
+    <div class="schedule-label">Ronde nuit</div>
+  </div>
+  <div class="schedule-card">
+    <div class="schedule-time">03h</div>
+    <div class="schedule-label">Ronde nuit</div>
+  </div>
+  <div class="schedule-card">
+    <div class="schedule-time">08h</div>
+    <div class="schedule-label">Ronde matin</div>
+  </div>
+  <div class="schedule-card">
+    <div class="schedule-time">12h</div>
+    <div class="schedule-label">Ronde midi</div>
+  </div>
+  <div class="schedule-card">
+    <div class="schedule-time">16h</div>
+    <div class="schedule-label">Ronde après-midi</div>
+  </div>
+  <div class="schedule-card">
+    <div class="schedule-time">20h</div>
+    <div class="schedule-label">Ronde soir</div>
+  </div>
+</div>
+
+<p style="font-size:12px;color:#888;margin-bottom:20px;">Le bot envoie un rappel WhatsApp aux techniciens avant chaque ronde. Les saisies non effectuées apparaissent en rouge sur le tableau de bord.</p>
+
+<!-- CE QUE VOUS RECEVEZ -->
+<div class="section-divider"><div class="line"></div><div class="label">Ce que vous recevez automatiquement</div><div class="line"></div></div>
+
+<div class="flow-card">
+  <div class="flow-header">
+    <div class="ico">🔴</div>
+    <div class="title">Alerte panne</div>
+    <div class="sub">Immédiat</div>
+  </div>
+  <div class="flow-body">
+    <p>Dès qu'un technicien tape "panne", vous recevez un WhatsApp avec l'équipement concerné et la description. La panne reste ouverte jusqu'à ce que le technicien tape "resolu".</p>
+  </div>
+</div>
+
+<div class="flow-card">
+  <div class="flow-header">
+    <div class="ico">⛽</div>
+    <div class="title">Alerte ravitaillement</div>
+    <div class="sub">À chaque plein</div>
+  </div>
+  <div class="flow-body">
+    <p>Chaque plein enregistré génère un message : volume ajouté, niveau après remplissage, prénom du technicien.</p>
+  </div>
+</div>
+
+<div class="flow-card">
+  <div class="flow-header">
+    <div class="ico">📋</div>
+    <div class="title">Rapport hebdomadaire</div>
+    <div class="sub">Lundi matin</div>
+  </div>
+  <div class="flow-body">
+    <p>Chaque lundi vous recevez un récapitulatif de la semaine : taux de saisies, consommation cuve, heures GE, pannes enregistrées, vidanges à venir.</p>
+  </div>
+</div>
+
+<!-- COMMANDES RESP TECH -->
+<div class="section-divider"><div class="line"></div><div class="label">Vos commandes bot (Responsable Technique)</div><div class="line"></div></div>
+
+<div class="cmd-card">
+  <div class="cmd-ico">📊</div>
+  <div>
+    <div class="cmd-name">rapport</div>
+    <div class="cmd-desc">Demander un résumé immédiat de l'état du site : niveau cuve, heures GE, saisies du jour, pannes en cours.</div>
+  </div>
+</div>
+
+<div class="cmd-card">
+  <div class="cmd-ico">🔧</div>
+  <div>
+    <div class="cmd-name">vidange</div>
+    <div class="cmd-desc">Enregistrer vous-même une vidange effectuée sur un groupe électrogène.</div>
+  </div>
+</div>
+
+<div class="cmd-card">
+  <div class="cmd-ico">✅</div>
+  <div>
+    <div class="cmd-name">resolu</div>
+    <div class="cmd-desc">Clôturer une panne ouverte si le technicien n'a pas encore envoyé la résolution.</div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <span>Support technique : GenTrack</span>
+  <span class="brand">GenTrack</span>
+</div>
+
+</body>
+</html>

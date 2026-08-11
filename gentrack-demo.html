@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack — Demo</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#C8922A;--gold-d:#a67520;--gold-l:#fef3cd;
+  --side:#1C1C1E;--bg:#F4F2EE;--card:#fff;
+  --border:#e4e1db;--text:#1a1a1a;--muted:#6b6b6b;
+  --green:#276749;--green-bg:#d4edda;
+  --red:#9b2c2c;--red-bg:#fed7d7;
+  --orange:#7b341e;--orange-bg:#feebc8;
+  --blue:#2a4365;--blue-bg:#bee3f8;
+  --gray-bg:#e2e8f0;--gray-t:#4a5568;
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* TOP NAV */
+#topnav{background:var(--side);height:52px;display:flex;align-items:center;padding:0 24px;gap:20px;position:sticky;top:0;z-index:100}
+.tn-logo{font-size:17px;font-weight:700;color:#fff;letter-spacing:-0.3px;white-space:nowrap}
+.tn-logo span{color:var(--gold)}
+.tn-tabs{display:flex;gap:4px;background:rgba(255,255,255,.07);border-radius:8px;padding:3px}
+.tn-tab{padding:5px 14px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;color:#aaa;border:none;background:none;transition:all .15s}
+.tn-tab.active{background:var(--gold);color:#fff}
+.tn-tag{margin-left:auto;font-size:11px;background:rgba(200,146,42,.2);color:var(--gold);padding:3px 10px;border-radius:20px;font-weight:500}
+
+/* TAB CONTENT */
+.tab-pane{display:none}.tab-pane.active{display:flex}
+
+/* DASHBOARD */
+#pane-dash{height:calc(100vh - 52px);overflow:hidden}
+#dash-side{width:200px;min-width:200px;background:var(--side);display:flex;flex-direction:column;overflow-y:auto}
+.ds-logo{padding:16px 16px 12px;border-bottom:1px solid #2c2c2e}
+.ds-logo h2{font-size:15px;font-weight:700;color:#fff}.ds-logo h2 span{color:var(--gold)}
+.ds-logo small{display:block;font-size:10px;color:#555;margin-top:2px}
+.ds-nav{flex:1;padding:10px 8px;display:flex;flex-direction:column;gap:2px}
+.ds-nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:12.5px;color:#888;transition:all .12s;border-left:2px solid transparent}
+.ds-nav-item:hover{color:#ccc;background:rgba(255,255,255,.04)}
+.ds-nav-item.active{color:#fff;background:rgba(200,146,42,.14);border-left-color:var(--gold)}
+.ds-nav-item i{font-size:15px;width:16px}
+#dash-main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#dash-top{background:var(--card);border-bottom:1px solid var(--border);padding:0 20px;height:46px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+#dash-top-t{font-size:13.5px;font-weight:600}
+#dash-top-r{display:flex;align-items:center;gap:8px}
+#dash-content{flex:1;overflow-y:auto;padding:16px 20px}
+.ds{display:none}.ds.active{display:block}
+
+/* CARDS */
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px}
+.card-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.card-h h3{font-size:13px;font-weight:600}
+.g5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:11px 13px}
+.kpi-l{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.kpi-v{font-size:21px;font-weight:700}
+.kpi-s{font-size:11px;color:var(--muted);margin-top:2px}
+.kv-b{color:var(--blue)}.kv-g{color:#276749}.kv-r{color:#9b2c2c}.kv-o{color:#7b341e}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.b-g{background:var(--green-bg);color:var(--green)}
+.b-r{background:var(--red-bg);color:var(--red)}
+.b-o{background:var(--orange-bg);color:var(--orange)}
+.b-b{background:var(--blue-bg);color:var(--blue)}
+.b-gray{background:var(--gray-bg);color:var(--gray-t)}
+.b-gold{background:var(--gold-l);color:#7d5a00}
+
+/* ROWS */
+.row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px}
+.row:last-child{border-bottom:none}
+.row-s{font-size:11px;color:var(--muted);margin-top:1px}
+
+/* EQUIPMENT GRID */
+.eq-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.eq-card{background:var(--card);border:1px solid var(--border);border-radius:9px;padding:11px 12px}
+.eq-card.ok{border-left:3px solid #38a169}
+.eq-card.warn{border-left:3px solid var(--gold)}
+.eq-card.err{border-left:3px solid #e53e3e}
+.eq-icon{font-size:18px;margin-bottom:4px}
+.eq-name{font-size:12.5px;font-weight:600}
+.eq-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.eq-val{font-size:13px;font-weight:600;margin-top:5px}
+.eq-v-g{color:#276749}.eq-v-o{color:#7b341e}.eq-v-r{color:#9b2c2c}
+
+/* BAR CHARTS */
+.mini-bars{display:flex;align-items:flex-end;gap:3px;height:60px;margin-top:8px}
+.mb{flex:1;border-radius:2px 2px 0 0;min-height:3px}
+.mb-b{background:#3182ce88}
+.mb-g{background:#38a16988}
+.mb-a{background:rgba(200,146,42,.7)}
+.bar-labels{display:flex;justify-content:space-between;font-size:9.5px;color:var(--muted);margin-top:3px}
+
+/* CONS BARS */
+.cons-bar-wrap{margin-bottom:10px}
+.cons-label{display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:4px}
+.cons-bar{height:8px;background:#eee;border-radius:4px;overflow:hidden}
+.cons-fill{height:100%;border-radius:4px}
+.cf-blue{background:#3182ce}
+.cf-green{background:#38a169}
+.cf-gold{background:var(--gold)}
+
+/* INC/WO ROWS */
+.inc-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.inc-row:last-child{border-bottom:none}
+.inc-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px}
+.av-r{background:var(--blue-bg);color:var(--blue)}
+.av-t{background:var(--green-bg);color:var(--green)}
+.inc-t{font-size:12.5px;font-weight:500}
+.inc-s{font-size:11px;color:var(--muted);margin-top:2px}
+.wt-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.wt-row:last-child{border-bottom:none}
+.wt-num{font-size:10px;color:var(--muted);min-width:40px;padding-top:2px}
+.wt-body{flex:1}
+.wt-t{font-size:12.5px;font-weight:500}
+.wt-s{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* FICHE */
+.fiche{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px}
+.fiche-h{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.fiche-ic{font-size:22px}
+.fiche-t{font-size:14px;font-weight:600}
+.fiche-s{font-size:11px;color:var(--muted)}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.stat-b{background:var(--bg);border-radius:8px;padding:9px;text-align:center}
+.stat-v{font-size:17px;font-weight:700}
+.stat-l{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-top:2px}
+
+/* RONDE ROWS */
+.ronde-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
+.ronde-row:last-child{border-bottom:none}
+.rdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.rdot-g{background:#38a169}.rdot-o{background:var(--gold)}.rdot-r{background:#e53e3e}
+
+/* ─── BOT SIMULATOR ─── */
+#pane-bot{padding:20px 24px;gap:16px}
+.bot-left{width:180px;flex-shrink:0}
+.sc-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;font-weight:600}
+.sc-btn{display:flex;align-items:flex-start;gap:8px;width:100%;text-align:left;padding:9px 11px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid var(--border);background:var(--card);color:var(--muted);margin-bottom:5px;transition:all .12s;line-height:1.35}
+.sc-btn:hover{background:var(--bg);color:var(--text);border-color:#ccc}
+.sc-btn.active{background:var(--gold-l);color:#7d5a00;border-color:var(--gold);font-weight:600}
+.sc-btn i{font-size:13px;margin-top:1px;flex-shrink:0}
+.phone-wrap{flex:1;max-width:520px}
+.phone{border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 2px 12px rgba(0,0,0,.07)}
+.ph-hdr{background:var(--side);padding:10px 14px;display:flex;align-items:center;gap:10px}
+.ph-av{width:34px;height:34px;border-radius:50%;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
+.ph-name{font-size:13px;font-weight:600;color:#fff}
+.ph-sub{font-size:10px;color:#888}
+.chat{padding:12px 14px;background:#EFE7DD;display:flex;flex-direction:column;gap:4px;overflow-y:auto;height:430px}
+.msg{max-width:84%;padding:7px 10px 4px;font-size:12.5px;line-height:1.5;border-radius:8px;animation:fadeUp .18s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.msg-t{font-size:9px;margin-top:3px;text-align:right}
+.bot-msg{align-self:flex-start;background:#fff;border-radius:2px 8px 8px 8px;color:#111}
+.bot-msg .msg-t{color:#aaa}
+.usr-msg{align-self:flex-end;background:#D9FDD3;border-radius:8px 2px 8px 8px;color:#111}
+.usr-msg .msg-t{color:#4a9a5a}
+.typing{align-self:flex-start;background:#fff;border-radius:8px;padding:9px 13px;display:none;gap:4px;align-items:center}
+.td{width:7px;height:7px;border-radius:50%;background:#ccc;animation:blink 1.1s infinite}
+.td:nth-child(2){animation-delay:.22s}.td:nth-child(3){animation-delay:.44s}
+@keyframes blink{0%,100%{opacity:.25}50%{opacity:1}}
+.day-sep{align-self:center;background:rgba(0,0,0,.1);border-radius:20px;padding:2px 10px;font-size:10px;color:#555;margin:4px 0}
+.bot-hint{font-size:11.5px;color:var(--muted);margin-top:12px;text-align:center;line-height:1.5}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#ddd;border-radius:10px}
+</style>
+</head>
+<body>
+
+<nav id="topnav">
+  <div class="tn-logo">Gen<span>Track</span></div>
+  <div class="tn-tabs">
+    <button class="tn-tab active" onclick="switchTab('dash')">Dashboard</button>
+    <button class="tn-tab" onclick="switchTab('bot')">Simulateur Bot</button>
+  </div>
+  <div class="tn-tag">Demo · Pullman Dakar Teranga</div>
+</nav>
+
+<!-- ═══════════════════════════════════ DASHBOARD ═══════════════════════════════════ -->
+<div id="pane-dash" class="tab-pane active">
+  <div id="dash-side">
+    <div class="ds-logo">
+      <h2>Gen<span>Track</span></h2>
+      <small>Pullman Dakar Teranga</small>
+    </div>
+    <nav class="ds-nav">
+      <div class="ds-nav-item active" onclick="dsNav(this,'vue')"><i class="ti ti-layout-dashboard"></i>Vue globale</div>
+      <div class="ds-nav-item" onclick="dsNav(this,'ops')"><i class="ti ti-activity"></i>Opérations</div>
+      <div class="ds-nav-item" onclick="dsNav(this,'conso')"><i class="ti ti-bolt"></i>Consommations</div>
+      <div class="ds-nav-item" onclick="dsNav(this,'bt')"><i class="ti ti-tools"></i>Bons de travaux</div>
+      <div class="ds-nav-item" onclick="dsNav(this,'inc')"><i class="ti ti-alert-triangle"></i>Incidents</div>
+      <div class="ds-nav-item" onclick="dsNav(this,'equip')"><i class="ti ti-cpu"></i>Équipements</div>
+    </nav>
+  </div>
+
+  <div id="dash-main">
+    <div id="dash-top">
+      <span id="dash-top-t">Vue globale</span>
+      <div id="dash-top-r">
+        <span class="badge b-g"><i class="ti ti-circle-check" style="font-size:11px"></i> Système actif</span>
+        <span style="font-size:11px;color:var(--muted)">Màj 14:32</span>
+      </div>
+    </div>
+    <div id="dash-content">
+
+      <!-- VUE GLOBALE -->
+      <div class="ds active" id="ds-vue">
+        <div class="g5">
+          <div class="kpi"><div class="kpi-l">Rondes auj.</div><div class="kpi-v kv-b">8</div><div class="kpi-s">4 shifts · 2 en cours</div></div>
+          <div class="kpi"><div class="kpi-l">Équipements</div><div class="kpi-v kv-g">6/7</div><div class="kpi-s">1 en alerte</div></div>
+          <div class="kpi"><div class="kpi-l">Incidents</div><div class="kpi-v kv-r">2</div><div class="kpi-s">ouverts</div></div>
+          <div class="kpi"><div class="kpi-l">BT en cours</div><div class="kpi-v kv-o">3</div><div class="kpi-s">1 en retard</div></div>
+          <div class="kpi"><div class="kpi-l">Élec. mois</div><div class="kpi-v">12 450</div><div class="kpi-s">kWh · +8% vs août</div></div>
+        </div>
+        <div class="g2">
+          <div class="card">
+            <div class="card-h"><h3>Rondes aujourd'hui</h3><span class="badge b-b">8 complètes</span></div>
+            <div class="ronde-row"><div class="rdot rdot-g"></div><div style="flex:1"><strong style="font-size:12px">Shift 1 — 06h14</strong><span style="font-size:11px;color:var(--muted)"> · Moussa D. · 7 équip.</span></div><span class="badge b-g">OK</span></div>
+            <div class="ronde-row"><div class="rdot rdot-g"></div><div style="flex:1"><strong style="font-size:12px">Shift 2 — 09h02</strong><span style="font-size:11px;color:var(--muted)"> · Ibrahima S. · 7 équip.</span></div><span class="badge b-g">OK</span></div>
+            <div class="ronde-row"><div class="rdot rdot-o"></div><div style="flex:1"><strong style="font-size:12px">Shift 3 — 12h18</strong><span style="font-size:11px;color:var(--muted)"> · Moussa D. · 7 équip.</span></div><span class="badge b-o">1 anomalie</span></div>
+            <div class="ronde-row"><div class="rdot rdot-g"></div><div style="flex:1"><strong style="font-size:12px">Shift 4 — 15h45</strong><span style="font-size:11px;color:var(--muted)"> · Ibrahima S. · 7 équip.</span></div><span class="badge b-g">OK</span></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>Incidents ouverts</h3><span class="badge b-r">2</span></div>
+            <div class="inc-row"><div class="inc-av av-r">R</div><div style="flex:1"><div class="inc-t">Clim. chambre 108 — ne refroidit plus</div><div class="inc-s">Réception · il y a 1h · BT #040 créé</div></div><span class="badge b-o">en cours</span></div>
+            <div class="inc-row"><div class="inc-av av-t">T</div><div style="flex:1"><div class="inc-t">CF Négative — alarme température</div><div class="inc-s">Moussa D. · il y a 3h · priorité haute</div></div><span class="badge b-r">ouvert</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><h3>Électricité — 7 derniers jours (kWh)</h3></div>
+          <div class="mini-bars">
+            <div class="mb mb-b" style="height:52px"></div><div class="mb mb-b" style="height:44px"></div>
+            <div class="mb mb-b" style="height:58px"></div><div class="mb mb-b" style="height:40px"></div>
+            <div class="mb mb-b" style="height:55px"></div><div class="mb mb-b" style="height:48px"></div>
+            <div class="mb mb-b" style="height:60px"></div>
+          </div>
+          <div class="bar-labels"><span>Lun</span><span>Mar</span><span>Mer</span><span>Jeu</span><span>Ven</span><span>Sam</span><span>Dim</span></div>
+        </div>
+      </div>
+
+      <!-- OPÉRATIONS -->
+      <div class="ds" id="ds-ops">
+        <div class="eq-grid">
+          <div class="eq-card ok"><div class="eq-icon">⚡</div><div class="eq-name">GE1 — SDMO 1400 kVA</div><div class="eq-sub">Shift 4 · Moussa · 15h45</div><div class="eq-val eq-v-g">4 820h · Huile OK · 91°C</div></div>
+          <div class="eq-card ok"><div class="eq-icon">⚡</div><div class="eq-name">GE2 — SDMO 1400 kVA</div><div class="eq-sub">Shift 4 · Ibrahima · 15h45</div><div class="eq-val eq-v-g">3 140h · Huile OK · 88°C</div></div>
+          <div class="eq-card warn"><div class="eq-icon">🛢️</div><div class="eq-name">Cuve principale</div><div class="eq-sub">Shift 4 · 15h52</div><div class="eq-val eq-v-o">4 200 L / 8 725 L — 48%</div></div>
+          <div class="eq-card ok"><div class="eq-icon">❄️</div><div class="eq-name">CF Cuisine</div><div class="eq-sub">Shift 4 · 16h01</div><div class="eq-val eq-v-g">+2.1°C — normal</div></div>
+          <div class="eq-card ok"><div class="eq-icon">❄️</div><div class="eq-name">CF Pâtisserie</div><div class="eq-sub">Shift 4 · 16h01</div><div class="eq-val eq-v-g">+3.4°C — normal</div></div>
+          <div class="eq-card err"><div class="eq-icon">❄️</div><div class="eq-name">CF Négative</div><div class="eq-sub">Shift 3 · alarme active</div><div class="eq-val eq-v-r">-14°C — attendu: -20°C</div></div>
+          <div class="eq-card ok"><div class="eq-icon">💧</div><div class="eq-name">Groupe eau glacée</div><div class="eq-sub">Shift 4 · 16h03</div><div class="eq-val eq-v-g">7.1°C — consigne 7°C</div></div>
+        </div>
+        <div class="card"><div class="card-h"><h3>Anomalie détectée — Shift 3</h3><span class="badge b-r">1</span></div>
+          <div class="row"><div><div style="font-size:12.5px;font-weight:500">CF Négative — température hors seuil</div><div class="row-s">Relevé: -14°C · attendu: -20°C · Moussa D. · 12h22</div></div><span class="badge b-r">critique</span></div>
+        </div>
+      </div>
+
+      <!-- CONSOMMATIONS -->
+      <div class="ds" id="ds-conso">
+        <div class="g3">
+          <div class="kpi"><div class="kpi-l">Électricité mois</div><div class="kpi-v">12 450</div><div class="kpi-s">kWh · 1 742 500 FCFA</div></div>
+          <div class="kpi"><div class="kpi-l">Eau mois</div><div class="kpi-v">840</div><div class="kpi-s">m³ · -3% vs sept.</div></div>
+          <div class="kpi"><div class="kpi-l">Fioul mois</div><div class="kpi-v">4 820</div><div class="kpi-s">L · 3 350 000 FCFA</div></div>
+        </div>
+        <div class="g2">
+          <div class="card"><div class="card-h"><h3>Électricité — 15 derniers jours</h3></div>
+            <div class="mini-bars" style="height:75px">
+              <div class="mb mb-b" style="height:52px"></div><div class="mb mb-b" style="height:44px"></div><div class="mb mb-b" style="height:58px"></div><div class="mb mb-b" style="height:40px"></div><div class="mb mb-b" style="height:55px"></div><div class="mb mb-b" style="height:61px"></div><div class="mb mb-b" style="height:48px"></div><div class="mb mb-b" style="height:70px"></div><div class="mb mb-b" style="height:44px"></div><div class="mb mb-b" style="height:52px"></div><div class="mb mb-b" style="height:60px"></div><div class="mb mb-b" style="height:45px"></div><div class="mb mb-b" style="height:55px"></div><div class="mb mb-b" style="height:66px"></div><div class="mb mb-b" style="height:50px"></div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:6px">Moy. 415 kWh/j · Pic: 580 kWh</div>
+          </div>
+          <div class="card"><div class="card-h"><h3>Eau — 15 derniers jours</h3></div>
+            <div class="mini-bars" style="height:75px">
+              <div class="mb mb-g" style="height:44px"></div><div class="mb mb-g" style="height:38px"></div><div class="mb mb-g" style="height:50px"></div><div class="mb mb-g" style="height:35px"></div><div class="mb mb-g" style="height:48px"></div><div class="mb mb-g" style="height:42px"></div><div class="mb mb-g" style="height:55px"></div><div class="mb mb-g" style="height:38px"></div><div class="mb mb-g" style="height:44px"></div><div class="mb mb-g" style="height:52px"></div><div class="mb mb-g" style="height:40px"></div><div class="mb mb-g" style="height:48px"></div><div class="mb mb-g" style="height:36px"></div><div class="mb mb-g" style="height:50px"></div><div class="mb mb-g" style="height:44px"></div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:6px">Moy. 28 m³/j · 0.33 m³/chambre</div>
+          </div>
+        </div>
+        <div class="card"><div class="card-h"><h3>Autonomie fioul</h3></div>
+          <div class="cons-bar-wrap">
+            <div class="cons-label"><span style="color:var(--muted)">Cuve principale</span><span style="font-weight:600">4 200 L / 8 725 L</span></div>
+            <div class="cons-bar"><div class="cons-fill cf-gold" style="width:48%"></div></div>
+          </div>
+          <div style="font-size:12px;color:var(--muted);margin-top:8px">À 65 L/h → autonomie estimée <strong style="color:var(--text)">64h</strong> · Ravitaillement recommandé dans 2 jours</div>
+        </div>
+      </div>
+
+      <!-- BONS DE TRAVAUX -->
+      <div class="ds" id="ds-bt">
+        <div class="g3"><div class="kpi"><div class="kpi-l">Ouverts</div><div class="kpi-v kv-r">3</div><div class="kpi-s">1 en retard</div></div><div class="kpi"><div class="kpi-l">Terminés mois</div><div class="kpi-v kv-g">12</div><div class="kpi-s">délai moy. 4h</div></div><div class="kpi"><div class="kpi-l">Coût mois</div><div class="kpi-v">680k</div><div class="kpi-s">FCFA</div></div></div>
+        <div class="card" style="margin-bottom:10px"><div class="card-h"><h3>Bons de travaux actifs</h3></div>
+          <div class="wt-row"><div class="wt-num">#BT-041</div><div class="wt-body"><div class="wt-t">CF Négative — contrôle compresseur</div><div class="wt-s">Assigné: Moussa D. · Ouvert il y a 3h · Priorité haute</div></div><span class="badge b-r">urgent</span></div>
+          <div class="wt-row"><div class="wt-num">#BT-040</div><div class="wt-body"><div class="wt-t">Chambre 108 — remplacement groupe froid clim.</div><div class="wt-s">Assigné: Ibrahima S. · Issu incident réception</div></div><span class="badge b-o">en cours</span></div>
+          <div class="wt-row"><div class="wt-num">#BT-038</div><div class="wt-body"><div class="wt-t">GE1 — vidange + filtre huile</div><div class="wt-s">Assigné: Moussa D. · Échéance dépassée · Planifié 03/10</div></div><span class="badge b-r">en retard</span></div>
+        </div>
+        <div class="card"><div class="card-h"><h3>Derniers terminés</h3></div>
+          <div class="wt-row"><div class="wt-num">#BT-037</div><div class="wt-body"><div class="wt-t">Pompe piscine — remplacement joint</div><div class="wt-s">Terminé 08/10 · Moussa D. · 2h · 45 000 FCFA</div></div><span class="badge b-g">terminé</span></div>
+          <div class="wt-row"><div class="wt-num">#BT-036</div><div class="wt-body"><div class="wt-t">GE2 — remplacement courroie</div><div class="wt-s">Terminé 06/10 · Ibrahima S. · 1h30 · 28 000 FCFA</div></div><span class="badge b-g">terminé</span></div>
+        </div>
+      </div>
+
+      <!-- INCIDENTS -->
+      <div class="ds" id="ds-inc">
+        <div class="g3" style="margin-bottom:12px"><div class="kpi"><div class="kpi-l">Ouverts</div><div class="kpi-v kv-r">2</div></div><div class="kpi"><div class="kpi-l">Résolus mois</div><div class="kpi-v kv-g">18</div><div class="kpi-s">délai moy. 2h20</div></div><div class="kpi"><div class="kpi-l">Sources</div><div class="kpi-v">3</div><div class="kpi-s">réception · tech · maint.</div></div></div>
+        <div class="card" style="margin-bottom:10px"><div class="card-h"><h3>Signalements ouverts</h3></div>
+          <div class="inc-row"><div class="inc-av av-r">R</div><div style="flex:1"><div class="inc-t">Clim. chambre 108 — ne refroidit plus</div><div class="inc-s">Fatou (réception) via WhatsApp · 13h22 · BT #040 créé automatiquement</div></div><span class="badge b-o">en cours</span></div>
+          <div class="inc-row"><div class="inc-av av-t">T</div><div style="flex:1"><div class="inc-t">CF Négative — alarme température -14°C</div><div class="inc-s">Moussa D. (technicien) · saisie shift 3 · 12h22 · BT #041 créé</div></div><span class="badge b-r">urgent</span></div>
+        </div>
+        <div class="card"><div class="card-h"><h3>Résolus récents</h3></div>
+          <div class="inc-row"><div class="inc-av av-r">R</div><div style="flex:1"><div class="inc-t">Fuite parking sous-sol — WC hommes</div><div class="inc-s">Réception · Résolu en 1h45 · 07/10</div></div><span class="badge b-g">résolu</span></div>
+          <div class="inc-row"><div class="inc-av av-t">T</div><div style="flex:1"><div class="inc-t">GE2 — vibration anormale au démarrage</div><div class="inc-s">Ibrahima S. · Résolu en 45min · 05/10</div></div><span class="badge b-g">résolu</span></div>
+        </div>
+      </div>
+
+      <!-- ÉQUIPEMENTS -->
+      <div class="ds" id="ds-equip">
+        <div class="fiche">
+          <div class="fiche-h">
+            <div class="fiche-ic">⚡</div>
+            <div style="flex:1"><div class="fiche-t">GE1 — Groupe électrogène principal</div><div class="fiche-s">SDMO · J1500K · 1 400 kVA · SN-SDMO-2019-0841</div></div>
+            <span class="badge b-g">actif</span>
+          </div>
+          <div class="stat-row">
+            <div class="stat-b"><div class="stat-v">4 820</div><div class="stat-l">heures moteur</div></div>
+            <div class="stat-b"><div class="stat-v" style="color:#7b341e">80h</div><div class="stat-l">avant vidange</div></div>
+            <div class="stat-b"><div class="stat-v">8</div><div class="stat-l">rondes auj.</div></div>
+            <div class="stat-b"><div class="stat-v">1.5</div><div class="stat-l">L/h conso</div></div>
+          </div>
+          <div style="font-size:12px;color:var(--muted)">Historique : 3 pannes · 8 BT · 2 vidanges · Coût maintenance 2024 : 480 000 FCFA</div>
+        </div>
+        <div class="fiche">
+          <div class="fiche-h">
+            <div class="fiche-ic">❄️</div>
+            <div style="flex:1"><div class="fiche-t">CF Négative</div><div class="fiche-s">Consigne -20°C · Température actuelle -14°C</div></div>
+            <span class="badge b-r">alerte</span>
+          </div>
+          <div class="stat-row">
+            <div class="stat-b"><div class="stat-v" style="color:#9b2c2c">-14°C</div><div class="stat-l">température</div></div>
+            <div class="stat-b"><div class="stat-v">-20°C</div><div class="stat-l">consigne</div></div>
+            <div class="stat-b"><div class="stat-v">3h</div><div class="stat-l">hors seuil</div></div>
+            <div class="stat-b"><div class="stat-v">BT-041</div><div class="stat-l">en cours</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════ BOT SIMULATOR ═══════════════════════════════════ -->
+<div id="pane-bot" class="tab-pane" style="min-height:calc(100vh - 52px)">
+  <div class="bot-left">
+    <div class="sc-lbl">Scénarios</div>
+    <button class="sc-btn active" data-id="shift1" onclick="loadBot('shift1')"><i class="ti ti-sun"></i>Saisie journalière</button>
+    <button class="sc-btn" data-id="shift2" onclick="loadBot('shift2')"><i class="ti ti-clock"></i>Saisie 2ème shift</button>
+    <button class="sc-btn" data-id="hebdo" onclick="loadBot('hebdo')"><i class="ti ti-calendar-week"></i>Saisie semaine</button>
+    <button class="sc-btn" data-id="panne" onclick="loadBot('panne')"><i class="ti ti-alert-triangle"></i>Panne technicien</button>
+    <button class="sc-btn" data-id="signal" onclick="loadBot('signal')"><i class="ti ti-door"></i>Signalement réception</button>
+    <button class="sc-btn" data-id="rapport" onclick="loadBot('rapport')"><i class="ti ti-report"></i>Rapport manager</button>
+    <p class="bot-hint">Cliquez un scénario pour rejouer la conversation</p>
+  </div>
+  <div class="phone-wrap">
+    <div class="phone">
+      <div class="ph-hdr">
+        <div class="ph-av">GT</div>
+        <div><div class="ph-name">GenTrack Bot</div><div class="ph-sub" id="ph-sub">Moussa Diallo · Technicien</div></div>
+      </div>
+      <div class="chat" id="chat">
+        <div class="typing" id="typing"><div class="td"></div><div class="td"></div><div class="td"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(id){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tn-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pane-'+id).classList.add('active');
+  event.target.classList.add('active');
+}
+function dsNav(el,id){
+  document.querySelectorAll('.ds-nav-item').forEach(x=>x.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.ds').forEach(x=>x.classList.remove('active'));
+  document.getElementById('ds-'+id).classList.add('active');
+  const t={vue:'Vue globale',ops:'Opérations',conso:'Consommations',bt:'Bons de travaux',inc:'Incidents',equip:'Équipements'};
+  document.getElementById('dash-top-t').textContent=t[id]||id;
+}
+
+const SCENARIOS={
+  shift1:{sub:'Moussa Diallo · Technicien',day:'05/10/2025',msgs:[
+    {f:'u',t:'saisie',h:'06h14'},
+    {f:'b',t:'Bonjour Moussa 👋\n\n*Ronde Shift 1 — Pullman Dakar*\n📅 05/10 · 06h14\n\n⚡ *GE1 — SDMO 1400 kVA*\n\n1️⃣ Compteur horaire (h) ?',h:'06h14',d:900},
+    {f:'u',t:'4820',h:'06h15'},
+    {f:'b',t:'✅ 4 820h noté.\n\n2️⃣ Niveau huile ?',h:'06h15',d:700},
+    {f:'u',t:'bon',h:'06h15'},
+    {f:'b',t:'✅ Huile OK.\n\n3️⃣ Température eau (°C) ?',h:'06h15',d:600},
+    {f:'u',t:'88',h:'06h16'},
+    {f:'b',t:'✅ 88°C OK.\n\n⚡ GE1 terminé ✓\n\n🛢️ *Cuve principale*\n\n1️⃣ Niveau actuel (L) ?',h:'06h16',d:900},
+    {f:'u',t:'4200',h:'06h17'},
+    {f:'b',t:'⚠️ 4 200 L (48%) — autonomie 64h\nRavitaillement recommandé dans 2 jours.\n\n🛢️ Cuve ✓\n\n❄️ *CF Cuisine*\n\n1️⃣ Température (°C) ?',h:'06h17',d:1000},
+    {f:'u',t:'2.1',h:'06h18'},
+    {f:'b',t:'✅ +2.1°C — normal.\n\n... (CF Pâtisserie, CF Négative, GEG)\n\n✅ *Ronde Shift 1 terminée*\n7 équipements · 1 alerte carburant\n\nRapport envoyé à Ndiaga Diouf.',h:'06h22',d:1000}
+  ]},
+  shift2:{sub:'Ibrahima Sow · Technicien',day:'05/10/2025',msgs:[
+    {f:'u',t:'saisie 2',h:'09h02'},
+    {f:'b',t:'Bonjour Ibrahima 👋\n\n*Ronde Shift 2 — Pullman Dakar*\n📅 05/10 · 09h02\n\n⚡ *GE1 — SDMO 1400 kVA*\n\n1️⃣ Compteur horaire (h) ?',h:'09h02',d:900},
+    {f:'u',t:'4823',h:'09h03'},
+    {f:'b',t:'✅ 4 823h — +3h depuis Shift 1.\n\n2️⃣ Niveau huile ?',h:'09h03',d:700},
+    {f:'u',t:'bon',h:'09h04'},
+    {f:'b',t:'✅ OK. 3️⃣ Température eau (°C) ?',h:'09h04',d:600},
+    {f:'u',t:'91',h:'09h04'},
+    {f:'b',t:'✅ 91°C OK.\n\n... (suite des équipements)\n\n✅ *Ronde Shift 2 terminée*\n7 équipements · aucune anomalie',h:'09h18',d:1000}
+  ]},
+  hebdo:{sub:'Moussa Diallo · Technicien',day:'Lun. 07/10/2025',msgs:[
+    {f:'u',t:'saisie semaine',h:'07h30'},
+    {f:'b',t:'📋 *Ronde hebdomadaire — Pullman Dakar*\n📅 Lundi 07/10\n\n⚡ *GE1 — SDMO 1400 kVA*\n\n1️⃣ Niveau huile moteur ?',h:'07h30',d:900},
+    {f:'u',t:'bon',h:'07h31'},
+    {f:'b',t:'2️⃣ État des filtres à air ?',h:'07h31',d:600},
+    {f:'u',t:'propres',h:'07h32'},
+    {f:'b',t:'3️⃣ Vérification connexions électriques ?',h:'07h32',d:700},
+    {f:'u',t:'ras',h:'07h33'},
+    {f:'b',t:'4️⃣ Courroies — état visuel ?',h:'07h33',d:600},
+    {f:'u',t:'bon',h:'07h33'},
+    {f:'b',t:'✅ GE1 hebdo ✓\n\n⚡ *GE2 — SDMO 1400 kVA*\n... (GE2 + CF + GEG)\n\n✅ *Ronde hebdomadaire terminée*\n7 équipements · tout OK\n\nRapport hebdo envoyé à Ndiaga.',h:'07h58',d:1000}
+  ]},
+  panne:{sub:'Moussa Diallo · Technicien',day:'05/10/2025',msgs:[
+    {f:'u',t:'panne',h:'12h20'},
+    {f:'b',t:'⚠️ *Signalement panne*\n\nQuel équipement est concerné ?',h:'12h20',d:700},
+    {f:'u',t:'CF Négative',h:'12h21'},
+    {f:'b',t:'Description du problème ?',h:'12h21',d:600},
+    {f:'u',t:'Temperature -14 au lieu de -20, alarme active',h:'12h22'},
+    {f:'b',t:'Priorité ?\n\n1️⃣ Normale\n2️⃣ Haute\n3️⃣ Critique',h:'12h22',d:700},
+    {f:'u',t:'2',h:'12h22'},
+    {f:'b',t:'🚨 *Panne signalée*\n\n❄️ CF Négative — -14°C (attendu -20°C)\n⚡ Priorité haute\n📋 BT #041 créé\n👤 Ndiaga Diouf notifié',h:'12h22',d:900}
+  ]},
+  signal:{sub:'Fatou Ndiaye · Réception',day:'05/10/2025',msgs:[
+    {f:'u',t:'signalement',h:'13h22'},
+    {f:'b',t:'Bonjour Fatou 👋\n\nDécrivez le problème en quelques mots.',h:'13h22',d:700},
+    {f:'u',t:'Clim chambre 108 ne refroidit plus depuis ce matin',h:'13h23'},
+    {f:'b',t:'📍 Chambre ou zone concernée ?',h:'13h23',d:600},
+    {f:'u',t:'Chambre 108 étage 1',h:'13h24'},
+    {f:'b',t:'📸 Une photo si possible ?\n(Répondez *non* pour passer)',h:'13h24',d:700},
+    {f:'u',t:'non',h:'13h24'},
+    {f:'b',t:'✅ *Incident #042 créé*\n\n🏨 Chambre 108 — Climatisation\n👷 Ibrahima Sow notifié\n📋 BT #040 créé automatiquement\n\nVous serez informée dès résolution.',h:'13h24',d:1000}
+  ]},
+  rapport:{sub:'Ndiaga Diouf · Resp. Technique',day:'05/10/2025',msgs:[
+    {f:'b',t:'📊 *Rapport quotidien*\nPullman Dakar Teranga\n05/10/2025 — 20h00\n\n✅ Rondes : 4 shifts effectués\n━━━━━━━━━━━━\n⚡ GE1 : 4 820h · Huile OK ✅\n⚡ GE2 : 3 140h · Huile OK ✅\n🛢️ Cuve : 4 200L (48%) ⚠️\n❄️ CF Cuisine : +2.1°C ✅\n❄️ CF Pâtisserie : +3.4°C ✅\n🚨 CF Négative : -14°C ❌\n💧 GEG : 7.1°C ✅\n━━━━━━━━━━━━\n⚠️ 1 anomalie · 2 incidents ouverts\n📋 BT #041 en cours\n\nBonne soirée. 🌙',h:'20h00',d:400}
+  ]}
+};
+
+function fmt(t){return t.replace(/\*(.*?)\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');}
+
+let timers=[];
+function loadBot(id){
+  timers.forEach(clearTimeout);timers=[];
+  const s=SCENARIOS[id];if(!s)return;
+  document.querySelectorAll('.sc-btn').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
+  document.getElementById('ph-sub').textContent=s.sub;
+  const chat=document.getElementById('chat');
+  const ty=document.getElementById('typing');
+  while(chat.firstChild&&chat.firstChild!==ty)chat.removeChild(chat.firstChild);
+  ty.style.display='none';
+  const sep=document.createElement('div');sep.className='day-sep';sep.textContent=s.day;chat.insertBefore(sep,ty);
+  let t=400;
+  s.msgs.forEach((msg,i)=>{
+    if(msg.f==='b'){timers.push(setTimeout(()=>{ty.style.display='flex';chat.scrollTop=chat.scrollHeight;},Math.max(50,t-750)));}
+    timers.push(setTimeout(()=>{
+      ty.style.display='none';
+      const el=document.createElement('div');
+      el.className='msg '+(msg.f==='b'?'bot-msg':'usr-msg');
+      el.innerHTML=fmt(msg.t)+'<div class="msg-t">'+msg.h+(msg.f==='u'?' ✓✓':'')+'</div>';
+      chat.insertBefore(el,ty);
+      chat.scrollTop=chat.scrollHeight;
+    },t));
+    t+=(msg.d||900)+250;
+  });
+}
+loadBot('shift1');
+</script>
+</body>
+</html>

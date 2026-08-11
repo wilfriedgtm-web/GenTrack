@@ -170,7 +170,6 @@ const TYPES = {
   groupe_electrogene: { id: '98849793-9201-4adf-aec2-a4a08587c4e2', label: 'Groupe électrogène', icon: '⚡', modele_id: 'a1000000-0000-0000-0000-000000000001' },
   groupe_eau_glacee:  { id: '656f0ac2-a6b3-42ed-8c50-bc3d1e16086f', label: 'Groupe eau glacée',  icon: '💧', modele_id: 'a1000000-0000-0000-0000-000000000002' },
   chambre_froide:     { id: 'e2c7e882-71dd-4a01-ac4e-d7bfc5954fff', label: 'Chambre froide',     icon: '❄️', modele_id: 'a1000000-0000-0000-0000-000000000003' },
-  cuve_fioul:         { id: 'de5519d0-363b-4628-b872-2dcf01859002', label: 'Cuve fioul',          icon: '🛢️', modele_id: 'a1000000-0000-0000-0000-000000000004' },
 };
 
 function typeById(id) { return Object.values(TYPES).find(t => t.id === id) || { label: 'Autre', icon: '🔩' }; }
@@ -369,7 +368,7 @@ function renderClientRows(clients) {
       <td style="font-size:12px">${esc(c.groupe_hotelier||'—')}</td>
       <td><span class="kpi-badge badge-gray">${c.plan||'—'}</span></td>
       <td>${sites.length}</td>
-      <td>${equips.length}</td>
+      <td>${equips.length+groupes.length}</td>
       <td>${fmtCFA(c.prix_mensuel||0)}</td>
       <td><span class="kpi-badge ${c.actif?'badge-green':'badge-gray'}">${c.actif?'Actif':'Inactif'}</span></td>
       <td onclick="event.stopPropagation()"><button class="btn btn-outline btn-xs" onclick="openClient('${c.id}')">Gérer →</button></td>
@@ -474,37 +473,8 @@ async function saveClientInfos(id) {
   await api('clients',`&id=eq.${id}`,'*','PATCH',body);
   toast('Client mis à jour'); await loadAll(); openClient(id,'infos');
 }
-// ── HELPERS CASCADE ────────────────────────────────────────
-async function _cascadeDeleteEquipement(eqId) {
-  const rEqs = await api('rondes_equipements',`&equipement_id=eq.${eqId}`,'id');
-  if (rEqs && rEqs.length) {
-    const ids = rEqs.map(r=>r.id).join(',');
-    await apiDelete('reponses',`ronde_equipement_id=in.(${ids})`);
-    await apiDelete('rondes_equipements',`equipement_id=eq.${eqId}`);
-  }
-  await apiDelete('questions',`equipement_id=eq.${eqId}`);
-  await apiDelete('equipements',`id=eq.${eqId}`);
-}
-async function _cascadeDeleteSite(siteId) {
-  const equips = await api('equipements',`&site_id=eq.${siteId}`,'id');
-  if (equips) for (const eq of equips) await _cascadeDeleteEquipement(eq.id);
-  await apiDelete('rondes',`site_id=eq.${siteId}`);
-  await apiDelete('pannes',`site_id=eq.${siteId}`);
-  const contacts = await api('contacts',`&site_id=eq.${siteId}`,'id');
-  if (contacts) for (const ct of contacts) await api('rondes',`&technicien_id=eq.${ct.id}`,'id','PATCH',{technicien_id:null});
-  await apiDelete('contacts',`site_id=eq.${siteId}`);
-  await apiDelete('tokens',`site_id=eq.${siteId}`);
-  await apiDelete('user_sites',`site_id=eq.${siteId}`);
-  await apiDelete('groupes',`site_id=eq.${siteId}`);
-  await apiDelete('cuves',`site_id=eq.${siteId}`);
-}
-
 async function deleteClient(id) {
-  if(!confirm('Supprimer ce client et toutes ses données ? Action irréversible.')) return;
-  const sites = await api('sites',`&client_id=eq.${id}`,'id');
-  if (sites) for (const s of sites) await _cascadeDeleteSite(s.id);
-  await apiDelete('vidanges',`client_id=eq.${id}`);
-  await apiDelete('sites',`client_id=eq.${id}`);
+  if(!confirm('Supprimer ce client ?')) return;
   await apiDelete('clients',`id=eq.${id}`);
   closeModal('modal-client'); toast('Client supprimé'); await loadAll();
 }
@@ -513,16 +483,36 @@ async function deleteClient(id) {
 function renderTabSites(client, sites, allEquip, groupes) {
   let html = `<div style="display:flex;justify-content:flex-end;margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="openAddSite('${client.id}')">+ Ajouter un site</button></div>`;
 
-  if (!sites.length) html += '<p style="color:var(--text-muted);font-size:13px">Aucun site configuré.</p>';
+  // Ancien modèle : groupes
+  if (groupes.length > 0) {
+    html += `<div class="info-box">📦 <strong>Ancien modèle (groupes)</strong> — ${groupes.length} groupe(s) existant(s) sur ce client.</div>`;
+    groupes.forEach(g => {
+      const cuve = S.cuves.find(c=>c.id===g.cuve_id);
+      html += `<div class="equip-item" style="margin-bottom:8px">
+        <div class="equip-item-left">
+          <div class="equip-icon">⚡</div>
+          <div>
+            <div class="equip-name">${esc(g.nom)}</div>
+            <div class="equip-meta">${g.puissance_kva?g.puissance_kva+' kVA':''} ${g.marque?'· '+esc(g.marque):''} ${g.reference?'· '+esc(g.reference):''} · Conso: ${g.conso_theorique_lh||1.5}L/h · Réservoir: ${g.capacite_reservoir_litres||500}L</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-xs" onclick="editGroupe('${g.id}','${client.id}')">✏️</button>
+        </div>
+      </div>`;
+    });
+    html += '<hr class="section-sep">';
+  }
+
+  if (!sites.length && !groupes.length) html += '<p style="color:var(--text-muted);font-size:13px">Aucun site ni équipement.</p>';
 
   sites.forEach(site => {
     const equips = allEquip.filter(e=>e.site_id===site.id);
     html += `<div class="card" style="margin-bottom:14px">
       <div class="card-header">
-        <div><strong style="font-size:14px">${esc(site.nom)}</strong>${site.ville?`<div style="font-size:11px;color:var(--text-muted)">${esc(site.ville)}</div>`:''}<div style="font-size:11px;color:var(--text-muted)">⏰ Rappel ${site.heure_rappel??8}h UTC</div></div>
+        <div><strong style="font-size:14px">${esc(site.nom)}</strong>${site.ville?`<div style="font-size:11px;color:var(--text-muted)">${esc(site.ville)}</div>`:''}</div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-outline btn-xs" onclick="openAddEquipement('${site.id}','${client.id}')">+ Équipement</button>
-          <button class="btn btn-outline btn-xs" onclick="openEditSite('${site.id}','${client.id}')">✏️</button>
           <button class="btn btn-danger btn-xs" onclick="deleteSite('${site.id}','${client.id}')">🗑️</button>
         </div>
       </div>`;
@@ -530,19 +520,15 @@ function renderTabSites(client, sites, allEquip, groupes) {
     else {
       equips.forEach(eq => {
         const t = typeById(eq.type_id);
-        html += `<div class="equip-item" style="opacity:${eq.actif?1:0.45}">
+        html += `<div class="equip-item">
           <div class="equip-item-left">
             <div class="equip-icon">${t.icon}</div>
             <div>
-              <div class="equip-name">${esc(eq.nom)} <span style="font-size:10px;color:var(--text-muted);font-weight:400">· ${t.label}</span></div>
-              <div class="equip-meta">${eq.marque?`<strong>${esc(eq.marque)}</strong> `:''}${eq.reference?`${esc(eq.reference)} · `:''}${eq.puissance_kva?`${eq.puissance_kva} kVA · `:''}${eq.conso_theorique_lh?`${eq.conso_theorique_lh}L/h · `:''}${eq.capacite_litres?`${eq.capacite_litres}L · `:''}${eq.seuil_vidange_heures?`Vidange: ${eq.seuil_vidange_heures}h · `:''}${eq.actif?'<span style="color:var(--green);font-weight:600">Actif</span>':'<span style="color:var(--text-muted)">Inactif</span>'}</div>
+              <div class="equip-name">${esc(eq.nom)}</div>
+              <div class="equip-meta">${t.label}${eq.conso_theorique_lh?` · ${eq.conso_theorique_lh}L/h`:''}${eq.capacite_litres?` · ${eq.capacite_litres}L`:''}${eq.seuil_vidange_heures?` · Vidange: ${eq.seuil_vidange_heures}h`:''}</div>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label class="toggle" title="${eq.actif?'Désactiver':'Activer'}" onclick="event.stopPropagation()">
-              <input type="checkbox" ${eq.actif?'checked':''} onchange="toggleEquipActif('${eq.id}',this.checked,'${client.id}')">
-              <span class="toggle-slider"></span>
-            </label>
+          <div style="display:flex;gap:6px">
             <button class="btn btn-outline btn-xs" onclick="openEditEquipement('${eq.id}','${client.id}')">✏️</button>
             <button class="btn btn-danger btn-xs" onclick="deleteEquipement('${eq.id}','${client.id}')">🗑️</button>
           </div>
@@ -606,7 +592,7 @@ function renderTabContacts(client, contacts) {
             <div class="contact-avatar">${initials}</div>
             <div>
               <div style="font-size:13px;font-weight:500">${esc(ct.nom)}</div>
-              <div style="font-size:11px;color:var(--text-muted)">${roleLabels[ct.role]||ct.role||'—'} ${ct.site_id?'· 🏨 '+(S.sites.find(s=>s.id===ct.site_id)?.nom||'Site inconnu'):''} ${ct.whatsapp?'· '+esc(ct.whatsapp):''} ${ct.email?'· '+esc(ct.email):''}</div>
+              <div style="font-size:11px;color:var(--text-muted)">${roleLabels[ct.role]||ct.role||'—'} ${ct.whatsapp?'· '+esc(ct.whatsapp):''} ${ct.email?'· '+esc(ct.email):''}</div>
             </div>
           </div>
           <div style="display:flex;gap:6px">
@@ -702,102 +688,40 @@ function openAddSite(clientId) {
     <div class="modal-header"><h3>Nouveau site</h3><button class="close-btn" onclick="closeModal('modal-site')">×</button></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Nom du site *</label><input class="form-input" id="s-nom" placeholder="Bâtiment principal, Annexe Nord…" /></div>
+      <div class="form-group"><label class="form-label">Description / Emplacement</label><input class="form-input" id="s-desc" placeholder="ex: Bâtiment A, côté piscine" /></div>
       <div class="form-row">
+        <div class="form-group"><label class="form-label">Adresse</label><input class="form-input" id="s-adresse" placeholder="123 rue du Port" /></div>
         <div class="form-group"><label class="form-label">Ville</label><input class="form-input" id="s-ville" value="${esc(client.ville||'')}" /></div>
+      </div>
+      <div class="form-row">
         <div class="form-group"><label class="form-label">Pays</label><input class="form-input" id="s-pays" value="${esc(client.pays||'Sénégal')}" /></div>
+        <div class="form-group"><label class="form-label">Référence interne</label><input class="form-input" id="s-ref" placeholder="SITE-01" /></div>
       </div>
-      <div class="form-group"><label class="form-label">Heure du rappel (UTC)</label>
-        <select class="form-input" id="s-heure-rappel">
-          <option value="6">6h UTC (7h Dakar)</option>
-          <option value="7">7h UTC (8h Dakar)</option>
-          <option value="8" selected>8h UTC (9h Dakar) — défaut</option>
-          <option value="9">9h UTC (10h Dakar)</option>
-          <option value="10">10h UTC (11h Dakar)</option>
-          <option value="11">11h UTC (12h Dakar)</option>
-          <option value="12">12h UTC (13h Dakar)</option>
-        </select>
-      </div>
+      <div class="form-group"><label class="form-label">WhatsApp responsable site</label><input class="form-input" id="s-wa" placeholder="+2250700000000" /></div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-site')">Annuler</button><button class="btn btn-primary" onclick="createSite('${clientId}')">Créer le site</button></div>
   </div>`);
 }
 async function createSite(clientId) {
   const nom=document.getElementById('s-nom').value.trim(); if(!nom){toast('Nom requis');return;}
-  const result = await api('sites','','*','POST',{
+  await api('sites','','*','POST',{
     nom, client_id:clientId,
+    description:document.getElementById('s-desc').value||null,
+    adresse:document.getElementById('s-adresse').value||null,
     ville:document.getElementById('s-ville').value||null,
     pays:document.getElementById('s-pays').value||null,
-    heure_rappel:parseInt(document.getElementById('s-heure-rappel').value)||8,
-    actif:true,
+    reference:document.getElementById('s-ref').value||null,
+    whatsapp_responsable:document.getElementById('s-wa').value||null,
   });
-  if(!result||!result[0]){toast('Erreur lors de la création du site','error');return;}
   closeModal('modal-site'); toast('Site ajouté'); await loadAll(); openClient(clientId,'sites');
 }
-function openEditSite(siteId, clientId) {
-  const site = (S.sites||[]).find(s=>s.id===siteId)||{};
-  const hr = site.heure_rappel ?? 8;
-  const opts = [6,7,8,9,10,11,12].map(h=>`<option value="${h}"${h===hr?' selected':''}>${h}h UTC (${h+1}h Dakar)</option>`).join('');
-  showModal('modal-edit-site',`<div class="modal modal-md">
-    <div class="modal-header"><h3>Modifier le site</h3><button class="close-btn" onclick="closeModal('modal-edit-site')">×</button></div>
-    <div class="modal-body">
-      <div class="form-group"><label class="form-label">Nom du site *</label><input class="form-input" id="es-nom" value="${esc(site.nom||'')}" /></div>
-      <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="es-desc" value="${esc(site.description||'')}" /></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-group"><label class="form-label">Ville</label><input class="form-input" id="es-ville" value="${esc(site.ville||'')}" /></div>
-        <div class="form-group"><label class="form-label">Pays</label><input class="form-input" id="es-pays" value="${esc(site.pays||'')}" /></div>
-        <div class="form-group"><label class="form-label">Adresse</label><input class="form-input" id="es-adresse" value="${esc(site.adresse||'')}" /></div>
-        <div class="form-group"><label class="form-label">Référence</label><input class="form-input" id="es-ref" value="${esc(site.reference||'')}" /></div>
-      </div>
-      <div class="form-group"><label class="form-label">WhatsApp responsable</label><input class="form-input" id="es-wa" value="${esc(site.whatsapp_responsable||'')}" /></div>
-      <div class="form-group"><label class="form-label">Heure du rappel (UTC)</label>
-        <select class="form-input" id="es-heure-rappel">${opts}</select>
-      </div>
-    </div>
-    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-edit-site')">Annuler</button><button class="btn btn-primary" onclick="saveSite('${siteId}','${clientId}')">Enregistrer</button></div>
-  </div>`);
-}
-async function saveSite(siteId, clientId) {
-  const nom = document.getElementById('es-nom').value.trim();
-  if (!nom) { toast('Nom requis'); return; }
-  await api('sites', `&id=eq.${siteId}`, '*', 'PATCH', {
-    nom,
-    description: document.getElementById('es-desc').value||null,
-    adresse: document.getElementById('es-adresse').value||null,
-    ville: document.getElementById('es-ville').value||null,
-    pays: document.getElementById('es-pays').value||null,
-    reference: document.getElementById('es-ref').value||null,
-    whatsapp_responsable: document.getElementById('es-wa').value||null,
-    heure_rappel: parseInt(document.getElementById('es-heure-rappel').value)||8,
-  });
-  closeModal('modal-edit-site'); toast('Site mis à jour'); await loadAll(); openClient(clientId,'sites');
-}
 async function deleteSite(siteId,clientId) {
-  if(!confirm('Supprimer ce site et toutes ses données ? Action irréversible.')) return;
-  await _cascadeDeleteSite(siteId);
+  if(!confirm('Supprimer ce site ?')) return;
   await apiDelete('sites',`id=eq.${siteId}`);
   toast('Site supprimé'); await loadAll(); openClient(clientId,'sites');
 }
 
-// ── ÉQUIPEMENTS (nouveau système) ────────────────────────────
-async function toggleEquipActif(eqId, actif, clientId) {
-  await api('equipements', `&id=eq.${eqId}`, '*', 'PATCH', { actif });
-  toast(actif ? '✅ Équipement activé — visible sur le dashboard client' : '⏸ Équipement désactivé — masqué du dashboard client');
-  S.equipements = S.equipements.map(e => e.id === eqId ? {...e, actif} : e);
-  openClient(clientId, 'sites');
-}
-
 // ── GROUPES (ancien modèle) ────────────────────────────────
-async function toggleGroupeActif(gId, actif, clientId) {
-  await fetch(`${SUPA_URL}/rest/v1/groupes?id=eq.${gId}`, {
-    method: 'PATCH',
-    headers: {'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
-    body: JSON.stringify({ actif })
-  });
-  toast(actif ? '✅ Équipement activé — visible sur le dashboard client' : '⏸ Équipement désactivé — masqué du dashboard client');
-  S.groupes = S.groupes.map(g => g.id === gId ? {...g, actif} : g);
-  openClient(clientId);
-}
-
 function editGroupe(gId, clientId) {
   const g=S.groupes.find(x=>x.id===gId); if(!g) return;
   showModal('modal-grp',`<div class="modal modal-md">
@@ -843,14 +767,6 @@ function openAddEquipement(siteId, clientId) {
         <div class="form-group"><label class="form-label">Nom *</label><input class="form-input" id="eq-nom" placeholder="GE Principal" /></div>
         <div class="form-group"><label class="form-label">Type</label><select class="form-select" id="eq-type">${typeOpts}</select></div>
       </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Marque</label><input class="form-input" id="eq-marque" placeholder="SDMO, Cummins, Perkins…" /></div>
-        <div class="form-group"><label class="form-label">Modèle / Référence</label><input class="form-input" id="eq-reference" placeholder="J1500K, C1400D5…" /></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Numéro de série</label><input class="form-input" id="eq-serie" placeholder="SN-XXXX" /></div>
-        <div class="form-group" id="eq-kva-wrap" style="display:none"><label class="form-label">Puissance (kVA)</label><input class="form-input" id="eq-kva" type="number" placeholder="1400" /></div>
-      </div>
       <div id="eq-type-fields"></div>
       <div class="info-box">💡 Les questions du modèle seront copiées automatiquement depuis Supabase.</div>
     </div>
@@ -863,10 +779,7 @@ function openAddEquipement(siteId, clientId) {
 function renderEqTypeFields() {
   const typeId = document.getElementById('eq-type')?.value;
   const isGE = typeId === TYPES.groupe_electrogene.id;
-  const isCuve = typeId === TYPES.cuve_fioul.id;
-  // Afficher champ kVA uniquement pour GE et GEG
-  const kvaWrap = document.getElementById('eq-kva-wrap');
-  if (kvaWrap) kvaWrap.style.display = (isGE || typeId === TYPES.groupe_eau_glacee.id) ? '' : 'none';
+  const isGEG = typeId === TYPES.groupe_eau_glacee.id;
   document.getElementById('eq-type-fields').innerHTML = isGE ? `
     <div class="form-row">
       <div class="form-group"><label class="form-label">Conso théorique (L/h)</label><input class="form-input" id="eq-conso" type="number" step="0.1" value="1.5" /></div>
@@ -875,10 +788,6 @@ function renderEqTypeFields() {
     <div class="form-row">
       <div class="form-group"><label class="form-label">Seuil vidange (heures)</label><input class="form-input" id="eq-vidange" type="number" value="250" /></div>
       <div class="form-group"></div>
-    </div>` : isCuve ? `
-    <div class="form-row">
-      <div class="form-group"><label class="form-label">Capacité totale (L)</label><input class="form-input" id="eq-capa" type="number" value="10000" /></div>
-      <div class="form-group"><label class="form-label">Conso estimée GEs (L/h)</label><input class="form-input" id="eq-conso" type="number" step="0.1" value="65" /></div>
     </div>` : '';
 }
 
@@ -886,10 +795,6 @@ async function createEquipement(siteId, clientId) {
   const nom=document.getElementById('eq-nom').value.trim(); if(!nom){toast('Nom requis');return;}
   const typeId=document.getElementById('eq-type').value;
   const body = { nom, type_id:typeId, site_id:siteId, actif:true };
-  body.marque = document.getElementById('eq-marque').value||null;
-  body.reference = document.getElementById('eq-reference').value||null;
-  body.numero_serie = document.getElementById('eq-serie').value||null;
-  if (document.getElementById('eq-kva')?.value) body.puissance_kva = parseFloat(document.getElementById('eq-kva').value)||null;
   if (document.getElementById('eq-conso')) body.conso_theorique_lh = parseFloat(document.getElementById('eq-conso').value)||null;
   if (document.getElementById('eq-capa')) body.capacite_litres = parseInt(document.getElementById('eq-capa').value)||null;
   if (document.getElementById('eq-vidange')) body.seuil_vidange_heures = parseInt(document.getElementById('eq-vidange').value)||null;
@@ -906,22 +811,12 @@ function openEditEquipement(eqId, clientId) {
   const eq=S.equipements.find(e=>e.id===eqId); if(!eq) return;
   const t=typeById(eq.type_id);
   const isGE = eq.type_id===TYPES.groupe_electrogene.id;
-  const isGEG = eq.type_id===TYPES.groupe_eau_glacee.id;
-  const isCuve = eq.type_id===TYPES.cuve_fioul.id;
   showModal('modal-eq-edit',`<div class="modal modal-md">
     <div class="modal-header"><h3>Modifier l'équipement</h3><button class="close-btn" onclick="closeModal('modal-eq-edit')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group"><label class="form-label">Nom *</label><input class="form-input" id="eqe-nom" value="${esc(eq.nom)}" /></div>
         <div class="form-group"><label class="form-label">Type</label><input class="form-input" value="${t.icon} ${t.label}" disabled style="background:#f5f5f5" /></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Marque</label><input class="form-input" id="eqe-marque" value="${esc(eq.marque||'')}" placeholder="SDMO, Cummins…" /></div>
-        <div class="form-group"><label class="form-label">Modèle / Référence</label><input class="form-input" id="eqe-reference" value="${esc(eq.reference||'')}" placeholder="J1500K…" /></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Numéro de série</label><input class="form-input" id="eqe-serie" value="${esc(eq.numero_serie||'')}" placeholder="SN-XXXX" /></div>
-        ${(isGE||isGEG)?`<div class="form-group"><label class="form-label">Puissance (kVA)</label><input class="form-input" id="eqe-kva" type="number" value="${eq.puissance_kva||''}" placeholder="1400" /></div>`:'<div class="form-group"></div>'}
       </div>
       ${isGE?`<div class="form-row">
         <div class="form-group"><label class="form-label">Conso théorique (L/h)</label><input class="form-input" id="eqe-conso" type="number" step="0.1" value="${eq.conso_theorique_lh||1.5}" /></div>
@@ -930,9 +825,6 @@ function openEditEquipement(eqId, clientId) {
       <div class="form-row">
         <div class="form-group"><label class="form-label">Seuil vidange (heures)</label><input class="form-input" id="eqe-vidange" type="number" value="${eq.seuil_vidange_heures||250}" /></div>
         <div class="form-group"></div>
-      </div>`:isCuve?`<div class="form-row">
-        <div class="form-group"><label class="form-label">Capacité totale (L)</label><input class="form-input" id="eqe-capa" type="number" value="${eq.capacite_litres||10000}" /></div>
-        <div class="form-group"><label class="form-label">Conso estimée GEs (L/h)</label><input class="form-input" id="eqe-conso" type="number" step="0.1" value="${eq.conso_theorique_lh||65}" /></div>
       </div>`:''}
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('modal-eq-edit')">Annuler</button><button class="btn btn-primary" onclick="saveEquipement('${eqId}','${clientId}')">Enregistrer</button></div>
@@ -940,10 +832,6 @@ function openEditEquipement(eqId, clientId) {
 }
 async function saveEquipement(eqId, clientId) {
   const body={nom:document.getElementById('eqe-nom').value};
-  body.marque = document.getElementById('eqe-marque').value||null;
-  body.reference = document.getElementById('eqe-reference').value||null;
-  body.numero_serie = document.getElementById('eqe-serie').value||null;
-  if(document.getElementById('eqe-kva')) body.puissance_kva=parseFloat(document.getElementById('eqe-kva').value)||null;
   if(document.getElementById('eqe-conso')) body.conso_theorique_lh=parseFloat(document.getElementById('eqe-conso').value)||null;
   if(document.getElementById('eqe-capa')) body.capacite_litres=parseInt(document.getElementById('eqe-capa').value)||null;
   if(document.getElementById('eqe-vidange')) body.seuil_vidange_heures=parseInt(document.getElementById('eqe-vidange').value)||null;
@@ -951,8 +839,8 @@ async function saveEquipement(eqId, clientId) {
   closeModal('modal-eq-edit'); toast('Équipement mis à jour'); await loadAll(); openClient(clientId,'sites');
 }
 async function deleteEquipement(eqId,clientId) {
-  if(!confirm('Supprimer cet équipement et toutes ses données ?')) return;
-  await _cascadeDeleteEquipement(eqId);
+  if(!confirm('Supprimer cet équipement ?')) return;
+  await apiDelete('equipements',`id=eq.${eqId}`);
   toast('Équipement supprimé'); await loadAll(); openClient(clientId,'sites');
 }
 
@@ -1060,8 +948,6 @@ function addContact(cId) { openContactModal(null,cId); }
 function editContact(id,cId) { openContactModal(S.contacts.find(c=>c.id===id),cId); }
 function openContactModal(ct,clientId) {
   const isEdit=!!ct;
-  const clientSites=S.sites.filter(s=>s.client_id===clientId);
-  const siteOpts=clientSites.map(s=>`<option value="${s.id}" ${ct?.site_id===s.id?'selected':''}>${esc(s.nom)}</option>`).join('');
   showModal('modal-ct',`<div class="modal modal-sm">
     <div class="modal-header"><h3>${isEdit?'Modifier':'Ajouter'} un contact</h3><button class="close-btn" onclick="closeModal('modal-ct')">×</button></div>
     <div class="modal-body">
@@ -1074,12 +960,6 @@ function openContactModal(ct,clientId) {
           <option value="dir_ops" ${ct?.role==='dir_ops'?'selected':''}>Directeur opérations</option>
         </select>
       </div>
-      ${clientSites.length?`<div class="form-group"><label class="form-label">Site rattaché</label>
-        <select class="form-select" id="ct-site">
-          <option value="">— Tous les sites (dir_ops / dir_tech) —</option>${siteOpts}
-        </select>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">⚠️ Obligatoire pour les techniciens et resp_tech — le bot l'utilise pour router les rondes et alertes.</div>
-      </div>`:''}
       <div class="form-group"><label class="form-label">WhatsApp</label><input class="form-input" id="ct-wa" value="${esc(ct?.whatsapp||'')}" placeholder="+2250700000000" /></div>
       <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="ct-email" type="email" value="${esc(ct?.email||'')}" /></div>
     </div>
@@ -1088,18 +968,13 @@ function openContactModal(ct,clientId) {
 }
 async function saveContact(id,clientId,isEdit) {
   const nom=document.getElementById('ct-nom').value.trim(); if(!nom){toast('Nom requis');return;}
-  const role=document.getElementById('ct-role').value;
-  const siteEl=document.getElementById('ct-site');
-  const site_id=siteEl?.value||null;
-  if(['technicien','resp_tech'].includes(role)&&!site_id){toast('Site requis pour ce rôle — le bot ne peut pas router sans site_id','error');return;}
-  const body={nom,role,whatsapp:document.getElementById('ct-wa').value||null,email:document.getElementById('ct-email').value||null,client_id:clientId,site_id,actif:true};
+  const body={nom,role:document.getElementById('ct-role').value,whatsapp:document.getElementById('ct-wa').value||null,email:document.getElementById('ct-email').value||null,client_id:clientId};
   if(isEdit) await api('contacts',`&id=eq.${id}`,'*','PATCH',body);
   else await api('contacts','','*','POST',body);
   closeModal('modal-ct'); toast(isEdit?'Contact mis à jour':'Contact ajouté'); await loadAll(); openClient(clientId,'contacts');
 }
 async function deleteContact(id,clientId) {
   if(!confirm('Supprimer ce contact ?')) return;
-  await api('rondes',`&technicien_id=eq.${id}`,'id','PATCH',{technicien_id:null});
   await apiDelete('contacts',`id=eq.${id}`);
   toast('Contact supprimé'); await loadAll(); openClient(clientId,'contacts');
 }

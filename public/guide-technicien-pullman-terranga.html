@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guide Technicien — GenTrack Pullman Dakar Terranga</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #f5f5f0;
+    color: #1a1a1a;
+    padding: 24px 16px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+
+  /* HEADER */
+  .header {
+    background: #1B2A4A;
+    border-radius: 12px;
+    padding: 20px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+  }
+  .header-logo { color: white; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .header-logo span { color: #C9A84C; }
+  .header-right { text-align: right; }
+  .header-right .hotel { color: #C9A84C; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+  .header-right .role { color: rgba(255,255,255,0.7); font-size: 12px; margin-top: 2px; }
+
+  /* BOT NUMBER */
+  .bot-box {
+    background: white;
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-left: 4px solid #25D366;
+  }
+  .bot-icon { font-size: 28px; }
+  .bot-label { font-size: 11px; font-weight: 600; color: #666; letter-spacing: 0.5px; text-transform: uppercase; }
+  .bot-number { font-size: 24px; font-weight: 700; color: #1B2A4A; }
+
+  /* ACTIVATION */
+  .activation-box {
+    background: #FFF8E7;
+    border: 1px solid #C9A84C;
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .activation-box .ico { font-size: 20px; }
+  .activation-box .title { font-size: 13px; font-weight: 600; color: #8B6914; }
+  .activation-box .sub { font-size: 12px; color: #a07820; margin-top: 2px; }
+  .activation-box .code {
+    display: inline-block;
+    background: #1B2A4A;
+    color: white;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 5px 14px;
+    border-radius: 20px;
+    margin-top: 6px;
+    font-family: monospace;
+    letter-spacing: 0.5px;
+  }
+
+  /* SECTION TITLE */
+  .section-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 22px 0 12px;
+  }
+  .section-divider .label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: #888;
+    white-space: nowrap;
+  }
+  .section-divider .line { flex: 1; height: 1px; background: #ddd; }
+
+  /* ÉQUIPEMENTS TABLE */
+  .equip-table {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    border: 1px solid #e8e8e8;
+  }
+  .equip-table table { width: 100%; border-collapse: collapse; }
+  .equip-table thead { background: #1B2A4A; color: white; }
+  .equip-table thead th { padding: 10px 16px; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; text-align: left; }
+  .equip-table tbody tr { border-bottom: 1px solid #f0f0f0; }
+  .equip-table tbody tr:last-child { border-bottom: none; }
+  .equip-table tbody td { padding: 10px 16px; font-size: 13px; }
+  .equip-table tbody td:first-child { font-weight: 600; }
+  .equip-table .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tag-ge { background: #E8F0FB; color: #1B2A4A; }
+  .tag-cuve { background: #E8F5E9; color: #2E7D32; }
+  .tag-cf { background: #E3F2FD; color: #0D47A1; }
+
+  /* COMMANDES GRID */
+  .cmd-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .cmd-card {
+    background: white;
+    border-radius: 10px;
+    padding: 14px 16px;
+    border: 1px solid #e8e8e8;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .cmd-ico { font-size: 22px; }
+  .cmd-name { font-size: 15px; font-weight: 700; color: #1B2A4A; font-family: monospace; }
+  .cmd-desc { font-size: 12px; color: #666; margin-top: 1px; }
+
+  /* FLOW CARD */
+  .flow-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    border: 1px solid #e8e8e8;
+  }
+  .flow-header {
+    background: #1B2A4A;
+    color: white;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .flow-header .cmd { font-family: monospace; font-weight: 700; font-size: 16px; color: #C9A84C; }
+  .flow-header .desc { font-size: 13px; color: rgba(255,255,255,0.8); }
+  .flow-steps { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .step-num {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    background: #1B2A4A;
+    color: white;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .step-body { flex: 1; }
+  .step-q { font-size: 13px; font-weight: 500; color: #1a1a1a; }
+  .step-hint { font-size: 12px; color: #666; margin-top: 3px; }
+  .step-example {
+    display: inline-block;
+    background: #f0f0f0;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #333;
+    margin-top: 4px;
+    font-family: monospace;
+  }
+  .step-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .step-choice {
+    background: #f5f5f5;
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 12px;
+    color: #333;
+  }
+  .step-choice strong { color: #1B2A4A; }
+
+  /* SUCCESS */
+  .flow-success {
+    background: #E8F5E9;
+    padding: 10px 20px;
+    font-size: 12px;
+    color: #2E7D32;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ALERT BOX */
+  .alert-box {
+    background: #FFF3E0;
+    border: 1px solid #FFB74D;
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #E65100;
+  }
+  .alert-box strong { display: block; margin-bottom: 4px; }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    font-size: 11px;
+    color: #aaa;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #e0e0e0;
+    display: flex;
+    justify-content: space-between;
+  }
+  .footer .brand { font-weight: 700; color: #1B2A4A; }
+
+  @media print {
+    body { background: white; padding: 0; }
+    .flow-card, .equip-table, .cmd-card, .bot-box { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-logo">GEN<span>TRACK</span></div>
+  <div class="header-right">
+    <div class="hotel">Pullman Dakar Terranga</div>
+    <div class="role">Guide Technicien — v1</div>
+  </div>
+</div>
+
+<!-- BOT NUMBER -->
+<div class="bot-box">
+  <div class="bot-icon">💬</div>
+  <div>
+    <div class="bot-label">Numéro WhatsApp du bot</div>
+    <div class="bot-number">+1 415 523 8886</div>
+  </div>
+</div>
+
+<!-- ACTIVATION -->
+<div class="activation-box">
+  <div class="ico">🔑</div>
+  <div>
+    <div class="title">Activation — à faire tous les 2 jours</div>
+    <div class="sub">Renvoyez ce message au bot pour rester connecté :</div>
+    <div class="code">join breeze-society</div>
+  </div>
+</div>
+
+<!-- ÉQUIPEMENTS -->
+<div class="section-divider"><div class="line"></div><div class="label">Vos équipements</div><div class="line"></div></div>
+
+<div class="equip-table">
+  <table>
+    <thead>
+      <tr>
+        <th>Équipement</th>
+        <th>Réf. / Type</th>
+        <th>Seuil / Vidange</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>GE PRINCIPAL <span class="tag tag-ge">GE</span></td>
+        <td>Mitsubishi · 1 400 kVA</td>
+        <td>250h</td>
+      </tr>
+      <tr>
+        <td>GE SECURITE <span class="tag tag-ge">GE</span></td>
+        <td>Pramac · 450 kVA</td>
+        <td>250h</td>
+      </tr>
+      <tr>
+        <td>GASOIL <span class="tag tag-cuve">Cuve</span></td>
+        <td>10 000 litres</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>CF BOUCHERIE <span class="tag tag-cf">CF</span></td>
+        <td>Positive</td>
+        <td>max +7°C</td>
+      </tr>
+      <tr>
+        <td>CF BOUCHERIE 2 <span class="tag tag-cf">CF</span></td>
+        <td>Négative</td>
+        <td>max -15°C</td>
+      </tr>
+      <tr>
+        <td>CF CRUSTACE <span class="tag tag-cf">CF</span></td>
+        <td>Négative</td>
+        <td>max -15°C</td>
+      </tr>
+      <tr>
+        <td>CF GARDE MANGER <span class="tag tag-cf">CF</span></td>
+        <td>Positive</td>
+        <td>max +7°C</td>
+      </tr>
+      <tr>
+        <td>CF LEGUME ET FRUIT <span class="tag tag-cf">CF</span></td>
+        <td>Positive</td>
+        <td>max +7°C</td>
+      </tr>
+      <tr>
+        <td>CF PATISSERIE <span class="tag tag-cf">CF</span></td>
+        <td>Négative</td>
+        <td>max -15°C</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- COMMANDES -->
+<div class="section-divider"><div class="line"></div><div class="label">Commandes disponibles</div><div class="line"></div></div>
+
+<div class="cmd-grid">
+  <div class="cmd-card">
+    <div class="cmd-ico">📋</div>
+    <div>
+      <div class="cmd-name">saisie</div>
+      <div class="cmd-desc">Relevé quotidien</div>
+    </div>
+  </div>
+  <div class="cmd-card">
+    <div class="cmd-ico">⛽</div>
+    <div>
+      <div class="cmd-name">plein</div>
+      <div class="cmd-desc">Enregistrer un ravitaillement</div>
+    </div>
+  </div>
+  <div class="cmd-card">
+    <div class="cmd-ico">🔴</div>
+    <div>
+      <div class="cmd-name">panne</div>
+      <div class="cmd-desc">Signaler une urgence</div>
+    </div>
+  </div>
+  <div class="cmd-card">
+    <div class="cmd-ico">✅</div>
+    <div>
+      <div class="cmd-name">resolu</div>
+      <div class="cmd-desc">Clôturer une panne</div>
+    </div>
+  </div>
+  <div class="cmd-card">
+    <div class="cmd-ico">🔧</div>
+    <div>
+      <div class="cmd-name">vidange</div>
+      <div class="cmd-desc">Déclarer une vidange GE</div>
+    </div>
+  </div>
+</div>
+
+<!-- FLOW : SAISIE -->
+<div class="section-divider"><div class="line"></div><div class="label">Relevé quotidien — tapez "saisie"</div><div class="line"></div></div>
+
+<div class="flow-card">
+  <div class="flow-header">
+    <div class="cmd">saisie</div>
+    <div class="desc">Groupe électrogène (GE PRINCIPAL ou GE SECURITE)</div>
+  </div>
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-q">Choisissez l'équipement à saisir</div>
+        <div class="step-hint">Le bot affiche la liste numérotée de vos équipements</div>
+        <div class="step-choices">
+          <div class="step-choice"><strong>1</strong> GE PRINCIPAL</div>
+          <div class="step-choice"><strong>2</strong> GE SECURITE</div>
+          <div class="step-choice"><strong>3</strong> GASOIL</div>
+          <div class="step-choice"><strong>4</strong> CF BOUCHERIE…</div>
+        </div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-q">Relevé du compteur horaire ?</div>
+        <div class="step-hint">Lisez les heures affichées sur l'écran du groupe</div>
+        <div class="step-example">2856</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-q">Niveau d'huile moteur ?</div>
+        <div class="step-choices">
+          <div class="step-choice"><strong>1</strong> Normal</div>
+          <div class="step-choice"><strong>2</strong> Bas — à surveiller</div>
+          <div class="step-choice"><strong>3</strong> Critique</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="flow-success">✔ Saisie enregistrée — rapport envoyé au responsable technique</div>
+</div>
+
+<div class="flow-card">
+  <div class="flow-header">
+    <div class="cmd">saisie</div>
+    <div class="desc">Cuve carburant (GASOIL)</div>
+  </div>
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-q">Niveau actuel de la cuve ?</div>
+        <div class="step-hint">Entrez le volume en litres affiché sur la jauge</div>
+        <div class="step-example">7 400</div>
+      </div>
+    </div>
+  </div>
+  <div class="flow-success">✔ Niveau enregistré — autonomie calculée automatiquement</div>
+</div>
+
+<div class="flow-card">
+  <div class="flow-header">
+    <div class="cmd">saisie</div>
+    <div class="desc">Chambre froide (CF BOUCHERIE, CF CRUSTACE, etc.)</div>
+  </div>
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-q">Température affichée sur le panneau ?</div>
+        <div class="step-hint">En degrés Celsius — peut être négatif</div>
+        <div class="step-example">-18</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-q">Température de consigne configurée ?</div>
+        <div class="step-example">-20</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-q">État de la porte ?</div>
+        <div class="step-choices">
+          <div class="step-choice"><strong>1</strong> Ferme bien — joint étanche</div>
+          <div class="step-choice"><strong>2</strong> Ferme mais joint usé</div>
+          <div class="step-choice"><strong>3</strong> Ne ferme pas correctement</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="flow-success">✔ Saisie enregistrée — alerte automatique si température hors consigne</div>
+</div>
+
+<!-- FLOW : PLEIN -->
+<div class="section-divider"><div class="line"></div><div class="label">Ravitaillement — tapez "plein"</div><div class="line"></div></div>
+
+<div class="flow-card">
+  <div class="flow-header">
+    <div class="cmd">plein</div>
+    <div class="desc">Enregistrer un ravitaillement de carburant</div>
+  </div>
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-q">Combien de litres ajoutés ?</div>
+        <div class="step-example">2 000</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-q">Niveau Dover après le plein ?</div>
+        <div class="step-hint">Lisez le chiffre sur la jauge après le ravitaillement</div>
+        <div class="step-example">9 200</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-q">Votre prénom ?</div>
+        <div class="step-example">Moussa</div>
+      </div>
+    </div>
+  </div>
+  <div class="flow-success">✔ Ravitaillement enregistré — équipe et responsable notifiés</div>
+</div>
+
+<!-- FLOW : PANNE -->
+<div class="section-divider"><div class="line"></div><div class="label">Urgence — tapez "panne"</div><div class="line"></div></div>
+
+<div class="flow-card">
+  <div class="flow-header">
+    <div class="cmd">panne</div>
+    <div class="desc">Signaler un incident ou une panne</div>
+  </div>
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-q">Quel équipement est en panne ?</div>
+        <div class="step-hint">Choisissez dans la liste ou tapez le nom</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-q">Décrivez le problème</div>
+        <div class="step-example">GE ne démarre pas, alarme rouge allumée</div>
+      </div>
+    </div>
+  </div>
+  <div class="flow-success">🔴 Panne enregistrée — responsable alerté immédiatement par WhatsApp</div>
+</div>
+
+<!-- FLOW : RÉSOLU -->
+<div class="flow-card">
+  <div class="flow-header">
+    <div class="cmd">resolu</div>
+    <div class="desc">Clôturer une panne après intervention</div>
+  </div>
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-q">Le bot affiche la panne en cours — confirmez la résolution</div>
+        <div class="step-choices">
+          <div class="step-choice"><strong>1</strong> Confirmer la résolution</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="flow-success">✔ Panne clôturée — durée d'indisponibilité calculée</div>
+</div>
+
+<!-- FLOW : VIDANGE -->
+<div class="section-divider"><div class="line"></div><div class="label">Vidange GE — tapez "vidange"</div><div class="line"></div></div>
+
+<div class="flow-card">
+  <div class="flow-header">
+    <div class="cmd">vidange</div>
+    <div class="desc">Déclarer une vidange effectuée sur un groupe</div>
+  </div>
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <div class="step-q">Quel groupe vient d'être vidangé ?</div>
+        <div class="step-choices">
+          <div class="step-choice"><strong>1</strong> GE PRINCIPAL</div>
+          <div class="step-choice"><strong>2</strong> GE SECURITE</div>
+        </div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <div class="step-q">Relevé du compteur au moment de la vidange ?</div>
+        <div class="step-example">3 250</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <div class="step-q">Votre prénom ?</div>
+        <div class="step-example">Moussa</div>
+      </div>
+    </div>
+  </div>
+  <div class="flow-success">✔ Vidange enregistrée — compteur réinitialisé, prochain rappel à 250h</div>
+</div>
+
+<!-- ALERT -->
+<div class="alert-box">
+  <strong>⚠️ En cas de problème avec le bot</strong>
+  Contactez le responsable technique ou envoyez "aide" au bot pour afficher les commandes disponibles.
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <span>En cas de problème contactez le responsable technique</span>
+  <span class="brand">GenTrack</span>
+</div>
+
+</body>
+</html>

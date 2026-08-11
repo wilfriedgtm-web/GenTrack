@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack — Générateur de Contrats</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f0f4f8;
+    color: #1a202c;
+    min-height: 100vh;
+  }
+
+  header {
+    background: #1a1a2e;
+    color: white;
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  header .logo { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  header .logo span { color: #4fc3f7; }
+  header p { font-size: 13px; color: #90caf9; margin-top: 2px; }
+
+  .container {
+    max-width: 820px;
+    margin: 40px auto;
+    padding: 0 20px 60px;
+  }
+
+  .type-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .type-card {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 22px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .type-card:hover { border-color: #4fc3f7; }
+  .type-card.active { border-color: #1a1a2e; background: #f0f9ff; }
+  .type-card .icon { font-size: 28px; margin-bottom: 8px; }
+  .type-card h3 { font-size: 15px; font-weight: 600; color: #1a1a2e; }
+  .type-card p { font-size: 12px; color: #718096; margin-top: 3px; }
+
+  .info-banner {
+    background: #fffbeb;
+    border: 1px solid #f6d860;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #92400e;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .form-card {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    display: none;
+  }
+
+  .form-card.visible { display: block; }
+
+  /* Bloc prestataire pré-rempli */
+  .prestataire-block {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .prestataire-block .prest-info { flex: 1; }
+  .prestataire-block .prest-name { font-size: 15px; font-weight: 700; color: #1a1a2e; }
+  .prestataire-block .prest-detail { font-size: 12px; color: #718096; margin-top: 3px; line-height: 1.6; }
+  .prestataire-block .prest-badge {
+    background: #ebf8ff;
+    color: #2b6cb0;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .form-section { margin-bottom: 24px; }
+
+  .section-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: #718096;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 7px;
+    margin-bottom: 14px;
+  }
+
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .field-grid.single { grid-template-columns: 1fr; }
+  .field-grid.triple { grid-template-columns: 1fr 1fr 1fr; }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+
+  label { font-size: 13px; font-weight: 500; color: #4a5568; }
+  label .req { color: #e53e3e; margin-left: 2px; }
+  label .opt { color: #a0aec0; font-weight: 400; font-size: 11px; margin-left: 4px; }
+
+  input, select, textarea {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #1a202c;
+    transition: border-color 0.2s;
+    background: #fafafa;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: #4fc3f7;
+    background: white;
+  }
+
+  textarea { resize: vertical; min-height: 80px; }
+
+  .droit-badge {
+    background: #f0fff4;
+    border: 1px solid #9ae6b4;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #276749;
+    margin-top: 10px;
+    display: none;
+  }
+
+  .droit-badge.visible { display: block; }
+
+  .btn-generate {
+    width: 100%;
+    background: #1a1a2e;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-top: 8px;
+  }
+
+  .btn-generate:hover { background: #2d2d5e; }
+
+  .output-card {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    margin-top: 24px;
+    display: none;
+  }
+
+  .output-card.visible { display: block; }
+
+  .output-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+
+  .output-header h2 { font-size: 18px; font-weight: 700; }
+
+  .btn-copy {
+    background: #edf2f7;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: #1a202c;
+  }
+
+  .btn-copy:hover { background: #e2e8f0; }
+  .btn-copy.copied { background: #c6f6d5; color: #276749; }
+
+  .output-block {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 20px;
+    font-size: 13px;
+    line-height: 1.9;
+    white-space: pre-wrap;
+    font-family: 'Courier New', monospace;
+    color: #2d3748;
+  }
+
+  .hint {
+    font-size: 12px;
+    color: #a0aec0;
+    margin-top: 12px;
+    text-align: center;
+  }
+
+  .badge {
+    display: inline-block;
+    background: #ebf8ff;
+    color: #2b6cb0;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 600px) {
+    .field-grid, .field-grid.triple { grid-template-columns: 1fr; }
+    header { padding: 16px 20px; }
+    .form-card { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Gen<span>Track</span></div>
+    <p>Outil de génération de contrats — Wire.w Conseil</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="info-banner">
+    ⚠️ <span>Cet outil génère un <strong>projet de contrat</strong> à titre indicatif. Il est recommandé de le faire valider par un juriste local avant signature, notamment pour les aspects de droit national applicables.</span>
+  </div>
+
+  <div class="type-selector">
+    <div class="type-card active" onclick="selectType('client')" id="card-client">
+      <div class="icon">📄</div>
+      <h3>Contrat Client</h3>
+      <p>Accord de prestation de services</p>
+    </div>
+    <div class="type-card" onclick="selectType('nda')" id="card-nda">
+      <div class="icon">🔒</div>
+      <h3>NDA / Confidentialité</h3>
+      <p>Accord de non-divulgation</p>
+    </div>
+  </div>
+
+  <!-- ══ CONTRAT CLIENT ══════════════════════════════════════════════════ -->
+  <div class="form-card visible" id="form-client">
+    <div class="badge">Contrat de Prestation de Services</div>
+
+    <!-- Prestataire pré-rempli -->
+    <div class="prestataire-block">
+      <div class="prest-info">
+        <div class="prest-name">Wire.w — Conseil & Gestion</div>
+        <div class="prest-detail">
+          Auto-entrepreneur · SIRET 85312083000023 · NAF 7022Z<br>
+          2 Pas du Buisson Saint Louis, 75010 Paris, France<br>
+          SIREN 853120830 · Actif depuis le 14/09/2024
+        </div>
+      </div>
+      <div class="prest-badge">Prestataire</div>
+    </div>
+
+    <!-- Partie cliente -->
+    <div class="form-section">
+      <div class="section-title">Informations Client</div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Pays du client <span class="req">*</span></label>
+          <select id="c-pays" onchange="updateDroit('client')">
+            <option value="">— Sélectionner —</option>
+            <option value="SN">🇸🇳 Sénégal</option>
+            <option value="CI">🇨🇮 Côte d'Ivoire</option>
+            <option value="CM">🇨🇲 Cameroun</option>
+            <option value="ML">🇲🇱 Mali</option>
+            <option value="BF">🇧🇫 Burkina Faso</option>
+            <option value="GN">🇬🇳 Guinée</option>
+            <option value="TG">🇹🇬 Togo</option>
+            <option value="BJ">🇧🇯 Bénin</option>
+            <option value="NE">🇳🇪 Niger</option>
+            <option value="GA">🇬🇦 Gabon</option>
+            <option value="FR">🇫🇷 France</option>
+            <option value="CA">🇨🇦 Canada</option>
+            <option value="OTHER">Autre</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Ville</label>
+          <input type="text" id="c-ville" placeholder="Ex: Dakar, Abidjan, Yaoundé…">
+        </div>
+        <div class="field">
+          <label>Nom de l'entreprise / Client <span class="req">*</span></label>
+          <input type="text" id="c-client-nom" placeholder="Ex: Acme Sarl">
+        </div>
+        <div class="field">
+          <label>Nom du signataire <span class="req">*</span></label>
+          <input type="text" id="c-client-signataire" placeholder="Ex: Mamadou Diallo">
+        </div>
+        <div class="field">
+          <label>Titre / Poste du signataire</label>
+          <input type="text" id="c-client-titre" placeholder="Ex: Directeur Général">
+        </div>
+        <div class="field">
+          <label>Adresse complète</label>
+          <input type="text" id="c-client-adresse" placeholder="Ex: Avenue Cheikh Anta Diop, Dakar">
+        </div>
+        <div class="field">
+          <label>Courriel</label>
+          <input type="email" id="c-client-email" placeholder="contact@client.com">
+        </div>
+        <div class="field">
+          <label>Téléphone</label>
+          <input type="tel" id="c-client-tel" placeholder="Ex: +221 77 000 00 00">
+        </div>
+        <div class="field">
+          <label>NINEA / Numéro fiscal <span class="opt">(optionnel)</span></label>
+          <input type="text" id="c-ninea" placeholder="Ex: 007123456 2Z3 (Sénégal)">
+        </div>
+        <div class="field">
+          <label>N° RCCM <span class="opt">(optionnel — sociétés enregistrées)</span></label>
+          <input type="text" id="c-rccm" placeholder="Ex: SN-DKR-2020-B-12345">
+        </div>
+      </div>
+      <div class="droit-badge" id="droit-client"></div>
+    </div>
+
+    <!-- Détails contrat -->
+    <div class="form-section">
+      <div class="section-title">Détails du Contrat</div>
+      <div class="field-grid single">
+        <div class="field">
+          <label>Description des services <span class="req">*</span></label>
+          <textarea id="c-services" placeholder="Décrire les services fournis par Wire.w…"></textarea>
+        </div>
+      </div>
+      <div class="field-grid triple" style="margin-top:14px;">
+        <div class="field">
+          <label>Montant total</label>
+          <input type="text" id="c-montant" placeholder="Ex: 500 000">
+        </div>
+        <div class="field">
+          <label>Devise</label>
+          <select id="c-devise">
+            <option value="FCFA">FCFA (XOF)</option>
+            <option value="EUR">EUR €</option>
+            <option value="USD">USD $</option>
+            <option value="CAD">CAD $</option>
+            <option value="XAF">FCFA (XAF — Cameroun)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Mode de paiement</label>
+          <select id="c-paiement">
+            <option value="">— Sélectionner —</option>
+            <option>Virement bancaire</option>
+            <option>Mobile Money (Wave / Orange Money)</option>
+            <option>Chèque</option>
+            <option>Espèces</option>
+            <option>Carte de crédit</option>
+            <option>Autre</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Date de début</label>
+          <input type="date" id="c-debut">
+        </div>
+        <div class="field">
+          <label>Date de fin / Durée</label>
+          <input type="text" id="c-fin" placeholder="Ex: 31 déc. 2026 ou 6 mois">
+        </div>
+        <div class="field">
+          <label>Conditions de paiement</label>
+          <input type="text" id="c-conditions" placeholder="Ex: 50% à la signature, 50% à la livraison">
+        </div>
+      </div>
+    </div>
+
+    <!-- Juridiction -->
+    <div class="form-section">
+      <div class="section-title">Droit Applicable & Juridiction</div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Droit applicable</label>
+          <input type="text" id="c-droit" placeholder="Ex: Droit sénégalais / OHADA">
+        </div>
+        <div class="field">
+          <label>Tribunal compétent en cas de litige</label>
+          <input type="text" id="c-tribunal" placeholder="Ex: Tribunal de Commerce de Dakar">
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="form-section">
+      <div class="section-title">Clauses spécifiques <span style="font-weight:400;font-size:11px;color:#a0aec0;">(optionnel)</span></div>
+      <div class="field-grid single">
+        <div class="field">
+          <textarea id="c-notes" placeholder="Ex: Clause de révision, pénalités de retard, propriété intellectuelle…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-generate" onclick="generateClient()">Générer le récapitulatif →</button>
+  </div>
+
+  <!-- ══ NDA ═════════════════════════════════════════════════════════════ -->
+  <div class="form-card" id="form-nda">
+    <div class="badge">Accord de Non-Divulgation (NDA)</div>
+
+    <!-- Prestataire pré-rempli -->
+    <div class="prestataire-block">
+      <div class="prest-info">
+        <div class="prest-name">Wire.w — Conseil & Gestion</div>
+        <div class="prest-detail">
+          Auto-entrepreneur · SIRET 85312083000023 · NAF 7022Z<br>
+          2 Pas du Buisson Saint Louis, 75010 Paris, France
+        </div>
+      </div>
+      <div class="prest-badge">Partie Divulgatrice</div>
+    </div>
+
+    <div class="form-section">
+      <div class="section-title">Partie Réceptrice</div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Pays <span class="req">*</span></label>
+          <select id="n-pays" onchange="updateDroit('nda')">
+            <option value="">— Sélectionner —</option>
+            <option value="SN">🇸🇳 Sénégal</option>
+            <option value="CI">🇨🇮 Côte d'Ivoire</option>
+            <option value="CM">🇨🇲 Cameroun</option>
+            <option value="ML">🇲🇱 Mali</option>
+            <option value="BF">🇧🇫 Burkina Faso</option>
+            <option value="GN">🇬🇳 Guinée</option>
+            <option value="TG">🇹🇬 Togo</option>
+            <option value="BJ">🇧🇯 Bénin</option>
+            <option value="NE">🇳🇪 Niger</option>
+            <option value="GA">🇬🇦 Gabon</option>
+            <option value="FR">🇫🇷 France</option>
+            <option value="CA">🇨🇦 Canada</option>
+            <option value="OTHER">Autre</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Ville</label>
+          <input type="text" id="n-ville" placeholder="Ex: Abidjan">
+        </div>
+        <div class="field">
+          <label>Nom / Entreprise <span class="req">*</span></label>
+          <input type="text" id="n-rec-nom" placeholder="Ex: Partenaire Sarl">
+        </div>
+        <div class="field">
+          <label>Représenté(e) par</label>
+          <input type="text" id="n-rec-rep" placeholder="Nom du signataire">
+        </div>
+        <div class="field">
+          <label>Adresse</label>
+          <input type="text" id="n-rec-adresse" placeholder="Adresse complète">
+        </div>
+        <div class="field">
+          <label>Courriel</label>
+          <input type="email" id="n-rec-email" placeholder="contact@partenaire.com">
+        </div>
+        <div class="field">
+          <label>NINEA / Numéro fiscal <span class="opt">(optionnel)</span></label>
+          <input type="text" id="n-ninea" placeholder="">
+        </div>
+        <div class="field">
+          <label>N° RCCM <span class="opt">(optionnel)</span></label>
+          <input type="text" id="n-rccm" placeholder="">
+        </div>
+      </div>
+      <div class="droit-badge" id="droit-nda"></div>
+    </div>
+
+    <div class="form-section">
+      <div class="section-title">Détails de l'Accord</div>
+      <div class="field-grid single">
+        <div class="field">
+          <label>Nature des informations confidentielles <span class="req">*</span></label>
+          <textarea id="n-info" placeholder="Ex: Données financières, stratégie commerciale, code source, liste de clients…"></textarea>
+        </div>
+      </div>
+      <div class="field-grid triple" style="margin-top:14px;">
+        <div class="field">
+          <label>Type d'accord</label>
+          <select id="n-type">
+            <option value="unilatéral">Unilatéral (Wire.w → Réceptrice)</option>
+            <option value="bilatéral">Bilatéral (mutuel)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Durée de confidentialité</label>
+          <select id="n-duree">
+            <option value="">— Sélectionner —</option>
+            <option>1 an</option>
+            <option>2 ans</option>
+            <option>3 ans</option>
+            <option>5 ans</option>
+            <option>Indéfinie</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Date de signature prévue</label>
+          <input type="date" id="n-date">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="section-title">Droit Applicable & Juridiction</div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Droit applicable</label>
+          <input type="text" id="n-droit" placeholder="Ex: Droit ivoirien / OHADA">
+        </div>
+        <div class="field">
+          <label>Tribunal compétent</label>
+          <input type="text" id="n-tribunal" placeholder="Ex: Tribunal de Commerce d'Abidjan">
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-generate" onclick="generateNDA()">Générer le récapitulatif →</button>
+  </div>
+
+  <!-- ══ OUTPUT ══════════════════════════════════════════════════════════ -->
+  <div class="output-card" id="output-card">
+    <div class="output-header">
+      <h2 id="output-title">Récapitulatif</h2>
+      <button class="btn-copy" id="btn-copy" onclick="copyOutput()">📋 Copier</button>
+    </div>
+    <div class="output-block" id="output-text"></div>
+    <p class="hint">Copiez ce récapitulatif et collez-le dans votre template Word.</p>
+  </div>
+
+</div>
+
+<script>
+  // ── Données pays ──────────────────────────────────────────────────────
+  const PAYS_DATA = {
+    SN: { nom: 'Sénégal', capitale: 'Dakar', tribunal: 'Tribunal de Commerce de Dakar', droit: 'Droit sénégalais (OHADA)', fiscal: 'NINEA', info: 'Membre OHADA · Acte uniforme OHADA applicable · Loi n°2016-25 sur les contrats commerciaux' },
+    CI: { nom: "Côte d'Ivoire", capitale: 'Abidjan', tribunal: "Tribunal de Commerce d'Abidjan", droit: "Droit ivoirien (OHADA)", fiscal: 'CC (Compte Contribuable)', info: "Membre OHADA · Centre d'Arbitrage de Côte d'Ivoire (CACI) disponible" },
+    CM: { nom: 'Cameroun', capitale: 'Yaoundé', tribunal: 'Tribunal de Grande Instance de Yaoundé', droit: 'Droit camerounais (OHADA)', fiscal: 'NIU (Numéro d\'Identifiant Unique)', info: 'Membre OHADA · Pays bilingue (Fr/En) · Préciser la langue du contrat' },
+    ML: { nom: 'Mali', capitale: 'Bamako', tribunal: 'Tribunal de Commerce de Bamako', droit: 'Droit malien (OHADA)', fiscal: 'NIF (Numéro d\'Identification Fiscale)', info: 'Membre OHADA · FCFA (XOF) · Acte uniforme OHADA applicable' },
+    BF: { nom: 'Burkina Faso', capitale: 'Ouagadougou', tribunal: 'Tribunal de Commerce de Ouagadougou', droit: 'Droit burkinabè (OHADA)', fiscal: 'IFU', info: 'Membre OHADA · FCFA (XOF)' },
+    GN: { nom: 'Guinée', capitale: 'Conakry', tribunal: 'Tribunal de Commerce de Conakry', droit: 'Droit guinéen (OHADA)', fiscal: 'NIF', info: 'Membre OHADA · Franc guinéen (GNF)' },
+    TG: { nom: 'Togo', capitale: 'Lomé', tribunal: 'Tribunal de Commerce de Lomé', droit: 'Droit togolais (OHADA)', fiscal: 'NIF', info: 'Membre OHADA · FCFA (XOF)' },
+    BJ: { nom: 'Bénin', capitale: 'Cotonou', tribunal: 'Tribunal de Commerce de Cotonou', droit: 'Droit béninois (OHADA)', fiscal: 'IFU', info: 'Membre OHADA · FCFA (XOF)' },
+    NE: { nom: 'Niger', capitale: 'Niamey', tribunal: 'Tribunal de Commerce de Niamey', droit: 'Droit nigérien (OHADA)', fiscal: 'NIF', info: 'Membre OHADA · FCFA (XOF)' },
+    GA: { nom: 'Gabon', capitale: 'Libreville', tribunal: 'Tribunal de Commerce de Libreville', droit: 'Droit gabonais (OHADA)', fiscal: 'NIF', info: 'Membre OHADA · FCFA (XAF)' },
+    FR: { nom: 'France', capitale: 'Paris', tribunal: 'Tribunal de Commerce de Paris', droit: 'Droit français', fiscal: 'SIRET / TVA intracommunautaire', info: 'Droit commercial français · Code de commerce' },
+    CA: { nom: 'Canada', capitale: 'Montréal', tribunal: 'Cour supérieure du Québec', droit: 'Droit québécois (Code civil)', fiscal: 'TPS/TVQ', info: 'Droit civil québécois' },
+  };
+
+  function updateDroit(form) {
+    const paysId = form === 'client' ? 'c-pays' : 'n-pays';
+    const badgeId = form === 'client' ? 'droit-client' : 'droit-nda';
+    const droitId = form === 'client' ? 'c-droit' : 'n-droit';
+    const tribunalId = form === 'client' ? 'c-tribunal' : 'n-tribunal';
+
+    const code = document.getElementById(paysId).value;
+    const badge = document.getElementById(badgeId);
+
+    if (code && PAYS_DATA[code]) {
+      const p = PAYS_DATA[code];
+      badge.textContent = `⚖️ ${p.info}`;
+      badge.classList.add('visible');
+      if (!document.getElementById(droitId).value) document.getElementById(droitId).value = p.droit;
+      if (!document.getElementById(tribunalId).value) document.getElementById(tribunalId).value = p.tribunal;
+      // Adapter le label NINEA selon le pays
+      if (form === 'client') {
+        document.querySelector('label[for="c-ninea"], label:has(#c-ninea)');
+        const labels = document.querySelectorAll('label');
+        labels.forEach(l => { if (l.textContent.includes('NINEA') && form === 'client') { l.innerHTML = `${p.fiscal || 'NINEA / N° fiscal'} <span class="opt">(optionnel)</span>`; } });
+      }
+    } else {
+      badge.classList.remove('visible');
+    }
+  }
+
+  function selectType(type) {
+    document.querySelectorAll('.type-card').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.form-card').forEach(f => f.classList.remove('visible'));
+    document.getElementById('card-' + type).classList.add('active');
+    document.getElementById('form-' + type).classList.add('visible');
+    document.getElementById('output-card').classList.remove('visible');
+  }
+
+  function val(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+  function fmt(label, value) { return value ? `${label}: ${value}\n` : ''; }
+
+  function getPaysNom(code) {
+    if (!code) return '';
+    return PAYS_DATA[code] ? PAYS_DATA[code].nom : code;
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    const mois = ['jan.','fév.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+    return `${parseInt(d)} ${mois[parseInt(m)-1]} ${y}`;
+  }
+
+  // ── Génération Contrat Client ─────────────────────────────────────────
+  function generateClient() {
+    const clientNom = val('c-client-nom');
+    const services  = val('c-services');
+    if (!clientNom || !services) {
+      alert('Veuillez remplir au minimum le nom du client et la description des services.');
+      return;
+    }
+
+    const pays = getPaysNom(val('c-pays'));
+    const devise = val('c-devise') || 'FCFA';
+    const montant = val('c-montant') ? `${val('c-montant')} ${devise}` : '';
+    const debut = val('c-debut') ? formatDate(val('c-debut')) : '';
+
+    const text =
+`════════════════════════════════════════════════════════════
+  CONTRAT DE PRESTATION DE SERVICES
+════════════════════════════════════════════════════════════
+
+■ PRESTATAIRE
+  Wire.w — Conseil & Gestion
+  Auto-entrepreneur · SIRET 85312083000023 · NAF 7022Z
+  2 Pas du Buisson Saint Louis, 75010 Paris, France
+  SIREN 853120830
+
+────────────────────────────────────────────────────────────
+
+■ CLIENT
+${fmt('  Entreprise / Nom', clientNom)}${fmt('  Pays', pays + (val('c-ville') ? ', ' + val('c-ville') : ''))}${fmt('  Signataire', val('c-client-signataire'))}${fmt('  Titre', val('c-client-titre'))}${fmt('  Adresse', val('c-client-adresse'))}${fmt('  Courriel', val('c-client-email'))}${fmt('  Téléphone', val('c-client-tel'))}${fmt('  NINEA / N° fiscal', val('c-ninea'))}${fmt('  N° RCCM', val('c-rccm'))}
+────────────────────────────────────────────────────────────
+
+■ SERVICES FOURNIS
+  ${services.replace(/\n/g, '\n  ')}
+
+────────────────────────────────────────────────────────────
+
+■ CONDITIONS FINANCIÈRES
+${fmt('  Montant total', montant)}${fmt('  Mode de paiement', val('c-paiement'))}${fmt('  Conditions', val('c-conditions'))}
+────────────────────────────────────────────────────────────
+
+■ DURÉE
+${fmt('  Date de début', debut)}${fmt('  Date de fin / Durée', val('c-fin'))}
+────────────────────────────────────────────────────────────
+
+■ DROIT APPLICABLE & JURIDICTION
+${fmt('  Droit applicable', val('c-droit'))}${fmt('  Tribunal compétent', val('c-tribunal'))}${val('c-notes') ? `\n────────────────────────────────────────────────────────────\n\n■ CLAUSES SPÉCIFIQUES\n  ${val('c-notes').replace(/\n/g, '\n  ')}\n` : ''}
+════════════════════════════════════════════════════════════
+
+■ SIGNATURES
+
+  Wire.w — Conseil & Gestion          ${clientNom}
+
+  ____________________________         ____________________________
+  Signature                            Signature
+
+  ____________________________         ____________________________
+  Nom & Titre                          Nom & Titre
+
+  ____________________________         ____________________________
+  Date                                 Date
+
+════════════════════════════════════════════════════════════
+Projet de contrat généré via l'outil GenTrack — à valider par un juriste.`;
+
+    showOutput('Contrat — ' + clientNom, text);
+  }
+
+  // ── Génération NDA ───────────────────────────────────────────────────
+  function generateNDA() {
+    const recNom = val('n-rec-nom');
+    const info   = val('n-info');
+    if (!recNom || !info) {
+      alert('Veuillez remplir le nom de la partie réceptrice et la nature des informations.');
+      return;
+    }
+
+    const pays = getPaysNom(val('n-pays'));
+    const date = val('n-date') ? formatDate(val('n-date')) : '___________';
+
+    const text =
+`════════════════════════════════════════════════════════════
+  ACCORD DE NON-DIVULGATION (NDA) — ${val('n-type').toUpperCase()}
+════════════════════════════════════════════════════════════
+
+■ PARTIE DIVULGATRICE
+  Wire.w — Conseil & Gestion
+  Auto-entrepreneur · SIRET 85312083000023
+  2 Pas du Buisson Saint Louis, 75010 Paris, France
+
+────────────────────────────────────────────────────────────
+
+■ PARTIE RÉCEPTRICE
+${fmt('  Nom / Entreprise', recNom)}${fmt('  Pays', pays + (val('n-ville') ? ', ' + val('n-ville') : ''))}${fmt('  Représenté(e) par', val('n-rec-rep'))}${fmt('  Adresse', val('n-rec-adresse'))}${fmt('  Courriel', val('n-rec-email'))}${fmt('  NINEA / N° fiscal', val('n-ninea'))}${fmt('  N° RCCM', val('n-rccm'))}
+────────────────────────────────────────────────────────────
+
+■ INFORMATIONS CONFIDENTIELLES
+  Les parties conviennent que les informations suivantes sont
+  confidentielles et ne peuvent être divulguées à des tiers :
+
+  ${info.replace(/\n/g, '\n  ')}
+
+────────────────────────────────────────────────────────────
+
+■ CONDITIONS DE L'ACCORD
+${fmt('  Type d\'accord', val('n-type'))}${fmt('  Durée de confidentialité', val('n-duree'))}  Date d'entrée en vigueur: ${date}
+
+────────────────────────────────────────────────────────────
+
+■ OBLIGATIONS DE LA PARTIE RÉCEPTRICE
+  • Garder toutes les informations confidentielles strictement secrètes.
+  • Ne pas divulguer ces informations à des tiers sans consentement écrit.
+  • Utiliser les informations uniquement dans le cadre convenu.
+  • Prendre toutes les mesures raisonnables pour protéger la confidentialité.
+
+────────────────────────────────────────────────────────────
+
+■ DROIT APPLICABLE & JURIDICTION
+${fmt('  Droit applicable', val('n-droit'))}${fmt('  Tribunal compétent', val('n-tribunal'))}
+════════════════════════════════════════════════════════════
+
+■ SIGNATURES
+
+  Wire.w — Conseil & Gestion          ${recNom}
+
+  ____________________________         ____________________________
+  Signature                            Signature
+
+  ____________________________         ____________________________
+  Nom & Titre                          Nom & Titre
+
+  ____________________________         ____________________________
+  Date                                 Date
+
+════════════════════════════════════════════════════════════
+Projet de contrat généré via l'outil GenTrack — à valider par un juriste.`;
+
+    showOutput('NDA — ' + recNom, text);
+  }
+
+  function showOutput(title, text) {
+    document.getElementById('output-title').textContent = title;
+    document.getElementById('output-text').textContent = text;
+    const card = document.getElementById('output-card');
+    card.classList.add('visible');
+    document.getElementById('btn-copy').textContent = '📋 Copier';
+    document.getElementById('btn-copy').classList.remove('copied');
+    setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
+
+  function copyOutput() {
+    navigator.clipboard.writeText(document.getElementById('output-text').textContent).then(() => {
+      const btn = document.getElementById('btn-copy');
+      btn.textContent = '✓ Copié !';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = '📋 Copier'; btn.classList.remove('copied'); }, 2500);
+    });
+  }
+</script>
+
+</body>
+</html>

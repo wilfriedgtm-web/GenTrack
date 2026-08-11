@@ -317,8 +317,9 @@ async function init(){
     return;
   }
 
-  var sites=await supa('sites','id=eq.'+_releve.site_id+'&select=nom');
+  var sites=await supa('sites','id=eq.'+_releve.site_id+'&select=nom,client_id');
   var site=sites&&sites[0];
+  _releve._clientId=site&&site.client_id||null;
 
   var contactNom='Technicien';
   if(_releve.contact_id){
@@ -642,13 +643,32 @@ async function _submitReleve(){
 
   try{
     var nbAlertes=0;
+    var alertePosts=[];
     var posts=_questions.map(function(q){
       var val=String(_answers[q.id]!=null?_answers[q.id]:'');
       if(q.type_reponse==='numerique'){
         var num=parseFloat(val.replace(',','.'));
         if(!isNaN(num)){
-          if(q.seuil_min!=null&&num<q.seuil_min)nbAlertes++;
-          else if(q.seuil_max!=null&&num>q.seuil_max)nbAlertes++;
+          var isOver=q.seuil_max!=null&&num>q.seuil_max;
+          var isUnder=q.seuil_min!=null&&num<q.seuil_min;
+          if(isOver||isUnder){
+            nbAlertes++;
+            var eq=_equips.find(function(e){return e.id===q.equipement_id;});
+            var eqNom=eq?eq.nom:'Équipement';
+            var u=q.unite?' '+q.unite:'';
+            var seuil=isOver?'max '+q.seuil_max+u:'min '+q.seuil_min+u;
+            var sev=q.alerte_severite==='critique'?'danger':q.alerte_severite==='info'?'info':'warning';
+            alertePosts.push(supaPost('alertes',{
+              client_id:_releve._clientId,
+              groupe_id:_releve.site_id,
+              type:'seuil_releve',
+              severite:sev,
+              message:eqNom+' — '+q.texte+' : '+num+u+' (seuil : '+seuil+')',
+              type_alerte:'seuil_releve',
+              lue:false,
+              resolue:false
+            }));
+          }
         }
       }
       return supaPost('reponses',{
@@ -657,6 +677,7 @@ async function _submitReleve(){
       });
     });
     await Promise.all(posts);
+    if(alertePosts.length)await Promise.all(alertePosts);
 
     // Save observations
     var obsKeys=Object.keys(_obs).filter(function(k){return _obs[k];});

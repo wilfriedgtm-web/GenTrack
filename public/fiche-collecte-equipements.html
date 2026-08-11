@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack — Fiche de collecte équipements</title>
+<style>
+  @page { size: A4; margin: 20mm 18mm; }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11pt;
+    color: #1a1a1a;
+    background: #fff;
+    margin: 0;
+    padding: 24px;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  /* HEADER */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    border-bottom: 3px solid #1a56db;
+    padding-bottom: 14px;
+    margin-bottom: 22px;
+  }
+  .header-left h1 {
+    font-size: 18pt;
+    font-weight: 700;
+    color: #1a56db;
+    margin: 0 0 4px 0;
+  }
+  .header-left p {
+    font-size: 9.5pt;
+    color: #555;
+    margin: 0;
+  }
+  .header-right {
+    text-align: right;
+    font-size: 9pt;
+    color: #555;
+  }
+  .header-right strong { color: #1a1a1a; }
+  .version-badge {
+    display: inline-block;
+    background: #e8f0fe;
+    color: #1a56db;
+    font-size: 8pt;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-top: 4px;
+  }
+
+  /* INTRO BOX */
+  .intro-box {
+    background: #f0f4ff;
+    border-left: 4px solid #1a56db;
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin-bottom: 22px;
+    font-size: 9.5pt;
+    color: #333;
+    line-height: 1.6;
+  }
+  .intro-box strong { color: #1a56db; }
+
+  /* SECTION TITLES */
+  .section-title {
+    font-size: 12pt;
+    font-weight: 700;
+    color: #fff;
+    background: #1a56db;
+    padding: 7px 14px;
+    border-radius: 4px;
+    margin: 24px 0 14px 0;
+    letter-spacing: 0.02em;
+  }
+  .subsection-title {
+    font-size: 10.5pt;
+    font-weight: 600;
+    color: #1a56db;
+    border-bottom: 1.5px solid #c2d4f8;
+    padding-bottom: 4px;
+    margin: 18px 0 10px 0;
+  }
+
+  /* FORM FIELDS */
+  .field-row {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    align-items: start;
+    margin-bottom: 10px;
+    gap: 8px;
+  }
+  .field-row.two-col {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .field-row.three-col {
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+  }
+  .field-label {
+    font-size: 9.5pt;
+    font-weight: 600;
+    color: #444;
+    padding-top: 5px;
+  }
+  .field-value {
+    border-bottom: 1.5px solid #bbb;
+    min-height: 24px;
+    padding: 3px 4px;
+    font-size: 9.5pt;
+  }
+  .field-inline {
+    display: flex;
+    flex-direction: column;
+  }
+  .field-inline .field-label {
+    font-size: 8.5pt;
+    color: #666;
+    margin-bottom: 2px;
+    padding-top: 0;
+  }
+  .field-inline .field-value {
+    min-height: 22px;
+  }
+
+  /* EQUIPMENT TABLE */
+  table.equip-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+    margin-bottom: 8px;
+  }
+  table.equip-table th {
+    background: #e8f0fe;
+    color: #1a56db;
+    font-weight: 600;
+    padding: 7px 8px;
+    text-align: left;
+    border: 1px solid #c2d4f8;
+    white-space: nowrap;
+  }
+  table.equip-table td {
+    border: 1px solid #ddd;
+    padding: 7px 8px;
+    vertical-align: top;
+  }
+  table.equip-table tr:nth-child(even) td {
+    background: #f8f9fc;
+  }
+  table.equip-table .row-num {
+    color: #999;
+    font-size: 8pt;
+    font-weight: 600;
+    text-align: center;
+    width: 22px;
+  }
+  .table-note {
+    font-size: 8pt;
+    color: #777;
+    font-style: italic;
+    margin-bottom: 6px;
+  }
+  .add-more {
+    font-size: 8pt;
+    color: #999;
+    margin-top: 4px;
+    font-style: italic;
+  }
+
+  /* CONTACTS TABLE */
+  table.contacts-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+    margin-bottom: 8px;
+  }
+  table.contacts-table th {
+    background: #e8f0fe;
+    color: #1a56db;
+    font-weight: 600;
+    padding: 7px 8px;
+    text-align: left;
+    border: 1px solid #c2d4f8;
+  }
+  table.contacts-table td {
+    border: 1px solid #ddd;
+    padding: 7px 8px;
+    height: 28px;
+  }
+  table.contacts-table tr:nth-child(even) td {
+    background: #f8f9fc;
+  }
+
+  /* CHECKBOX GRID */
+  .checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px 12px;
+    margin: 6px 0 10px 0;
+  }
+  .checkbox-item {
+    display: flex;
+    align-items: center;
+    font-size: 9.5pt;
+    gap: 7px;
+  }
+  .checkbox-item .box {
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid #888;
+    border-radius: 2px;
+    flex-shrink: 0;
+    display: inline-block;
+  }
+
+  /* NOTES AREA */
+  .notes-area {
+    border: 1.5px solid #ddd;
+    border-radius: 4px;
+    min-height: 60px;
+    padding: 8px;
+    margin-top: 6px;
+    background: #fafafa;
+  }
+
+  /* SIGNATURE BLOCK */
+  .signature-block {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-top: 30px;
+    border-top: 1.5px solid #ddd;
+    padding-top: 20px;
+  }
+  .sig-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .sig-label { font-size: 9pt; color: #666; }
+  .sig-line { border-bottom: 1.5px solid #555; min-height: 40px; }
+
+  /* FOOTER */
+  .footer {
+    margin-top: 30px;
+    border-top: 1.5px solid #e0e0e0;
+    padding-top: 10px;
+    font-size: 8pt;
+    color: #999;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ALERT BOX */
+  .alert-box {
+    background: #fff8e6;
+    border-left: 4px solid #f59e0b;
+    border-radius: 4px;
+    padding: 9px 14px;
+    font-size: 9pt;
+    color: #555;
+    margin: 10px 0;
+  }
+  .alert-box strong { color: #b45309; }
+
+  /* PRINT */
+  @media print {
+    body { padding: 0; }
+    .section-title { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    table.equip-table th, table.contacts-table th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .intro-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page-break { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <h1>GenTrack</h1>
+    <p>Fiche de collecte — Configuration phase pilote</p>
+  </div>
+  <div class="header-right">
+    <strong>À retourner à votre chargé de compte</strong><br>
+    contact@gentrack.io<br>
+    <span class="version-badge">v1.0</span>
+  </div>
+</div>
+
+<!-- INTRO -->
+<div class="intro-box">
+  <strong>Objet de ce document :</strong> Nous permettre de configurer votre espace GenTrack avant le lancement de la phase pilote. Merci de renseigner toutes les sections et de nous retourner ce document complété. La mise en service sera effectuée dans les <strong>48h suivant réception</strong>.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  SECTION 1 : INFORMATIONS GÉNÉRALES                   -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-title">1. Informations générales</div>
+
+<div class="field-row">
+  <div class="field-label">Nom de l'entreprise</div>
+  <div class="field-value">&nbsp;</div>
+</div>
+<div class="field-row">
+  <div class="field-label">Nom du site / hôtel</div>
+  <div class="field-value">&nbsp;</div>
+</div>
+<div class="field-row">
+  <div class="field-label">Adresse</div>
+  <div class="field-value">&nbsp;</div>
+</div>
+<div class="field-row two-col">
+  <div class="field-inline">
+    <div class="field-label">Ville</div>
+    <div class="field-value">&nbsp;</div>
+  </div>
+  <div class="field-inline">
+    <div class="field-label">Pays</div>
+    <div class="field-value">&nbsp;</div>
+  </div>
+</div>
+<div class="field-row">
+  <div class="field-label">Responsable technique</div>
+  <div class="field-value">&nbsp;</div>
+</div>
+<div class="field-row">
+  <div class="field-label">Email responsable</div>
+  <div class="field-value">&nbsp;</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  SECTION 2 : CONTACTS WHATSAPP                        -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-title">2. Contacts WhatsApp</div>
+
+<p class="table-note">Renseignez le numéro WhatsApp de chaque personne qui utilisera le bot (format international, ex : +225 07 12 34 56 78).</p>
+
+<table class="contacts-table">
+  <thead>
+    <tr>
+      <th style="width:30%">Nom et prénom</th>
+      <th style="width:30%">Numéro WhatsApp</th>
+      <th style="width:40%">Rôle</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>&nbsp;</td>
+      <td>&nbsp;</td>
+      <td>
+        <div class="checkbox-item" style="display:inline-flex;margin-right:12px"><span class="box"></span> Technicien</div>
+        <div class="checkbox-item" style="display:inline-flex;margin-right:12px"><span class="box"></span> Resp. technique</div>
+        <div class="checkbox-item" style="display:inline-flex"><span class="box"></span> Directeur tech.</div>
+      </td>
+    </tr>
+    <tr>
+      <td>&nbsp;</td>
+      <td>&nbsp;</td>
+      <td>
+        <div class="checkbox-item" style="display:inline-flex;margin-right:12px"><span class="box"></span> Technicien</div>
+        <div class="checkbox-item" style="display:inline-flex;margin-right:12px"><span class="box"></span> Resp. technique</div>
+        <div class="checkbox-item" style="display:inline-flex"><span class="box"></span> Directeur tech.</div>
+      </td>
+    </tr>
+    <tr>
+      <td>&nbsp;</td>
+      <td>&nbsp;</td>
+      <td>
+        <div class="checkbox-item" style="display:inline-flex;margin-right:12px"><span class="box"></span> Technicien</div>
+        <div class="checkbox-item" style="display:inline-flex;margin-right:12px"><span class="box"></span> Resp. technique</div>
+        <div class="checkbox-item" style="display:inline-flex"><span class="box"></span> Directeur tech.</div>
+      </td>
+    </tr>
+    <tr>
+      <td>&nbsp;</td>
+      <td>&nbsp;</td>
+      <td>
+        <div class="checkbox-item" style="display:inline-flex;margin-right:12px"><span class="box"></span> Technicien</div>
+        <div class="checkbox-item" style="display:inline-flex;margin-right:12px"><span class="box"></span> Resp. technique</div>
+        <div class="checkbox-item" style="display:inline-flex"><span class="box"></span> Directeur tech.</div>
+      </td>
+    </tr>
+    <tr>
+      <td>&nbsp;</td>
+      <td>&nbsp;</td>
+      <td>
+        <div class="checkbox-item" style="display:inline-flex;margin-right:12px"><span class="box"></span> Technicien</div>
+        <div class="checkbox-item" style="display:inline-flex;margin-right:12px"><span class="box"></span> Resp. technique</div>
+        <div class="checkbox-item" style="display:inline-flex"><span class="box"></span> Directeur tech.</div>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="alert-box">
+  <strong>Important :</strong> Le numéro WhatsApp doit correspondre à un compte WhatsApp actif. Le bot envoie les alertes en temps réel à toutes les personnes ayant le rôle <em>Resp. technique</em> ou <em>Directeur technique</em>.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  SECTION 3 : GROUPES ÉLECTROGÈNES (GE)                -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-title">3. Groupes électrogènes (GE)</div>
+
+<p class="table-note">Un groupe électrogène est suivi par relevé de compteur horaire. Renseignez un GE par ligne.</p>
+
+<table class="equip-table">
+  <thead>
+    <tr>
+      <th class="row-num">#</th>
+      <th style="width:22%">Nom du GE<br><small style="font-weight:400;color:#5a7acb">(ex : GE Principal)</small></th>
+      <th style="width:20%">Marque / Modèle<br><small style="font-weight:400;color:#5a7acb">(ex : Perkins 100kVA)</small></th>
+      <th style="width:15%">Puissance (kVA)</th>
+      <th style="width:20%">Compteur actuel (h)<br><small style="font-weight:400;color:#5a7acb">(relevé à ce jour)</small></th>
+      <th style="width:23%">Seuil alerte vidange (h)<br><small style="font-weight:400;color:#5a7acb">(ex : 250h entre vidanges)</small></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="row-num">1</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td class="row-num">2</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td class="row-num">3</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td class="row-num">4</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  </tbody>
+</table>
+<p class="add-more">Ajouter des lignes si nécessaire.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  SECTION 4 : CUVES FIOUL                              -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-title">4. Cuves fioul</div>
+
+<p class="table-note">Une cuve est suivie par relevé de niveau en litres. Renseignez une cuve par ligne.</p>
+
+<table class="equip-table">
+  <thead>
+    <tr>
+      <th class="row-num">#</th>
+      <th style="width:22%">Nom de la cuve<br><small style="font-weight:400;color:#5a7acb">(ex : Cuve principale)</small></th>
+      <th style="width:18%">Capacité totale (L)</th>
+      <th style="width:18%">Niveau actuel (L)<br><small style="font-weight:400;color:#5a7acb">(à ce jour)</small></th>
+      <th style="width:22%">Consommation estimée (L/h)<br><small style="font-weight:400;color:#5a7acb">(des GE alimentés)</small></th>
+      <th style="width:20%">Seuil alerte bas (%)<br><small style="font-weight:400;color:#5a7acb">(ex : 20%)</small></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="row-num">1</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td class="row-num">2</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td class="row-num">3</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  </tbody>
+</table>
+<p class="add-more">Ajouter des lignes si nécessaire.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  SECTION 5 : CHAMBRES FROIDES                         -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-title">5. Chambres froides (CF)</div>
+
+<p class="table-note">Une chambre froide est suivie par relevé de température. Renseignez une CF par ligne.</p>
+
+<table class="equip-table">
+  <thead>
+    <tr>
+      <th class="row-num">#</th>
+      <th style="width:25%">Nom de la CF<br><small style="font-weight:400;color:#5a7acb">(ex : CF Cuisine 1)</small></th>
+      <th style="width:20%">Type<br><small style="font-weight:400;color:#5a7acb">Positive / Négative</small></th>
+      <th style="width:20%">Temp. cible (°C)<br><small style="font-weight:400;color:#5a7acb">(ex : +4°C ou -18°C)</small></th>
+      <th style="width:35%">Seuil d'alerte (°C)<br><small style="font-weight:400;color:#5a7acb">Alerte si temp. &gt; X°C (ex : +7°C pour positive, -15°C pour négative)</small></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="row-num">1</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td class="row-num">2</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td class="row-num">3</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td class="row-num">4</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td class="row-num">5</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td class="row-num">6</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  </tbody>
+</table>
+<p class="add-more">Ajouter des lignes si nécessaire.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  SECTION 6 : AUTRES ÉQUIPEMENTS                       -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-title">6. Autres équipements à surveiller</div>
+
+<p class="table-note">Tout autre équipement qui nécessite un suivi régulier (climatisation, compresseur, groupe de froid, pompe, etc.).</p>
+
+<table class="equip-table">
+  <thead>
+    <tr>
+      <th class="row-num">#</th>
+      <th style="width:25%">Nom de l'équipement</th>
+      <th style="width:20%">Type / Catégorie</th>
+      <th style="width:20%">Marque / Modèle</th>
+      <th style="width:35%">Ce qu'il faut relever à chaque ronde</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="row-num">1</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td class="row-num">2</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td class="row-num">3</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  </tbody>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  SECTION 7 : CONFIGURATION DES RONDES                 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-title">7. Configuration des rondes</div>
+
+<div class="subsection-title">Fréquence souhaitée</div>
+
+<div class="checkbox-grid">
+  <div class="checkbox-item"><span class="box"></span> Journalière (1× / jour)</div>
+  <div class="checkbox-item"><span class="box"></span> Matin + Soir (2× / jour)</div>
+  <div class="checkbox-item"><span class="box"></span> Hebdomadaire</div>
+</div>
+
+<div class="field-row">
+  <div class="field-label">Heure(s) de ronde</div>
+  <div class="field-value">&nbsp;</div>
+</div>
+
+<div class="subsection-title">Rappel WhatsApp</div>
+<p style="font-size:9.5pt;color:#444;margin:4px 0 8px">Le bot peut envoyer un rappel WhatsApp aux techniciens si la ronde n'a pas encore été effectuée à une heure définie.</p>
+<div class="field-row">
+  <div class="field-label">Heure de rappel</div>
+  <div class="field-value">&nbsp;</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  SECTION 8 : OBSERVATIONS / REMARQUES                 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-title">8. Observations et remarques</div>
+
+<p style="font-size:9.5pt;color:#444;margin:4px 0 6px">Toute information utile pour la configuration (particularités du site, équipements critiques, contraintes opérationnelles…)</p>
+<div class="notes-area">&nbsp;<br>&nbsp;<br>&nbsp;<br>&nbsp;</div>
+
+<!-- SIGNATURES -->
+<div class="signature-block">
+  <div class="sig-field">
+    <div class="sig-label">Nom et signature du responsable client</div>
+    <div class="sig-line">&nbsp;</div>
+    <div class="field-row" style="margin-top:8px">
+      <div class="field-label" style="font-size:9pt">Date</div>
+      <div class="field-value">&nbsp;</div>
+    </div>
+  </div>
+  <div class="sig-field">
+    <div class="sig-label">Réservé à GenTrack — Date de mise en service</div>
+    <div class="sig-line">&nbsp;</div>
+    <div class="field-row" style="margin-top:8px">
+      <div class="field-label" style="font-size:9pt">Chargé de compte</div>
+      <div class="field-value">&nbsp;</div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <span>GenTrack — Fiche de collecte équipements v1.0 — Confidentiel</span>
+  <span>contact@gentrack.io</span>
+</div>
+
+</body>
+</html>

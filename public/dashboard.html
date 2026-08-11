@@ -1203,7 +1203,8 @@ async function _rtConfig(sid){
   var tabs=[
     {key:'equipements',label:'⚙️ Équipements & Rondes'},
     {key:'seuils',label:'🎯 Seuils d\'alerte'},
-    {key:'contacts',label:'👥 Contacts & Alertes'}
+    {key:'contacts',label:'👥 Contacts & Alertes'},
+    {key:'releves',label:'📋 Relevés horaires'}
   ];
   var tabHtml=tabs.map(function(t){
     return '<button class="config-tab'+(_configCurrentTab===t.key?' active':'')+'" onclick="_switchConfigTab(\''+t.key+'\')">'+t.label+'</button>';
@@ -1220,6 +1221,12 @@ async function _rtConfig(sid){
     if(dc2b){dc2b.style.padding='24px';dc2b.style.maxWidth='none';}
     var contactsHtml=await _buildContactsTab(sid);
     return '<div class="config-tabs">'+tabHtml+'</div>'+contactsHtml;
+  }
+  if(_configCurrentTab==='releves'){
+    var dc2c=document.getElementById('dash-content-main');
+    if(dc2c){dc2c.style.padding='24px';dc2c.style.maxWidth='none';}
+    var relevesCfgHtml=await _buildReleveConfigTab(sid);
+    return '<div class="config-tabs">'+tabHtml+'</div>'+relevesCfgHtml;
   }
 
   // Default selection
@@ -1495,6 +1502,71 @@ async function _buildSeuilsTab(sid){
 
   html+='<div style="font-size:11px;color:var(--text3);margin-top:4px">💡 Cliquez dans un champ et appuyez sur Tab ou Entrée pour sauvegarder. Laissez vide pour désactiver l\'alerte.</div>';
   return html+'</div>';
+}
+
+async function _buildReleveConfigTab(sid){
+  var equips=await supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,types_equipements(nom)&order=ordre_ronde.asc');
+  if(!equips.length)return '<div class="placeholder-card" style="margin-top:16px"><div class="placeholder-icon">📋</div>Aucun équipement configuré</div>';
+  var eqIds=equips.map(function(e){return e.id;});
+  var questions=await supaGet('questions','equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&select=id,texte,type_reponse,unite,frequences,equipement_id&order=ordre.asc');
+  var eqMap={};equips.forEach(function(e){eqMap[e.id]=e;});
+  var byEq={};
+  questions.forEach(function(q){if(!byEq[q.equipement_id])byEq[q.equipement_id]=[];byEq[q.equipement_id].push(q);});
+
+  var html='<div style="max-width:680px">'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.5">'+
+      'Activez les questions à inclure dans le relevé horaire. Les questions activées apparaîtront dans le formulaire envoyé aux techniciens chaque jour.'+
+    '</div>';
+
+  Object.keys(byEq).forEach(function(eqId){
+    var eq=eqMap[eqId];if(!eq)return;
+    var icon=_TYPE_ICONS[(eq.types_equipements&&eq.types_equipements.nom)]||'⚙️';
+    var qs=byEq[eqId];
+    var rowsHtml=qs.map(function(q){
+      var freqs=Array.isArray(q.frequences)?q.frequences:[];
+      var active=freqs.indexOf('journalier')!==-1;
+      var typeLabel={numerique:'123',oui_non:'✓/✗',choix:'choix',texte:'texte',photo:'📷'}[q.type_reponse]||q.type_reponse;
+      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:'+(active?'var(--vert-pale)':'white')+'">'+
+        '<label class="releve-toggle" style="position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0">'+
+          '<input type="checkbox" '+(active?'checked':'')+' onchange="_toggleReleveQuestion(\''+q.id+'\',this.checked,this)" '+
+            'style="opacity:0;width:0;height:0;position:absolute" />'+
+          '<span style="position:absolute;inset:0;background:'+(active?'var(--amber)':'#ccc')+';border-radius:20px;transition:.2s;cursor:pointer"></span>'+
+          '<span style="position:absolute;left:'+(active?'18px':'2px')+';top:2px;width:16px;height:16px;background:white;border-radius:50%;transition:.2s"></span>'+
+        '</label>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:13px;color:'+(active?'var(--dark)':'var(--text2)')+'">'+escape_html(q.texte)+(q.unite?' <span style="color:var(--text3);font-size:11px">('+escape_html(q.unite)+')</span>':'')+'</div>'+
+          '<div style="font-size:10px;color:var(--text3);margin-top:1px">'+typeLabel+'</div>'+
+        '</div>'+
+        '<div style="font-size:11px;font-weight:600;color:'+(active?'var(--vert)':'var(--text3)')+'">'+
+          (active?'Inclus':'Non inclus')+
+        '</div>'+
+      '</div>';
+    }).join('');
+    html+=
+      '<div style="margin-bottom:20px;border:1.5px solid var(--border);border-radius:10px;overflow:hidden">'+
+        '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--border)">'+
+          '<span style="font-size:16px">'+icon+'</span>'+
+          '<span style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(eq.nom)+'</span>'+
+        '</div>'+
+        rowsHtml+
+      '</div>';
+  });
+
+  html+='<div style="font-size:11px;color:var(--text3);margin-top:4px">💡 Les modifications sont appliquées immédiatement — les prochains relevés refléteront vos changements.</div>';
+  return html+'</div>';
+}
+
+async function _toggleReleveQuestion(qId,active,el){
+  // Read current frequences, add or remove 'journalier'
+  var rows=await supaGet('questions','id=eq.'+qId+'&select=frequences');
+  var cur=rows&&rows[0]?rows[0].frequences:null;
+  var freqs=Array.isArray(cur)?cur.slice():[];
+  var idx=freqs.indexOf('journalier');
+  if(active&&idx===-1)freqs.push('journalier');
+  else if(!active&&idx!==-1)freqs.splice(idx,1);
+  await supaPatch('questions',qId,{frequences:freqs});
+  // Refresh the tab to reflect colors/labels
+  if(_session)renderRespTech(_session,'config');
 }
 
 async function _saveAlerte(qId,field,val){
@@ -2746,17 +2818,20 @@ function _buildRecoTag(reco){
 async function _fetchRecoEquipements(sid){
   var since7=dateNJours(7);
   var since90=dateNJours(90);
+  // --- Rondes (7 derniers jours) ---
+  var reToEq={};
+  var reponses=[];
   var rondes7=await supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+since7+'&select=id&limit=100');
-  if(!rondes7.length)return{};
-  var rIds=rondes7.map(function(r){return r.id;});
-  var rondesEq=await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=id,equipement_id&limit=500');
-  if(!rondesEq.length)return{};
-  var reIds=rondesEq.map(function(re){return re.id;});
-  var reToEq={};rondesEq.forEach(function(re){reToEq[re.id]=re.equipement_id;});
-  var[reponses,pannes90]=await Promise.all([
-    supaGet('reponses','ronde_equipement_id=in.('+reIds.join(',')+')'+'&select=valeur,created_at,ronde_equipement_id,question_id,questions(texte,type_reponse,unite,seuil_min,seuil_max)'+'&order=created_at.desc&limit=600'),
-    supaGet('pannes','site_id=eq.'+sid+'&date_panne=gte.'+since90+'&select=id,equipement_id&limit=200')
-  ]);
+  if(rondes7.length){
+    var rIds=rondes7.map(function(r){return r.id;});
+    var rondesEq=await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=id,equipement_id&limit=500');
+    if(rondesEq.length){
+      var reIds=rondesEq.map(function(re){return re.id;});
+      rondesEq.forEach(function(re){reToEq[re.id]=re.equipement_id;});
+      reponses=await supaGet('reponses','ronde_equipement_id=in.('+reIds.join(',')+')'+'&select=valeur,created_at,ronde_equipement_id,question_id,questions(texte,type_reponse,unite,seuil_min,seuil_max)'+'&order=created_at.desc&limit=600');
+    }
+  }
+  var pannes90=await supaGet('pannes','site_id=eq.'+sid+'&date_panne=gte.'+since90+'&select=id,equipement_id&limit=200');
   var pannesByEq={};
   pannes90.forEach(function(p){pannesByEq[p.equipement_id]=(pannesByEq[p.equipement_id]||0)+1;});
   // Group reponses numériques (avec seuils) par équipement → question
@@ -2778,6 +2853,26 @@ async function _fetchRecoEquipements(sid){
     if(!repByEqQ[eqId][r.question_id])repByEqQ[eqId][r.question_id]=[];
     repByEqQ[eqId][r.question_id].push({v:parseFloat(r.valeur),t:r.created_at,q:q});
   });
+  // --- Relevés horaires validés (7 derniers jours) ---
+  var relevesRecent=await supaGet('releves_horaires','site_id=eq.'+sid+'&statut=eq.validé&created_at=gte.'+since7+'T00:00:00Z&select=id&limit=50');
+  if(relevesRecent.length){
+    var relIds=relevesRecent.map(function(r){return r.id;});
+    var releveReps=await supaGet('reponses','releve_id=in.('+relIds.join(',')+')'+'&select=valeur,created_at,question_id,questions(texte,type_reponse,unite,seuil_min,seuil_max,equipement_id)'+'&order=created_at.desc&limit=400');
+    releveReps.forEach(function(r){
+      var q=r.questions;if(!q)return;
+      var eqId=q.equipement_id;if(!eqId)return;
+      if(q.type_reponse==='numerique'){
+        if(!lastSaisieByEq[eqId]||r.created_at>lastSaisieByEq[eqId].t){
+          lastSaisieByEq[eqId]={v:parseFloat(r.valeur),t:r.created_at,unite:q.unite||''};
+        }
+        if(q.seuil_min!==null||q.seuil_max!==null){
+          if(!repByEqQ[eqId])repByEqQ[eqId]={};
+          if(!repByEqQ[eqId][r.question_id])repByEqQ[eqId][r.question_id]=[];
+          repByEqQ[eqId][r.question_id].push({v:parseFloat(r.valeur),t:r.created_at,q:q});
+        }
+      }
+    });
+  }
   var result={};
   var allEqIds=Object.keys(Object.assign({},repByEqQ,pannesByEq));
   allEqIds.forEach(function(eqId){
