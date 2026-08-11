@@ -113,9 +113,15 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
       <input id="sg-prenom" class="sg-input" type="text" placeholder="Ex : Fatou, Ibrahima…" autocomplete="given-name"/>
     </div>
 
+    <!-- Lieu -->
+    <div class="sg-section">
+      <div class="sg-label">Lieu</div>
+      <input id="sg-lieu" class="sg-input" type="text" placeholder="Ex : Cuisine, Réception, Parking, Chambre 204…"/>
+    </div>
+
     <!-- Équipement -->
     <div class="sg-section">
-      <div class="sg-label">Équipement concerné</div>
+      <div class="sg-label">Équipement concerné (optionnel)</div>
       <select id="sg-equip" class="sg-select">
         <option value="">— Sélectionner —</option>
       </select>
@@ -242,6 +248,7 @@ function _onPhotoChange(input){
 
 async function _submit(){
   var prenom=(document.getElementById('sg-prenom').value||'').trim();
+  var lieu=(document.getElementById('sg-lieu').value||'').trim();
   var equipId=document.getElementById('sg-equip').value;
   var desc=(document.getElementById('sg-desc').value||'').trim();
   var errEl=document.getElementById('sg-error');
@@ -272,6 +279,7 @@ async function _submit(){
       groupe_id:_groupeId,
       equipement_id:equipId||null,
       signale_par:prenom||null,
+      lieu:lieu||null,
       type:_selectedType,
       description:desc,
       photo_url:photoUrl,
@@ -284,7 +292,7 @@ async function _submit(){
       groupe_id:_groupeId,
       type:'signalement',
       severite:'warning',
-      message:(prenom?prenom+' — ':'')+(_typeLabels[_selectedType]||_selectedType)+' : '+desc,
+      message:(prenom?prenom+' — ':'')+(_typeLabels[_selectedType]||_selectedType)+(lieu?' ('+lieu+')':'')+' : '+desc,
       type_alerte:'signalement',
       lue:false,
       resolue:false
@@ -306,6 +314,7 @@ function _reset(){
   document.getElementById('sg-confirm').style.display='none';
   document.getElementById('sg-main').style.display='block';
   document.getElementById('sg-prenom').value='';
+  document.getElementById('sg-lieu').value='';
   document.getElementById('sg-equip').value='';
   document.getElementById('sg-desc').value='';
   document.querySelectorAll('.type-pill').forEach(function(b){b.classList.remove('selected');});

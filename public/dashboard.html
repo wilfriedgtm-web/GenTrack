@@ -1212,7 +1212,7 @@ async function _rtSignalements(sid){
   var dc=document.getElementById('dash-content-main');
   if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
 
-  var query='groupe_id=eq.'+sid+'&order=created_at.desc&limit=100&select=id,type,description,statut,signale_par,cout_intervention,note_resolution,resolved_by,resolved_at,created_at,equipement_id,source,equipements(nom)';
+  var query='groupe_id=eq.'+sid+'&order=created_at.desc&limit=100&select=id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,created_at,equipement_id,source,equipements(nom)';
   if(_sgFilter!=='tous')query+='&statut=eq.'+_sgFilter;
   var rows=await supaGet('signalements',query);
 
@@ -1245,7 +1245,9 @@ async function _rtSignalements(sid){
             '</div>'+
             '<div style="font-size:13px;color:var(--text);margin-bottom:6px;line-height:1.5">'+escape_html(r.description)+'</div>'+
             '<div style="font-size:11px;color:var(--text3)">'+
-              (r.signale_par?'👤 '+escape_html(r.signale_par)+' · ':'')+'🕐 '+date+
+              (r.signale_par?'👤 '+escape_html(r.signale_par)+' · ':'')+
+              (r.lieu?'📍 '+escape_html(r.lieu)+' · ':'')+
+              '🕐 '+date+
               (r.source==='formulaire'?' · 📱 Formulaire':r.source==='seuil_releve'?' · 📈 Seuil auto':'')+
             '</div>'+
             (r.note_resolution?'<div style="margin-top:8px;font-size:12px;background:var(--vert-pale);border-radius:8px;padding:8px 10px;color:var(--vert-text)">✅ '+escape_html(r.note_resolution)+(r.resolved_by?' · '+escape_html(r.resolved_by):'')+'</div>':'')+
