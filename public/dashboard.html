@@ -855,10 +855,11 @@ function _buildVidangesSection(geEquips,geQs,vidanges){
 /* ── Alertes (vue complète) ── */
 async function _rtAlertes(sid,cid){
   var cutoff30=dateNJours(30);
-  var[actives,historique,anomalies]=await Promise.all([
+  var[actives,historique,anomalies,pannesActives]=await Promise.all([
     supaGet('alertes','groupe_id=eq.'+sid+'&resolue=eq.false&select=id,type,severite,type_alerte,message,created_at&order=created_at.desc&limit=50'),
     supaGet('alertes','groupe_id=eq.'+sid+'&resolue=eq.true&created_at=gte.'+cutoff30+'T00:00:00&select=id,type,severite,type_alerte,message,created_at&order=created_at.desc&limit=30'),
-    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.anomalie&statut=neq.resolu&select=id,description,equipement_id,created_at,equipements(nom)&order=created_at.desc&limit=20')
+    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.anomalie&statut=neq.resolu&select=id,description,equipement_id,created_at,equipements(nom)&order=created_at.desc&limit=20'),
+    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&statut=neq.resolu&select=id,description,equipement_id,created_at,equipements(nom)&order=created_at.desc&limit=20')
   ]);
 
   // marquer toutes les alertes actives comme lues
@@ -872,7 +873,7 @@ async function _rtAlertes(sid,cid){
   var h='<div style="display:flex;flex-direction:column;gap:16px">';
 
   // ── Actives ──
-  var totalActif=actives.length+anomalies.length;
+  var totalActif=actives.length+anomalies.length+pannesActives.length;
   h+='<div>';
   h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
     '<div style="font-size:13px;font-weight:600;color:var(--text)">Alertes actives</div>'+
@@ -905,6 +906,19 @@ async function _rtAlertes(sid,cid){
           (a.type==='signalement'||a.type_alerte==='signalement'?
             '<button onclick="navTo(\'signalements\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid '+bd+';background:none;font-size:11px;color:'+bl+';cursor:pointer">Voir signalements</button>':'')+
           '<button onclick="_resolveAlerte(\''+a.id+'\')" style="flex:1;padding:6px;border-radius:6px;border:none;background:'+bl+';color:white;font-size:11px;font-weight:600;cursor:pointer">✓ Résolu</button>'+
+        '</div>'+
+      '</div>';
+    });
+    pannesActives.forEach(function(sg){
+      var eqNom=sg.equipements&&sg.equipements.nom?sg.equipements.nom:'';
+      var ts=sg.created_at?_relativeTime(sg.created_at):'';
+      h+='<div style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge);border-radius:10px;padding:12px 14px">'+
+        '<div style="font-size:11px;font-weight:600;color:var(--rouge);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">🔴 Panne'+(eqNom?' · '+escape_html(eqNom):'')+'</div>'+
+        '<div style="font-size:12px;color:var(--text);line-height:1.4">'+escape_html(sg.description||'')+'</div>'+
+        (ts?'<div style="font-size:10px;color:var(--text3);margin-top:5px">'+ts+'</div>':'')+
+        '<div style="display:flex;gap:6px;margin-top:10px">'+
+          '<button onclick="navTo(\'signalements\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--rouge-border);background:none;font-size:11px;color:var(--rouge);cursor:pointer">Voir signalement</button>'+
+          '<button onclick="_resolveSg(\''+sg.id+'\')" style="flex:1;padding:6px;border-radius:6px;border:none;background:var(--rouge);color:white;font-size:11px;font-weight:600;cursor:pointer">✓ Résolu</button>'+
         '</div>'+
       '</div>';
     });
@@ -995,10 +1009,10 @@ async function _rtHistorique(sid){
   var cutoff=dateNJours(period);
   var[rondes,pannes]=await Promise.all([
     supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+since30+'&select=id,date_ronde,frequence&order=date_ronde.desc&limit=90'),
-    supaGet('pannes','site_id=eq.'+sid+'&date_panne=gte.'+since30+'&select=id,type,description,date_panne,resolue,equipements(nom)&order=date_panne.desc&limit=60')
+    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&created_at=gte.'+since30+'T00:00:00&select=id,description,statut,created_at,equipement_id,equipements(nom)&order=created_at.desc&limit=60')
   ]);
   var rondesFilt=rondes.filter(function(r){return r.date_ronde>=cutoff;});
-  var pannesFilt=pannes.filter(function(p){return!p.date_panne||p.date_panne>=cutoff;});
+  var pannesFilt=pannes.filter(function(p){return!p.created_at||p.created_at>=cutoff+'T00:00:00';});
   var h=_buildPeriodSelector(period);
   if(rondesFilt.length===0&&pannesFilt.length===0){
     return h+'<div class="placeholder-card"><div class="placeholder-icon">📊</div>Aucune donnée sur les '+period+' derniers jours</div>';
@@ -1049,13 +1063,13 @@ async function _rtHistorique(sid){
     h+='<div style="display:flex;flex-direction:column;gap:6px">';
     pannesFilt.forEach(function(p){
       var eqNom=p.equipements&&p.equipements.nom?p.equipements.nom:'Équipement';
-      var ts=p.date_panne?new Date(p.date_panne).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-      var resolved=p.resolue;
+      var ts=p.created_at?new Date(p.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+      var resolved=p.statut==='resolu';
       h+='<div class="eq-card" style="padding:12px 14px'+(resolved?';opacity:0.65':'')+'">'+
         '<span style="font-size:16px">'+(resolved?'✅':'🔴')+'</span>'+
         '<div style="flex:1">'+
           '<div class="eq-card-nom">'+escape_html(eqNom)+'</div>'+
-          '<div class="eq-card-type">'+(p.type?escape_html(p.type)+' — ':'')+escape_html(p.description||'')+(ts?' · '+ts:'')+'</div>'+
+          '<div class="eq-card-type">'+escape_html(p.description||'')+(ts?' · '+ts:'')+'</div>'+
         '</div>'+
         '<span style="font-size:10px;font-weight:600;color:'+(resolved?'var(--vert)':'var(--rouge)')+'">'+( resolved?'Résolu':'En cours')+'</span>'+
       '</div>';
