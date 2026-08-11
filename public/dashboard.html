@@ -458,15 +458,14 @@ function buildMobileNav(role,activeNav){
   }).join('')+'</div></div>';
 }
 function buildLayout(session,activeNav,contentHtml){
-  var exportItems=[7,14,30].map(function(n){
-    return '<button onclick="_openReport('+n+')" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap" onmouseover="this.style.background=\'var(--creme)\'" onmouseout="this.style.background=\'none\'">'+n+' derniers jours</button>';
-  }).join('');
-  var exportBtn='<div style="position:relative">'+
-    '<button id="export-btn-trigger" onclick="_toggleExportMenu()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">⬇&#8239;Exporter</button>'+
-    '<div id="export-menu" style="display:none;position:absolute;right:0;top:calc(100% + 8px);background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.1);z-index:200;padding:6px;min-width:180px">'+
-      '<div style="font-size:9px;text-transform:uppercase;letter-spacing:1.2px;color:var(--text3);padding:8px 12px 4px">Période du rapport</div>'+
-      exportItems+
-    '</div></div>';
+  var exportBtn='<div style="display:flex;align-items:center;gap:8px">'+
+    (session.role==='resp_tech'?
+      '<button id="rapport-btn" onclick="_openRapportHebdo()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">📄&#8239;Rapport hebdo</button>':
+      '<button id="export-btn-trigger" onclick="_toggleExportMenu()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">⬇&#8239;Exporter</button>'+
+      '<div id="export-menu" style="display:none;position:absolute;right:40px;top:60px;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.1);z-index:200;padding:6px;min-width:180px">'+
+        [7,14,30].map(function(n){return '<button onclick="_openReport('+n+')" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">'+n+' derniers jours</button>';}).join('')+
+      '</div>')+
+  '</div>';
   return buildSidebar(session,activeNav)+
     '<div class="dash-main">'+buildMobileHeader(session)+
     '<div class="dash-topbar">'+
@@ -3677,8 +3676,7 @@ async function _openReport(period){
   finally{if(btn){btn.disabled=false;btn.textContent='⬇ Exporter';}}
 }
 
-function _reportShell(title,bodyHtml){
-  var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+function _reportShell(title,bodyHtml,autoPrint){
   return '<!DOCTYPE html><html lang="fr"><head>'+
     '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>'+title+'</title>'+
@@ -3686,18 +3684,23 @@ function _reportShell(title,bodyHtml){
     '<style>'+
       '*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}'+
       ':root{--creme:#F5F0E8;--dark:#111110;--amber:#C49A1C;--vert:#2D7A4F;--rouge:#C0392B;--orange:#D4761E;--border:#DDD0BC;--text:#1A1A18;--text2:#6B5E4A;--text3:#A8957E}'+
-      'body{font-family:Inter,sans-serif;background:white;color:var(--text);padding:36px 40px;max-width:920px;margin:0 auto}'+
+      'body{font-family:Inter,sans-serif;background:white;color:var(--text);padding:36px 40px;max-width:960px;margin:0 auto}'+
       '.report-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid var(--dark);padding-bottom:20px;margin-bottom:28px}'+
       '.report-logo{font-family:"Cormorant Garamond",serif;font-size:22px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--dark)}'+
       '.report-sub{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-top:3px}'+
       '.report-meta{text-align:right;font-size:11px;color:var(--text2);line-height:1.7}'+
       '.report-site{font-family:"Cormorant Garamond",serif;font-size:20px;font-weight:600;color:var(--dark);margin-bottom:2px}'+
-      'h2{font-family:"Cormorant Garamond",serif;font-size:17px;font-weight:600;color:var(--dark);margin:28px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px}'+
-      '.kpi-row{display:flex;gap:10px;margin-bottom:4px}'+
-      '.kpi{flex:1;background:#F9F6F0;border:1px solid var(--border);border-radius:8px;padding:12px 14px}'+
-      '.kpi-label{font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text2);font-weight:600;margin-bottom:5px}'+
-      '.kpi-value{font-family:"Cormorant Garamond",serif;font-size:24px;font-weight:600;line-height:1}'+
-      'table{width:100%;border-collapse:collapse;font-size:12px}'+
+      'h2{font-family:"Cormorant Garamond",serif;font-size:17px;font-weight:600;color:var(--dark);margin:32px 0 8px;border-bottom:1px solid var(--border);padding-bottom:6px}'+
+      '.kpi-row{display:flex;gap:10px;margin:20px 0 24px}'+
+      '.kpi{flex:1;background:#F9F6F0;border:1px solid var(--border);border-radius:8px;padding:14px 16px}'+
+      '.kpi-label{font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text2);font-weight:600;margin-bottom:6px}'+
+      '.kpi-value{font-family:"Cormorant Garamond",serif;font-size:26px;font-weight:600;line-height:1}'+
+      '.kpi-sub{font-size:10px;color:var(--text3);margin-top:4px}'+
+      '.narrative{font-size:13px;line-height:1.7;color:var(--text);padding:12px 16px;background:#FAFAF8;border-left:3px solid var(--amber);border-radius:0 6px 6px 0;margin:10px 0 16px;min-height:36px;outline:none}'+
+      '.narrative:hover{background:#F5F0E8}'+
+      '.narrative:focus{background:#F5F0E8;border-left-color:var(--dark)}'+
+      '.edit-hint{font-size:10px;color:var(--text3);margin-bottom:6px;letter-spacing:0.3px}'+
+      'table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}'+
       'th{background:#F5F0E8;font-size:9px;text-transform:uppercase;letter-spacing:0.6px;color:var(--text2);font-weight:600;padding:7px 11px;text-align:left;border-bottom:1px solid var(--border)}'+
       'td{padding:8px 11px;border-bottom:1px solid #EDE5D8;vertical-align:middle}'+
       'tr:last-child td{border-bottom:none}'+
@@ -3707,21 +3710,321 @@ function _reportShell(title,bodyHtml){
       '.badge-warn{background:#FEF3E2;color:#D4761E}'+
       '.pbar-wrap{height:6px;background:var(--border);border-radius:3px;min-width:60px}'+
       '.pbar-fill{height:100%;border-radius:3px}'+
-      '.empty-msg{padding:12px 14px;background:#F9F6F0;border-radius:6px;font-size:12px;color:var(--text3)}'+
-      '.print-actions{margin-top:36px;padding-top:20px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:center}'+
-      '.btn-print{padding:10px 24px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;letter-spacing:0.3px}'+
-      '.btn-close{padding:10px 24px;background:none;color:var(--text2);border:1px solid var(--border);border-radius:7px;font-size:12px;cursor:pointer}'+
-      '.footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);text-align:center;letter-spacing:0.5px}'+
+      '.empty-msg{padding:12px 14px;background:#F9F6F0;border-radius:6px;font-size:12px;color:var(--text3);margin-top:8px}'+
+      '.obs-zone{width:100%;min-height:120px;border:1px dashed var(--border);border-radius:8px;padding:16px;font-size:13px;line-height:1.7;color:var(--text);background:#FEFEFE;outline:none;margin-top:8px;font-family:Inter,sans-serif;resize:vertical}'+
+      '.obs-zone:focus{border-color:var(--amber);background:#FAFAF8}'+
+      '.sig-row{display:flex;gap:40px;margin-top:32px}'+
+      '.sig-block{flex:1;border-top:1px solid var(--dark);padding-top:8px;font-size:11px;color:var(--text2)}'+
+      '.print-bar{position:sticky;top:0;background:white;border-bottom:1px solid var(--border);padding:10px 0;display:flex;gap:10px;justify-content:center;z-index:100;margin:-36px -40px 24px;padding-left:40px;padding-right:40px}'+
+      '.btn-print{padding:9px 22px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer}'+
+      '.btn-close{padding:9px 22px;background:none;color:var(--text2);border:1px solid var(--border);border-radius:7px;font-size:12px;cursor:pointer}'+
+      '.print-note{font-size:11px;color:var(--text3);align-self:center}'+
+      '.footer-doc{margin-top:48px;padding-top:14px;border-top:1px solid var(--border);font-size:10px;color:var(--text3);display:flex;justify-content:space-between}'+
       '@media print{'+
-        '@page{margin:15mm 12mm}'+
-        '.print-actions,.footer{display:none}'+
+        '@page{margin:15mm 12mm;size:A4}'+
+        '.print-bar,.edit-hint{display:none!important}'+
         'body{padding:0}'+
         'h2{page-break-after:avoid}'+
         'tr{page-break-inside:avoid}'+
+        '.narrative{border-left-color:#C49A1C!important;background:#F9F6F0!important}'+
+        '.obs-zone{border:1px solid #DDD0BC!important;min-height:80px}'+
       '}'+
     '</style></head><body>'+bodyHtml+
-    '<scr'+'ipt>setTimeout(function(){window.print();},900);<\/scr'+'ipt>'+
+    (autoPrint?'<scr'+'ipt>setTimeout(function(){window.print();},900);<\/scr'+'ipt>':'')+
     '</body></html>';
+}
+
+// ── Rapport hebdomadaire professionnel (resp_tech) ─────────────────────────────
+async function _openRapportHebdo(){
+  var btn=document.getElementById('rapport-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Chargement...';}
+  try{
+    var sid=_session.site_ids&&_session.site_ids[0];
+    if(!sid){alert('Aucun site configuré.');return;}
+    var cutoff=dateNJours(7);
+    var dateDebut=new Date();dateDebut.setDate(dateDebut.getDate()-7);
+    var dateFin=new Date();
+    var periodeStr=dateDebut.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})+' – '+dateFin.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+
+    var[siteRow,equips,rondes,signalements,maintenances]=await Promise.all([
+      supaGet('sites','id=eq.'+sid+'&select=nom&limit=1'),
+      supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,capacite_litres,conso_theorique_lh,types_equipements(nom)&order=ordre_ronde.asc'),
+      supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+cutoff+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=90'),
+      supaGet('signalements','groupe_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,type,description,statut,signale_par,equipement_id,cout_intervention,created_at,resolved_at&order=created_at.desc&limit=60'),
+      supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+cutoff+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id&order=date_intervention.desc&limit=40')
+    ]);
+    var siteNom=siteRow.length?siteRow[0].nom:'Mon site';
+    var rIds=rondes.map(function(r){return r.id;});
+    var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,equipement_id,statut'):[];
+
+    // Dernières réponses pour les équipements (niveau cuve, compteur GE)
+    var eqIds=equips.map(function(e){return e.id;});
+    var lastRepsByEq={};
+    if(eqIds.length){
+      var allLastRE=await supaGet('rondes_equipements','equipement_id=in.('+eqIds.join(',')+')'+'&statut=eq.valide&select=id,equipement_id,valide_at&order=valide_at.desc&limit='+eqIds.length*3);
+      var seenEq=new Set();
+      var topREIds=[];
+      allLastRE.forEach(function(re){if(!seenEq.has(re.equipement_id)){seenEq.add(re.equipement_id);topREIds.push(re.id);lastRepsByEq[re.equipement_id]={re_id:re.id,valide_at:re.valide_at};}});
+      if(topREIds.length){
+        var reponses=await supaGet('reponses','ronde_equipement_id=in.('+topREIds.join(',')+')'+'&select=ronde_equipement_id,question_id,valeur');
+        var questions=await supaGet('questions','equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&select=id,equipement_id,texte,unite');
+        var qMap={};questions.forEach(function(q){qMap[q.id]=q;});
+        reponses.forEach(function(r){
+          var q=qMap[r.question_id];if(!q)return;
+          var eqId=Object.keys(lastRepsByEq).find(function(k){return lastRepsByEq[k].re_id===r.ronde_equipement_id;});
+          if(!eqId)return;
+          if(!lastRepsByEq[eqId].vals)lastRepsByEq[eqId].vals=[];
+          lastRepsByEq[eqId].vals.push({texte:q.texte,valeur:r.valeur,unite:q.unite||''});
+        });
+      }
+    }
+
+    var html=_buildRapportPro(siteNom,periodeStr,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq);
+    var w=window.open('','_blank');
+    if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
+    w.document.write(html);w.document.close();
+  }catch(e){console.error(e);alert('Erreur : '+(e.message||e));}
+  finally{if(btn){btn.disabled=false;btn.textContent='📄 Rapport hebdo';}}
+}
+
+function _buildRapportPro(siteNom,periodeStr,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq){
+  var respNom=(session.contact&&session.contact.nom)||'Responsable technique';
+  var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  // ── Calculs ──
+  var reByRonde={};
+  rondesEq.forEach(function(re){if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];reByRonde[re.ronde_id].push(re);});
+  var rondesJ=rondes.filter(function(r){return r.frequence==='journalier';});
+  var rondesH=rondes.filter(function(r){return r.frequence==='hebdo';});
+  var rondesM=rondes.filter(function(r){return r.frequence==='mensuel';});
+  var totalVal=0,totalTot=0;
+  rondes.forEach(function(r){var eq=reByRonde[r.id]||[];totalTot+=eq.length;totalVal+=eq.filter(function(re){return re.statut==='valide';}).length;});
+  var tauxRondes=totalTot>0?Math.round(totalVal/totalTot*100):null;
+  var nbSgOuverts=signalements.filter(function(s){return s.statut!=='resolu';}).length;
+  var nbSgResolus=signalements.filter(function(s){return s.statut==='resolu';}).length;
+  var coutTotal=maintenances.reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
+  var nbMaintenances=maintenances.length;
+  var cuves=equips.filter(function(e){return e.capacite_litres!=null;});
+  var ges=equips.filter(function(e){return e.conso_theorique_lh!=null&&e.capacite_litres==null;});
+
+  // ── Narratives auto-générées ──
+  // Résumé global
+  var narResume='Semaine du '+periodeStr+'. ';
+  if(tauxRondes!==null)narResume+='Taux de conformité des rondes : '+tauxRondes+'%. ';
+  if(signalements.length===0)narResume+='Aucun signalement enregistré sur la période. ';
+  else narResume+=(signalements.length)+' signalement'+(signalements.length>1?'s':'')+' enregistré'+(signalements.length>1?'s':'')+' dont '+nbSgOuverts+' en cours et '+nbSgResolus+' résolu'+(nbSgResolus>1?'s':'')+'. ';
+  if(coutTotal>0)narResume+='Coût total des interventions : '+coutTotal.toLocaleString('fr-FR')+' FCFA.';
+
+  // Équipements
+  var narEquip='';
+  var consoTotale=ges.reduce(function(s,g){return s+(parseFloat(g.conso_theorique_lh)||0);},0);
+  cuves.forEach(function(c){
+    var lr=lastRepsByEq[c.id];
+    if(!lr||!lr.vals)return;
+    var niveauEntry=lr.vals.find(function(v){return v.texte.toLowerCase().includes('niveau');});
+    if(!niveauEntry)return;
+    var niveau=parseFloat(niveauEntry.valeur);
+    var cap=parseFloat(c.capacite_litres);
+    if(isNaN(niveau)||isNaN(cap))return;
+    var pct=Math.round(niveau/cap*100);
+    var autoJ=consoTotale>0?Math.round(niveau/(consoTotale*8)*10)/10:null;
+    var etat=pct<=20?'critique (⚠️ commande urgente requise)':pct<=40?'à surveiller':' satisfaisant';
+    narEquip+=(c.nom||'La cuve')+' est à '+pct+'% de capacité ('+niveau+'L / '+cap+'L). État '+etat+'.'+( autoJ?' Autonomie estimée : ~'+autoJ+' jour'+(autoJ>1?'s':'')+'.' :'')+' ';
+  });
+  ges.forEach(function(g){
+    var lr=lastRepsByEq[g.id];
+    if(!lr||!lr.vals)return;
+    var cptEntry=lr.vals.find(function(v){return v.texte.toLowerCase().includes('compteur');});
+    if(cptEntry)narEquip+=(g.nom||'Le groupe')+' affiche '+cptEntry.valeur+' heures au compteur. ';
+  });
+  if(!narEquip)narEquip='Aucune donnée de relevé disponible sur la période pour évaluer l\'état des équipements.';
+
+  // Rondes
+  var narRondes='';
+  if(rondes.length===0){narRondes='Aucune ronde enregistrée sur la semaine.';}
+  else{
+    if(rondesJ.length>0){
+      var jVal=0,jTot=0;
+      rondesJ.forEach(function(r){var eq=reByRonde[r.id]||[];jTot+=eq.length;jVal+=eq.filter(function(re){return re.statut==='valide';}).length;});
+      var jPct=jTot>0?Math.round(jVal/jTot*100):null;
+      narRondes+=rondesJ.length+' ronde'+(rondesJ.length>1?'s journalières':' journalière')+' effectuée'+(rondesJ.length>1?'s':'')+' sur 7 jours'+(jPct!==null?' ('+jPct+'% de conformité)':'')+'. ';
+    }
+    if(rondesH.length>0)narRondes+='Ronde hebdomadaire effectuée. ';
+    if(rondesM.length>0)narRondes+='Ronde mensuelle effectuée. ';
+  }
+
+  // Signalements
+  var narSg='';
+  if(signalements.length===0){narSg='Aucun signalement ou incident enregistré sur la semaine.';}
+  else{
+    var pannes=signalements.filter(function(s){return s.type==='panne';});
+    var anomalies=signalements.filter(function(s){return s.type==='anomalie';});
+    if(pannes.length>0)narSg+=pannes.length+' panne'+(pannes.length>1?'s':'')+' signalée'+(pannes.length>1?'s':'')+', dont '+pannes.filter(function(p){return p.statut==='resolu';}).length+' résolue'+(pannes.length>1?'s':'')+'. ';
+    if(anomalies.length>0)narSg+=anomalies.length+' anomalie'+(anomalies.length>1?'s':'')+' détectée'+(anomalies.length>1?'s':'')+' lors des rondes. ';
+    if(nbSgOuverts>0)narSg+=nbSgOuverts+' signalement'+(nbSgOuverts>1?'s':'')+' en attente de traitement.';
+  }
+
+  // Maintenances
+  var narMaint='';
+  if(maintenances.length===0){narMaint='Aucune intervention de maintenance enregistrée sur la semaine.';}
+  else{
+    var realises=maintenances.filter(function(m){return m.statut==='realise';});
+    narMaint+=realises.length+' intervention'+(realises.length>1?'s':'')+(realises.length>1?' réalisées':' réalisée')+' sur la période. ';
+    if(coutTotal>0)narMaint+='Coût total : '+coutTotal.toLocaleString('fr-FR')+' FCFA.';
+  }
+
+  // ── KPI couleurs ──
+  function kpiCol(val,seuil1,seuil2,invert){
+    if(val===null||val===undefined)return 'var(--text3)';
+    if(invert){return val<=seuil1?'var(--vert)':val<=seuil2?'var(--amber)':'var(--rouge)';}
+    return val>=seuil2?'var(--vert)':val>=seuil1?'var(--amber)':'var(--rouge)';
+  }
+
+  // ── HTML ──
+  var h='';
+
+  // Barre d'action (non imprimée)
+  h+='<div class="print-bar">'+
+    '<span class="print-note">✏️ Cliquez sur les zones de texte pour les modifier avant impression</span>'+
+    '<button class="btn-print" onclick="window.print()">🖨 Imprimer / PDF</button>'+
+    '<button class="btn-close" onclick="window.close()">Fermer</button>'+
+  '</div>';
+
+  // En-tête
+  h+='<div class="report-header">'+
+    '<div>'+
+      '<div class="report-logo">GenTrack</div>'+
+      '<div class="report-sub">Rapport hebdomadaire — Responsable technique</div>'+
+    '</div>'+
+    '<div class="report-meta">'+
+      '<div class="report-site">'+escape_html(siteNom)+'</div>'+
+      '<div>Période : '+escape_html(periodeStr)+'</div>'+
+      '<div>Responsable : '+escape_html(respNom)+'</div>'+
+      '<div>Généré le '+genDate+'</div>'+
+    '</div>'+
+  '</div>';
+
+  // KPIs
+  h+='<div class="kpi-row">'+
+    '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+kpiCol(tauxRondes,70,90,false)+'">'+(tauxRondes!==null?tauxRondes+'%':'—')+'</div><div class="kpi-sub">'+rondes.length+' ronde(s) / semaine</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Signalements actifs</div><div class="kpi-value" style="color:'+kpiCol(nbSgOuverts,1,3,true)+'">'+nbSgOuverts+'</div><div class="kpi-sub">'+nbSgResolus+' résolu(s) cette semaine</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Interventions</div><div class="kpi-value">'+nbMaintenances+'</div><div class="kpi-sub">'+(coutTotal>0?coutTotal.toLocaleString('fr-FR')+' FCFA':'Aucun coût enregistré')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Équipements actifs</div><div class="kpi-value">'+equips.length+'</div><div class="kpi-sub">'+ges.length+' groupe(s) · '+cuves.length+' cuve(s)</div></div>'+
+  '</div>';
+
+  // Résumé
+  h+='<h2>Synthèse de la semaine</h2>'+
+    '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
+    '<p class="narrative" contenteditable="true">'+escape_html(narResume)+'</p>';
+
+  // Équipements
+  h+='<h2>État des équipements</h2>'+
+    '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
+    '<p class="narrative" contenteditable="true">'+escape_html(narEquip)+'</p>';
+  if(equips.length>0){
+    h+='<table><thead><tr><th>Équipement</th><th>Type</th><th>Dernier relevé</th><th>État</th></tr></thead><tbody>';
+    equips.forEach(function(e){
+      var lr=lastRepsByEq[e.id];
+      var vals=lr&&lr.vals?lr.vals:[];
+      var valStr=vals.length>0?vals.map(function(v){return v.texte+' : '+v.valeur+(v.unite?' '+v.unite:'');}).join(' / '):'—';
+      var quand=lr&&lr.valide_at?new Date(lr.valide_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
+      var typeNom=e.types_equipements&&e.types_equipements.nom?e.types_equipements.nom:(e.capacite_litres?'Cuve':e.conso_theorique_lh?'Groupe électrogène':'Équipement');
+      h+='<tr>'+
+        '<td><strong>'+escape_html(e.nom)+'</strong></td>'+
+        '<td style="font-size:11px;color:var(--text2)">'+escape_html(typeNom)+'</td>'+
+        '<td style="font-size:11px">'+escape_html(valStr)+'<span style="color:var(--text3);font-size:10px"> · '+quand+'</span></td>'+
+        '<td><span class="badge '+(lr?'badge-ok':'badge-warn')+'">'+(lr?'✓ Relevé disponible':'En attente')+'</span></td>'+
+      '</tr>';
+    });
+    h+='</tbody></table>';
+  }
+
+  // Rondes
+  h+='<h2>Rondes & Relevés</h2>'+
+    '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
+    '<p class="narrative" contenteditable="true">'+escape_html(narRondes)+'</p>';
+  if(rondes.length>0){
+    h+='<table><thead><tr><th>Date</th><th>Type</th><th>Progression</th><th>Résultat</th></tr></thead><tbody>';
+    rondes.forEach(function(r){
+      var eq=reByRonde[r.id]||[];
+      var val=eq.filter(function(re){return re.statut==='valide';}).length;
+      var tot=eq.length;
+      var pct=tot>0?Math.round(val/tot*100):0;
+      var ok=val===tot&&tot>0;
+      var fillCol=ok?'#2D7A4F':pct>0?'#C49A1C':'#C0392B';
+      var dateDisp=new Date(r.date_ronde).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
+      h+='<tr>'+
+        '<td style="white-space:nowrap;color:var(--text2);font-size:11px">'+dateDisp+'</td>'+
+        '<td>'+(_FREQ_LABELS[r.frequence]||r.frequence)+'</td>'+
+        '<td style="min-width:100px">'+(tot>0?'<div style="display:flex;align-items:center;gap:8px"><div class="pbar-wrap" style="flex:1"><div class="pbar-fill" style="width:'+pct+'%;background:'+fillCol+'"></div></div><span style="font-size:11px;color:var(--text2)">'+val+'/'+tot+'</span></div>':'—')+'</td>'+
+        '<td>'+(tot===0?'<span class="badge badge-warn">Non commencée</span>':ok?'<span class="badge badge-ok">✓ Validée</span>':'<span class="badge badge-warn">'+pct+'%</span>')+'</td>'+
+      '</tr>';
+    });
+    h+='</tbody></table>';
+  }else{h+='<div class="empty-msg">Aucune ronde enregistrée sur la période</div>';}
+
+  // Signalements
+  h+='<h2>Signalements & Incidents</h2>'+
+    '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
+    '<p class="narrative" contenteditable="true">'+escape_html(narSg)+'</p>';
+  if(signalements.length>0){
+    var typeLabels={panne:'⚡ Panne',anomalie:'👁 Anomalie',autre:'📝 Autre'};
+    var statutLabels={ouvert:'En cours',en_cours:'En cours',resolu:'Résolu'};
+    h+='<table><thead><tr><th>Type</th><th>Description</th><th>Signalé par</th><th>Date</th><th>Statut</th><th>Coût</th></tr></thead><tbody>';
+    signalements.forEach(function(s){
+      var ts=new Date(s.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+      var resolu=s.statut==='resolu';
+      h+='<tr>'+
+        '<td style="white-space:nowrap">'+escape_html(typeLabels[s.type]||s.type)+'</td>'+
+        '<td style="max-width:280px">'+escape_html((s.description||'').substring(0,80))+'</td>'+
+        '<td style="font-size:11px;color:var(--text2)">'+escape_html(s.signale_par||'—')+'</td>'+
+        '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
+        '<td>'+(resolu?'<span class="badge badge-ok">Résolu</span>':'<span class="badge badge-ko">En cours</span>')+'</td>'+
+        '<td style="font-size:11px">'+(s.cout_intervention?s.cout_intervention.toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+      '</tr>';
+    });
+    h+='</tbody></table>';
+  }else{h+='<div class="empty-msg">Aucun signalement sur la période</div>';}
+
+  // Maintenances
+  h+='<h2>Maintenances & Interventions</h2>'+
+    '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
+    '<p class="narrative" contenteditable="true">'+escape_html(narMaint)+'</p>';
+  if(maintenances.length>0){
+    h+='<table><thead><tr><th>Intervention</th><th>Type</th><th>Intervenant</th><th>Date</th><th>Statut</th><th>Coût</th></tr></thead><tbody>';
+    maintenances.forEach(function(m){
+      var ts=new Date(m.date_intervention).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+      var realise=m.statut==='realise';
+      h+='<tr>'+
+        '<td><strong>'+escape_html(m.titre||'Intervention')+'</strong></td>'+
+        '<td style="font-size:11px;color:var(--text2)">'+escape_html(m.type||'—')+'</td>'+
+        '<td style="font-size:11px">'+escape_html(m.prestataire||'—')+'</td>'+
+        '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
+        '<td>'+(realise?'<span class="badge badge-ok">Réalisé</span>':'<span class="badge badge-warn">Planifié</span>')+'</td>'+
+        '<td style="font-size:11px">'+(m.cout?(parseFloat(m.cout)||0).toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+      '</tr>';
+    });
+    h+='</tbody></table>';
+  }else{h+='<div class="empty-msg">Aucune intervention sur la période</div>';}
+
+  // Observations
+  h+='<h2>Observations du responsable</h2>'+
+    '<div class="edit-hint">✏️ Zone libre — saisissez vos remarques, constats ou recommandations</div>'+
+    '<div class="obs-zone" contenteditable="true" data-placeholder="Saisissez ici vos observations, recommandations ou actions à venir..."></div>';
+
+  // Signature
+  h+='<div class="sig-row">'+
+    '<div class="sig-block">Fait à ________________, le '+new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+'<br><br><br>'+escape_html(respNom)+'<br><span style="font-size:10px;color:var(--text3)">Responsable Technique</span></div>'+
+    '<div class="sig-block">Visa direction<br><br><br>____________________</div>'+
+  '</div>';
+
+  // Pied de page
+  h+='<div class="footer-doc">'+
+    '<span>GenTrack · Pilotage technique hôtelier</span>'+
+    '<span>Rapport généré le '+new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+'</span>'+
+  '</div>';
+
+  return _reportShell('Rapport hebdo — '+siteNom,h,false);
 }
 
 function _buildReportSingle(siteNom,period,rondes,rondesEq,pannes,alertes,equips){
