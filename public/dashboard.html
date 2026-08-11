@@ -1371,7 +1371,7 @@ function _sgDetail(id){
     row('Signalé par',r.signale_par?escape_html(r.signale_par):null)+
     row('Source',r.source==='formulaire'?'📱 Formulaire QR':r.source==='seuil_releve'?'📈 Seuil automatique':'Manuel')+
     row('Date',date)+
-    (r.note_resolution?row('Note résolution','✅ '+escape_html(r.note_resolution)+(r.resolved_by?' ('+escape_html(r.resolved_by)+')'):''):'')+
+    (r.note_resolution?row('Note résolution','✅ '+escape_html(r.note_resolution)+(r.resolved_by?' ('+escape_html(r.resolved_by)+')':'')):'')+
     (r.cout_intervention?row('Coût intervention',Number(r.cout_intervention).toLocaleString('fr-FR')+' FCFA'):'')+
     (r.resolved_at?row('Résolu le',new Date(r.resolved_at).toLocaleString('fr-FR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})):'')+
     (r.photo_url?'<div style="margin-top:12px"><img src="'+r.photo_url+'" style="max-width:100%;border-radius:8px;border:1.5px solid var(--border)" onerror="this.style.display=\'none\'"/></div>':'')+
