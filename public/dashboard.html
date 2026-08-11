@@ -1483,12 +1483,13 @@ async function _sgAffecterConfirm(id){
   var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
   var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
   var lieu=r.lieu||'';
+  var rapportUrl=location.origin+location.pathname.replace('dashboard.html','rapport.html')+'?sg='+id;
   var msg='🔧 *Intervention requise — GenTrack*\n\n'+
     '📍 *Type :* '+typeLabel+'\n'+
     (eqNom?'⚙️ *Équipement :* '+eqNom+'\n':'')+
     (lieu?'📍 *Lieu :* '+lieu+'\n':'')+
     '📝 *Détail :* '+r.description+'\n\n'+
-    'Merci de prendre en charge et de confirmer.';
+    '✅ Une fois terminé, soumettez votre rapport ici :\n'+rapportUrl;
   _closeCfgModal();
   if(_sgAffecterChosen.wa){
     var waNum=_sgAffecterChosen.wa.replace(/\D/g,'');

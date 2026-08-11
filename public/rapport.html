@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>GenTrack · Rapport d'intervention</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --dark:#12151E;--dark2:#1E2332;
+  --text:#1A1D28;--text2:#5A5F78;--text3:#9AA0B8;
+  --border:#E4E6EF;--bg:#F4F5FA;--white:#FFFFFF;
+  --amber:#E8A020;--amber-dark:#B87A10;--amber-pale:#FFF6E0;--amber-border:#F5D080;
+  --vert:#1B7A4A;--vert-pale:#E8F7EE;--vert-border:#A8DEC0;
+  --rouge:#C0392B;--rouge-pale:#FDF0EE;--rouge-border:#F0B8B2;
+  --orange:#D46B0A;--orange-pale:#FEF3E5;
+  --radius:16px;--radius-sm:10px;
+  --shadow:0 2px 12px rgba(18,21,30,.07);
+}
+body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;color:var(--text);min-height:100vh;overflow-x:hidden}
+
+.rp-header{
+  background:linear-gradient(145deg,var(--dark) 0%,var(--dark2) 100%);
+  padding:calc(env(safe-area-inset-top,0px) + 18px) 20px 22px;
+  box-shadow:0 2px 20px rgba(0,0,0,.25);
+}
+.rp-logo{font-size:10px;font-weight:800;letter-spacing:.2em;color:var(--amber);text-transform:uppercase;margin-bottom:14px}
+.rp-title{font-size:22px;font-weight:800;color:#fff;letter-spacing:-.02em;margin-bottom:4px}
+.rp-subtitle{font-size:13px;color:rgba(255,255,255,.55)}
+
+.rp-body{padding:20px 16px;max-width:480px;margin:0 auto}
+
+/* Contexte signalement */
+.rp-context{background:var(--dark2);border-radius:var(--radius);padding:16px;margin-bottom:16px;color:#fff}
+.rp-context-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:10px}
+.rp-context-type{font-size:16px;font-weight:800;color:#fff;margin-bottom:6px}
+.rp-context-row{font-size:13px;color:rgba(255,255,255,.65);line-height:1.7}
+.rp-context-desc{font-size:13px;color:rgba(255,255,255,.85);margin-top:8px;line-height:1.5;background:rgba(255,255,255,.06);border-radius:8px;padding:10px 12px}
+
+.rp-section{background:var(--white);border-radius:var(--radius);padding:18px 16px;margin-bottom:14px;box-shadow:var(--shadow)}
+.rp-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text2);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.rp-required{color:var(--rouge);font-size:13px}
+.rp-input{width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;font-size:15px;color:var(--text);background:var(--bg);outline:none;transition:border-color .15s;font-family:inherit}
+.rp-input:focus{border-color:var(--amber);background:var(--white)}
+.rp-textarea{width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;font-size:15px;color:var(--text);background:var(--bg);outline:none;resize:none;min-height:110px;font-family:inherit;transition:border-color .15s}
+.rp-textarea:focus{border-color:var(--amber);background:var(--white)}
+
+.rp-row{display:flex;gap:10px}
+.rp-row>div{flex:1}
+
+/* Photo */
+.photo-zone{border:2px dashed var(--border);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;transition:border-color .15s;background:var(--bg);position:relative}
+.photo-zone:active{border-color:var(--amber)}
+.photo-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.photo-zone-icon{font-size:28px;margin-bottom:6px}
+.photo-zone-text{font-size:13px;color:var(--text3)}
+.photo-preview{width:100%;border-radius:var(--radius-sm);margin-top:10px;display:none;max-height:220px;object-fit:cover}
+
+.rp-submit{
+  width:100%;padding:16px;border:none;border-radius:var(--radius);
+  background:var(--vert);color:#fff;font-size:16px;font-weight:800;
+  cursor:pointer;transition:all .15s;letter-spacing:-.01em;
+  box-shadow:0 4px 16px rgba(27,122,74,.3);
+  margin-top:8px;margin-bottom:calc(env(safe-area-inset-bottom,0px) + 24px);
+}
+.rp-submit:active{transform:scale(.98);box-shadow:none}
+.rp-submit:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+.rp-error{background:var(--rouge-pale);border:1.5px solid var(--rouge-border);border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;color:var(--rouge);margin-bottom:14px;display:none}
+
+/* Loading */
+.rp-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:12px;color:var(--text2);font-size:14px}
+.rp-spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Confirmation */
+.rp-confirm{display:none;flex-direction:column;align-items:center;padding:40px 24px;text-align:center;max-width:480px;margin:0 auto}
+.rp-confirm-icon{font-size:64px;margin-bottom:20px;animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
+.rp-confirm-title{font-size:22px;font-weight:800;color:var(--dark);margin-bottom:8px}
+.rp-confirm-sub{font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:28px}
+.rp-wa-btn{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;padding:15px;border:none;border-radius:var(--radius);
+  background:#25D366;color:#fff;font-size:15px;font-weight:700;cursor:pointer;
+  box-shadow:0 4px 14px rgba(37,211,102,.35);margin-bottom:12px;
+}
+.rp-wa-btn:active{transform:scale(.98)}
+.rp-done-btn{
+  width:100%;padding:13px;border:1.5px solid var(--border);border-radius:var(--radius);
+  background:var(--white);color:var(--text2);font-size:14px;font-weight:600;cursor:pointer;
+}
+
+/* Already resolved */
+.rp-done-screen{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:40px 24px;text-align:center}
+</style>
+</head>
+<body>
+
+<div id="rp-loading" class="rp-loading">
+  <div class="rp-spinner"></div>
+  <span>Chargement…</span>
+</div>
+
+<div id="rp-invalid" style="display:none;padding:40px 24px;text-align:center">
+  <div style="font-size:48px;margin-bottom:16px">⚠️</div>
+  <div style="font-size:18px;font-weight:700;color:var(--dark);margin-bottom:8px">Lien invalide</div>
+  <div style="font-size:14px;color:var(--text2)">Ce lien n'est pas valide ou a expiré.<br>Contactez votre responsable technique.</div>
+</div>
+
+<div id="rp-done-screen" class="rp-done-screen">
+  <div style="font-size:52px;margin-bottom:16px">✅</div>
+  <div style="font-size:18px;font-weight:700;color:var(--dark);margin-bottom:8px">Déjà traité</div>
+  <div style="font-size:14px;color:var(--text2)">Ce signalement a déjà été résolu.<br>Merci pour votre intervention !</div>
+</div>
+
+<div id="rp-main" style="display:none">
+  <div class="rp-header">
+    <div class="rp-logo">GenTrack</div>
+    <div class="rp-title">🔧 Rapport d'intervention</div>
+    <div class="rp-subtitle" id="rp-site-name">Chargement…</div>
+  </div>
+
+  <div class="rp-body">
+    <div id="rp-error" class="rp-error"></div>
+
+    <!-- Contexte signalement -->
+    <div class="rp-context" id="rp-context-card">
+      <div class="rp-context-label">Signalement à traiter</div>
+      <div class="rp-context-type" id="rp-ctx-type"></div>
+      <div class="rp-context-row" id="rp-ctx-meta"></div>
+      <div class="rp-context-desc" id="rp-ctx-desc"></div>
+    </div>
+
+    <!-- Technicien -->
+    <div class="rp-section">
+      <div class="rp-label">Votre nom <span class="rp-required">*</span></div>
+      <input id="rp-tech" class="rp-input" type="text" placeholder="Votre nom ou prénom" autocomplete="name"/>
+    </div>
+
+    <!-- Travaux effectués -->
+    <div class="rp-section">
+      <div class="rp-label">Travaux effectués <span class="rp-required">*</span></div>
+      <textarea id="rp-travaux" class="rp-textarea" placeholder="Décrivez ce qui a été fait : pièces remplacées, réglages, réparations…"></textarea>
+    </div>
+
+    <!-- Coût + Durée -->
+    <div class="rp-section">
+      <div class="rp-row">
+        <div>
+          <div class="rp-label">Coût matériaux (FCFA)</div>
+          <input id="rp-cout" class="rp-input" type="number" placeholder="0" min="0"/>
+        </div>
+        <div>
+          <div class="rp-label">Durée (heures)</div>
+          <input id="rp-duree" class="rp-input" type="number" placeholder="Ex : 2" min="0" step="0.5"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- Photo -->
+    <div class="rp-section">
+      <div class="rp-label">Photo après intervention (optionnelle)</div>
+      <div class="photo-zone" id="rp-photo-zone">
+        <input type="file" accept="image/*" capture="environment" id="rp-photo-input" onchange="_onPhotoChange(this)"/>
+        <div class="photo-zone-icon">📷</div>
+        <div class="photo-zone-text">Prendre une photo de preuve</div>
+      </div>
+      <img id="rp-photo-preview" class="photo-preview" alt="Aperçu"/>
+    </div>
+
+    <button id="rp-submit-btn" class="rp-submit" onclick="_submit()">✅ Soumettre le rapport</button>
+  </div>
+</div>
+
+<!-- Confirmation -->
+<div id="rp-confirm" class="rp-confirm">
+  <div class="rp-confirm-icon">✅</div>
+  <div class="rp-confirm-title">Rapport envoyé !</div>
+  <div class="rp-confirm-sub">L'intervention a été enregistrée.<br>Le signalement est marqué comme résolu.</div>
+  <button id="rp-wa-notif" class="rp-wa-btn" onclick="_notifResp()" style="display:none">
+    <span style="font-size:20px">💬</span> Notifier le responsable
+  </button>
+  <button class="rp-done-btn" onclick="window.close()">Fermer</button>
+</div>
+
+<script>
+var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+
+var _sg=null;       // signalement object
+var _respWa=null;   // resp_tech WhatsApp number
+var _photoFile=null;
+
+var _TYPE_LABELS={panne:'⚡ Panne',anomalie:'👁 Anomalie',bruit:'🔊 Bruit anormal',odeur:'💨 Odeur suspecte',fuite:'💧 Fuite',seuil:'📈 Seuil dépassé',autre:'📝 Autre'};
+
+function supa(table,query){
+  return fetch(SUPA_URL+'/rest/v1/'+table+'?'+query,{
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Accept':'application/json'}
+  }).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];});
+}
+
+function supaPatch(table,id,data){
+  return fetch(SUPA_URL+'/rest/v1/'+table+'?id=eq.'+id,{
+    method:'PATCH',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify(data)
+  });
+}
+
+function supaPost(table,data){
+  return fetch(SUPA_URL+'/rest/v1/'+table,{
+    method:'POST',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify(data)
+  }).then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error(t);});});
+}
+
+async function init(){
+  var params=new URLSearchParams(location.search);
+  var sgId=params.get('sg');
+  if(!sgId){_showInvalid();return;}
+
+  // Fetch signalement + site
+  var rows=await supa('signalements',
+    'id=eq.'+sgId+
+    '&select=id,type,description,lieu,statut,assigne_a,groupe_id,equipement_id,created_at,equipements(nom),sites(nom)'
+  );
+  if(!rows||!rows[0]){_showInvalid();return;}
+  _sg=rows[0];
+
+  // Already resolved ?
+  if(_sg.statut==='resolu'){
+    document.getElementById('rp-loading').style.display='none';
+    document.getElementById('rp-done-screen').style.display='flex';
+    return;
+  }
+
+  // Site name
+  var siteNom=(_sg.sites&&_sg.sites.nom)||'';
+  document.getElementById('rp-site-name').textContent=siteNom;
+
+  // Context card
+  var typeLabel=_TYPE_LABELS[_sg.type]||_sg.type||'Signalement';
+  var eqNom=_sg.equipements&&_sg.equipements.nom?_sg.equipements.nom:'';
+  document.getElementById('rp-ctx-type').textContent=typeLabel;
+  var metaParts=[];
+  if(eqNom)metaParts.push('⚙️ '+eqNom);
+  if(_sg.lieu)metaParts.push('📍 '+_sg.lieu);
+  if(_sg.assigne_a)metaParts.push('👷 Affecté à '+_sg.assigne_a);
+  document.getElementById('rp-ctx-meta').textContent=metaParts.join('  ');
+  document.getElementById('rp-ctx-desc').textContent=_sg.description||'';
+
+  // Pre-fill technician name
+  if(_sg.assigne_a)document.getElementById('rp-tech').value=_sg.assigne_a;
+
+  // Fetch resp_tech contact for notification
+  if(_sg.groupe_id){
+    var contacts=await supa('contacts',
+      'site_id=eq.'+_sg.groupe_id+'&actif=eq.true&whatsapp=not.is.null&select=nom,whatsapp,role&order=created_at.asc'
+    );
+    // Prefer resp_tech role, fallback to first contact with WA
+    var respContact=contacts.find(function(c){return c.role==='resp_tech';})||contacts[0]||null;
+    if(respContact&&respContact.whatsapp)_respWa=respContact.whatsapp;
+  }
+
+  document.getElementById('rp-loading').style.display='none';
+  document.getElementById('rp-main').style.display='block';
+}
+
+function _showInvalid(){
+  document.getElementById('rp-loading').style.display='none';
+  document.getElementById('rp-invalid').style.display='block';
+}
+
+function _onPhotoChange(input){
+  var file=input.files&&input.files[0];
+  if(!file)return;
+  _photoFile=file;
+  var preview=document.getElementById('rp-photo-preview');
+  preview.src=URL.createObjectURL(file);
+  preview.style.display='block';
+  var zone=document.getElementById('rp-photo-zone');
+  zone.querySelector('.photo-zone-icon').textContent='✅';
+  zone.querySelector('.photo-zone-text').textContent=file.name;
+}
+
+async function _submit(){
+  var tech=(document.getElementById('rp-tech').value||'').trim();
+  var travaux=(document.getElementById('rp-travaux').value||'').trim();
+  var coutStr=document.getElementById('rp-cout').value;
+  var cout=coutStr&&!isNaN(parseFloat(coutStr))?parseFloat(coutStr):null;
+  var dureeStr=document.getElementById('rp-duree').value;
+  var duree=dureeStr&&!isNaN(parseFloat(dureeStr))?parseFloat(dureeStr):null;
+  var errEl=document.getElementById('rp-error');
+
+  if(!tech){
+    errEl.textContent='Veuillez indiquer votre nom.';
+    errEl.style.display='block';
+    document.getElementById('rp-tech').focus();
+    return;
+  }
+  if(!travaux){
+    errEl.textContent='Veuillez décrire les travaux effectués.';
+    errEl.style.display='block';
+    document.getElementById('rp-travaux').focus();
+    return;
+  }
+  errEl.style.display='none';
+
+  var btn=document.getElementById('rp-submit-btn');
+  btn.disabled=true;
+  btn.textContent='Envoi en cours…';
+
+  try{
+    var now=new Date().toISOString();
+    var today=now.split('T')[0];
+
+    // Note complète : travaux + durée si renseignée
+    var noteComplete=travaux+(duree?' (Durée : '+duree+'h)':'');
+
+    // 1. Marquer signalement résolu
+    await supaPatch('signalements',_sg.id,{
+      statut:'resolu',
+      note_resolution:noteComplete,
+      cout_intervention:cout,
+      resolved_by:tech,
+      resolved_at:now
+    });
+
+    // 2. Créer fiche maintenance
+    var eqNom=_sg.equipements&&_sg.equipements.nom?_sg.equipements.nom:'';
+    await supaPost('maintenances',{
+      groupe_id:_sg.groupe_id,
+      equipement_id:_sg.equipement_id||null,
+      type:'panne',
+      titre:'Intervention — '+(eqNom||(_TYPE_LABELS[_sg.type]||'Panne')),
+      description:noteComplete,
+      date_intervention:today,
+      statut:'realise',
+      cout:cout,
+      prestataire:tech,
+      created_by:tech
+    });
+
+    // 3. Masquer form, afficher confirmation
+    document.getElementById('rp-main').style.display='none';
+    document.getElementById('rp-confirm').style.display='flex';
+
+    // 4. Afficher bouton WA si resp_tech a un numéro
+    if(_respWa){
+      document.getElementById('rp-wa-notif').style.display='flex';
+      // Préparer le message pour le resp_tech
+      var typeLabel=_TYPE_LABELS[_sg.type]||_sg.type||'Intervention';
+      window._notifMsg='✅ *Intervention résolue — GenTrack*\n\n'+
+        '🔧 *Type :* '+typeLabel+'\n'+
+        (eqNom?'⚙️ *Équipement :* '+eqNom+'\n':'')+
+        (_sg.lieu?'📍 *Lieu :* '+_sg.lieu+'\n':'')+
+        '👷 *Technicien :* '+tech+'\n'+
+        '📝 *Travaux :* '+travaux+'\n'+
+        (cout?'💰 *Coût :* '+cout.toLocaleString('fr-FR')+' FCFA\n':'')+
+        (duree?'⏱ *Durée :* '+duree+'h\n':'')+
+        '\nSignalement clôturé.';
+    }
+  }catch(e){
+    errEl.textContent='Erreur lors de l\'envoi. Vérifiez votre connexion et réessayez.';
+    errEl.style.display='block';
+    btn.disabled=false;
+    btn.textContent='✅ Soumettre le rapport';
+  }
+}
+
+function _notifResp(){
+  if(!_respWa||!window._notifMsg)return;
+  var num=_respWa.replace(/\D/g,'');
+  window.open('https://wa.me/'+num+'?text='+encodeURIComponent(window._notifMsg),'_blank');
+}
+
+init();
+</script>
+</body>
+</html>
