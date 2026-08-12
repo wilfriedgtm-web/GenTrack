@@ -886,7 +886,7 @@ function _buildVidangesSection(geEquips,geQs,vidangesHist){
         '</div>':
         '<div style="font-size:11px;color:var(--text3)">'+(baseline==null?'Compteur de référence non configuré':'Pas de lecture compteur')+'</div>'
       )+
-      '<button onclick="openDeclareVidange(\''+e.id+'\',\''+escape_html(e.nom)+'\')" style="margin-top:4px;padding:6px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text1);font-size:12px;cursor:pointer;width:100%;text-align:center">🛢 Déclarer vidange effectuée</button>'+
+      '<button onclick="openDeclareVidange(\''+e.id+'\',\''+escape_html(e.nom)+'\','+(currentH!=null?currentH:'null')+')" style="margin-top:4px;padding:6px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text1);font-size:12px;cursor:pointer;width:100%;text-align:center">🛢 Déclarer vidange effectuée</button>'+
       (function(){
         var hist=vidangesHist.filter(function(v){return v.equipement_id===e.id;}).slice(0,5);
         if(!hist.length)return '';
@@ -907,51 +907,45 @@ function _buildVidangesSection(geEquips,geQs,vidangesHist){
   return html;
 }
 
-function openDeclareVidange(eqId,eqNom){
+function openDeclareVidange(eqId,eqNom,currentH){
+  // currentH = dernière lecture compteur connue (auto depuis la dernière ronde)
   var m=document.getElementById('modal-vidange');
   if(!m){
     m=document.createElement('div');
     m.id='modal-vidange';
     m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
-    m.innerHTML='<div style="background:var(--card1);border-radius:16px;padding:24px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.3)">'+
-      '<div style="font-size:16px;font-weight:700;color:var(--text1);margin-bottom:4px" id="mv-title"></div>'+
-      '<div style="font-size:12px;color:var(--text3);margin-bottom:14px">Renseignez le compteur et le coût de l\'intervention</div>'+
-      '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Compteur horaire actuel *</label>'+
-      '<input id="mv-compteur" type="number" step="0.1" placeholder="ex: 3 450" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:10px"/>'+
-      '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Coût vidange (FCFA, optionnel)</label>'+
-      '<input id="mv-cout" type="number" step="100" placeholder="ex: 45 000" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:10px"/>'+
-      '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Notes (optionnel)</label>'+
-      '<input id="mv-notes" type="text" placeholder="ex: Huile 15W40, filtre changé" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:13px;box-sizing:border-box;margin-bottom:16px"/>'+
-      '<div style="display:flex;gap:8px">'+
-        '<button onclick="document.getElementById(\'modal-vidange\').remove()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text2);font-size:13px;cursor:pointer">Annuler</button>'+
-        '<button id="mv-confirm" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Confirmer</button>'+
-      '</div>'+
-    '</div>';
     document.body.appendChild(m);
   }
-  document.getElementById('mv-title').textContent='🛢 Vidange – '+eqNom;
-  document.getElementById('mv-compteur').value='';
+  var compteurTxt=currentH!=null?'<div style="font-size:12px;color:var(--text3);margin-bottom:14px">Compteur actuel relevé lors de la dernière ronde : <strong style="color:var(--text1)">'+Math.round(currentH)+' h</strong></div>':'<div style="font-size:12px;color:var(--orange);margin-bottom:14px">⚠️ Aucune lecture compteur disponible. Assurez-vous que la ronde a bien été saisie.</div>';
+  m.innerHTML='<div style="background:var(--card1);border-radius:16px;padding:24px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.3)">'+
+    '<div style="font-size:16px;font-weight:700;color:var(--text1);margin-bottom:8px">🛢 Vidange – '+escape_html(eqNom)+'</div>'+
+    compteurTxt+
+    '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Coût vidange (FCFA, optionnel)</label>'+
+    '<input id="mv-cout" type="number" step="100" placeholder="ex: 45 000" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:10px"/>'+
+    '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Notes (optionnel)</label>'+
+    '<input id="mv-notes" type="text" placeholder="ex: Huile 15W40, filtre changé" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:13px;box-sizing:border-box;margin-bottom:16px"/>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="document.getElementById(\'modal-vidange\').remove()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text2);font-size:13px;cursor:pointer">Annuler</button>'+
+      '<button id="mv-confirm" '+(currentH==null?'disabled title="Aucune lecture compteur disponible"':'')+' style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer'+(currentH==null?';opacity:.4':'')+'">Confirmer</button>'+
+    '</div>'+
+  '</div>';
   document.getElementById('mv-cout').value='';
   document.getElementById('mv-notes').value='';
   document.getElementById('mv-confirm').onclick=async function(){
-    var val=parseFloat(document.getElementById('mv-compteur').value);
-    if(isNaN(val)||val<0){alert('Valeur compteur invalide');return;}
     var cout=document.getElementById('mv-cout').value?parseFloat(document.getElementById('mv-cout').value):null;
     var notes=document.getElementById('mv-notes').value.trim()||null;
     var btn=document.getElementById('mv-confirm');
     btn.disabled=true;btn.textContent='…';
     var now=new Date().toISOString();
     try{
-      // Mettre à jour le compteur de référence sur l'équipement
       await supaUpdate('equipements','id=eq.'+eqId,{
-        heures_dernier_vidange:val,
+        heures_dernier_vidange:currentH,
         date_dernier_vidange:now
       });
-      // Insérer dans l'historique
       await supaPost('vidanges',{
         equipement_id:eqId,
         date:now.slice(0,10),
-        heures_au_moment:val,
+        heures_au_moment:currentH,
         cout:cout,
         notes:notes
       });
@@ -1980,7 +1974,7 @@ async function _mntCreerSubmit(sid){
 async function _rtConfig(sid){
   _configCurrentSid=sid;
   var types=await supaGet('types_equipements','select=id,nom&order=nom');
-  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,actif_ronde,actif_releve,ordre_ronde,type_id,types_equipements(nom)&order=ordre_ronde.asc');
+  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,actif_ronde,actif_releve,ordre_ronde,type_id,seuil_vidange_heures,heures_dernier_vidange,types_equipements(nom)&order=ordre_ronde.asc');
   var tabs=[
     {key:'equipements',label:'⚙️ Équipements & Rondes'},
     {key:'seuils',label:'🎯 Seuils d\'alerte'},
@@ -2041,7 +2035,7 @@ async function _rtConfig(sid){
             '<div class="config-eq-name" style="'+(e.actif?'':'color:var(--text3)')+'">'+escape_html(e.nom)+'</div>'+
             '<div class="config-eq-type">'+(e.actif?'Actif':'Inactif')+'</div>'+
           '</div>'+
-          '<button class="config-eq-edit-btn" onclick="event.stopPropagation();_openEditEquipModal(\''+e.id+'\',\''+escape_html(e.nom)+'\','+e.actif+','+(e.actif_ronde!==false)+','+(e.actif_releve!==false)+')" title="Modifier">✏️</button>'+
+          '<button class="config-eq-edit-btn" onclick="event.stopPropagation();_openEditEquipModal(\''+e.id+'\',\''+escape_html(e.nom)+'\','+e.actif+','+(e.actif_ronde!==false)+','+(e.actif_releve!==false)+',\''+e.type_id+'\','+(e.seuil_vidange_heures||'null')+','+(e.heures_dernier_vidange||'null')+')" title="Modifier">✏️</button>'+
         '</div>';
       });
     });
@@ -2813,9 +2807,29 @@ function _openAddEquipModal(){
   });
 }
 
-function _openEditEquipModal(eqId, nom, actif, actifRonde, actifReleve){
+function _openEditEquipModal(eqId, nom, actif, actifRonde, actifReleve, typeId, seuilVidange, heuresDernierVidange){
   if(actifRonde===undefined)actifRonde=true;
   if(actifReleve===undefined)actifReleve=true;
+  var GE_TYPE_ID='98849793-9201-4adf-aec2-a4a08587c4e2';
+  var isGE=(typeId===GE_TYPE_ID);
+  var geFields='';
+  if(isGE){
+    geFields=
+      '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">'+
+        '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">⚡ Groupe électrogène</div>'+
+        '<div style="display:flex;gap:10px">'+
+          '<div class="cfg-form-group" style="flex:1;margin-bottom:0">'+
+            '<label class="cfg-form-label">Seuil vidange (heures)</label>'+
+            '<input id="eq-edit-seuil" class="cfg-form-input" type="number" placeholder="ex: 250" value="'+(seuilVidange||'')+'" />'+
+          '</div>'+
+          '<div class="cfg-form-group" style="flex:1;margin-bottom:0">'+
+            '<label class="cfg-form-label">Compteur à la dernière vidange</label>'+
+            '<input id="eq-edit-baseline" class="cfg-form-input" type="number" step="0.1" placeholder="ex: 2830" value="'+(heuresDernierVidange||'')+'" />'+
+            '<div style="font-size:10px;color:var(--text3);margin-top:3px">Valeur du compteur le jour où la dernière vidange a été faite</div>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+  }
   _showCfgModal(
     '<div class="cfg-modal-title">✏️ Modifier l\'équipement</div>'+
     '<div class="cfg-form-group"><label class="cfg-form-label">Nom *</label>'+
@@ -2840,6 +2854,7 @@ function _openEditEquipModal(eqId, nom, actif, actifRonde, actifReleve){
           '<span>📋 Relevé horaire</span></label>'+
       '</div>'+
     '</div>'+
+    geFields+
     '<div class="cfg-modal-footer">'+
       '<button class="cfg-btn-danger" onclick="_confirmDeleteEquip(\''+eqId+'\')" style="margin-right:auto">🗑 Supprimer</button>'+
       '<button class="cfg-btn-secondary" onclick="_closeCfgModal()">Annuler</button>'+
@@ -2855,8 +2870,17 @@ async function _saveEditEquip(eqId){
   var actif=actifRadio?actifRadio.value==='true':true;
   var actifRonde=!!(document.getElementById('eq-edit-ronde')||{}).checked;
   var actifReleve=!!(document.getElementById('eq-edit-releve')||{}).checked;
+  var body={nom:nom.trim(),actif:actif,actif_ronde:actifRonde,actif_releve:actifReleve};
+  // Champs GE (si présents)
+  var seuilEl=document.getElementById('eq-edit-seuil');
+  var baselineEl=document.getElementById('eq-edit-baseline');
+  if(seuilEl&&seuilEl.value)body.seuil_vidange_heures=parseFloat(seuilEl.value);
+  if(baselineEl&&baselineEl.value){
+    body.heures_dernier_vidange=parseFloat(baselineEl.value);
+    body.date_dernier_vidange=new Date().toISOString();
+  }
   _closeCfgModal();
-  await supaPatch('equipements',eqId,{nom:nom.trim(),actif:actif,actif_ronde:actifRonde,actif_releve:actifReleve});
+  await supaPatch('equipements',eqId,body);
   if(eqId===_configSelectedEqId&&!actif)_configSelectedEqId=null;
   if(_session)renderRespTech(_session,'config');
 }
