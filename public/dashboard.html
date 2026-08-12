@@ -1014,14 +1014,28 @@ function openDeclarePlein(eqId,eqNom,cap,currentNiveau,operateur){
     btn.disabled=true;btn.textContent='…';
     var today=new Date().toISOString().slice(0,10);
     try{
+      var sid2=_session&&_session.site_ids?_session.site_ids[0]:null;
       await supaPost('pleins',{
         equipement_id:eqId,
-        site_id:_session&&_session.site_ids?_session.site_ids[0]:null,
+        site_id:sid2,
         date:today,
         litres_ajoutes:litres,
         niveau_apres:niveauApres,
         cout:cout,
         operateur:oper
+      });
+      // Aussi dans maintenances pour l'onglet Maintenance/Ravitaillement
+      await supaPost('maintenances',{
+        groupe_id:sid2,
+        equipement_id:eqId,
+        type:'ravitaillement',
+        titre:'Ravitaillement — '+eqNom,
+        date_intervention:today,
+        quantite:litres,
+        unite:'L',
+        cout:cout||0,
+        statut:'realise',
+        created_by:oper||null
       });
       document.getElementById('modal-plein').remove();
       var el=document.querySelector('.dash-content');
@@ -2054,6 +2068,7 @@ async function _rtConfig(sid){
   equips.forEach(function(e){_configEquipCache[e.id]=e;});
   var tabs=[
     {key:'equipements',label:'⚙️ Équipements & Rondes'},
+    {key:'planning',label:'📅 Planning rondes'},
     {key:'seuils',label:'🎯 Seuils d\'alerte'},
     {key:'contacts',label:'👥 Contacts & Alertes'},
     {key:'releves',label:'📋 Relevés horaires'}
@@ -2062,6 +2077,12 @@ async function _rtConfig(sid){
     return '<button class="config-tab'+(_configCurrentTab===t.key?' active':'')+'" onclick="_switchConfigTab(\''+t.key+'\')">'+t.label+'</button>';
   }).join('');
 
+  if(_configCurrentTab==='planning'){
+    var dc2p=document.getElementById('dash-content-main');
+    if(dc2p){dc2p.style.padding='24px';dc2p.style.maxWidth='none';}
+    var planningHtml=await _buildPlanningTab(sid);
+    return '<div class="config-tabs">'+tabHtml+'</div>'+planningHtml;
+  }
   if(_configCurrentTab==='seuils'){
     var dc2=document.getElementById('dash-content-main');
     if(dc2){dc2.style.padding='24px';dc2.style.maxWidth='none';}
@@ -2627,6 +2648,140 @@ function _selectConfigEq(id){
   renderRespTech(_session,'config');
 }
 
+function _onPlanToggle(type){
+  var el=document.getElementById('plan-'+type+'-actif');
+  if(!el)return;
+  var on=el.checked;
+  var detail=document.getElementById('plan-'+type+'-detail');
+  if(detail)detail.style.display=on?'':'none';
+  // Update slider appearance
+  var slider=document.getElementById('plan-'+type+'-slider');
+  var knob=document.getElementById('plan-'+type+'-knob');
+  if(slider)slider.style.background=on?'var(--amber)':'#ccc';
+  if(knob)knob.style.left=on?'22px':'3px';
+}
+
+async function _buildPlanningTab(sid){
+  var sArr=await supaGet('sites','id=eq.'+sid+'&select=journalier_actif,hebdo_actif,mensuel_actif,heure_rappel,jour_hebdo,jour_mensuel');
+  var s=(sArr&&sArr[0])||{};
+  var jourActif=s.journalier_actif!==false;
+  var hebdoActif=s.hebdo_actif===true;
+  var mensuelActif=s.mensuel_actif===true;
+  var heureRappel=s.heure_rappel||'08:00';
+  var jourHebdo=s.jour_hebdo!=null?Number(s.jour_hebdo):0;
+  var jourMensuel=s.jour_mensuel!=null?Number(s.jour_mensuel):1;
+  var jours=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+  var jourHebdoOpts=jours.map(function(j,i){return '<option value="'+i+'"'+(i===jourHebdo?' selected':'')+'>'+j+'</option>';}).join('');
+  var jourMensuelOpts='';for(var d=1;d<=31;d++){jourMensuelOpts+='<option value="'+d+'"'+(d===jourMensuel?' selected':'')+'>'+d+'</option>';}
+
+  function toggleHtml(type,on){
+    return '<label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer">'+
+      '<input type="checkbox" id="plan-'+type+'-actif"'+(on?' checked':'')+' onchange="_onPlanToggle(\''+type+'\')" style="opacity:0;width:0;height:0;position:absolute">'+
+      '<span id="plan-'+type+'-slider" style="position:absolute;inset:0;background:'+(on?'var(--amber)':'#ccc')+';border-radius:22px;transition:.2s"></span>'+
+      '<span id="plan-'+type+'-knob" style="position:absolute;left:'+(on?'22px':'3px')+';top:3px;width:16px;height:16px;background:white;border-radius:50%;transition:.2s"></span>'+
+    '</label>';
+  }
+
+  var html='<style>'+
+    '#plan-jour-detail,#plan-hebdo-detail,#plan-mensuel-detail{transition:all .2s}'+
+    '.plan-card{background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:12px}'+
+    '.plan-card-row{display:flex;align-items:center;gap:12px}'+
+    '.plan-card-detail{padding-top:12px;margin-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px}'+
+    '.plan-label{font-size:11px;color:var(--text2);width:110px;flex-shrink:0}'+
+  '</style>'+
+  '<div style="max-width:600px">'+
+  '<div style="font-size:12px;color:var(--text2);margin-bottom:20px;line-height:1.6">'+
+    'Activez les rondes et définissez quel jour elles doivent être effectuées.'+
+  '</div>'+
+
+  // Journalier
+  '<div class="plan-card">'+
+    '<div class="plan-card-row">'+
+      '<span style="font-size:20px">☀️</span>'+
+      '<div style="flex:1">'+
+        '<div style="font-weight:700;font-size:14px;color:var(--text1)">Ronde quotidienne</div>'+
+        '<div style="font-size:12px;color:var(--text2)">Chaque jour — matin, après-midi, soir</div>'+
+      '</div>'+
+      toggleHtml('jour',jourActif)+
+    '</div>'+
+    '<div id="plan-jour-detail" class="plan-card-detail"'+(jourActif?'':' style="display:none"')+'>'+
+      '<span class="plan-label">Heure de rappel</span>'+
+      '<input type="time" id="plan-heure" class="cfg-form-input" style="width:120px;padding:6px 10px;font-size:13px" value="'+escape_html(heureRappel)+'">'+
+    '</div>'+
+  '</div>'+
+
+  // Hebdo
+  '<div class="plan-card">'+
+    '<div class="plan-card-row">'+
+      '<span style="font-size:20px">📅</span>'+
+      '<div style="flex:1">'+
+        '<div style="font-weight:700;font-size:14px;color:var(--text1)">Ronde hebdomadaire</div>'+
+        '<div style="font-size:12px;color:var(--text2)">1 fois par semaine</div>'+
+      '</div>'+
+      toggleHtml('hebdo',hebdoActif)+
+    '</div>'+
+    '<div id="plan-hebdo-detail" class="plan-card-detail"'+(hebdoActif?'':' style="display:none"')+'>'+
+      '<span class="plan-label">Jour</span>'+
+      '<select id="plan-jour-hebdo" class="cfg-form-select" style="width:160px;padding:6px 10px;font-size:13px">'+jourHebdoOpts+'</select>'+
+    '</div>'+
+  '</div>'+
+
+  // Mensuel
+  '<div class="plan-card">'+
+    '<div class="plan-card-row">'+
+      '<span style="font-size:20px">🗓️</span>'+
+      '<div style="flex:1">'+
+        '<div style="font-weight:700;font-size:14px;color:var(--text1)">Ronde mensuelle</div>'+
+        '<div style="font-size:12px;color:var(--text2)">1 fois par mois</div>'+
+      '</div>'+
+      toggleHtml('mensuel',mensuelActif)+
+    '</div>'+
+    '<div id="plan-mensuel-detail" class="plan-card-detail"'+(mensuelActif?'':' style="display:none"')+'>'+
+      '<span class="plan-label">Jour du mois</span>'+
+      '<select id="plan-jour-mensuel" class="cfg-form-select" style="width:90px;padding:6px 10px;font-size:13px">'+jourMensuelOpts+'</select>'+
+    '</div>'+
+  '</div>'+
+
+  '<div style="display:flex;align-items:center;gap:12px;margin-top:4px">'+
+    '<button class="cfg-btn-primary" onclick="_savePlanningTab(\''+sid+'\')">💾 Enregistrer</button>'+
+    '<span id="plan-save-msg" style="font-size:12px;color:var(--vert);display:none">✓ Enregistré</span>'+
+    '<span id="plan-save-err" style="font-size:12px;color:var(--rouge);display:none">Erreur — réessayez</span>'+
+  '</div>'+
+  '</div>';
+
+  return html;
+}
+
+async function _savePlanningTab(sid){
+  var jourActif=document.getElementById('plan-jour-actif').checked;
+  var hebdoActif=document.getElementById('plan-hebdo-actif').checked;
+  var mensuelActif=document.getElementById('plan-mensuel-actif').checked;
+  var heureEl=document.getElementById('plan-heure');
+  var heureRappel=heureEl?heureEl.value||'08:00':'08:00';
+  var jHEl=document.getElementById('plan-jour-hebdo');
+  var jMEl=document.getElementById('plan-jour-mensuel');
+  var jourHebdo=jHEl?parseInt(jHEl.value)||0:0;
+  var jourMensuel=jMEl?parseInt(jMEl.value)||1:1;
+  var body={
+    journalier_actif:jourActif,
+    hebdo_actif:hebdoActif,
+    mensuel_actif:mensuelActif,
+    heure_rappel:heureRappel,
+    jour_hebdo:jourHebdo,
+    jour_mensuel:jourMensuel
+  };
+  var ok=await supaPatch('sites',sid,body);
+  var msgOk=document.getElementById('plan-save-msg');
+  var msgErr=document.getElementById('plan-save-err');
+  if(ok){
+    if(msgOk){msgOk.style.display='';setTimeout(function(){msgOk.style.display='none';},3000);}
+    if(msgErr)msgErr.style.display='none';
+  } else {
+    if(msgErr){msgErr.style.display='';setTimeout(function(){msgErr.style.display='none';},4000);}
+    if(msgOk)msgOk.style.display='none';
+  }
+}
+
 async function _buildConfigRondePanel(sid,eqId,equips){
   var eq=equips&&equips.find(function(e){return e.id===eqId;});
   if(!eq)return '<div class="config-ronde-panel"><div style="color:var(--text3);font-size:13px;padding:40px;text-align:center">Sélectionnez un équipement</div></div>';
@@ -2645,9 +2800,18 @@ async function _buildConfigRondePanel(sid,eqId,equips){
 
   var _RONDE_CFG=[
     {freq:'journalier',color:'green',label:'Quotidienne',freqDisp:'Chaque shift · 3×/jour',trigger:'⏰ 8h, 15h, 23h'},
-    {freq:'hebdo',color:'amber',label:'Hebdomadaire',freqDisp:'Chaque lundi · 1×/semaine',trigger:'📅 Chaque lundi'},
-    {freq:'mensuel',color:'blue',label:'Mensuelle',freqDisp:'1er du mois · 1×/mois',trigger:'📅 1er du mois'}
+    {freq:'hebdo',color:'amber',label:'Hebdomadaire',freqDisp:'Chaque '+jourHebdoLabel+' · 1×/semaine'+(hebdoActif?'':' · Désactivée'),trigger:'📅 Chaque '+jourHebdoLabel},
+    {freq:'mensuel',color:'blue',label:'Mensuelle',freqDisp:'Le '+jourMensuelNum+' du mois · 1×/mois'+(mensuelActif?'':' · Désactivée'),trigger:'📅 Le '+jourMensuelNum+' du mois'}
   ];
+
+  // Fetch site config (jour rondes)
+  var siteArr=await supaGet('sites','id=eq.'+sid+'&select=journalier_actif,hebdo_actif,mensuel_actif,heure_rappel,jour_hebdo,jour_mensuel');
+  var siteConf=(siteArr&&siteArr[0])||{};
+  var _JOURS_SEMAINE=['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+  var jourHebdoLabel=_JOURS_SEMAINE[siteConf.jour_hebdo!=null?Number(siteConf.jour_hebdo):0]||'Lundi';
+  var jourMensuelNum=siteConf.jour_mensuel!=null?Number(siteConf.jour_mensuel):1;
+  var hebdoActif=siteConf.hebdo_actif===true;
+  var mensuelActif=siteConf.mensuel_actif===true;
 
   // Fetch available modele for this equipment type
   var modeles=eq.type_id?await supaGet('modeles_questions','type_id=eq.'+eq.type_id+'&select=id,nom'):[];
