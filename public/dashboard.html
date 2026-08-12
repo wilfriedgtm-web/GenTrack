@@ -625,16 +625,18 @@ async function _rtAccueil(session,sid,cid){
   var specialIds=cuveEquips.concat(geEquips).map(function(e){return e.id;});
   if(specialIds.length){
     var geIds=geEquips.map(function(e){return e.id;});
-    var[specialQs,vidangesHist]=await Promise.all([
+    var cuveIds=cuveEquips.map(function(e){return e.id;});
+    var[specialQs,vidangesHist,pleinsHist]=await Promise.all([
       supaGet('questions','equipement_id=in.('+specialIds.join(',')+')'+'&actif=eq.true&select=id,texte,unite,seuil_min,seuil_max,equipement_id&order=ordre.asc'),
-      geIds.length?supaGet('vidanges','equipement_id=in.('+geIds.join(',')+')'+'&select=id,equipement_id,date,heures_au_moment,cout,notes&order=date.desc&limit=50'):Promise.resolve([])
+      geIds.length?supaGet('vidanges','equipement_id=in.('+geIds.join(',')+')'+'&select=id,equipement_id,date,heures_au_moment,cout,notes&order=date.desc&limit=50'):Promise.resolve([]),
+      cuveIds.length?supaGet('pleins','equipement_id=in.('+cuveIds.join(',')+')'+'&select=id,equipement_id,date,litres_ajoutes,niveau_apres,cout,operateur&order=date.desc&limit=50'):Promise.resolve([])
     ]);
     var qIds=specialQs.map(function(q){return q.id;});
     var latestReps=qIds.length?await supaGet('reponses','question_id=in.('+qIds.join(',')+')'+'&select=question_id,valeur,created_at&order=created_at.desc&limit=300'):[];
     var repByQ={};
     latestReps.forEach(function(r){if(!repByQ[r.question_id]||r.created_at>repByQ[r.question_id].created_at)repByQ[r.question_id]=r;});
     specialQs.forEach(function(q){q._lastVal=repByQ[q.id]?repByQ[q.id].valeur:null;q._lastAt=repByQ[q.id]?repByQ[q.id].created_at:null;});
-    cuveSection=_buildCuveSection(cuveEquips,specialQs.filter(function(q){return cuveEquips.some(function(e){return e.id===q.equipement_id;});}));
+    cuveSection=_buildCuveSection(cuveEquips,specialQs.filter(function(q){return cuveEquips.some(function(e){return e.id===q.equipement_id;})}),pleinsHist);
     vidangesSection=_buildVidangesSection(geEquips,specialQs.filter(function(q){return geEquips.some(function(e){return e.id===q.equipement_id;})}),vidangesHist);
   }
 
@@ -776,7 +778,8 @@ async function _rtAccueil(session,sid,cid){
 }
 
 /* ── Cuve carburant section ── */
-function _buildCuveSection(cuveEquips,cuveQs){
+function _buildCuveSection(cuveEquips,cuveQs,pleinsHist){
+  pleinsHist=pleinsHist||[];
   if(!cuveEquips.length)return '';
   var html='<div class="section-title">⛽ Carburant</div>';
   cuveEquips.forEach(function(e){
@@ -812,6 +815,24 @@ function _buildCuveSection(cuveEquips,cuveQs){
         (seuilMin!=null?'<div style="font-size:11px;color:var(--text3)">Seuil alerte : <strong>'+Math.round(seuilMin).toLocaleString('fr-FR')+' L</strong></div>':'<div></div>')+
         (autoJours!=null?'<div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;background:'+autoBg+';color:'+autoCol+'">≈ '+autoJours+' j autonomie</div>':'<div style="font-size:11px;color:var(--text3)">Autonomie : —</div>')+
       '</div>'+
+      (function(){
+        var hist=pleinsHist.filter(function(p){return p.equipement_id===e.id;}).slice(0,5);
+        if(!hist.length)return '';
+        var rows=hist.map(function(p){
+          var d=new Date(p.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+          var litr=p.litres_ajoutes?'+'+Math.round(p.litres_ajoutes).toLocaleString('fr-FR')+'L → ':'';
+          var apres=p.niveau_apres!=null?Math.round(p.niveau_apres).toLocaleString('fr-FR')+'L':'';
+          var cout=p.cout?(' · '+(p.cout).toLocaleString('fr-FR')+' FCFA'):'';
+          var oper=p.operateur?' · '+p.operateur:'';
+          return '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);padding:4px 0;border-top:1px solid var(--border)">'+
+            '<span>'+d+oper+'</span>'+
+            '<span style="white-space:nowrap;margin-left:8px">⛽ '+litr+apres+cout+'</span>'+
+          '</div>';
+        }).join('');
+        return '<div style="margin-top:10px">'+
+          '<div style="font-size:10px;font-weight:600;color:var(--text3);margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em">Derniers ravitaillements</div>'+
+          rows+'</div>';
+      })()+
     '</div>';
   });
   return html;

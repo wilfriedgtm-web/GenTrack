@@ -78,11 +78,23 @@ function getStartOfMonth():   string {
 
 // ── Lien relevé horaire ───────────────────────────────────────────────────────
 async function getReleveLink(siteId: string): Promise<string | null> {
-  const rows = await db('auth_sessions', {
-    query: `&site_id=eq.${siteId}&expires_at=gt.${new Date().toISOString()}&order=expires_at.desc&limit=1`,
+  const now = new Date().toISOString();
+  // Chercher un relevé ouvert non expiré pour ce site
+  const rows = await db('releves_horaires', {
+    query: `&site_id=eq.${siteId}&statut=eq.ouvert&expires_at=gt.${now}&order=expires_at.desc&limit=1`,
     select: 'token'
   });
-  const token = Array.isArray(rows) && rows[0]?.token ? rows[0].token : null;
+  let token = Array.isArray(rows) && rows[0]?.token ? rows[0].token : null;
+  // Sinon en créer un nouveau valable 8h
+  if (!token) {
+    const expires = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
+    const created = await db('releves_horaires', {
+      method: 'POST',
+      body: { site_id: siteId, statut: 'ouvert', expires_at: expires },
+      select: 'token'
+    });
+    token = Array.isArray(created) ? created[0]?.token : created?.token;
+  }
   return token ? `${BASE_URL}/releve.html?token=${token}` : null;
 }
 
@@ -972,6 +984,16 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       const reId = await getOrCreateRondeEquipement(rondeId, sd.cuve_id);
       await db('reponses', { method: 'POST', body: { ronde_equipement_id: reId, question_id: sd.question_niveau_id, valeur: String(niveauL) } });
     }
+
+    // Enregistrer dans l'historique pleins
+    await db('pleins', { method: 'POST', body: {
+      equipement_id: sd.cuve_id,
+      site_id: sd.site_id,
+      date: today,
+      litres_ajoutes: sd.litres_ajoutes || null,
+      niveau_apres: niveauL,
+      operateur: operateur || null,
+    }}).catch(() => {});
 
     if (pct <= 20) {
       await db('alertes', { method: 'POST', body: { groupe_id: sd.site_id, type: 'carburant_bas', severite: 'danger', message: `Critique — ${niveauL}L (${pct}%) — ${sd.cuve_nom}`, resolue: false } }).catch(() => {});
