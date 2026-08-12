@@ -831,7 +831,7 @@ function _buildCuveSection(cuveEquips,cuveQs,pleinsHist){
         (seuilMin!=null?'<div style="font-size:11px;color:var(--text3)">Seuil alerte : <strong>'+Math.round(seuilMin).toLocaleString('fr-FR')+' L</strong></div>':'<div></div>')+
         (autoJours!=null?'<div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;background:'+autoBg+';color:'+autoCol+'">≈ '+autoJours+' j autonomie</div>':'<div style="font-size:11px;color:var(--text3)">Autonomie : —</div>')+
       '</div>'+
-      '<button onclick="openDeclarePlein(\''+e.id+'\',\''+js_esc(e.nom)+'\','+cap+',\''+js_esc(operateur)+'\')" style="margin-top:10px;padding:7px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text1);font-size:12px;cursor:pointer;width:100%;text-align:center;font-weight:600">⛽ Déclarer ravitaillement</button>'+
+      '<button onclick="openDeclarePlein(\''+e.id+'\',\''+js_esc(e.nom)+'\','+cap+','+(niveau!=null?niveau:'null')+',\''+js_esc(operateur)+'\')" style="margin-top:10px;padding:7px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text1);font-size:12px;cursor:pointer;width:100%;text-align:center;font-weight:600">⛽ Déclarer ravitaillement</button>'+
       (function(){
         var hist=pleinsHist.filter(function(p){return p.equipement_id===e.id;}).slice(0,5);
         if(!hist.length)return '';
@@ -979,7 +979,7 @@ function openDeclareVidange(eqId,eqNom,currentH){
   };
 }
 
-function openDeclarePlein(eqId,eqNom,cap,operateur){
+function openDeclarePlein(eqId,eqNom,cap,currentNiveau,operateur){
   var m=document.getElementById('modal-plein');
   if(!m){
     m=document.createElement('div');
@@ -987,12 +987,12 @@ function openDeclarePlein(eqId,eqNom,cap,operateur){
     m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
     document.body.appendChild(m);
   }
+  var niveauInfo=currentNiveau!=null?'<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Niveau actuel : <strong>'+Math.round(currentNiveau).toLocaleString('fr-FR')+' L</strong> / '+Math.round(cap).toLocaleString('fr-FR')+' L</div>':'';
   m.innerHTML='<div style="background:var(--card1);border-radius:16px;padding:24px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.3)">'+
-    '<div style="font-size:16px;font-weight:700;color:var(--text1);margin-bottom:16px">⛽ Ravitaillement – '+escape_html(eqNom)+'</div>'+
-    '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Litres ajoutés (optionnel)</label>'+
+    '<div style="font-size:16px;font-weight:700;color:var(--text1);margin-bottom:12px">⛽ Ravitaillement – '+escape_html(eqNom)+'</div>'+
+    niveauInfo+
+    '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Litres ajoutés</label>'+
     '<input id="mp-litres" type="number" step="1" placeholder="ex: 3 000" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:10px"/>'+
-    '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Niveau après ravitaillement (L) <span style="color:var(--text2)">— met à jour la jauge</span></label>'+
-    '<input id="mp-niveau" type="number" step="10" placeholder="ex: 7 500" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:10px"/>'+
     '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Coût (FCFA, optionnel)</label>'+
     '<input id="mp-cout" type="number" step="100" placeholder="ex: 1 800 000" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:10px"/>'+
     '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Opérateur</label>'+
@@ -1004,7 +1004,10 @@ function openDeclarePlein(eqId,eqNom,cap,operateur){
   '</div>';
   document.getElementById('mp-confirm').onclick=async function(){
     var litres=document.getElementById('mp-litres').value?parseFloat(document.getElementById('mp-litres').value):null;
-    var niveauApres=document.getElementById('mp-niveau').value?parseFloat(document.getElementById('mp-niveau').value):null;
+    // Calcul automatique du niveau après
+    var niveauApres=null;
+    if(litres!=null&&currentNiveau!=null){niveauApres=Math.min(cap,currentNiveau+litres);}
+    else if(litres!=null&&currentNiveau==null){niveauApres=Math.min(cap,litres);}
     var cout=document.getElementById('mp-cout').value?parseFloat(document.getElementById('mp-cout').value):null;
     var oper=document.getElementById('mp-oper').value.trim()||null;
     var btn=document.getElementById('mp-confirm');
@@ -2045,7 +2048,7 @@ async function _mntCreerSubmit(sid){
 async function _rtConfig(sid){
   _configCurrentSid=sid;
   var types=await supaGet('types_equipements','select=id,nom&order=nom');
-  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,actif_ronde,actif_releve,ordre_ronde,type_id,seuil_vidange_heures,heures_dernier_vidange,types_equipements(nom)&order=ordre_ronde.asc');
+  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,actif_ronde,actif_releve,ordre_ronde,type_id,puissance_kva,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,types_equipements(nom)&order=ordre_ronde.asc');
   // Populate cache for safe onclick lookup (évite l'échappement multi-niveau)
   _configEquipCache={};
   equips.forEach(function(e){_configEquipCache[e.id]=e;});
@@ -2919,27 +2922,61 @@ function _updateAddEquipFields(){
 function _openEditEquipFromCache(eqId){
   var e=_configEquipCache[eqId];
   if(!e){return;}
-  _openEditEquipModal(eqId,e.nom,e.actif,e.actif_ronde!==false,e.actif_releve!==false,e.type_id||'',e.seuil_vidange_heures||null,e.heures_dernier_vidange||null);
+  _openEditEquipModal(eqId,e.nom,e.actif,e.actif_ronde!==false,e.actif_releve!==false,e.type_id||'',e.seuil_vidange_heures||null,e.heures_dernier_vidange||null,e.puissance_kva||null,e.conso_theorique_lh||null,e.capacite_litres||null);
 }
-function _openEditEquipModal(eqId, nom, actif, actifRonde, actifReleve, typeId, seuilVidange, heuresDernierVidange){
+function _openEditEquipModal(eqId, nom, actif, actifRonde, actifReleve, typeId, seuilVidange, heuresDernierVidange, puissanceKva, consoLh, capaciteLitres){
   if(actifRonde===undefined)actifRonde=true;
   if(actifReleve===undefined)actifReleve=true;
   var GE_TYPE_ID='98849793-9201-4adf-aec2-a4a08587c4e2';
+  var CUVE_TYPE_ID='de5519d0-363b-4628-b872-2dcf01859002';
   var isGE=(typeId===GE_TYPE_ID);
+  var isCuve=(typeId===CUVE_TYPE_ID);
   var geFields='';
+  var cuveFields='';
   if(isGE){
     geFields=
       '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">'+
         '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">⚡ Groupe électrogène</div>'+
-        '<div style="display:flex;gap:10px">'+
+        '<div style="display:flex;gap:10px;margin-bottom:10px">'+
           '<div class="cfg-form-group" style="flex:1;margin-bottom:0">'+
-            '<label class="cfg-form-label">Seuil vidange (heures)</label>'+
-            '<input id="eq-edit-seuil" class="cfg-form-input" type="number" placeholder="ex: 250" value="'+(seuilVidange||'')+'" />'+
+            '<label class="cfg-form-label">Puissance (kVA)</label>'+
+            '<input id="eq-edit-kva" class="cfg-form-input" type="number" step="1" placeholder="ex: 1400" value="'+(puissanceKva||'')+'" />'+
           '</div>'+
           '<div class="cfg-form-group" style="flex:1;margin-bottom:0">'+
-            '<label class="cfg-form-label">Compteur à la dernière vidange</label>'+
-            '<input id="eq-edit-baseline" class="cfg-form-input" type="number" step="0.1" placeholder="ex: 2830" value="'+(heuresDernierVidange||'')+'" />'+
-            '<div style="font-size:10px;color:var(--text3);margin-top:3px">Valeur du compteur le jour où la dernière vidange a été faite</div>'+
+            '<label class="cfg-form-label">Conso (L/h)</label>'+
+            '<input id="eq-edit-conso" class="cfg-form-input" type="number" step="0.1" placeholder="ex: 65" value="'+(consoLh||'')+'" />'+
+          '</div>'+
+        '</div>'+
+        '<div style="display:flex;gap:10px;margin-bottom:10px">'+
+          '<div class="cfg-form-group" style="flex:1;margin-bottom:0">'+
+            '<label class="cfg-form-label">Capacité réservoir (L)</label>'+
+            '<input id="eq-edit-capa" class="cfg-form-input" type="number" step="10" placeholder="ex: 500" value="'+(capaciteLitres||'')+'" />'+
+          '</div>'+
+          '<div class="cfg-form-group" style="flex:1;margin-bottom:0">'+
+            '<label class="cfg-form-label">Seuil vidange (h)</label>'+
+            '<input id="eq-edit-seuil" class="cfg-form-input" type="number" placeholder="ex: 250" value="'+(seuilVidange||'')+'" />'+
+          '</div>'+
+        '</div>'+
+        '<div class="cfg-form-group">'+
+          '<label class="cfg-form-label">Compteur à la dernière vidange</label>'+
+          '<input id="eq-edit-baseline" class="cfg-form-input" type="number" step="0.1" placeholder="ex: 2830" value="'+(heuresDernierVidange||'')+'" />'+
+          '<div style="font-size:10px;color:var(--text3);margin-top:3px">Valeur du compteur le jour de la dernière vidange</div>'+
+        '</div>'+
+      '</div>';
+  }
+  if(isCuve){
+    cuveFields=
+      '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">'+
+        '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">🛢️ Cuve carburant</div>'+
+        '<div style="display:flex;gap:10px">'+
+          '<div class="cfg-form-group" style="flex:1;margin-bottom:0">'+
+            '<label class="cfg-form-label">Capacité totale (L)</label>'+
+            '<input id="eq-edit-capa" class="cfg-form-input" type="number" step="100" placeholder="ex: 8000" value="'+(capaciteLitres||'')+'" />'+
+          '</div>'+
+          '<div class="cfg-form-group" style="flex:1;margin-bottom:0">'+
+            '<label class="cfg-form-label">Conso GEs (L/h)</label>'+
+            '<input id="eq-edit-conso" class="cfg-form-input" type="number" step="0.1" placeholder="ex: 65" value="'+(consoLh||'')+'" />'+
+            '<div style="font-size:10px;color:var(--text3);margin-top:3px">Conso totale de tous les GEs alimentés par cette cuve</div>'+
           '</div>'+
         '</div>'+
       '</div>';
@@ -2969,6 +3006,7 @@ function _openEditEquipModal(eqId, nom, actif, actifRonde, actifReleve, typeId, 
       '</div>'+
     '</div>'+
     geFields+
+    cuveFields+
     '<div class="cfg-modal-footer">'+
       '<button class="cfg-btn-danger" onclick="_confirmDeleteEquip(\''+eqId+'\')" style="margin-right:auto">🗑 Supprimer</button>'+
       '<button class="cfg-btn-secondary" onclick="_closeCfgModal()">Annuler</button>'+
@@ -2985,11 +3023,17 @@ async function _saveEditEquip(eqId){
   var actifRonde=!!(document.getElementById('eq-edit-ronde')||{}).checked;
   var actifReleve=!!(document.getElementById('eq-edit-releve')||{}).checked;
   var body={nom:nom.trim(),actif:actif,actif_ronde:actifRonde,actif_releve:actifReleve};
-  // Champs GE (si présents)
+  // Champs techniques GE / Cuve (si présents dans le DOM)
+  var kvaEl=document.getElementById('eq-edit-kva');
+  var consoEl=document.getElementById('eq-edit-conso');
+  var capaEl=document.getElementById('eq-edit-capa');
   var seuilEl=document.getElementById('eq-edit-seuil');
   var baselineEl=document.getElementById('eq-edit-baseline');
-  if(seuilEl&&seuilEl.value)body.seuil_vidange_heures=parseFloat(seuilEl.value);
-  if(baselineEl&&baselineEl.value){
+  if(kvaEl&&kvaEl.value!=='')body.puissance_kva=parseFloat(kvaEl.value);
+  if(consoEl&&consoEl.value!=='')body.conso_theorique_lh=parseFloat(consoEl.value);
+  if(capaEl&&capaEl.value!=='')body.capacite_litres=parseFloat(capaEl.value);
+  if(seuilEl&&seuilEl.value!=='')body.seuil_vidange_heures=parseFloat(seuilEl.value);
+  if(baselineEl&&baselineEl.value!==''){
     body.heures_dernier_vidange=parseFloat(baselineEl.value);
     body.date_dernier_vidange=new Date().toISOString();
   }
