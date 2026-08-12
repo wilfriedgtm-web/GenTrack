@@ -372,8 +372,8 @@ async function init(){
     if(ok){renderDashboard(_session);return;}
   }
   var stored=loadStored();
-  if(stored&&stored.session_token){
-    var ok2=await _validateToken(stored.session_token);
+  if(stored&&stored.token){
+    var ok2=await _validateToken(stored.token);
     if(ok2){renderDashboard(_session);return;}
     clearSession();
   }
@@ -382,22 +382,30 @@ async function init(){
 
 async function _validateToken(token){
   var now=new Date().toISOString();
-  var rows=await supaGet('auth_sessions',
-    'session_token=eq.'+encodeURIComponent(token)+
-    '&expire_at=gte.'+now+
-    '&select=session_token,role,site_ids,client_id,contact_id,contacts(nom,email)'+
+  var rows=await supaGet('tokens',
+    'token=eq.'+encodeURIComponent(token)+
+    '&actif=eq.true'+
+    '&select=id,token,role,site_ids,site_id,client_id,nom,expire_at'+
     '&limit=1'
   );
   if(!rows||!rows.length)return false;
   var s=rows[0];
-  var c=s.contacts||{};
+  // Vérifier expiration si définie
+  if(s.expire_at&&s.expire_at<now)return false;
+  // Parser site_ids (stocké en JSON string ou array)
+  var siteIds=[];
+  try{
+    if(Array.isArray(s.site_ids))siteIds=s.site_ids;
+    else if(s.site_ids)siteIds=JSON.parse(s.site_ids);
+  }catch(e){}
+  if(!siteIds.length&&s.site_id)siteIds=[s.site_id];
   _session={
-    session_token:token,
+    token:token,
     role:s.role,
-    site_ids:s.site_ids||[],
+    site_ids:siteIds,
     client_id:s.client_id,
-    contact:{id:s.contact_id,nom:c.nom||''},
-    email:c.email||''
+    contact:{id:null,nom:s.nom||''},
+    email:''
   };
   saveSession(_session);
   return true;
