@@ -298,6 +298,15 @@ async function _submit(){
       resolue:false
     });
 
+    // Notifier le resp_tech par WhatsApp (fire & forget)
+    var equipNom=null;
+    if(equipId){var eq=_equips.find(function(x){return x.id===equipId;});if(eq)equipNom=eq.nom;}
+    fetch(SUPA_URL+'/functions/v1/notify-signalement',{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({site_id:_groupeId,type:_selectedType,description:desc,signale_par:prenom||null,equipement_nom:equipNom,lieu:lieu||null})
+    }).catch(function(){});
+
     document.getElementById('sg-main').style.display='none';
     document.getElementById('sg-confirm').style.display='flex';
   }catch(e){

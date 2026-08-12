@@ -624,14 +624,18 @@ async function _rtAccueil(session,sid,cid){
   var cuveSection='',vidangesSection='';
   var specialIds=cuveEquips.concat(geEquips).map(function(e){return e.id;});
   if(specialIds.length){
-    var specialQs=await supaGet('questions','equipement_id=in.('+specialIds.join(',')+')'+'&actif=eq.true&select=id,texte,unite,seuil_min,seuil_max,equipement_id&order=ordre.asc');
+    var geIds=geEquips.map(function(e){return e.id;});
+    var[specialQs,vidangesHist]=await Promise.all([
+      supaGet('questions','equipement_id=in.('+specialIds.join(',')+')'+'&actif=eq.true&select=id,texte,unite,seuil_min,seuil_max,equipement_id&order=ordre.asc'),
+      geIds.length?supaGet('vidanges','equipement_id=in.('+geIds.join(',')+')'+'&select=id,equipement_id,date,heures_au_moment,cout,notes&order=date.desc&limit=50'):Promise.resolve([])
+    ]);
     var qIds=specialQs.map(function(q){return q.id;});
     var latestReps=qIds.length?await supaGet('reponses','question_id=in.('+qIds.join(',')+')'+'&select=question_id,valeur,created_at&order=created_at.desc&limit=300'):[];
     var repByQ={};
     latestReps.forEach(function(r){if(!repByQ[r.question_id]||r.created_at>repByQ[r.question_id].created_at)repByQ[r.question_id]=r;});
     specialQs.forEach(function(q){q._lastVal=repByQ[q.id]?repByQ[q.id].valeur:null;q._lastAt=repByQ[q.id]?repByQ[q.id].created_at:null;});
     cuveSection=_buildCuveSection(cuveEquips,specialQs.filter(function(q){return cuveEquips.some(function(e){return e.id===q.equipement_id;});}));
-    vidangesSection=_buildVidangesSection(geEquips,specialQs.filter(function(q){return geEquips.some(function(e){return e.id===q.equipement_id;});}));
+    vidangesSection=_buildVidangesSection(geEquips,specialQs.filter(function(q){return geEquips.some(function(e){return e.id===q.equipement_id;})}),vidangesHist);
   }
 
   // Ronde journalière
@@ -814,7 +818,8 @@ function _buildCuveSection(cuveEquips,cuveQs){
 }
 
 /* ── Vidanges / maintenance préventive section ── */
-function _buildVidangesSection(geEquips,geQs){
+function _buildVidangesSection(geEquips,geQs,vidangesHist){
+  vidangesHist=vidangesHist||[];
   if(!geEquips.length)return '';
   var hasVidange=geEquips.some(function(e){return e.seuil_vidange_heures;});
   if(!hasVidange)return '';
@@ -861,6 +866,20 @@ function _buildVidangesSection(geEquips,geQs){
         '<div style="font-size:11px;color:var(--text3)">'+(baseline==null?'Compteur de référence non configuré':'Pas de lecture compteur')+'</div>'
       )+
       '<button onclick="openDeclareVidange(\''+e.id+'\',\''+escape_html(e.nom)+'\')" style="margin-top:4px;padding:6px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text1);font-size:12px;cursor:pointer;width:100%;text-align:center">🛢 Déclarer vidange effectuée</button>'+
+      (function(){
+        var hist=vidangesHist.filter(function(v){return v.equipement_id===e.id;}).slice(0,5);
+        if(!hist.length)return '';
+        var rows=hist.map(function(v){
+          var d=new Date(v.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
+          var cout=v.cout?(' · '+(v.cout).toLocaleString('fr-FR')+' FCFA'):'';
+          var notes=v.notes?(' — '+v.notes):'';
+          return '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);padding:4px 0;border-top:1px solid var(--border)">'+
+            '<span>'+d+(notes?'<br><span style="font-style:italic">'+v.notes+'</span>':'')+'</span>'+
+            '<span style="white-space:nowrap;margin-left:8px">'+Math.round(v.heures_au_moment)+'h'+cout+'</span>'+
+          '</div>';
+        }).join('');
+        return '<div style="margin-top:8px"><div style="font-size:10px;font-weight:600;color:var(--text3);margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em">Historique</div>'+rows+'</div>';
+      })()+
     '</div>';
   });
   html+='</div>';
@@ -875,8 +894,13 @@ function openDeclareVidange(eqId,eqNom){
     m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
     m.innerHTML='<div style="background:var(--card1);border-radius:16px;padding:24px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.3)">'+
       '<div style="font-size:16px;font-weight:700;color:var(--text1);margin-bottom:4px" id="mv-title"></div>'+
-      '<div style="font-size:12px;color:var(--text3);margin-bottom:16px">Entrez la valeur actuelle du compteur horaire</div>'+
-      '<input id="mv-compteur" type="number" step="0.1" placeholder="ex: 3 450" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:16px"/>'+
+      '<div style="font-size:12px;color:var(--text3);margin-bottom:14px">Renseignez le compteur et le coût de l\'intervention</div>'+
+      '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Compteur horaire actuel *</label>'+
+      '<input id="mv-compteur" type="number" step="0.1" placeholder="ex: 3 450" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:10px"/>'+
+      '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Coût vidange (FCFA, optionnel)</label>'+
+      '<input id="mv-cout" type="number" step="100" placeholder="ex: 45 000" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:10px"/>'+
+      '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Notes (optionnel)</label>'+
+      '<input id="mv-notes" type="text" placeholder="ex: Huile 15W40, filtre changé" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:13px;box-sizing:border-box;margin-bottom:16px"/>'+
       '<div style="display:flex;gap:8px">'+
         '<button onclick="document.getElementById(\'modal-vidange\').remove()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text2);font-size:13px;cursor:pointer">Annuler</button>'+
         '<button id="mv-confirm" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Confirmer</button>'+
@@ -884,20 +908,33 @@ function openDeclareVidange(eqId,eqNom){
     '</div>';
     document.body.appendChild(m);
   }
-  document.getElementById('mv-title').textContent='Vidange – '+eqNom;
+  document.getElementById('mv-title').textContent='🛢 Vidange – '+eqNom;
   document.getElementById('mv-compteur').value='';
+  document.getElementById('mv-cout').value='';
+  document.getElementById('mv-notes').value='';
   document.getElementById('mv-confirm').onclick=async function(){
     var val=parseFloat(document.getElementById('mv-compteur').value);
-    if(isNaN(val)||val<0){alert('Valeur invalide');return;}
+    if(isNaN(val)||val<0){alert('Valeur compteur invalide');return;}
+    var cout=document.getElementById('mv-cout').value?parseFloat(document.getElementById('mv-cout').value):null;
+    var notes=document.getElementById('mv-notes').value.trim()||null;
     var btn=document.getElementById('mv-confirm');
     btn.disabled=true;btn.textContent='…';
+    var now=new Date().toISOString();
     try{
+      // Mettre à jour le compteur de référence sur l'équipement
       await supaUpdate('equipements','id=eq.'+eqId,{
         heures_dernier_vidange:val,
-        date_dernier_vidange:new Date().toISOString()
+        date_dernier_vidange:now
+      });
+      // Insérer dans l'historique
+      await supaPost('vidanges',{
+        equipement_id:eqId,
+        date:now.slice(0,10),
+        heures_au_moment:val,
+        cout:cout,
+        notes:notes
       });
       document.getElementById('modal-vidange').remove();
-      // Reload the accueil section
       var el=document.querySelector('.dash-content');
       if(el&&_session&&_session.site_ids&&_session.site_ids.length){
         el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text3);font-size:13px">Actualisation...</div>';
