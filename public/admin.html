@@ -637,8 +637,10 @@ function renderTabAcces(client, tokens) {
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px"><span class="token-code">${t.token?.slice(0,16)}…</span>${t.expire_at?' · Expire: '+fmtDate(t.expire_at):' · Sans expiration'}</div>
           ${['resp_tech','dir_tech'].includes(t.role)?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px">🏨 ${esc(sitesLabel)}</div>`:''}
         </div>
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-outline btn-xs" onclick="copyToken('${BASE_URL}/client.html?token=${t.token}')">📋 Copier</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <a href="${BASE_URL}/dashboard.html?token=${t.token}" target="_blank" class="btn btn-outline btn-xs">👁 Voir</a>
+          <button class="btn btn-outline btn-xs" onclick="copyToken('${BASE_URL}/dashboard.html?token=${t.token}')">📋 Copier</button>
+          <button class="btn btn-outline btn-xs" onclick="sendTokenWA('${t.token}','${esc(t.nom||'Accès')}','${t.role}','${client.id}')">📤 WA</button>
           <button class="btn btn-danger btn-xs" onclick="revokeToken('${t.id}','${client.id}')">🗑️</button>
         </div>
       </div>`;}).join('')}`;
@@ -1112,6 +1114,22 @@ async function revokeToken(id,clientId) {
   toast('Accès révoqué'); await loadAll(); openClient(clientId,'acces');
 }
 function copyToken(url) { navigator.clipboard.writeText(url).then(()=>toast('Lien copié !')); }
+function sendTokenWA(token, label, role, clientId) {
+  const c = S.clients.find(x=>x.id===clientId);
+  const url = `${BASE_URL}/dashboard.html?token=${token}`;
+  const roleLabel = {resp_tech:'Responsable technique', dir_tech:'Directeur technique', dir_ops:'Directeur des opérations', technicien:'Technicien'}[role]||role;
+  const msg = `Bonjour 👋
+
+Voici votre accès *GenTrack* — tableau de bord${c?' de *'+c.nom+'*':''}.
+
+🔑 *Rôle :* ${roleLabel}
+📊 *Votre tableau de bord :*
+${url}
+
+Ouvrez ce lien depuis votre téléphone ou ordinateur. Pour toute question, répondez à ce message.
+— Équipe GenTrack ✅`;
+  window.open('https://wa.me/?text='+encodeURIComponent(msg), '_blank');
+}
 
 // ── ALERTES ────────────────────────────────────────────────
 function renderAlertes() {
