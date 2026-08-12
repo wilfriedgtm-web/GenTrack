@@ -638,8 +638,8 @@ function renderTabAcces(client, tokens) {
           ${['resp_tech','dir_tech'].includes(t.role)?`<div style="font-size:11px;color:var(--text-muted);margin-top:2px">🏨 ${esc(sitesLabel)}</div>`:''}
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <a href="./client.html?token=${t.token}" target="_blank" class="btn btn-outline btn-xs">👁 Voir</a>
-          <button class="btn btn-outline btn-xs" onclick="copyToken(location.origin+'/client.html?token=${t.token}')">📋 Copier</button>
+          <a href="./dashboard.html?token=${t.token}" target="_blank" class="btn btn-outline btn-xs">👁 Voir</a>
+          <button class="btn btn-outline btn-xs" onclick="copyToken(location.origin+'/dashboard.html?token=${t.token}')">📋 Copier</button>
           <button class="btn btn-outline btn-xs" onclick="sendTokenWA('${t.token}','${esc(t.nom||'Accès')}','${t.role}','${client.id}')">📤 WA</button>
           <button class="btn btn-danger btn-xs" onclick="revokeToken('${t.id}','${client.id}')">🗑️</button>
         </div>
@@ -1116,7 +1116,7 @@ async function revokeToken(id,clientId) {
 function copyToken(url) { navigator.clipboard.writeText(url).then(()=>toast('Lien copié !')); }
 function sendTokenWA(token, label, role, clientId) {
   const c = S.clients.find(x=>x.id===clientId);
-  const url = location.origin+`/client.html?token=${token}`;
+  const url = location.origin+`/dashboard.html?token=${token}`;
   const roleLabel = {resp_tech:'Responsable technique', dir_tech:'Directeur technique', dir_ops:'Directeur des opérations', technicien:'Technicien'}[role]||role;
   const msg = `Bonjour 👋
 
@@ -1271,7 +1271,7 @@ async function envoyerBienvenue(clientId) {
 
   function tokenUrlFor(role) {
     const tok = clientTokens.find(t=>t.role===role) || anyTok;
-    return tok ? `${BASE_URL}/client.html?token=${tok.token}` : BASE_URL+'/client.html';
+    return tok ? `${BASE_URL}/dashboard.html?token=${tok.token}` : BASE_URL+'/client.html';
   }
 
   const msgFor = (ct) => {
