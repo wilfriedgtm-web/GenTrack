@@ -567,6 +567,11 @@ function buildLayout(session,activeNav,contentHtml){
       '<div id="rapport-menu" style="display:none;position:absolute;right:40px;top:60px;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:200;padding:6px;min-width:180px">'+
         [7,14,30].map(function(n){return '<button onclick="_openRapportHebdo('+n+')" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">📋&#8239;'+n+' derniers jours</button>';}).join('')+
       '</div>':
+    session.role==='dir_tech'?
+      '<button id="rapport-btn-dt" onclick="_toggleRapportMenuDT()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">📊&#8239;Rapport ▾</button>'+
+      '<div id="rapport-menu-dt" style="display:none;position:absolute;right:40px;top:60px;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:200;padding:6px;min-width:180px">'+
+        [7,14,30].map(function(n){return '<button onclick="_openRapportDT('+n+')" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">📋&#8239;'+n+' derniers jours</button>';}).join('')+
+      '</div>':
       '<button id="export-btn-trigger" onclick="_toggleExportMenu()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">⬇&#8239;Exporter</button>'+
       '<div id="export-menu" style="display:none;position:absolute;right:40px;top:60px;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.1);z-index:200;padding:6px;min-width:180px">'+
         [7,14,30].map(function(n){return '<button onclick="_openReport('+n+')" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">'+n+' derniers jours</button>';}).join('')+
@@ -3925,7 +3930,7 @@ async function _dtMaintenances(sids){
 }
 function _dtSetMntFilter(f){_dtMntFilter=f;if(_session)renderDirTech(_session,'maintenances');}
 
-/* ── DIR TECH : rapport conso ── */
+/* ── DIR TECH : rapport conso (tab landing page) ── */
 var _dtRapportPeriod=30;
 async function _dtRapport(sids,session){
   var dc=document.getElementById('dash-content-main');
@@ -3945,14 +3950,13 @@ async function _dtRapport(sids,session){
   var periodOpts=[7,14,30,60,90].map(function(n){
     return '<button onclick="_dtSetRapportPeriod('+n+')" style="padding:6px 14px;border-radius:20px;border:1.5px solid '+(period===n?'var(--amber)':'var(--border)')+';background:'+(period===n?'var(--amber-pale)':'white')+';font-size:12px;font-weight:'+(period===n?'700':'500')+';color:'+(period===n?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+n+' jours</button>';
   }).join('');
-  // Aggregate by site
+  // Agrégation
   var sitesData={};
   sids.forEach(function(sid){sitesData[sid]={nom:siteMap[sid]||sid,litres:0,coutCarb:0,pannes:0,coutPannes:0,mntCout:0,rondes:0};});
   pleins.forEach(function(p){if(sitesData[p.site_id]){sitesData[p.site_id].litres+=Number(p.litres_ajoutes)||0;sitesData[p.site_id].coutCarb+=Number(p.cout)||0;}});
   maintenances.forEach(function(m){if(sitesData[m.groupe_id])sitesData[m.groupe_id].mntCout+=Number(m.cout)||0;});
   signalements.forEach(function(s){if(sitesData[s.groupe_id]){sitesData[s.groupe_id].pannes++;sitesData[s.groupe_id].coutPannes+=Number(s.cout_intervention)||0;}});
   rondes.forEach(function(r){if(sitesData[r.site_id])sitesData[r.site_id].rondes++;});
-  // Totals
   var totLitres=0,totCarb=0,totPannes=0,totCoutPannes=0,totMnt=0;
   Object.values(sitesData).forEach(function(d){totLitres+=d.litres;totCarb+=d.coutCarb;totPannes+=d.pannes;totCoutPannes+=d.coutPannes;totMnt+=d.mntCout;});
   var kpis='<div class="kpi-grid" style="margin-bottom:24px">'+
@@ -3966,32 +3970,27 @@ async function _dtRapport(sids,session){
     return '<div style="background:white;border:1.5px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:12px">'+
       '<div style="font-size:14px;font-weight:700;color:var(--dark);margin-bottom:14px">🏨 '+escape_html(d.nom)+'</div>'+
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">'+
-        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px">'+
-          '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Carburant</div>'+
-          '<div style="font-size:18px;font-weight:800;color:var(--dark)">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div>'+
-          '<div style="font-size:11px;color:var(--text3)">'+( d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' FCFA':'Coût non saisi')+'</div>'+
-        '</div>'+
-        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px">'+
-          '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Pannes</div>'+
-          '<div style="font-size:18px;font-weight:800;color:'+(d.pannes>0?'var(--rouge)':'var(--vert)')+'">'+d.pannes+'</div>'+
-          '<div style="font-size:11px;color:var(--text3)">'+( d.coutPannes>0?d.coutPannes.toLocaleString('fr-FR')+' FCFA':'—')+'</div>'+
-        '</div>'+
-        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px">'+
-          '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Maintenance</div>'+
-          '<div style="font-size:18px;font-weight:800;color:var(--dark)">'+d.mntCout.toLocaleString('fr-FR')+' FCFA</div>'+
-          '<div style="font-size:11px;color:var(--text3)">'+d.rondes+' rondes effectuées</div>'+
-        '</div>'+
-        (total>0?'<div style="background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:10px;padding:12px 14px">'+
-          '<div style="font-size:10px;font-weight:700;color:var(--amber-dark);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Total coûts</div>'+
-          '<div style="font-size:18px;font-weight:800;color:var(--amber-dark)">'+total.toLocaleString('fr-FR')+' FCFA</div>'+
-        '</div>':'')+
-      '</div>'+
-    '</div>';
+        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Carburant</div><div style="font-size:18px;font-weight:800;color:var(--dark)">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div style="font-size:11px;color:var(--text3)">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' FCFA':'Coût non saisi')+'</div></div>'+
+        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Pannes</div><div style="font-size:18px;font-weight:800;color:'+(d.pannes>0?'var(--rouge)':'var(--vert)')+'">'+d.pannes+'</div><div style="font-size:11px;color:var(--text3)">'+(d.coutPannes>0?d.coutPannes.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
+        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Maintenance</div><div style="font-size:18px;font-weight:800;color:var(--dark)">'+d.mntCout.toLocaleString('fr-FR')+' FCFA</div><div style="font-size:11px;color:var(--text3)">'+d.rondes+' rondes effectuées</div></div>'+
+        (total>0?'<div style="background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--amber-dark);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Total coûts</div><div style="font-size:18px;font-weight:800;color:var(--amber-dark)">'+total.toLocaleString('fr-FR')+' FCFA</div></div>':'')+
+      '</div></div>';
   }).join('');
+  // Bouton génération rapport complet
+  var genBtn='<div style="background:linear-gradient(135deg,#1A1411 0%,#2D2520 100%);border-radius:14px;padding:24px 28px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">'+
+    '<div>'+
+      '<div style="font-size:14px;font-weight:700;color:white;margin-bottom:4px">📊 Rapport complet de direction</div>'+
+      '<div style="font-size:12px;color:rgba(255,255,255,0.6)">Rapport PDF avec graphiques, editables, tableaux détaillés et signature — s\'ouvre dans un nouvel onglet</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      [7,14,30].map(function(n){return '<button onclick="_openRapportDT('+n+')" style="padding:8px 16px;background:white;color:#1A1411;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">'+n+'j</button>';}).join('')+
+    '</div>'+
+  '</div>';
   return '<div>'+
+    genBtn+
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:20px">'+periodOpts+'</div>'+
     kpis+
-    '<div class="section-title">Détail par hôtel</div>'+
+    '<div class="section-title">Aperçu par hôtel</div>'+
     siteCards+
   '</div>';
 }
@@ -4658,6 +4657,223 @@ function _reportShell(title,bodyHtml,autoPrint){
     '</style></head><body>'+bodyHtml+
     (autoPrint?'<scr'+'ipt>setTimeout(function(){window.print();},900);<\/scr'+'ipt>':'')+
     '</body></html>';
+}
+
+// ── Rapport dir_tech ─────────────────────────────────────────────────────────
+function _toggleRapportMenuDT(){
+  var m=document.getElementById('rapport-menu-dt');
+  if(!m)return;
+  var open=m.style.display==='none';
+  m.style.display=open?'block':'none';
+  if(open){
+    var close=function(e){if(!m.contains(e.target)&&e.target.id!=='rapport-btn-dt'){m.style.display='none';document.removeEventListener('click',close);}};
+    setTimeout(function(){document.addEventListener('click',close);},0);
+  }
+}
+
+async function _openRapportDT(period){
+  period=period||30;
+  var m=document.getElementById('rapport-menu-dt');if(m)m.style.display='none';
+  var btn=document.getElementById('rapport-btn-dt');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Chargement...';}
+  try{
+    var sids=_session.site_ids||[];
+    if(!sids.length){alert('Aucun site configuré.');return;}
+    var cutoff=dateNJours(period);
+    var dateDebut=new Date();dateDebut.setDate(dateDebut.getDate()-period);
+    var dateFin=new Date();
+    var periodeStr=dateDebut.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})+' – '+dateFin.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+    var sidStr=sids.join(',');
+
+    var[sites,pleins,maintenances,signalements,rondes]=await Promise.all([
+      supaGet('sites','id=in.('+sidStr+')&select=id,nom'),
+      supaGet('pleins','site_id=in.('+sidStr+')&date=gte.'+cutoff+'&select=id,site_id,litres_ajoutes,cout,date&order=date.asc'),
+      supaGet('maintenances','groupe_id=in.('+sidStr+')&date_intervention=gte.'+cutoff+'&select=id,groupe_id,type,titre,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=200'),
+      supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+cutoff+'T00:00:00&select=id,groupe_id,type,description,statut,signale_par,cout_intervention,created_at,equipement_id,equipements(nom)&order=created_at.desc&limit=200'),
+      supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+cutoff+'&select=id,site_id,date_ronde,frequence&order=date_ronde.asc&limit=500')
+    ]);
+    var rIds=rondes.map(function(r){return r.id;});
+    var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,equipement_id,statut'):[];
+
+    var html=_buildRapportDirTech(period,periodeStr,_session,sites,pleins,maintenances,signalements,rondes,rondesEq);
+    var w=window.open('','_blank');
+    if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
+    w.document.write(html);w.document.close();
+  }catch(e){console.error(e);alert('Erreur : '+(e.message||e));}
+  finally{if(btn){btn.disabled=false;btn.textContent='📊 Rapport ▾';}}
+}
+
+function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenances,signalements,rondes,rondesEq){
+  var dirNom=(session.contact&&session.contact.nom)||'Directeur technique';
+  var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
+
+  // ── Agrégation par site ──
+  var siteData={};
+  sites.forEach(function(s){siteData[s.id]={nom:s.nom,litres:0,coutCarb:0,pannes:0,pannesTot:0,panneCout:0,mntCout:0,mntCount:0,rondes:0,rondesVal:0,rondesTot:0};});
+  pleins.forEach(function(p){if(siteData[p.site_id]){siteData[p.site_id].litres+=Number(p.litres_ajoutes)||0;siteData[p.site_id].coutCarb+=Number(p.cout)||0;}});
+  maintenances.forEach(function(m){if(siteData[m.groupe_id]){siteData[m.groupe_id].mntCout+=Number(m.cout)||0;siteData[m.groupe_id].mntCount++;}});
+  signalements.forEach(function(s){if(siteData[s.groupe_id]){siteData[s.groupe_id].pannesTot++;if(s.statut!=='resolu')siteData[s.groupe_id].pannes++;siteData[s.groupe_id].panneCout+=Number(s.cout_intervention)||0;}});
+  var reByRonde={};rondesEq.forEach(function(re){if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];reByRonde[re.ronde_id].push(re);});
+  rondes.forEach(function(r){if(siteData[r.site_id]){siteData[r.site_id].rondes++;var eq=reByRonde[r.id]||[];siteData[r.site_id].rondesTot+=eq.length;siteData[r.site_id].rondesVal+=eq.filter(function(re){return re.statut==='valide';}).length;}});
+
+  // ── KPI globaux ──
+  var totLitres=0,totCarb=0,totPannes=0,totMnt=0,totMntCout=0,totRVal=0,totRTot=0;
+  Object.values(siteData).forEach(function(d){totLitres+=d.litres;totCarb+=d.coutCarb;totPannes+=d.pannes;totMnt+=d.mntCount;totMntCout+=d.mntCout;totRVal+=d.rondesVal;totRTot+=d.rondesTot;});
+  var confPct=totRTot>0?Math.round(totRVal/totRTot*100):null;
+  function kpiCol(val,s1,s2,inv){if(val===null||val===undefined)return'#888';if(inv)return val<=s1?'#2D7A4F':val<=s2?'#C49A1C':'#C0392B';return val>=s2?'#2D7A4F':val>=s1?'#C49A1C':'#C0392B';}
+
+  // ── Narratives ──
+  var narGlobal='Bilan sur la période du '+periodeStr+'. ';
+  if(confPct!==null)narGlobal+='Taux de conformité rondes (multi-sites) : '+confPct+'%. ';
+  narGlobal+=totLitres>0?'Consommation carburant : '+Math.round(totLitres).toLocaleString('fr-FR')+' L'+( totCarb>0?' ('+totCarb.toLocaleString('fr-FR')+' FCFA)':'')+'. ':'';
+  narGlobal+=totPannes>0?totPannes+' panne'+(totPannes>1?'s':'')+' active'+(totPannes>1?'s':'')+' en cours. ':'Aucune panne active. ';
+  narGlobal+=totMnt>0?totMnt+' intervention'+(totMnt>1?'s':'')+' de maintenance'+( totMntCout>0?' pour '+totMntCout.toLocaleString('fr-FR')+' FCFA':'')+'.':'';
+
+  // ── SVG bar chart ──
+  function svgBarChart(data,labels,maxVal,colors,unit){
+    if(!data.length)return '';
+    var W=500,H=90,BW=Math.min(60,Math.floor((W-40)/data.length)-8),gap=(W-40-BW*data.length)/(data.length+1);
+    var html='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-height:110px" xmlns="http://www.w3.org/2000/svg">';
+    data.forEach(function(v,i){
+      var x=40+gap*(i+1)+BW*i;
+      var barH=maxVal>0?Math.round((v/maxVal)*(H-30)):0;
+      var y=H-20-barH;
+      html+='<rect x="'+x+'" y="'+y+'" width="'+BW+'" height="'+barH+'" rx="3" fill="'+(colors[i]||'#C49A1C')+'"/>';
+      html+='<text x="'+(x+BW/2)+'" y="'+(H-6)+'" text-anchor="middle" font-size="8" fill="#A8957E" font-family="Inter,sans-serif">'+escape_html(labels[i].substring(0,8))+'</text>';
+      if(v>0)html+='<text x="'+(x+BW/2)+'" y="'+(y-3)+'" text-anchor="middle" font-size="7.5" fill="#666" font-family="Inter,sans-serif">'+( unit==='L'?Math.round(v).toLocaleString('fr-FR'):v)+'</text>';
+    });
+    html+='</svg>';
+    return html;
+  }
+
+  var siteIds=sites.map(function(s){return s.id;});
+  var siteNoms=sites.map(function(s){return s.nom;});
+  var barColors=['#C49A1C','#2D7A4F','#D4761E','#3498DB','#8E44AD','#E74C3C'];
+
+  // ── HTML ──
+  var h='';
+  // Barre d'action
+  h+='<div class="print-bar">'+
+    '<span class="print-note">✏️ Cliquez sur les zones de texte pour les modifier avant impression</span>'+
+    '<button class="btn-print" onclick="window.print()">🖨 Imprimer / PDF</button>'+
+    '<button class="btn-close" onclick="window.close()">Fermer</button>'+
+  '</div>';
+
+  // En-tête
+  h+='<div class="report-header">'+
+    '<div><div class="report-logo">GenTrack</div><div class="report-sub">Rapport de direction technique</div></div>'+
+    '<div class="report-meta">'+
+      '<div class="report-site">Portefeuille — '+sites.length+' hôtel'+(sites.length>1?'s':'')+'</div>'+
+      '<div>Période : '+escape_html(periodeStr)+'</div>'+
+      '<div>Directeur technique : '+escape_html(dirNom)+'</div>'+
+      '<div>Généré le '+genDate+'</div>'+
+    '</div>'+
+  '</div>';
+
+  // KPIs globaux
+  h+='<div class="kpi-row">'+
+    '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+kpiCol(confPct,70,90,false)+'">'+(confPct!==null?confPct+'%':'—')+'</div><div class="kpi-sub">Tous sites · '+period+' jours</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+' FCFA':'Coût non saisi')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+kpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-sub">'+totMnt+' intervention'+(totMnt>1?'s':'')+' maintenance</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Coût total</div><div class="kpi-value">'+(totCarb+totMntCout>0?(totCarb+totMntCout).toLocaleString('fr-FR'):'—')+'</div><div class="kpi-sub">FCFA (carburant + maintenance)</div></div>'+
+  '</div>';
+
+  // Synthèse narrative
+  h+='<h2>Synthèse de direction</h2>'+
+    '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
+    '<p class="narrative" contenteditable="true">'+escape_html(narGlobal)+'</p>';
+
+  // Graphiques comparatifs
+  if(sites.length>1){
+    h+='<h2>Comparatif multi-sites</h2>';
+    var litresVals=siteIds.map(function(id){return siteData[id].litres;});
+    var maxLitres=Math.max.apply(null,litresVals)||1;
+    h+='<div style="margin-bottom:18px">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Consommation carburant (L)</div>'+
+      svgBarChart(litresVals,siteNoms,maxLitres,barColors,'L')+
+    '</div>';
+    var coutVals=siteIds.map(function(id){return siteData[id].coutCarb+siteData[id].mntCout+siteData[id].panneCout;});
+    var maxCout=Math.max.apply(null,coutVals)||1;
+    if(maxCout>0){
+      h+='<div style="margin-bottom:18px">'+
+        '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Coût total (FCFA)</div>'+
+        svgBarChart(coutVals,siteNoms,maxCout,barColors,'FCFA')+
+      '</div>';
+    }
+  }
+
+  // Section par site
+  h+='<h2>Détail par hôtel</h2>';
+  sites.forEach(function(site,si){
+    var d=siteData[site.id];
+    var sConf=d.rondesTot>0?Math.round(d.rondesVal/d.rondesTot*100):null;
+    var total=d.coutCarb+d.mntCout+d.panneCout;
+    var siteSignalements=signalements.filter(function(s){return s.groupe_id===site.id;});
+    var siteMaintenances=maintenances.filter(function(m){return m.groupe_id===site.id;});
+
+    h+='<div style="border:1.5px solid #E8DFD0;border-radius:12px;padding:18px 22px;margin-bottom:24px;page-break-inside:avoid">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px">'+
+        '<span style="font-size:15px;font-weight:700;color:#1A1411">🏨 '+escape_html(site.nom)+'</span>'+
+        (total>0?'<span style="font-size:12px;font-weight:600;color:var(--text2)">'+total.toLocaleString('fr-FR')+' FCFA total</span>':'')+
+      '</div>'+
+      '<div class="kpi-row" style="margin-bottom:12px">'+
+        '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value" style="font-size:18px">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Rondes</div><div class="kpi-value" style="font-size:18px;color:'+kpiCol(sConf,70,90,false)+'">'+(sConf!==null?sConf+'%':'—')+'</div><div class="kpi-sub">'+d.rondes+' rondes</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="font-size:18px;color:'+kpiCol(d.pannes,1,3,true)+'">'+d.pannes+'</div><div class="kpi-sub">'+d.pannesTot+' total sur période</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Maintenance</div><div class="kpi-value" style="font-size:18px">'+d.mntCount+'</div><div class="kpi-sub">'+(d.mntCout>0?d.mntCout.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
+      '</div>'+
+
+      // Observations par site (editables)
+      '<div class="edit-hint">✏️ Observations — cliquez pour éditer</div>'+
+      '<div class="obs-zone" contenteditable="true" data-placeholder="Observations pour '+escape_html(site.nom)+' : constats, recommandations, actions..."></div>'+
+
+      // Signalements de ce site
+      (siteSignalements.length>0?
+        '<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Signalements</div>'+
+        '<table><thead><tr><th>Type</th><th>Description</th><th>Date</th><th>Statut</th><th>Coût</th></tr></thead><tbody>'+
+        siteSignalements.slice(0,15).map(function(s){
+          var ts=new Date(s.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+          var typeLabels={panne:'⚡ Panne',anomalie:'👁 Anomalie',autre:'📝 Autre'};
+          var resolu=s.statut==='resolu';
+          var eqNom=s.equipements&&s.equipements.nom?' · '+s.equipements.nom:'';
+          return '<tr>'+
+            '<td>'+escape_html(typeLabels[s.type]||s.type)+'</td>'+
+            '<td style="max-width:240px">'+escape_html((s.description||'').substring(0,70))+escape_html(eqNom)+'</td>'+
+            '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
+            '<td>'+(resolu?'<span class="badge badge-ok">Résolu</span>':'<span class="badge badge-ko">En cours</span>')+'</td>'+
+            '<td style="font-size:11px">'+(s.cout_intervention?Number(s.cout_intervention).toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody></table></div>':'')+''+
+
+      // Maintenances de ce site
+      (siteMaintenances.length>0?
+        '<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Interventions maintenance</div>'+
+        '<table><thead><tr><th>Intervention</th><th>Type</th><th>Intervenant</th><th>Date</th><th>Coût</th></tr></thead><tbody>'+
+        siteMaintenances.slice(0,15).map(function(m){
+          var ts=m.date_intervention?new Date(m.date_intervention).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
+          var eqNom=m.equipements&&m.equipements.nom?' · '+m.equipements.nom:'';
+          return '<tr>'+
+            '<td><strong>'+escape_html(m.titre||'Intervention')+'</strong>'+escape_html(eqNom)+'</td>'+
+            '<td style="font-size:11px;color:var(--text2)">'+escape_html(m.type||'—')+'</td>'+
+            '<td style="font-size:11px">'+escape_html(m.prestataire||'—')+'</td>'+
+            '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
+            '<td style="font-size:11px">'+(m.cout?(Number(m.cout)||0).toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody></table></div>':'')+
+    '</div>';
+  });
+
+  // Signature
+  h+='<div class="sig-row">'+
+    '<div class="sig-block">Fait à ________________, le '+new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+'<br><br><br>'+escape_html(dirNom)+'<br><span style="font-size:10px;color:var(--text3)">Directeur Technique</span></div>'+
+    '<div class="sig-block">Visa direction générale<br><br><br>____________________</div>'+
+  '</div>';
+  h+='<div class="footer-doc"><span>GenTrack · Pilotage technique hôtelier</span><span>Rapport généré le '+new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+'</span></div>';
+
+  return _reportShell('Rapport DT — '+period+' jours',h,false);
 }
 
 // ── Rapport hebdomadaire professionnel (resp_tech) ─────────────────────────────
