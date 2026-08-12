@@ -547,12 +547,16 @@ async function demarrerVidange(phone: string, contact: any, site: any): Promise<
 
 // ── Plein carburant ───────────────────────────────────────────────────────────
 async function demarrerPlein(phone: string, contact: any, site: any): Promise<any> {
+  const CUVE_TYPE_ID = 'de5519d0-363b-4628-b872-2dcf01859002';
   const siteId = site?.id || contact.site_id;
-  const cuves = await db('equipements', {
+  const allReservoirs = await db('equipements', {
     query: `&site_id=eq.${siteId}&actif=eq.true&capacite_litres=not.is.null&order=ordre_ronde.asc`
   });
-  const cuve = Array.isArray(cuves) ? cuves[0] || null : null;
-  if (!cuve) return sendWA(phone, `Aucune cuve configurée. Contactez votre administrateur.`);
+  // Priorité : cuve dédiée, sinon GE avec réservoir intégré
+  const reservoirs = Array.isArray(allReservoirs) ? [...allReservoirs] : [];
+  reservoirs.sort((a: any, b: any) => (a.type_id === CUVE_TYPE_ID ? 0 : 1) - (b.type_id === CUVE_TYPE_ID ? 0 : 1));
+  const cuve = reservoirs[0] || null;
+  if (!cuve) return sendWA(phone, `Aucun réservoir configuré pour ce site. Contactez votre administrateur.`);
 
   const qNiveau = await db('questions', {
     query: `&equipement_id=eq.${cuve.id}&actif=eq.true&texte=ilike.*niveau*&limit=1`
@@ -563,13 +567,17 @@ async function demarrerPlein(phone: string, contact: any, site: any): Promise<an
     if (Array.isArray(lastRep) && lastRep[0]) niveauPrec = parseFloat(lastRep[0].valeur);
   }
   const cap = parseFloat(cuve.capacite_litres);
+  const prixLitre = cuve.prix_litre ? parseFloat(cuve.prix_litre) : null;
+  const consoLh = cuve.conso_theorique_lh ? parseFloat(cuve.conso_theorique_lh) : 65;
   const niveauTxt = niveauPrec != null ? ` _(niveau actuel : ${niveauPrec}L / ${cap}L, ${Math.round(niveauPrec/cap*100)}%)_` : '';
+  const prixTxt = prixLitre ? ` · ${prixLitre.toLocaleString('fr-FR')} FCFA/L` : '';
   await setSession(phone, 'plein_litres', {
     site_id: siteId, site_nom: site?.nom || '', tech_nom: contact.nom,
     cuve_id: cuve.id, cuve_nom: cuve.nom, cuve_capacite: cap, niveau_precedent: niveauPrec,
+    prix_litre: prixLitre, conso_theorique: consoLh,
     question_niveau_id: Array.isArray(qNiveau) && qNiveau[0] ? qNiveau[0].id : null
   });
-  return sendWA(phone, `⛽ *Ravitaillement — ${site?.nom || ''}*\n\n🛢️ *${cuve.nom}* (${cap}L)${niveauTxt}\n\nCombien de litres ont été ajoutés ?\n_(Ex: 500)_`);
+  return sendWA(phone, `⛽ *Ravitaillement — ${site?.nom || ''}*\n\n🛢️ *${cuve.nom}* (${cap}L)${niveauTxt}${prixTxt}\n\nCombien de litres ont été ajoutés ?\n_(Ex: 500)_`);
 }
 
 // ── Gestionnaire des états partagés ──────────────────────────────────────────
@@ -925,51 +933,36 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
 
   // ── Plein carburant flow ──────────────────────────────────
   if (state === 'plein_litres') {
-    const litres = parseFloat(bodyText.trim().replace(',', '.'));
+    const litres = parseFloat(bodyText.trim().replace(',', '.').replace(/\s/g, ''));
     if (isNaN(litres) || litres <= 0) return sendWA(phone, `❌ Quantité invalide.\n_(Ex: 500)_`);
     const cap = sd.cuve_capacite || 500;
+    // Calcul automatique du niveau après
+    const niveauApresCalc = Math.min(cap, (sd.niveau_precedent != null ? sd.niveau_precedent : 0) + litres);
     if (sd.niveau_precedent != null && (sd.niveau_precedent + litres) > cap * 1.05) {
-      await setSession(phone, 'plein_confirm_litres', { ...sd, litres_ajoutes: litres });
-      return sendWA(phone, `⚠️ Total calculé (${sd.niveau_precedent + litres}L) dépasse la capacité (${cap}L).\nVous confirmez *${litres}L* ?\n\n*1* — Oui\n*2* — Re-saisir`);
+      await setSession(phone, 'plein_confirm_litres', { ...sd, litres_ajoutes: litres, niveau_apres_calc: niveauApresCalc });
+      return sendWA(phone, `⚠️ Total calculé (${Math.round(sd.niveau_precedent + litres)}L) dépasse la capacité (${cap}L).\nNiveau enregistré automatiquement : *${Math.round(niveauApresCalc)}L*\n\nVous confirmez *${litres}L* ajoutés ?\n\n*1* — Oui\n*2* — Re-saisir`);
     }
-    await setSession(phone, 'plein_niveau', { ...sd, litres_ajoutes: litres });
-    return sendWA(phone, `✅ *${litres}L* ajoutés.\n\n🛢️ Quel niveau indique l'écran Dover maintenant ?\n_(en litres)_`);
+    await setSession(phone, 'plein_operateur', { ...sd, litres_ajoutes: litres, niveau_apres_calc: niveauApresCalc });
+    return sendWA(phone, `✅ *${litres}L* ajoutés — niveau calculé : *${Math.round(niveauApresCalc)}L*\n\n👤 Votre prénom ?`);
   }
 
   if (state === 'plein_confirm_litres') {
-    if (msg.trim() === '1') { await setSession(phone, 'plein_niveau', sd); return sendWA(phone, `🛢️ Quel niveau indique l'écran Dover ?\n_(en litres)_`); }
-    if (msg.trim() === '2') { await setSession(phone, 'plein_litres', sd); return sendWA(phone, `🔄 Combien de litres ont été ajoutés ?`); }
-    return sendWA(phone, `*1* confirmer · *2* re-saisir`);
-  }
-
-  if (state === 'plein_niveau') {
-    const niveau = parseInt(bodyText.trim().replace(/\s/g, ''));
-    const cap = sd.cuve_capacite || 500;
-    if (isNaN(niveau) || niveau < 0) return sendWA(phone, `❌ Niveau invalide.`);
-    if (niveau > cap) return sendWA(phone, `❌ Niveau impossible — max ${cap}L.\nRessaisissez.`);
-    if (sd.niveau_precedent != null) {
-      const attendu = sd.niveau_precedent + sd.litres_ajoutes;
-      const ecart = Math.abs(niveau - attendu);
-      if (ecart > cap * 0.05) {
-        await setSession(phone, 'plein_confirmation', { ...sd, niveau_litres: niveau });
-        return sendWA(phone, `⚠️ Niveau attendu : ~${Math.min(attendu, cap)}L\nNiveau saisi : ${niveau}L\nÉcart : ${ecart}L\n\nC'est correct ?\n*1* Oui · *2* Re-saisir`);
-      }
+    if (msg.trim() === '1') {
+      await setSession(phone, 'plein_operateur', sd);
+      return sendWA(phone, `👤 Votre prénom ?`);
     }
-    await setSession(phone, 'plein_operateur', { ...sd, niveau_litres: niveau });
-    return sendWA(phone, `✅ Niveau noté : *${niveau}L*\n\n👤 Votre prénom ?`);
-  }
-
-  if (state === 'plein_confirmation') {
-    if (msg.trim() === '1') { await setSession(phone, 'plein_operateur', sd); return sendWA(phone, `👤 Votre prénom ?`); }
-    if (msg.trim() === '2') { await setSession(phone, 'plein_niveau', sd); return sendWA(phone, `🛢️ Quel niveau indique l'écran Dover ?`); }
+    if (msg.trim() === '2') { await setSession(phone, 'plein_litres', sd); return sendWA(phone, `🔄 Combien de litres ont été ajoutés ?`); }
     return sendWA(phone, `*1* confirmer · *2* re-saisir`);
   }
 
   if (state === 'plein_operateur') {
     const operateur = bodyText.trim();
-    const niveauL = sd.niveau_litres;
+    const niveauL = sd.niveau_apres_calc != null ? Math.round(sd.niveau_apres_calc) : (sd.niveau_precedent || 0);
     const cap = sd.cuve_capacite || 500;
-    const { pct, autoJ, col } = calcCuve(niveauL, cap, 65); // 65L/h par défaut si pas de conso configurée
+    const prixLitre: number | null = sd.prix_litre ? parseFloat(sd.prix_litre) : null;
+    const cout = prixLitre && sd.litres_ajoutes ? Math.round(prixLitre * sd.litres_ajoutes) : 0;
+    const { pct, autoJ, col } = calcCuve(niveauL, cap, sd.conso_theorique || 65);
+    const coutTxt = cout > 0 ? `\n💰 Coût : *${cout.toLocaleString('fr-FR')} FCFA*` : '';
 
     // Enregistrer le relevé dans reponses
     if (sd.question_niveau_id) {
@@ -992,7 +985,22 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       date: today,
       litres_ajoutes: sd.litres_ajoutes || null,
       niveau_apres: niveauL,
+      cout: cout || null,
       operateur: operateur || null,
+    }}).catch(() => {});
+
+    // Aussi dans maintenances pour l'onglet Maintenance/Ravitaillement
+    await db('maintenances', { method: 'POST', body: {
+      groupe_id: sd.site_id,
+      equipement_id: sd.cuve_id,
+      type: 'ravitaillement',
+      titre: `Ravitaillement — ${sd.cuve_nom}`,
+      date_intervention: today,
+      quantite: sd.litres_ajoutes || null,
+      unite: 'L',
+      cout: cout || 0,
+      statut: 'realise',
+      created_by: operateur || null,
     }}).catch(() => {});
 
     if (pct <= 20) {
@@ -1002,12 +1010,12 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     }
     await setSession(phone, 'idle', {});
 
-    const notifMsg = `⛽ *Ravitaillement effectué*\n*${siteNom}*\n\n🛢️ ${sd.cuve_nom}\n💧 *${sd.litres_ajoutes}L* ajoutés\n📊 Niveau : *${niveauL}L / ${cap}L* (${pct}%) ${col}${autoJ ? `\n⏱️ Autonomie : ~${autoJ}j` : ''}\n👤 ${operateur}`;
+    const notifMsg = `⛽ *Ravitaillement effectué*\n*${siteNom}*\n\n🛢️ ${sd.cuve_nom}\n💧 *${sd.litres_ajoutes}L* ajoutés\n📊 Niveau : *${niveauL}L / ${cap}L* (${pct}%) ${col}${autoJ ? `\n⏱️ Autonomie : ~${autoJ}j` : ''}${coutTxt}\n👤 ${operateur}`;
     const responsables = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` });
     if (Array.isArray(responsables)) {
       for (const r of responsables) if (r.whatsapp && r.whatsapp !== phone) await sendWA(r.whatsapp, notifMsg);
     }
-    return sendWA(phone, `✅ *Ravitaillement enregistré !*\n\n🛢️ ${sd.cuve_nom}\n💧 ${sd.litres_ajoutes}L ajoutés\n📊 ${niveauL}L / ${cap}L (${pct}%) ${col}${autoJ ? `\n⏱️ Autonomie : ~${autoJ}j` : ''}\n\n_Équipe notifiée 📲_`);
+    return sendWA(phone, `✅ *Ravitaillement enregistré !*\n\n🛢️ ${sd.cuve_nom}\n💧 ${sd.litres_ajoutes}L ajoutés — ${niveauL}L / ${cap}L (${pct}%) ${col}${autoJ ? `\n⏱️ Autonomie : ~${autoJ}j` : ''}${coutTxt}\n\n_Équipe notifiée 📲_`);
   }
 
   return sendWA(phone, `Tapez *aide* pour les commandes.`);
@@ -1031,6 +1039,13 @@ async function handleMessage(from: string, bodyText: string) {
     const sd = session?.data ? JSON.parse(session.data) : {};
     const siteNom = site?.nom || '';
 
+    // Commandes toujours disponibles — avant toute gestion d'état
+    if (msg === 'saisie' || msg === 'bonjour') {
+      if (!site) return sendWA(phone, `⚠️ Votre compte n'est pas associé à un site. Contactez votre responsable.`);
+      await setSession(phone, 'idle', {});
+      return demarrerSaisie(phone, contact, site);
+    }
+
     // États de conversation actifs → déléguer
     const activeStates = [
       'saisie_choix_freq','saisie_choix_equip','saisie_question','saisie_followup',
@@ -1038,7 +1053,7 @@ async function handleMessage(from: string, bodyText: string) {
       'panne_equip','panne_type','panne_description',
       'resolu_choix','resolu_note','resolu_cout','resolu_technicien','resolu_final',
       'vidange_equip','vidange_intervenant','vidange_confirm',
-      'plein_litres','plein_confirm_litres','plein_niveau','plein_confirmation','plein_operateur',
+      'plein_litres','plein_confirm_litres','plein_operateur',
     ];
     if (activeStates.includes(state)) {
       return handleStates(phone, msg, bodyText, contact, site, state, sd);
@@ -1053,10 +1068,6 @@ async function handleMessage(from: string, bodyText: string) {
     // Commandes principales
     if (msg === 'aide' || msg === 'help') {
       return sendWA(phone, `🔧 *GenTrack — Commandes*\n\n• *saisie* — Ronde / Relevé horaire\n• *panne* — Signaler une urgence\n• *resolu* — Clôturer un signalement\n• *plein* — Ravitaillement cuve\n• *vidange* — Déclarer une vidange\n• *rapport* — Dernier rapport\n• *annuler* — Annuler l'action en cours\n• *aide* — Ce menu`);
-    }
-    if (msg === 'saisie' || msg === 'bonjour') {
-      if (!site) return sendWA(phone, `⚠️ Votre compte n'est pas associé à un site. Contactez votre responsable.`);
-      return demarrerSaisie(phone, contact, site);
     }
     if (msg === 'rapport') {
       if (!site) return sendWA(phone, `Aucun site configuré.`);
