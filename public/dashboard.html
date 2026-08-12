@@ -791,14 +791,27 @@ function _buildCuveSection(cuveEquips,cuveQs,pleinsHist){
     });
     var niveau=niveauQ&&niveauQ._lastVal!=null?parseFloat(niveauQ._lastVal):null;
     var cap=parseFloat(e.capacite_litres)||8000;
+    // Si le dernier plein est plus récent que la dernière ronde, utiliser niveau_apres
+    var pleinsEquip=pleinsHist.filter(function(p){return p.equipement_id===e.id;});
+    var latestPlein=pleinsEquip[0]||null;
+    var sourceLabel=null;
+    if(latestPlein&&latestPlein.niveau_apres!=null){
+      var pleinDate=latestPlein.date||'';
+      var rondeDate=niveauQ&&niveauQ._lastAt?niveauQ._lastAt.slice(0,10):'0';
+      if(pleinDate>=rondeDate){
+        niveau=parseFloat(latestPlein.niveau_apres);
+        sourceLabel='Après plein du '+new Date(latestPlein.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+      }
+    }
     var pct=niveau!=null?Math.min(100,Math.round(niveau/cap*100)):null;
     var consoH=parseFloat(e.conso_theorique_lh)||65;
     var autoJours=niveau!=null?Math.round(niveau/(consoH*8)*10)/10:null;
     var seuilMin=niveauQ&&niveauQ.seuil_min!=null?parseFloat(niveauQ.seuil_min):null;
     var col=pct!=null?(pct<=20?'var(--rouge)':pct<=40?'var(--orange)':'var(--vert)'):'var(--text3)';
-    var lastAt=niveauQ&&niveauQ._lastAt?'Relevé '+_timeAgo(niveauQ._lastAt):'Aucun relevé';
+    var lastAt=sourceLabel||(niveauQ&&niveauQ._lastAt?'Relevé '+_timeAgo(niveauQ._lastAt):'Aucun relevé');
     var autoBg=autoJours!=null?(autoJours<2?'var(--rouge-pale)':autoJours<5?'var(--orange-pale)':'var(--vert-pale)'):'transparent';
     var autoCol=autoJours!=null?(autoJours<2?'var(--rouge)':autoJours<5?'var(--orange)':'var(--vert)'):'var(--text3)';
+    var operateur=_session&&_session.contact&&_session.contact.nom?_session.contact.nom:'';
 
     html+='<div class="eq-card" style="flex-direction:column;align-items:stretch;gap:0;padding:16px 18px;border-top:3px solid var(--amber)">'+
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">'+
@@ -818,6 +831,7 @@ function _buildCuveSection(cuveEquips,cuveQs,pleinsHist){
         (seuilMin!=null?'<div style="font-size:11px;color:var(--text3)">Seuil alerte : <strong>'+Math.round(seuilMin).toLocaleString('fr-FR')+' L</strong></div>':'<div></div>')+
         (autoJours!=null?'<div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:6px;background:'+autoBg+';color:'+autoCol+'">≈ '+autoJours+' j autonomie</div>':'<div style="font-size:11px;color:var(--text3)">Autonomie : —</div>')+
       '</div>'+
+      '<button onclick="openDeclarePlein(\''+e.id+'\',\''+js_esc(e.nom)+'\','+cap+',\''+js_esc(operateur)+'\')" style="margin-top:10px;padding:7px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text1);font-size:12px;cursor:pointer;width:100%;text-align:center;font-weight:600">⛽ Déclarer ravitaillement</button>'+
       (function(){
         var hist=pleinsHist.filter(function(p){return p.equipement_id===e.id;}).slice(0,5);
         if(!hist.length)return '';
@@ -953,6 +967,60 @@ function openDeclareVidange(eqId,eqNom,currentH){
         notes:notes
       });
       document.getElementById('modal-vidange').remove();
+      var el=document.querySelector('.dash-content');
+      if(el&&_session&&_session.site_ids&&_session.site_ids.length){
+        el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text3);font-size:13px">Actualisation...</div>';
+        el.innerHTML=await _rtAccueil(_session,_session.site_ids[0],_session.client_id);
+      }
+    }catch(ex){
+      alert('Erreur : '+ex.message);
+      btn.disabled=false;btn.textContent='Confirmer';
+    }
+  };
+}
+
+function openDeclarePlein(eqId,eqNom,cap,operateur){
+  var m=document.getElementById('modal-plein');
+  if(!m){
+    m=document.createElement('div');
+    m.id='modal-plein';
+    m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+    document.body.appendChild(m);
+  }
+  m.innerHTML='<div style="background:var(--card1);border-radius:16px;padding:24px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.3)">'+
+    '<div style="font-size:16px;font-weight:700;color:var(--text1);margin-bottom:16px">⛽ Ravitaillement – '+escape_html(eqNom)+'</div>'+
+    '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Litres ajoutés (optionnel)</label>'+
+    '<input id="mp-litres" type="number" step="1" placeholder="ex: 3 000" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:10px"/>'+
+    '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Niveau après ravitaillement (L) <span style="color:var(--text2)">— met à jour la jauge</span></label>'+
+    '<input id="mp-niveau" type="number" step="10" placeholder="ex: 7 500" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:10px"/>'+
+    '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Coût (FCFA, optionnel)</label>'+
+    '<input id="mp-cout" type="number" step="100" placeholder="ex: 1 800 000" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:10px"/>'+
+    '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Opérateur</label>'+
+    '<input id="mp-oper" type="text" placeholder="Nom de la personne" value="'+escape_html(operateur||'')+'" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:13px;box-sizing:border-box;margin-bottom:16px"/>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="document.getElementById(\'modal-plein\').remove()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text2);font-size:13px;cursor:pointer">Annuler</button>'+
+      '<button id="mp-confirm" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--amber);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Confirmer</button>'+
+    '</div>'+
+  '</div>';
+  document.getElementById('mp-confirm').onclick=async function(){
+    var litres=document.getElementById('mp-litres').value?parseFloat(document.getElementById('mp-litres').value):null;
+    var niveauApres=document.getElementById('mp-niveau').value?parseFloat(document.getElementById('mp-niveau').value):null;
+    var cout=document.getElementById('mp-cout').value?parseFloat(document.getElementById('mp-cout').value):null;
+    var oper=document.getElementById('mp-oper').value.trim()||null;
+    var btn=document.getElementById('mp-confirm');
+    btn.disabled=true;btn.textContent='…';
+    var today=new Date().toISOString().slice(0,10);
+    try{
+      await supaPost('pleins',{
+        equipement_id:eqId,
+        site_id:_session&&_session.site_ids?_session.site_ids[0]:null,
+        date:today,
+        litres_ajoutes:litres,
+        niveau_apres:niveauApres,
+        cout:cout,
+        operateur:oper
+      });
+      document.getElementById('modal-plein').remove();
       var el=document.querySelector('.dash-content');
       if(el&&_session&&_session.site_ids&&_session.site_ids.length){
         el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text3);font-size:13px">Actualisation...</div>';
