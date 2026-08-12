@@ -887,7 +887,7 @@ function openEditEquipement(eqId, clientId) {
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Seuil vidange (heures)</label><input class="form-input" id="eqe-vidange" type="number" value="${eq.seuil_vidange_heures||250}" /></div>
-        <div class="form-group"></div>
+        <div class="form-group"><label class="form-label">Compteur au dernier vidange (h)</label><input class="form-input" id="eqe-dernier-vidange" type="number" step="0.1" value="${eq.heures_dernier_vidange||''}" placeholder="ex: 3200 — laisser vide si inconnu" /></div>
       </div>`:isCuve?`<div class="form-row">
         <div class="form-group"><label class="form-label">Capacité totale (L)</label><input class="form-input" id="eqe-capa" type="number" value="${eq.capacite_litres||10000}" /></div>
         <div class="form-group"><label class="form-label">Conso estimée GEs (L/h)</label><input class="form-input" id="eqe-conso" type="number" step="0.1" value="${eq.conso_theorique_lh||65}" /></div>
@@ -905,6 +905,7 @@ async function saveEquipement(eqId, clientId) {
   if(document.getElementById('eqe-conso')) body.conso_theorique_lh=parseFloat(document.getElementById('eqe-conso').value)||null;
   if(document.getElementById('eqe-capa')) body.capacite_litres=parseInt(document.getElementById('eqe-capa').value)||null;
   if(document.getElementById('eqe-vidange')) body.seuil_vidange_heures=parseInt(document.getElementById('eqe-vidange').value)||null;
+  if(document.getElementById('eqe-dernier-vidange')&&document.getElementById('eqe-dernier-vidange').value) body.heures_dernier_vidange=parseFloat(document.getElementById('eqe-dernier-vidange').value);
   await api('equipements',`&id=eq.${eqId}`,'*','PATCH',body);
   closeModal('modal-eq-edit'); toast('Équipement mis à jour'); await loadAll(); openClient(clientId,'sites');
 }

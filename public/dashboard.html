@@ -340,6 +340,15 @@ async function supaPatch(table,id,data){
     });
   }catch(e){}
 }
+async function supaUpdate(table,filter,data){
+  try{
+    await fetch(SUPA_URL+'/rest/v1/'+table+'?'+filter,{
+      method:'PATCH',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(data)
+    });
+  }catch(e){console.error('[supaUpdate]',e);}
+}
 async function supaPost(table,data){
   try{
     var r=await fetch(SUPA_URL+'/rest/v1/'+table,{
@@ -601,7 +610,7 @@ async function _rtAccueil(session,sid,cid){
   var GE_TYPE='98849793-9201-4adf-aec2-a4a08587c4e2';
   var[rondes,equips,alertes,pannes,recoData]=await Promise.all([
     supaGet('rondes','site_id=eq.'+sid+'&date_ronde=eq.'+today+'&select=id,frequence,date_ronde'),
-    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,ordre_ronde,type_id,conso_theorique_lh,capacite_litres,seuil_vidange_heures,types_equipements(nom)&order=ordre_ronde.asc'),
+    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,ordre_ronde,type_id,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,date_dernier_vidange,types_equipements(nom)&order=ordre_ronde.asc'),
     supaGet('alertes','groupe_id=eq.'+sid+'&resolue=eq.false&select=id,type,severite,type_alerte,message,created_at&order=created_at.desc&limit=20'),
     supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&statut=neq.resolu&select=id,type,description,created_at,equipement_id,equipements(nom)&order=created_at.desc&limit=20'),
     _fetchRecoEquipements(sid)
@@ -615,17 +624,14 @@ async function _rtAccueil(session,sid,cid){
   var cuveSection='',vidangesSection='';
   var specialIds=cuveEquips.concat(geEquips).map(function(e){return e.id;});
   if(specialIds.length){
-    var[specialQs,geVidanges]=await Promise.all([
-      supaGet('questions','equipement_id=in.('+specialIds.join(',')+')'+'&actif=eq.true&select=id,texte,unite,seuil_min,seuil_max,equipement_id&order=ordre.asc'),
-      geEquips.length?supaGet('vidanges','equipement_id=in.('+geEquips.map(function(e){return e.id;}).join(',')+')'+'&select=id,equipement_id,date,heures_au_moment&order=date.desc&limit=50'):Promise.resolve([])
-    ]);
+    var specialQs=await supaGet('questions','equipement_id=in.('+specialIds.join(',')+')'+'&actif=eq.true&select=id,texte,unite,seuil_min,seuil_max,equipement_id&order=ordre.asc');
     var qIds=specialQs.map(function(q){return q.id;});
     var latestReps=qIds.length?await supaGet('reponses','question_id=in.('+qIds.join(',')+')'+'&select=question_id,valeur,created_at&order=created_at.desc&limit=300'):[];
     var repByQ={};
     latestReps.forEach(function(r){if(!repByQ[r.question_id]||r.created_at>repByQ[r.question_id].created_at)repByQ[r.question_id]=r;});
     specialQs.forEach(function(q){q._lastVal=repByQ[q.id]?repByQ[q.id].valeur:null;q._lastAt=repByQ[q.id]?repByQ[q.id].created_at:null;});
     cuveSection=_buildCuveSection(cuveEquips,specialQs.filter(function(q){return cuveEquips.some(function(e){return e.id===q.equipement_id;});}));
-    vidangesSection=_buildVidangesSection(geEquips,specialQs.filter(function(q){return geEquips.some(function(e){return e.id===q.equipement_id;});}),geVidanges);
+    vidangesSection=_buildVidangesSection(geEquips,specialQs.filter(function(q){return geEquips.some(function(e){return e.id===q.equipement_id;});}));
   }
 
   // Ronde journalière
@@ -808,35 +814,32 @@ function _buildCuveSection(cuveEquips,cuveQs){
 }
 
 /* ── Vidanges / maintenance préventive section ── */
-function _buildVidangesSection(geEquips,geQs,vidanges){
+function _buildVidangesSection(geEquips,geQs){
   if(!geEquips.length)return '';
   var hasVidange=geEquips.some(function(e){return e.seuil_vidange_heures;});
   if(!hasVidange)return '';
-  var lastVidByEq={};
-  vidanges.forEach(function(v){if(!lastVidByEq[v.equipement_id])lastVidByEq[v.equipement_id]=v;});
   var html='<div class="section-title">🔧 Maintenance préventive</div>';
   html+='<div style="display:flex;flex-direction:column;gap:8px">';
   geEquips.forEach(function(e){
     if(!e.seuil_vidange_heures)return;
     var seuil=parseFloat(e.seuil_vidange_heures);
+    // Find the latest compteur reading from the ronde questions
     var compteurQ=geQs.find(function(q){
       return q.equipement_id===e.id&&(q.texte.toLowerCase().indexOf('compteur')>=0||q.texte.toLowerCase().indexOf('horaire')>=0);
     });
     var currentH=compteurQ&&compteurQ._lastVal!=null?parseFloat(compteurQ._lastVal):null;
-    var lastVid=lastVidByEq[e.id]||null;
+    // Baseline = counter value at last oil change (set during onboarding or after declaring vidange)
+    var baseline=e.heures_dernier_vidange!=null?parseFloat(e.heures_dernier_vidange):null;
+    var lastVidDate=e.date_dernier_vidange||null;
     var heuresDepuis=null;
-    if(currentH!=null){
-      if(lastVid&&lastVid.heures_au_moment!=null){
-        heuresDepuis=Math.max(0,currentH-parseFloat(lastVid.heures_au_moment));
-      } else {
-        heuresDepuis=currentH;
-      }
+    if(currentH!=null&&baseline!=null){
+      heuresDepuis=Math.max(0,currentH-baseline);
     }
     var pct=heuresDepuis!=null?Math.min(100,Math.round(heuresDepuis/seuil*100)):null;
     var col=pct!=null?(pct>=100?'var(--rouge)':pct>=80?'var(--orange)':'var(--vert)'):'var(--text3)';
     var statusTxt=pct!=null?(pct>=100?'⚠️ Vidange due':pct>=80?'Bientôt':'OK ✓'):'—';
     var statusCol=pct!=null?(pct>=100?'var(--rouge)':pct>=80?'var(--orange)':'var(--vert)'):'var(--text3)';
-    var lastVidStr=lastVid?new Date(lastVid.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'Aucune enregistrée';
+    var lastVidStr=lastVidDate?new Date(lastVidDate).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'Aucune enregistrée';
     var restantH=heuresDepuis!=null?Math.max(0,Math.round(seuil-heuresDepuis)):null;
 
     html+='<div class="eq-card" style="flex-direction:column;align-items:stretch;gap:8px;padding:14px 16px">'+
@@ -855,12 +858,56 @@ function _buildVidangesSection(geEquips,geQs,vidanges){
           '</div>'+
           '<div class="progress-bar-wrap" style="height:6px"><div class="progress-bar" style="width:'+Math.min(100,pct)+'%;background:'+col+'"></div></div>'+
         '</div>':
-        '<div style="font-size:11px;color:var(--text3)">Pas de données compteur</div>'
+        '<div style="font-size:11px;color:var(--text3)">'+(baseline==null?'Compteur de référence non configuré':'Pas de lecture compteur')+'</div>'
       )+
+      '<button onclick="openDeclareVidange(\''+e.id+'\',\''+escape_html(e.nom)+'\')" style="margin-top:4px;padding:6px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text1);font-size:12px;cursor:pointer;width:100%;text-align:center">🛢 Déclarer vidange effectuée</button>'+
     '</div>';
   });
   html+='</div>';
   return html;
+}
+
+function openDeclareVidange(eqId,eqNom){
+  var m=document.getElementById('modal-vidange');
+  if(!m){
+    m=document.createElement('div');
+    m.id='modal-vidange';
+    m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+    m.innerHTML='<div style="background:var(--card1);border-radius:16px;padding:24px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.3)">'+
+      '<div style="font-size:16px;font-weight:700;color:var(--text1);margin-bottom:4px" id="mv-title"></div>'+
+      '<div style="font-size:12px;color:var(--text3);margin-bottom:16px">Entrez la valeur actuelle du compteur horaire</div>'+
+      '<input id="mv-compteur" type="number" step="0.1" placeholder="ex: 3 450" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:16px"/>'+
+      '<div style="display:flex;gap:8px">'+
+        '<button onclick="document.getElementById(\'modal-vidange\').remove()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text2);font-size:13px;cursor:pointer">Annuler</button>'+
+        '<button id="mv-confirm" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Confirmer</button>'+
+      '</div>'+
+    '</div>';
+    document.body.appendChild(m);
+  }
+  document.getElementById('mv-title').textContent='Vidange – '+eqNom;
+  document.getElementById('mv-compteur').value='';
+  document.getElementById('mv-confirm').onclick=async function(){
+    var val=parseFloat(document.getElementById('mv-compteur').value);
+    if(isNaN(val)||val<0){alert('Valeur invalide');return;}
+    var btn=document.getElementById('mv-confirm');
+    btn.disabled=true;btn.textContent='…';
+    try{
+      await supaUpdate('equipements','id=eq.'+eqId,{
+        heures_dernier_vidange:val,
+        date_dernier_vidange:new Date().toISOString()
+      });
+      document.getElementById('modal-vidange').remove();
+      // Reload the accueil section
+      var el=document.querySelector('.dash-content');
+      if(el&&_session&&_session.site_ids&&_session.site_ids.length){
+        el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text3);font-size:13px">Actualisation...</div>';
+        el.innerHTML=await _rtAccueil(_session,_session.site_ids[0],_session.client_id);
+      }
+    }catch(ex){
+      alert('Erreur : '+ex.message);
+      btn.disabled=false;btn.textContent='Confirmer';
+    }
+  };
 }
 
 /* ── Alertes (vue complète) ── */

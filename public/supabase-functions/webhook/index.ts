@@ -208,10 +208,26 @@ async function alerterSeuilsEnArrierePlan(equip: any, questions: any[], reponses
   }
   if (!alertes.length) return;
   const msg = `🚨 *Seuil dépassé — ${equip.nom}*\n_${siteNom}_\n\n${alertes.join('\n')}\n\n_Signalé par ${contact.nom} · ${getHeure()}_`;
-  // Envoyer aux destinataires alertes (non bloquant — fire & forget)
+  const dejaEnvoyes = new Set<string>();
+  // 1. Destinataires configurés sur l'équipement
   const dests = await db('alertes_destinataires', { query: `&equipement_id=eq.${equip.id}` });
   if (Array.isArray(dests)) {
-    for (const d of dests) if (d.type_contact === 'whatsapp') sendWA(d.contact, msg).catch(() => {});
+    for (const d of dests) {
+      if (d.type_contact === 'whatsapp' && !dejaEnvoyes.has(d.contact)) {
+        dejaEnvoyes.add(d.contact);
+        sendWA(d.contact, msg).catch(() => {});
+      }
+    }
+  }
+  // 2. Toujours notifier resp_tech + dir_tech du site (garantie)
+  const responsables = await db('contacts', { query: `&site_id=eq.${equip.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` });
+  if (Array.isArray(responsables)) {
+    for (const r of responsables) {
+      if (r.whatsapp && !dejaEnvoyes.has(r.whatsapp)) {
+        dejaEnvoyes.add(r.whatsapp);
+        sendWA(r.whatsapp, msg).catch(() => {});
+      }
+    }
   }
 }
 
