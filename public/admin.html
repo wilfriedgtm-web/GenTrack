@@ -1023,9 +1023,15 @@ function editQuestion(qId, clientId) {
   </div>`);
 }
 async function saveEditQuestion(qId,clientId) {
+  const texte = document.getElementById('qe-txt').value;
+  const type_reponse = document.getElementById('qe-type').value;
+  const unite = document.getElementById('qe-unit').value||null;
+  const seuil_min = parseFloat(document.getElementById('qe-min').value)||null;
+  const seuil_max = parseFloat(document.getElementById('qe-max').value)||null;
   const freqs=['qe-f1','qe-f2','qe-f3'].map(id=>document.getElementById(id)).filter(el=>el?.checked).map(el=>el.value);
-  await api('questions',`&id=eq.${qId}`,'*','PATCH',{texte:document.getElementById('qe-txt').value,type_reponse:document.getElementById('qe-type').value,unite:document.getElementById('qe-unit').value||null,seuil_min:parseFloat(document.getElementById('qe-min').value)||null,seuil_max:parseFloat(document.getElementById('qe-max').value)||null,frequences:freqs.length?freqs:['journalier']});
-  closeModal('modal-qe'); toast('Question mise à jour'); await loadAll(); openClient(clientId,'questions');
+  const result = await apiPatch('questions', qId, {texte, type_reponse, unite, seuil_min, seuil_max, frequences: freqs.length?freqs:['journalier']});
+  if (!result.ok) { toast('❌ Erreur sauvegarde (' + (result.status||'réseau') + ')'); return; }
+  closeModal('modal-qe'); toast('Question mise à jour ✓'); await loadAll(); openClient(clientId,'questions');
 }
 async function deleteQuestion(qId,clientId) {
   if(!confirm('Supprimer cette question ?')) return;
