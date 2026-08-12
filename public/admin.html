@@ -182,6 +182,21 @@ async function api(table, q='', select='*', method='GET', body=null) {
     return res.json();
   } catch(e) { console.error(e); return []; }
 }
+async function apiPatch(table, id, body) {
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(()=>'');
+      console.error('[apiPatch]', table, res.status, t);
+      return { ok: false, status: res.status, error: t };
+    }
+    return { ok: true };
+  } catch(e) { console.error('[apiPatch]', e); return { ok: false, error: String(e) }; }
+}
 async function apiDelete(table, q) {
   const res = await fetch(`${SUPA_URL}/rest/v1/${table}?${q}`, { method:'DELETE', headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`} });
   return res.ok;
@@ -906,8 +921,12 @@ async function saveEquipement(eqId, clientId) {
   if(document.getElementById('eqe-capa')) body.capacite_litres=parseInt(document.getElementById('eqe-capa').value)||null;
   if(document.getElementById('eqe-vidange')) body.seuil_vidange_heures=parseInt(document.getElementById('eqe-vidange').value)||null;
   if(document.getElementById('eqe-dernier-vidange')&&document.getElementById('eqe-dernier-vidange').value) body.heures_dernier_vidange=parseFloat(document.getElementById('eqe-dernier-vidange').value);
-  await api('equipements',`&id=eq.${eqId}`,'*','PATCH',body);
-  closeModal('modal-eq-edit'); toast('Équipement mis à jour'); await loadAll(); openClient(clientId,'sites');
+  const result = await apiPatch('equipements', eqId, body);
+  if (!result.ok) {
+    toast('❌ Erreur sauvegarde (' + (result.status||'réseau') + '). Vérifiez la console.');
+    return;
+  }
+  closeModal('modal-eq-edit'); toast('Équipement mis à jour ✓'); await loadAll(); openClient(clientId,'sites');
 }
 async function deleteEquipement(eqId,clientId) {
   if(!confirm('Supprimer cet équipement et toutes ses données ?')) return;
