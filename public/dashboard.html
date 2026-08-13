@@ -4828,7 +4828,6 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
 
   // Synthèse narrative
   h+='<h2>Synthèse de direction</h2>'+
-    '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
     '<p class="narrative" contenteditable="true">'+escape_html(narGlobal)+'</p>';
 
   // Graphiques comparatifs
@@ -4872,7 +4871,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
       '</div>'+
 
       // Observations par site (editables)
-      '<div class="edit-hint">✏️ Observations — cliquez pour éditer</div>'+
+      '<div class="edit-hint" style="font-size:10px;color:var(--text3);margin-bottom:4px">Observations (modifiable)</div>'+
       '<div class="obs-zone" contenteditable="true" data-placeholder="Observations pour '+escape_html(site.nom)+' : constats, recommandations, actions..."></div>'+
 
       // Signalements de ce site
@@ -5255,13 +5254,11 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   '</div>';
 
   // Résumé
-  h+='<h2>Synthèse de la semaine</h2>'+
-    '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
+  h+='<h2>Synthèse des '+period+' derniers jours</h2>'+
     '<p class="narrative" contenteditable="true">'+escape_html(narResume)+'</p>';
 
   // Équipements
   h+='<h2>État des équipements</h2>'+
-    '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
     '<p class="narrative" contenteditable="true">'+escape_html(narEquip)+'</p>';
   if(equips.length>0){
     h+='<table><thead><tr><th>Équipement</th><th>Type</th><th>Dernier relevé</th><th>Date</th><th>État</th></tr></thead><tbody>';
@@ -5304,7 +5301,6 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
 
   // Rondes
   h+='<h2>Rondes & Relevés</h2>'+
-    '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
     '<p class="narrative" contenteditable="true">'+escape_html(narRondes)+'</p>';
   if(rondes.length>0){
     h+='<table><thead><tr><th>Date</th><th>Type</th><th>Progression</th><th>Résultat</th></tr></thead><tbody>';
@@ -5328,7 +5324,6 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
 
   // Signalements
   h+='<h2>Signalements & Incidents</h2>'+
-    '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
     '<p class="narrative" contenteditable="true">'+escape_html(narSg)+'</p>';
   if(signalements.length>0){
     var typeLabels={panne:'⚡ Panne',anomalie:'👁 Anomalie',autre:'📝 Autre'};
@@ -5351,7 +5346,6 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
 
   // Maintenances
   h+='<h2>Maintenances & Interventions</h2>'+
-    '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
     '<p class="narrative" contenteditable="true">'+escape_html(narMaint)+'</p>';
   if(maintenances.length>0){
     h+='<table><thead><tr><th>Intervention</th><th>Type</th><th>Intervenant</th><th>Date</th><th>Statut</th><th>Coût</th></tr></thead><tbody>';
