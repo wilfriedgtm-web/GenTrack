@@ -562,6 +562,7 @@ function renderTabSites(client, sites, allEquip, groupes) {
               <input type="checkbox" ${eq.actif?'checked':''} onchange="toggleEquipActif('${eq.id}',this.checked,'${client.id}')">
               <span class="toggle-slider"></span>
             </label>
+            <button class="btn btn-outline btn-xs" title="Dupliquer" onclick="duplicateEquipement('${eq.id}','${client.id}')">⧉</button>
             <button class="btn btn-outline btn-xs" onclick="openEditEquipement('${eq.id}','${client.id}')">✏️</button>
             <button class="btn btn-danger btn-xs" onclick="deleteEquipement('${eq.id}','${client.id}')">🗑️</button>
           </div>
@@ -927,6 +928,40 @@ async function saveEquipement(eqId, clientId) {
     return;
   }
   closeModal('modal-eq-edit'); toast('Équipement mis à jour ✓'); await loadAll(); openClient(clientId,'sites');
+}
+async function duplicateEquipement(eqId, clientId) {
+  const eq = await api('equipements',`&id=eq.${eqId}`,'id,site_id,type_id,nom,actif,actif_ronde,actif_releve,ordre_ronde,marque,reference,puissance_kva,conso_theorique_lh,capacite_litres,seuil_vidange_heures,baseline_compteur_heures');
+  if (!eq || !eq.length) return toast('Équipement introuvable','error');
+  const src = eq[0];
+  const newNom = src.nom + ' (copie)';
+  const newEq = {
+    site_id: src.site_id, type_id: src.type_id, nom: newNom,
+    actif: src.actif, actif_ronde: src.actif_ronde, actif_releve: src.actif_releve,
+    ordre_ronde: src.ordre_ronde,
+    marque: src.marque||null, reference: src.reference||null,
+    puissance_kva: src.puissance_kva||null, conso_theorique_lh: src.conso_theorique_lh||null,
+    capacite_litres: src.capacite_litres||null, seuil_vidange_heures: src.seuil_vidange_heures||null,
+    baseline_compteur_heures: src.baseline_compteur_heures||null
+  };
+  const res = await fetch(`${BASE}/equipements`, {
+    method:'POST', headers:{...HEADERS,'Prefer':'return=representation'},
+    body: JSON.stringify(newEq)
+  });
+  if (!res.ok) return toast('Erreur création équipement','error');
+  const created = await res.json();
+  const newId = created[0].id;
+  // Copier les questions
+  const qs = await api('questions',`&equipement_id=eq.${eqId}&actif=eq.true&order=ordre.asc`,
+    'texte,type_reponse,unite,ordre,actif,frequences,options,seuil_min,seuil_max,alerte_severite,alerte_canal');
+  if (qs && qs.length) {
+    const qsCopy = qs.map(q => ({...q, equipement_id: newId}));
+    await fetch(`${BASE}/questions`, {
+      method:'POST', headers:{...HEADERS,'Prefer':'return=minimal'},
+      body: JSON.stringify(qsCopy)
+    });
+  }
+  toast(`"${newNom}" créé avec ${qs?qs.length:0} question(s) ✓`);
+  await loadAll(); openClient(clientId,'sites');
 }
 async function deleteEquipement(eqId,clientId) {
   if(!confirm('Supprimer cet équipement et toutes ses données ?')) return;
