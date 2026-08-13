@@ -4992,7 +4992,7 @@ async function _openRapportHebdo(period){
     // ── Source 2 : relevés horaires (releve_id) ──
     var cuveHistory={};// {eqId:{nom,cap,points:[{t,v}]}}
     var releveExportRows=[];// pour CSV
-    var relevesH=await supaGet('releves_horaires','site_id=eq.'+sid+'&statut=eq.validé&created_at=gte.'+cutoff+'T00:00:00&select=id,created_at&order=created_at.asc&limit=500');
+    var relevesH=await supaGet('releves_horaires','site_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,created_at&order=created_at.asc&limit=500');
     if(relevesH.length){
       var relDateMap={};relevesH.forEach(function(r){relDateMap[r.id]=r.created_at;});
       var relIds=relevesH.map(function(r){return r.id;});
