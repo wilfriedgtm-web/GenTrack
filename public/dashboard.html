@@ -546,6 +546,9 @@ function buildMobileNav(role,activeNav,alerteBadge){
       (role==='resp_tech'?'<div class="plus-panel-sep"></div>'+
       '<button class="plus-panel-item" onclick="_openRapportHebdo(7);_togglePlusPanel()">'+
         '<span class="plus-panel-icon">📄</span>Rapport hebdo'+
+      '</button>'+
+      '<button class="plus-panel-item" onclick="_openAfficheBotRT();_togglePlusPanel()">'+
+        '<span class="plus-panel-icon">📋</span>Affiche bot WhatsApp'+
       '</button>':'')+
     '</div>';
 
@@ -566,6 +569,8 @@ function buildLayout(session,activeNav,contentHtml){
       '<button id="rapport-btn" onclick="_toggleRapportMenu()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">📄&#8239;Rapport ▾</button>'+
       '<div id="rapport-menu" style="display:none;position:absolute;right:40px;top:60px;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:200;padding:6px;min-width:180px">'+
         [7,14,30].map(function(n){return '<button onclick="_openRapportHebdo('+n+')" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">📋&#8239;'+n+' derniers jours</button>';}).join('')+
+        '<div style="height:1px;background:var(--border);margin:4px 8px"></div>'+
+        '<button onclick="_openAfficheBotRT()" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">📋&#8239;Affiche bot WhatsApp</button>'+
       '</div>':
     session.role==='dir_tech'?
       '<button id="rapport-btn-dt" onclick="_toggleRapportMenuDT()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">📊&#8239;Rapport ▾</button>'+
@@ -1839,7 +1844,7 @@ function _sgDetail(id){
     (r.note_resolution?row('Note résolution','✅ '+escape_html(r.note_resolution)+(r.resolved_by?' ('+escape_html(r.resolved_by)+')':'')):'')+
     (r.cout_intervention?row('Coût intervention',Number(r.cout_intervention).toLocaleString('fr-FR')+' FCFA'):'')+
     (r.resolved_at?row('Résolu le',new Date(r.resolved_at).toLocaleString('fr-FR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})):'')+
-    (r.photo_url?'<div style="margin-top:12px"><img src="'+r.photo_url+'" style="max-width:100%;border-radius:8px;border:1.5px solid var(--border)" onerror="this.style.display=\'none\'"/></div>':'')+
+    (r.photo_url?'<div style="margin-top:12px"><img src="'+r.photo_url+'" style="max-width:100%;border-radius:8px;border:1.5px solid var(--border)" onerror="this.parentElement.style.display=\'none\'"/><a href="'+r.photo_url+'" download target="_blank" style="display:inline-block;margin-top:8px;padding:6px 12px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;color:var(--text2);text-decoration:none">⬇️ Télécharger la photo</a></div>':'')+
     '<div style="margin-top:16px">'+
       '<button onclick="_closeCfgModal()" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Fermer</button>'+
     '</div>';
@@ -1932,7 +1937,7 @@ async function _rtMaintenances(sid){
   var dc=document.getElementById('dash-content-main');
   if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
 
-  var query='groupe_id=eq.'+sid+'&order=created_at.desc&limit=150&select=id,type,titre,description,date_intervention,date_planifiee,statut,cout,quantite,unite,prestataire,created_by,created_at,equipement_id,equipements(nom)';
+  var query='groupe_id=eq.'+sid+'&order=created_at.desc&limit=150&select=id,type,titre,description,date_intervention,date_planifiee,statut,cout,quantite,unite,prestataire,created_by,created_at,equipement_id,photo_url,equipements(nom)';
   if(_mntFilter!=='tous')query+='&type=eq.'+_mntFilter;
   var rows=await supaGet('maintenances',query);
 
@@ -1978,6 +1983,11 @@ async function _rtMaintenances(sid){
             '</div>'+
           '</div>'+
         '</div>'+
+        (r.photo_url?
+          '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
+            '<img src="'+r.photo_url+'" style="max-width:100%;border-radius:8px;border:1.5px solid var(--border);display:block" onerror="this.parentElement.style.display=\'none\'"/>'+
+            '<a href="'+r.photo_url+'" download target="_blank" style="display:inline-block;margin-top:6px;padding:5px 10px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;font-size:11px;font-weight:600;color:var(--text2);text-decoration:none">⬇️ Télécharger</a>'+
+          '</div>':'')+
         (isPlanifie?
           '<div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
             '<button onclick="_mntMarquerRealise(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Marquer réalisé</button>'+
@@ -2257,9 +2267,10 @@ async function _buildContactsTab(sid){
       '<div style="flex:1;min-width:200px">'+
         '<div style="font-size:11px;color:var(--text3);margin-bottom:6px">Lien direct :</div>'+
         '<div style="font-size:11px;font-family:monospace;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:7px 10px;word-break:break-all;color:var(--text)">'+escape_html(sgUrl)+'</div>'+
-        '<div style="display:flex;gap:8px;margin-top:10px">'+
+        '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'+
           '<button onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+sgUrl+'\')" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-weight:600;background:white;cursor:pointer;color:var(--text)">📋 Copier</button>'+
           '<a href="'+sgUrl+'" target="_blank" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-weight:600;background:white;cursor:pointer;color:var(--text);text-decoration:none">↗ Ouvrir</a>'+
+          '<a href="affiche-signalement.html?site='+sid+'&nom='+encodeURIComponent((_session&&_session.siteNom)||'')+'" target="_blank" style="padding:7px 14px;border:1.5px solid var(--amber-border);border-radius:7px;font-size:12px;font-weight:600;background:var(--amber-pale);cursor:pointer;color:var(--amber-dark);text-decoration:none">🖨️ Affiche</a>'+
         '</div>'+
       '</div>'+
     '</div>'+
@@ -3877,7 +3888,7 @@ async function _dtMaintenances(sids){
   var sidStr=sids.join(',');
   var sites=await supaGet('sites','id=in.('+sidStr+')&select=id,nom');
   var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
-  var query='groupe_id=in.('+sidStr+')&order=created_at.desc&limit=300&select=id,groupe_id,type,titre,description,date_intervention,statut,cout,quantite,unite,prestataire,created_by,created_at,equipements(nom)';
+  var query='groupe_id=in.('+sidStr+')&order=created_at.desc&limit=300&select=id,groupe_id,type,titre,description,date_intervention,statut,cout,quantite,unite,prestataire,created_by,created_at,photo_url,equipements(nom)';
   if(_dtMntFilter!=='tous')query+='&type=eq.'+_dtMntFilter;
   var rows=await supaGet('maintenances',query);
   var totalCout=rows.filter(function(r){return r.statut==='realise';}).reduce(function(s,r){return s+(Number(r.cout)||0);},0);
@@ -3916,6 +3927,11 @@ async function _dtMaintenances(sids){
             '</div>'+
           '</div>'+
         '</div>'+
+        (r.photo_url?
+          '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
+            '<img src="'+r.photo_url+'" style="max-width:100%;border-radius:8px;border:1.5px solid var(--border);display:block" onerror="this.parentElement.style.display=\'none\'"/>'+
+            '<a href="'+r.photo_url+'" download target="_blank" style="display:inline-block;margin-top:6px;padding:5px 10px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;font-size:11px;font-weight:600;color:var(--text2);text-decoration:none">⬇️ Télécharger</a>'+
+          '</div>':'')+
       '</div>';
     }).join('');
   }
@@ -4886,6 +4902,12 @@ function _toggleRapportMenu(){
     var close=function(e){if(!m.contains(e.target)&&e.target.id!=='rapport-btn'){m.style.display='none';document.removeEventListener('click',close);}};
     setTimeout(function(){document.addEventListener('click',close);},0);
   }
+}
+
+function _openAfficheBotRT(){
+  var siteNom=(_session&&_session.siteNom)||'';
+  var url='affiche-bot.html'+(siteNom?'?nom='+encodeURIComponent(siteNom):'');
+  window.open(url,'_blank');
 }
 
 async function _openRapportHebdo(period){

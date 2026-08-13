@@ -271,9 +271,18 @@ async function _submit(){
   btn.textContent='Envoi en cours…';
 
   try{
-    // Upload photo if present (skip if no storage bucket — just omit url)
+    // Upload photo si présente
     var photoUrl=null;
-    // Photo upload via Supabase Storage would go here if bucket configured
+    if(_photoFile){
+      var ext=_photoFile.name.split('.').pop()||'jpg';
+      var fname='signalements/'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.'+ext;
+      var upRes=await fetch(SUPA_URL+'/storage/v1/object/gentrack-photos/'+fname,{
+        method:'POST',
+        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':_photoFile.type||'image/jpeg'},
+        body:_photoFile
+      });
+      if(upRes.ok)photoUrl=SUPA_URL+'/storage/v1/object/public/gentrack-photos/'+fname;
+    }
 
     await supaPost('signalements',{
       groupe_id:_groupeId,

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>GenTrack · Affiche Signalement</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:24px 16px}
+
+.toolbar{display:flex;gap:12px;margin-bottom:24px;align-items:center;width:100%;max-width:680px;flex-wrap:wrap}
+.toolbar-title{font-size:14px;font-weight:700;color:#1A1D28;flex:1}
+.btn{padding:8px 18px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer}
+.btn-print{background:#E8A020;color:white}
+.btn-close{background:white;border:1.5px solid #E4E6EF;color:#5A5F78}
+
+/* Affiche */
+.affiche{
+  width:680px;max-width:100%;
+  background:white;border-radius:16px;
+  box-shadow:0 4px 32px rgba(18,21,30,.12);
+  overflow:hidden;
+  position:relative;
+}
+
+.aff-header{
+  background:linear-gradient(145deg,#12151E 0%,#1E2332 100%);
+  padding:36px 40px 32px;
+  text-align:center;
+  position:relative;
+}
+.aff-logo{font-size:11px;font-weight:800;letter-spacing:.25em;color:#E8A020;text-transform:uppercase;margin-bottom:16px}
+.aff-icon{font-size:56px;margin-bottom:16px;display:block}
+.aff-title{font-size:32px;font-weight:900;color:white;letter-spacing:-.03em;margin-bottom:8px;line-height:1.1}
+.aff-subtitle{font-size:15px;color:rgba(255,255,255,.6);line-height:1.5}
+
+.aff-body{padding:36px 40px}
+.aff-steps{display:flex;flex-direction:column;gap:16px;margin-bottom:32px}
+.aff-step{display:flex;align-items:flex-start;gap:14px}
+.aff-step-num{
+  width:32px;height:32px;border-radius:50%;
+  background:#E8A020;color:white;
+  font-size:15px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0
+}
+.aff-step-text{padding-top:4px}
+.aff-step-text strong{font-size:14px;font-weight:700;color:#12151E;display:block;margin-bottom:2px}
+.aff-step-text span{font-size:13px;color:#5A5F78;line-height:1.4}
+
+.aff-qr-section{
+  background:#F4F5FA;border-radius:12px;
+  padding:28px 24px;text-align:center;
+  border:2px solid #E4E6EF;
+}
+.aff-qr-label{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9AA0B8;margin-bottom:16px}
+.aff-qr-img{width:180px;height:180px;margin:0 auto 16px;display:block;border-radius:8px}
+.aff-qr-site{font-size:20px;font-weight:800;color:#12151E;margin-bottom:4px;letter-spacing:-.02em}
+.aff-qr-url{font-size:11px;color:#9AA0B8;word-break:break-all}
+
+.aff-footer{
+  background:#12151E;padding:18px 40px;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;flex-wrap:wrap;
+}
+.aff-footer-brand{font-size:11px;font-weight:800;letter-spacing:.2em;color:#E8A020;text-transform:uppercase}
+.aff-footer-note{font-size:11px;color:rgba(255,255,255,.4)}
+
+@media print{
+  body{background:white;padding:0}
+  .toolbar{display:none}
+  .affiche{box-shadow:none;border-radius:0;width:100%}
+  @page{size:A4;margin:0}
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="toolbar-title" id="toolbar-site">Affiche Signalement</span>
+  <button class="btn btn-close" onclick="window.close()">✕ Fermer</button>
+  <button class="btn btn-print" onclick="window.print()">🖨️ Imprimer / PDF</button>
+</div>
+
+<div class="affiche">
+  <div class="aff-header">
+    <div class="aff-logo">GenTrack</div>
+    <span class="aff-icon">📍</span>
+    <div class="aff-title">Signaler un problème</div>
+    <div class="aff-subtitle">Scannez le QR code pour nous informer<br/>de tout dysfonctionnement ou incident</div>
+  </div>
+
+  <div class="aff-body">
+    <div class="aff-steps">
+      <div class="aff-step">
+        <div class="aff-step-num">1</div>
+        <div class="aff-step-text">
+          <strong>Scannez le QR code</strong>
+          <span>Ouvrez l'appareil photo de votre téléphone et pointez-le vers le code ci-dessous</span>
+        </div>
+      </div>
+      <div class="aff-step">
+        <div class="aff-step-num">2</div>
+        <div class="aff-step-text">
+          <strong>Décrivez le problème</strong>
+          <span>Sélectionnez le type de problème, l'équipement concerné et ajoutez une photo si possible</span>
+        </div>
+      </div>
+      <div class="aff-step">
+        <div class="aff-step-num">3</div>
+        <div class="aff-step-text">
+          <strong>Envoyez le signalement</strong>
+          <span>L'équipe technique est immédiatement notifiée et prend en charge votre demande</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="aff-qr-section">
+      <div class="aff-qr-label">Scannez pour signaler</div>
+      <img class="aff-qr-img" id="qr-img" src="" alt="QR Code"/>
+      <div class="aff-qr-site" id="site-name">—</div>
+      <div class="aff-qr-url" id="qr-url">—</div>
+    </div>
+  </div>
+
+  <div class="aff-footer">
+    <div class="aff-footer-brand">GenTrack</div>
+    <div class="aff-footer-note">Système de gestion technique · Confidentiel</div>
+  </div>
+</div>
+
+<script>
+// Paramètres depuis URL
+var params=new URLSearchParams(window.location.search);
+var siteId=params.get('site')||'';
+var siteNom=params.get('nom')||'Hôtel';
+var BASE=location.origin+location.pathname.replace('affiche-signalement.html','');
+
+var sgUrl=BASE+'signalement.html?site='+encodeURIComponent(siteId);
+var qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(sgUrl);
+
+document.getElementById('qr-img').src=qrUrl;
+document.getElementById('site-name').textContent=decodeURIComponent(siteNom);
+document.getElementById('qr-url').textContent=sgUrl;
+document.getElementById('toolbar-site').textContent='Affiche — '+decodeURIComponent(siteNom);
+document.title='GenTrack · Affiche — '+decodeURIComponent(siteNom);
+</script>
+</body>
+</html>

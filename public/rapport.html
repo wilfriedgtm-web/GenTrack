@@ -320,6 +320,19 @@ async function _submit(){
     var now=new Date().toISOString();
     var today=now.split('T')[0];
 
+    // Upload photo si présente
+    var photoUrl=null;
+    if(_photoFile){
+      var ext=_photoFile.name.split('.').pop()||'jpg';
+      var fname='rapports/'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.'+ext;
+      var upRes=await fetch(SUPA_URL+'/storage/v1/object/gentrack-photos/'+fname,{
+        method:'POST',
+        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':_photoFile.type||'image/jpeg'},
+        body:_photoFile
+      });
+      if(upRes.ok)photoUrl=SUPA_URL+'/storage/v1/object/public/gentrack-photos/'+fname;
+    }
+
     // Note complète : travaux + durée si renseignée
     var noteComplete=travaux+(duree?' (Durée : '+duree+'h)':'');
 
@@ -344,7 +357,8 @@ async function _submit(){
       statut:'realise',
       cout:cout,
       prestataire:tech,
-      created_by:tech
+      created_by:tech,
+      photo_url:photoUrl||null
     });
 
     // 3. Masquer form, afficher confirmation

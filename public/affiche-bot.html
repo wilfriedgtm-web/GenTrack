@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>GenTrack · Guide Bot WhatsApp</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:24px 16px}
+
+.toolbar{display:flex;gap:12px;margin-bottom:24px;align-items:center;width:100%;max-width:720px;flex-wrap:wrap}
+.toolbar-title{font-size:14px;font-weight:700;color:#1A1D28;flex:1}
+.btn{padding:8px 18px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer}
+.btn-print{background:#25D366;color:white}
+.btn-close{background:white;border:1.5px solid #E4E6EF;color:#5A5F78}
+
+.affiche{width:720px;max-width:100%;background:white;border-radius:16px;box-shadow:0 4px 32px rgba(18,21,30,.12);overflow:hidden}
+
+/* Header */
+.aff-header{background:linear-gradient(145deg,#12151E 0%,#1A2D1F 100%);padding:32px 40px 28px;display:flex;align-items:center;gap:28px;flex-wrap:wrap}
+.aff-header-left{flex:1;min-width:200px}
+.aff-logo{font-size:10px;font-weight:800;letter-spacing:.25em;color:#E8A020;text-transform:uppercase;margin-bottom:10px}
+.aff-title{font-size:28px;font-weight:900;color:white;letter-spacing:-.03em;margin-bottom:6px;line-height:1.1}
+.aff-subtitle{font-size:13px;color:rgba(255,255,255,.55);line-height:1.5;max-width:340px}
+.aff-header-right{text-align:center;flex-shrink:0}
+.aff-wa-qr{background:white;border-radius:12px;padding:12px;display:inline-block;margin-bottom:8px}
+.aff-wa-qr img{display:block;border-radius:4px}
+.aff-wa-num{font-size:11px;color:rgba(255,255,255,.5)}
+.wa-badge{display:inline-flex;align-items:center;gap:6px;background:#25D366;border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;color:white;margin-bottom:8px}
+
+/* Intro */
+.aff-intro{padding:20px 40px 0;display:flex;gap:12px;align-items:flex-start}
+.aff-intro-icon{font-size:24px;flex-shrink:0;margin-top:2px}
+.aff-intro-text{font-size:13px;color:#5A5F78;line-height:1.6}
+
+/* Commands grid */
+.aff-commands{padding:20px 40px 0;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cmd-card{background:#F4F5FA;border-radius:12px;padding:16px;border-left:4px solid}
+.cmd-card.panne{border-color:#C0392B}
+.cmd-card.plein{border-color:#1565C0}
+.cmd-card.ronde{border-color:#1B7A4A}
+.cmd-card.saisie{border-color:#7B1FA2}
+.cmd-card.resolu{border-color:#E8A020}
+
+.cmd-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.cmd-icon{font-size:22px}
+.cmd-label{font-size:13px;font-weight:800;color:#12151E}
+.cmd-tag{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:4px;padding:2px 7px;display:inline-block}
+.panne .cmd-tag{background:#FDF0EE;color:#C0392B}
+.plein .cmd-tag{background:#E3F0FF;color:#1565C0}
+.ronde .cmd-tag{background:#E8F7EE;color:#1B7A4A}
+.saisie .cmd-tag{background:#F5E8FF;color:#7B1FA2}
+.resolu .cmd-tag{background:#FFF6E0;color:#B87A10}
+
+.cmd-desc{font-size:12px;color:#5A5F78;line-height:1.5;margin-bottom:10px}
+
+/* Flow steps (mini chat bubbles) */
+.flow{display:flex;flex-direction:column;gap:4px}
+.flow-msg{font-size:11px;border-radius:8px;padding:5px 9px;max-width:90%;line-height:1.35;position:relative}
+.flow-msg.bot{background:#E8F7EE;color:#1B7A4A;align-self:flex-start;border-bottom-left-radius:2px}
+.flow-msg.user{background:#12151E;color:white;align-self:flex-end;border-bottom-right-radius:2px}
+.flow-msg.bot.wa{background:#DCF8C6;color:#1A1D28}
+.flow-label{font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#9AA0B8;margin-top:4px;margin-bottom:2px}
+
+/* Quick commands */
+.aff-quick{padding:20px 40px 0}
+.aff-quick-title{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9AA0B8;margin-bottom:10px}
+.quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.quick-item{background:#F4F5FA;border-radius:8px;padding:8px 6px;text-align:center}
+.quick-word{font-size:13px;font-weight:800;color:#12151E;margin-bottom:2px;font-family:monospace}
+.quick-desc{font-size:10px;color:#9AA0B8}
+
+/* Tips */
+.aff-tips{padding:16px 40px 0;display:flex;gap:10px;flex-wrap:wrap}
+.tip{display:flex;align-items:center;gap:7px;font-size:11px;color:#5A5F78;background:#F4F5FA;border-radius:8px;padding:7px 10px;flex:1;min-width:180px}
+.tip-icon{font-size:16px;flex-shrink:0}
+
+/* Footer */
+.aff-footer{margin-top:24px;background:#12151E;padding:16px 40px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.aff-footer-brand{font-size:10px;font-weight:800;letter-spacing:.2em;color:#E8A020;text-transform:uppercase}
+.aff-footer-note{font-size:10px;color:rgba(255,255,255,.35)}
+
+@media print{
+  body{background:white;padding:0}
+  .toolbar{display:none}
+  .affiche{box-shadow:none;border-radius:0;width:100%}
+  @page{size:A4;margin:0}
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="toolbar-title">Guide Bot WhatsApp — Techniciens</span>
+  <button class="btn btn-close" onclick="window.close()">✕ Fermer</button>
+  <button class="btn btn-print" onclick="window.print()">🖨️ Imprimer / PDF</button>
+</div>
+
+<div class="affiche">
+
+  <!-- HEADER -->
+  <div class="aff-header">
+    <div class="aff-header-left">
+      <div class="aff-logo">GenTrack</div>
+      <div class="aff-title">Bot WhatsApp<br/>Techniciens</div>
+      <div class="aff-subtitle">Signalez, déclarez et suivez toutes les interventions directement depuis WhatsApp — sans connexion internet ni application à installer.</div>
+    </div>
+    <div class="aff-header-right">
+      <div class="wa-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.087.537 4.047 1.48 5.755L0 24l6.395-1.677A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.823 0-3.534-.487-5.012-1.337l-.36-.214-3.8.997.999-3.702-.237-.38A9.949 9.949 0 0 1 2 12c0-5.514 4.486-10 10-10s10 4.486 10 10-4.486 10-10 10z"/></svg>
+        WhatsApp Bot
+      </div>
+      <div class="aff-wa-qr">
+        <img id="wa-qr" src="" width="120" height="120" alt="QR WhatsApp"/>
+      </div>
+      <div class="aff-wa-num" id="wa-num">+1 (415) 523-8886</div>
+    </div>
+  </div>
+
+  <!-- INTRO -->
+  <div class="aff-intro">
+    <div class="aff-intro-icon">💡</div>
+    <div class="aff-intro-text"><strong>Comment démarrer :</strong> Scannez le QR code avec votre téléphone pour ouvrir une conversation WhatsApp avec le bot, ou enregistrez le numéro et envoyez n'importe quel message pour commencer. Le bot guide chaque étape.</div>
+  </div>
+
+  <!-- COMMANDS -->
+  <div class="aff-commands">
+
+    <!-- PANNE -->
+    <div class="cmd-card panne">
+      <div class="cmd-header">
+        <span class="cmd-icon">🚨</span>
+        <div>
+          <div class="cmd-label">Déclarer une panne</div>
+          <span class="cmd-tag">panne</span>
+        </div>
+      </div>
+      <div class="cmd-desc">Signalez une panne ou un dysfonctionnement sur un équipement. Le resp. technique est notifié immédiatement.</div>
+      <div class="flow">
+        <div class="flow-label">Exemple</div>
+        <div class="flow-msg user">panne</div>
+        <div class="flow-msg bot wa">🚨 Quel équipement est en panne ?<br/>1 - GE Principal<br/>2 - Cuve Fuel<br/>3 - Climatisation</div>
+        <div class="flow-msg user">1</div>
+        <div class="flow-msg bot wa">📝 Décrivez le problème :</div>
+        <div class="flow-msg user">Ne démarre plus, alarme rouge</div>
+        <div class="flow-msg bot wa">✅ Panne enregistrée. Le resp. tech est notifié.</div>
+      </div>
+    </div>
+
+    <!-- PLEIN -->
+    <div class="cmd-card plein">
+      <div class="cmd-header">
+        <span class="cmd-icon">⛽</span>
+        <div>
+          <div class="cmd-label">Déclarer un ravitaillement</div>
+          <span class="cmd-tag">plein</span>
+        </div>
+      </div>
+      <div class="cmd-desc">Enregistrez un ravitaillement de cuve. Le niveau et l'autonomie sont calculés automatiquement.</div>
+      <div class="flow">
+        <div class="flow-label">Exemple</div>
+        <div class="flow-msg user">plein</div>
+        <div class="flow-msg bot wa">⛽ Quelle cuve a été ravitaillée ?<br/>1 - Cuve Fuel Principale (450L)</div>
+        <div class="flow-msg user">1</div>
+        <div class="flow-msg bot wa">💧 Niveau actuel (litres) ?</div>
+        <div class="flow-msg user">280</div>
+        <div class="flow-msg bot wa">💧 Litres ajoutés ?</div>
+        <div class="flow-msg user">200</div>
+        <div class="flow-msg bot wa">👤 Votre nom / opérateur ?</div>
+        <div class="flow-msg user">Moussa</div>
+        <div class="flow-msg bot wa">✅ Ravitaillement enregistré.<br/>📊 Niveau : 480L (96%) 🟢<br/>⏱️ Autonomie : ~7j</div>
+      </div>
+    </div>
+
+    <!-- RONDE -->
+    <div class="cmd-card ronde">
+      <div class="cmd-header">
+        <span class="cmd-icon">🔄</span>
+        <div>
+          <div class="cmd-label">Effectuer une ronde</div>
+          <span class="cmd-tag">ronde</span>
+        </div>
+      </div>
+      <div class="cmd-desc">Saisissez les relevés de ronde quotidiens ou hebdomadaires. Le bot pose chaque question équipement par équipement.</div>
+      <div class="flow">
+        <div class="flow-label">Exemple</div>
+        <div class="flow-msg user">ronde</div>
+        <div class="flow-msg bot wa">🔄 Ronde journalière<br/>📍 Hôtel Azalaï<br/><br/>GE Principal :<br/>Q: Niveau cuve (litres) ?</div>
+        <div class="flow-msg user">380</div>
+        <div class="flow-msg bot wa">Q: État général (OK/Anomalie) ?</div>
+        <div class="flow-msg user">OK</div>
+        <div class="flow-msg bot wa">✅ Ronde enregistrée (5/5 équipements)</div>
+      </div>
+    </div>
+
+    <!-- SAISIE / RELEVÉ -->
+    <div class="cmd-card saisie">
+      <div class="cmd-header">
+        <span class="cmd-icon">📊</span>
+        <div>
+          <div class="cmd-label">Relevé horaire</div>
+          <span class="cmd-tag">saisie</span>
+        </div>
+      </div>
+      <div class="cmd-desc">Enregistrez un relevé horaire sur n'importe quel équipement : température, pression, consommation…</div>
+      <div class="flow">
+        <div class="flow-label">Exemple</div>
+        <div class="flow-msg user">saisie</div>
+        <div class="flow-msg bot wa">📊 Relevé horaire<br/>Quel équipement ?<br/>1 - GE Principal<br/>2 - Cuve Fuel<br/>3 - Groupe Froid</div>
+        <div class="flow-msg user">1</div>
+        <div class="flow-msg bot wa">📋 GE Principal<br/>Q: Température eau (°C) ?</div>
+        <div class="flow-msg user">87</div>
+        <div class="flow-msg bot wa">✅ Relevé enregistré. Aucune anomalie détectée.</div>
+      </div>
+    </div>
+
+    <!-- RÉSOLU -->
+    <div class="cmd-card resolu" style="grid-column:1/-1">
+      <div class="cmd-header">
+        <span class="cmd-icon">✅</span>
+        <div>
+          <div class="cmd-label">Clôturer une intervention</div>
+          <span class="cmd-tag">resolu</span>
+        </div>
+      </div>
+      <div class="cmd-desc">Après avoir résolu une panne, utilisez "resolu" pour clôturer le ticket et créer la fiche maintenance automatiquement. Vous pouvez aussi remplir le formulaire rapport via le lien WhatsApp reçu lors de l'affectation.</div>
+      <div class="flow" style="flex-direction:row;flex-wrap:wrap;gap:12px;align-items:flex-start">
+        <div style="flex:1;min-width:200px">
+          <div class="flow-label">Via bot</div>
+          <div class="flow-msg user" style="max-width:none">resolu</div>
+          <div class="flow-msg bot wa" style="max-width:none">✅ Quelle panne est résolue ?<br/>1 - GE Principal — Ne démarre plus</div>
+          <div class="flow-msg user" style="max-width:none">1</div>
+          <div class="flow-msg bot wa" style="max-width:none">Décrivez l'intervention :</div>
+          <div class="flow-msg user" style="max-width:none">Remplacement courroie alternateur</div>
+          <div class="flow-msg bot wa" style="max-width:none">✅ Panne clôturée. Fiche maintenance créée.</div>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <div class="flow-label">Via lien rapport (photo possible)</div>
+          <div class="flow-msg bot wa" style="max-width:none">👷 Affectation reçue — GE Principal<br/>📋 Remplissez le rapport : <u>bit.ly/rapport-...</u></div>
+          <div style="font-size:11px;color:#5A5F78;margin-top:6px;line-height:1.4">Le lien ouvre un formulaire mobile avec champ photo pour documenter l'intervention avec une preuve visuelle.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- QUICK COMMANDS -->
+  <div class="aff-quick">
+    <div class="aff-quick-title">Toutes les commandes disponibles</div>
+    <div class="quick-grid">
+      <div class="quick-item"><div class="quick-word">ronde</div><div class="quick-desc">Ronde équipements</div></div>
+      <div class="quick-item"><div class="quick-word">saisie</div><div class="quick-desc">Relevé horaire</div></div>
+      <div class="quick-item"><div class="quick-word">plein</div><div class="quick-desc">Ravitaillement cuve</div></div>
+      <div class="quick-item"><div class="quick-word">panne</div><div class="quick-desc">Déclarer une panne</div></div>
+      <div class="quick-item"><div class="quick-word">resolu</div><div class="quick-desc">Clôturer panne</div></div>
+      <div class="quick-item"><div class="quick-word">menu</div><div class="quick-desc">Afficher menu</div></div>
+      <div class="quick-item"><div class="quick-word">aide</div><div class="quick-desc">Aide commandes</div></div>
+      <div class="quick-item"><div class="quick-word">stop</div><div class="quick-desc">Annuler saisie</div></div>
+    </div>
+  </div>
+
+  <!-- TIPS -->
+  <div class="aff-tips">
+    <div class="tip"><span class="tip-icon">📱</span>Pas besoin d'application — fonctionne avec WhatsApp standard</div>
+    <div class="tip"><span class="tip-icon">🌐</span>Connexion internet requise au moment de l'envoi</div>
+    <div class="tip"><span class="tip-icon">🔔</span>Le resp. technique reçoit une notification à chaque signalement</div>
+    <div class="tip"><span class="tip-icon">📷</span>Vous pouvez joindre une photo via le formulaire rapport</div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="aff-footer">
+    <div class="aff-footer-brand">GenTrack</div>
+    <div class="aff-footer-note">Usage interne — Équipe technique · <span id="site-name-footer"></span></div>
+  </div>
+
+</div>
+
+<script>
+var params=new URLSearchParams(window.location.search);
+var siteNom=params.get('nom')||'';
+var WA_NUMBER='14155238886';
+var WA_URL='https://wa.me/'+WA_NUMBER;
+
+// QR code du bot
+document.getElementById('wa-qr').src='https://api.qrserver.com/v1/create-qr-code/?size=120x120&data='+encodeURIComponent(WA_URL);
+document.getElementById('site-name-footer').textContent=decodeURIComponent(siteNom);
+if(siteNom)document.querySelector('.toolbar-title').textContent='Guide Bot — '+decodeURIComponent(siteNom);
+</script>
+</body>
+</html>
