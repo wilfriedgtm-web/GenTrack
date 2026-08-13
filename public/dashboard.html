@@ -2183,6 +2183,7 @@ async function _rtConfig(sid){
             '<div class="config-eq-name" style="'+(e.actif?'':'color:var(--text3)')+'">'+escape_html(e.nom)+'</div>'+
             '<div class="config-eq-type">'+(e.actif?'Actif':'Inactif')+'</div>'+
           '</div>'+
+          '<button class="config-eq-edit-btn" onclick="event.stopPropagation();_duplicateEquip(\''+e.id+'\')" title="Dupliquer" style="font-size:14px">⧉</button>'+
           '<button class="config-eq-edit-btn" onclick="event.stopPropagation();_openEditEquipFromCache(\''+e.id+'\')" title="Modifier">✏️</button>'+
         '</div>';
       });
@@ -3134,6 +3135,36 @@ function _updateAddEquipFields(){
   if(cuveDiv)cuveDiv.style.display=(typeId===CUVE_TYPE_ID_CFG)?'block':'none';
 }
 
+async function _duplicateEquip(eqId){
+  var src=_configEquipCache[eqId];
+  if(!src){return;}
+  var newEq={
+    site_id:_configCurrentSid,type_id:src.type_id||null,nom:src.nom+' (copie)',
+    actif:src.actif,actif_ronde:src.actif_ronde,actif_releve:src.actif_releve,
+    ordre_ronde:src.ordre_ronde||99,
+    marque:src.marque||null,reference:src.reference||null,
+    puissance_kva:src.puissance_kva||null,conso_theorique_lh:src.conso_theorique_lh||null,
+    capacite_litres:src.capacite_litres||null,seuil_vidange_heures:src.seuil_vidange_heures||null,
+    baseline_compteur_heures:src.baseline_compteur_heures||null,prix_litre:src.prix_litre||null
+  };
+  var created=await supaPost('equipements',newEq);
+  if(!created||!created.id){alert('Erreur duplication');return;}
+  var newId=created.id;
+  var qs=await supaGet('questions','equipement_id=eq.'+eqId+'&actif=eq.true&order=ordre.asc&select=texte,type_reponse,unite,ordre,actif,frequences,options,seuil_min,seuil_max,alerte_severite,alerte_canal');
+  if(qs&&qs.length){
+    var qsCopy=qs.map(function(q){var o=Object.assign({},q);o.equipement_id=newId;return o;});
+    await fetch(SUPA_URL+'/rest/v1/questions',{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(qsCopy)
+    });
+  }
+  var t=document.createElement('div');
+  t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#16a34a;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999';
+  t.textContent='✅ Équipement dupliqué ('+(qs?qs.length:0)+' question(s))';
+  document.body.appendChild(t);setTimeout(function(){t.remove();},3000);
+  if(_session)renderRespTech(_session,'config');
+}
 function _openEditEquipFromCache(eqId){
   var e=_configEquipCache[eqId];
   if(!e){return;}
