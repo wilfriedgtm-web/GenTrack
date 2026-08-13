@@ -1631,7 +1631,7 @@ async function _rtSignalements(sid){
   var dc=document.getElementById('dash-content-main');
   if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
 
-  var query='groupe_id=eq.'+sid+'&order=created_at.desc&limit=100&select=id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,created_at,equipement_id,source,equipements(nom)';
+  var query='groupe_id=eq.'+sid+'&order=created_at.desc&limit=100&select=id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,created_at,equipement_id,source,photo_url,equipements(nom)';
   if(_sgFilter!=='tous')query+='&statut=eq.'+_sgFilter;
   var rows=await supaGet('signalements',query);
 
@@ -3830,7 +3830,7 @@ async function _dtSignalements(sids){
   var sidStr=sids.join(',');
   var sites=await supaGet('sites','id=in.('+sidStr+')&select=id,nom');
   var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
-  var query='groupe_id=in.('+sidStr+')&order=created_at.desc&limit=200&select=id,groupe_id,type,description,statut,signale_par,lieu,cout_intervention,assigne_a,created_at,equipements(nom)';
+  var query='groupe_id=in.('+sidStr+')&order=created_at.desc&limit=200&select=id,groupe_id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,created_at,photo_url,equipements(nom)';
   if(_dtSgFilter!=='tous')query+='&statut=eq.'+_dtSgFilter;
   var rows=await supaGet('signalements',query);
   var counts={tous:rows.length,ouvert:0,en_cours:0,resolu:0};
