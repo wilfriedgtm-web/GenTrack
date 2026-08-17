@@ -1259,7 +1259,26 @@ async function _resolveAlerte(id){
   navTo('alertes');
 }
 async function _resolveSg(id){
-  await supaPatch('signalements',id,{statut:'resolu',resolved_at:new Date().toISOString()});
+  // Fetch signalement pour avoir les infos nécessaires
+  var sgs=await supaGet('signalements','id=eq.'+id+'&select=id,type,description,groupe_id,equipement_id,cout_intervention,signale_par,lieu');
+  var sg=sgs&&sgs[0];
+  var now=new Date().toISOString();
+  await supaPatch('signalements',id,{statut:'resolu',resolved_at:now});
+  // Auto-créer entrée maintenance si c'est une panne
+  if(sg&&sg.type==='panne'){
+    var mnt={
+      groupe_id: sg.groupe_id,
+      type: 'panne',
+      titre: 'Panne résolue'+(sg.lieu?' · '+sg.lieu:''),
+      description: sg.description||'',
+      date_intervention: now.slice(0,10),
+      statut: 'realise',
+      cout: sg.cout_intervention||null,
+      created_by: sg.signale_par||null
+    };
+    if(sg.equipement_id)mnt.equipement_id=sg.equipement_id;
+    await supaPost('maintenances',mnt);
+  }
   navTo('alertes');
 }
 
@@ -1971,18 +1990,23 @@ async function _rtMaintenances(sid){
   var dc=document.getElementById('dash-content-main');
   if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
 
-  var query='groupe_id=eq.'+sid+'&order=created_at.desc&limit=150&select=id,type,titre,description,date_intervention,date_planifiee,statut,cout,quantite,unite,prestataire,created_by,created_at,equipement_id,photo_url,equipements(nom)';
+  // Lecture depuis la vue unifiée (signalements + vidanges + pleins + maintenances)
+  var query='site_id=eq.'+sid+'&order=date_ref.desc&limit=200&select=id,type,titre,description,date_ref,equipement_nom,cout,statut,intervenant,notes,created_at,source';
   if(_mntFilter!=='tous')query+='&type=eq.'+_mntFilter;
-  var rows=await supaGet('maintenances',query);
+  var rows=await supaGet('vue_journal_maintenance',query);
 
-  // Cost summary
-  var totalCout=rows.filter(function(r){return r.statut==='realise';}).reduce(function(s,r){return s+(r.cout||0);},0);
-  var byType={};
-  Object.keys(_MNT_TYPES).forEach(function(t){byType[t]=0;});
-  rows.forEach(function(r){if(r.type&&byType[r.type]!==undefined)byType[r.type]++;});
+  // KPI coût total (opérations réalisées / pannes résolues)
+  var totalCout=rows.reduce(function(s,r){
+    var done=r.statut==='realise'||r.statut==='resolu';
+    return done?s+(parseFloat(r.cout)||0):s;
+  },0);
 
-  var filterHtml=['tous','panne','vidange','ravitaillement','preventive'].map(function(f){
-    var labels={tous:'Tous',panne:'Pannes',vidange:'Vidanges',ravitaillement:'Ravitaillements',preventive:'Préventive'};
+  // Comptage par type
+  var byType={panne:0,vidange:0,ravitaillement:0,maintenance:0};
+  rows.forEach(function(r){if(byType[r.type]!==undefined)byType[r.type]++;});
+
+  var filterHtml=['tous','panne','vidange','ravitaillement','maintenance'].map(function(f){
+    var labels={tous:'Tous',panne:'Pannes',vidange:'Vidanges',ravitaillement:'Ravitaillements',maintenance:'Maintenance'};
     var active=_mntFilter===f;
     var n=f==='tous'?rows.length:(byType[f]||0);
     return '<button onclick="_setMntFilter(\''+f+'\')" style="padding:6px 14px;border-radius:20px;border:1.5px solid '+(active?'var(--amber)':'var(--border)')+';background:'+(active?'var(--amber-pale)':'white')+';font-size:12px;font-weight:'+(active?'700':'500')+';color:'+(active?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+labels[f]+(n?' ('+n+')':'')+'</button>';
@@ -1994,34 +2018,35 @@ async function _rtMaintenances(sid){
   } else {
     cardsHtml=rows.map(function(r){
       var t=_MNT_TYPES[r.type]||{label:r.type,icon:'🔧',color:'var(--text2)',bg:'var(--bg)'};
-      var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:null;
-      var date=r.date_intervention||r.date_planifiee||r.created_at;
-      var dateStr=date?new Date(date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'';
-      var isPlanifie=r.statut==='planifie';
-      return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+t.color+';opacity:'+(r.statut==='annule'?.5:1)+'">'+
+      var dateStr=r.date_ref?new Date(r.date_ref).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'';
+      // Badge statut pour les pannes
+      var statutBadge='';
+      if(r.type==='panne'){
+        if(r.statut==='ouvert')statutBadge='<span style="font-size:10px;padding:2px 8px;border-radius:12px;background:var(--rouge-pale);color:var(--rouge);font-weight:700">🔴 Ouvert</span>';
+        else if(r.statut==='en_cours')statutBadge='<span style="font-size:10px;padding:2px 8px;border-radius:12px;background:var(--orange-pale);color:var(--orange);font-weight:700">🟠 En cours</span>';
+        else if(r.statut==='resolu')statutBadge='<span style="font-size:10px;padding:2px 8px;border-radius:12px;background:var(--vert-pale);color:var(--vert);font-weight:700">✅ Résolu</span>';
+      } else if(r.statut==='planifie'){
+        statutBadge='<span style="font-size:10px;padding:2px 8px;border-radius:12px;background:var(--amber-pale);color:var(--amber-dark);font-weight:700">📅 Planifié</span>';
+      }
+      var isPlanifie=r.statut==='planifie'&&r.source==='maintenance';
+      var dim=r.statut==='annule'||r.statut==='resolu';
+      return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+t.color+';opacity:'+(dim?.75:1)+'">'+
         '<div style="display:flex;align-items:flex-start;gap:12px">'+
           '<div style="width:36px;height:36px;border-radius:10px;background:'+t.bg+';display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">'+t.icon+'</div>'+
           '<div style="flex:1;min-width:0">'+
             '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">'+
               '<span style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(r.titre||t.label)+'</span>'+
-              (isPlanifie?'<span style="font-size:10px;padding:2px 8px;border-radius:12px;background:var(--amber-pale);color:var(--amber-dark);font-weight:700">Planifié</span>':'')+
+              statutBadge+
             '</div>'+
-            (eqNom?'<div style="font-size:12px;color:var(--text2);margin-bottom:4px">'+escape_html(eqNom)+'</div>':'')+
+            (r.equipement_nom?'<div style="font-size:12px;color:var(--text2);margin-bottom:4px">'+escape_html(r.equipement_nom)+'</div>':'')+
             (r.description?'<div style="font-size:13px;color:var(--text);margin-bottom:6px;line-height:1.5">'+escape_html(r.description)+'</div>':'')+
             '<div style="font-size:11px;color:var(--text3);display:flex;flex-wrap:wrap;gap:10px">'+
               (dateStr?'<span>📅 '+dateStr+'</span>':'')+
-              (r.prestataire?'<span>👷 '+escape_html(r.prestataire)+'</span>':'')+
-              (r.quantite?'<span>📦 '+r.quantite+(r.unite?' '+r.unite:'')+'</span>':'')+
-              (r.cout?'<span>💰 '+r.cout.toLocaleString('fr-FR')+' FCFA</span>':'')+
-              (r.created_by?'<span>👤 '+escape_html(r.created_by)+'</span>':'')+
+              (r.intervenant?'<span>👷 '+escape_html(r.intervenant)+'</span>':'')+
+              (r.cout?'<span>💰 '+parseFloat(r.cout).toLocaleString('fr-FR')+' FCFA</span>':'')+
             '</div>'+
           '</div>'+
         '</div>'+
-        (r.photo_url?
-          '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
-            '<img src="'+r.photo_url+'" style="max-width:100%;border-radius:8px;border:1.5px solid var(--border);display:block" onerror="this.parentElement.style.display=\'none\'"/>'+
-            '<a href="'+r.photo_url+'" download target="_blank" style="display:inline-block;margin-top:6px;padding:5px 10px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;font-size:11px;font-weight:600;color:var(--text2);text-decoration:none">⬇️ Télécharger</a>'+
-          '</div>':'')+
         (isPlanifie?
           '<div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
             '<button onclick="_mntMarquerRealise(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Marquer réalisé</button>'+
@@ -2035,7 +2060,7 @@ async function _rtMaintenances(sid){
       '<div style="font-size:22px">💰</div>'+
       '<div>'+
         '<div style="font-size:18px;font-weight:800;color:var(--dark)">'+totalCout.toLocaleString('fr-FR')+' FCFA</div>'+
-        '<div style="font-size:11px;color:var(--text3)">Coût total des opérations réalisées</div>'+
+        '<div style="font-size:11px;color:var(--text3)">Coût total des opérations (pannes + interventions)</div>'+
       '</div>'+
     '</div>'+
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">'+
