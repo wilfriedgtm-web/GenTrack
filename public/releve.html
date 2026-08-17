@@ -272,6 +272,16 @@ async function supaPost(table,data){
   var rows=await r.json();
   return Array.isArray(rows)?rows[0]:rows;
 }
+async function supaUpsert(table,data,onConflict){
+  var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?on_conflict='+onConflict,{
+    method:'POST',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=ignore-duplicates,return=representation'},
+    body:JSON.stringify(data)
+  });
+  if(!r.ok){var err=await r.text();throw new Error('UPSERT /'+table+' → '+r.status+': '+err);}
+  var rows=await r.json();
+  return Array.isArray(rows)?rows[0]:rows;
+}
 async function supaPatch(table,id,data){
   await fetch(SUPA_URL+'/rest/v1/'+table+'?id=eq.'+id,{
     method:'PATCH',
@@ -328,7 +338,7 @@ async function init(){
   }
 
   _equips=await supa('equipements',
-    'site_id=eq.'+_releve.site_id+'&actif=eq.true&actif_releve=eq.true&select=id,nom,type_id,types_equipements(nom,icone)&order=ordre_ronde.asc'
+    'site_id=eq.'+_releve.site_id+'&actif=eq.true&select=id,nom,type_id,types_equipements(nom,icone)&order=ordre_ronde.asc'
   );
   if(!_equips.length){showState('⚙️','Aucun équipement','Aucun équipement actif sur ce site.');return;}
 
@@ -671,10 +681,10 @@ async function _submitReleve(){
           }
         }
       }
-      return supaPost('reponses',{
+      return supaUpsert('reponses',{
         question_id:q.id,valeur:val,
         releve_id:_releve.id,ronde_equipement_id:null
-      });
+      },'releve_id,question_id');
     });
     await Promise.all(posts);
     if(alertePosts.length)await Promise.all(alertePosts);
