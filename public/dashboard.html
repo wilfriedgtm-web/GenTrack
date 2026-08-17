@@ -636,13 +636,19 @@ async function _rtAccueil(session,sid,cid){
   var today=todayStr();
   var CUVE_TYPE='de5519d0-363b-4628-b872-2dcf01859002';
   var GE_TYPE='98849793-9201-4adf-aec2-a4a08587c4e2';
-  var[rondes,equips,alertes,pannes,recoData]=await Promise.all([
+  var todayStart=today+'T00:00:00Z';
+  var[rondes,equips,alertes,pannes,recoData,vueStat,relevesJour]=await Promise.all([
     supaGet('rondes','site_id=eq.'+sid+'&date_ronde=eq.'+today+'&select=id,frequence,date_ronde'),
     supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,ordre_ronde,type_id,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,date_dernier_vidange,types_equipements(nom)&order=ordre_ronde.asc'),
     supaGet('alertes','groupe_id=eq.'+sid+'&resolue=eq.false&select=id,type,severite,type_alerte,message,created_at&order=created_at.desc&limit=20'),
     supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&statut=neq.resolu&select=id,type,description,created_at,equipement_id,equipements(nom)&order=created_at.desc&limit=20'),
-    _fetchRecoEquipements(sid)
+    _fetchRecoEquipements(sid),
+    supaGet('vue_statut_equipements','site_id=eq.'+sid+'&select=equipement_id,statut_couleur,statut_label'),
+    supaGet('releves_horaires','site_id=eq.'+sid+'&created_at=gte.'+todayStart+'&select=id,statut,validated_at,nb_valeurs,nb_alertes,created_at&order=created_at.desc')
   ]);
+  // Index vue statut par equipement_id
+  var vueStatMap={};
+  (vueStat||[]).forEach(function(v){vueStatMap[v.equipement_id]=v;});
   var rIds=rondes.map(function(r){return r.id;});
   var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=id,ronde_id,equipement_id,statut,valide_at'):[];
 
@@ -698,8 +704,9 @@ async function _rtAccueil(session,sid,cid){
 
   // Ma journée
   var journee='<div class="section-title">Ma journée</div>';
-  if(rondes.length===0){
-    journee+='<div class="placeholder-card"><div class="placeholder-icon">📋</div>Aucune ronde programmée aujourd\'hui</div>';
+  var hasAnything=rondes.length>0||relevesJour.length>0;
+  if(!hasAnything){
+    journee+='<div class="placeholder-card"><div class="placeholder-icon">📋</div>Aucune activité enregistrée aujourd\'hui</div>';
   }else{
     journee+='<div style="display:flex;flex-direction:column;gap:8px">';
     rondes.forEach(function(ro){
@@ -722,23 +729,52 @@ async function _rtAccueil(session,sid,cid){
         (tot>0?'<div class="progress-bar-wrap"><div class="progress-bar" style="width:'+pct+'%;background:'+(ok?'var(--vert)':'var(--amber)')+'"></div></div>':'')+
       '</div>';
     });
+    // Relevés horaires du jour
+    relevesJour.forEach(function(rh){
+      var isVal=rh.statut==='validé';
+      var isExp=rh.statut==='expiré';
+      var icon=isVal?'✅':isExp?'⏰':'🔄';
+      var col=isVal?'var(--vert)':isExp?'var(--text3)':'var(--amber)';
+      var label=isVal?'Validé':isExp?'Expiré':'En cours';
+      var heure=new Date(rh.created_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+      var heureVal=rh.validated_at?new Date(rh.validated_at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):null;
+      var alertBadge=rh.nb_alertes>0?' · <span style="color:var(--rouge)">⚠️ '+rh.nb_alertes+' alerte'+(rh.nb_alertes>1?'s':'')+'</span>':'';
+      journee+='<div class="ronde-card" onclick="navTo(\'releves\')" style="cursor:pointer">'+
+        '<div style="display:flex;align-items:center;gap:12px">'+
+          '<span style="font-size:20px">'+icon+'</span>'+
+          '<div style="flex:1">'+
+            '<div style="font-size:13px;font-weight:600">Relevé horaire</div>'+
+            '<div style="font-size:11px;color:var(--text2);margin-top:2px">'+heure+(heureVal?' → '+heureVal:'')+(rh.nb_valeurs?' · '+rh.nb_valeurs+' valeurs':'')+alertBadge+'</div>'+
+          '</div>'+
+          '<span style="font-size:11px;font-weight:600;color:'+col+'">'+label+'</span>'+
+        '</div>'+
+      '</div>';
+    });
     journee+='</div>';
   }
 
   // Statut équipements
-  var statut='<div class="section-title">Statut équipements</div>';
+  var statutLegend='<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;font-size:10px;color:var(--text2)">'+
+    '<span>🔴 Signalement ouvert</span>'+
+    '<span>🟠 Résolu &lt;48h</span>'+
+    '<span>🟢 Ronde validée</span>'+
+    '<span>🟡 Relevé récent</span>'+
+    '<span>⚫ Aucune donnée</span>'+
+  '</div>';
+  var statut='<div class="section-title">Statut équipements</div>'+statutLegend;
   if(equips.length===0){
     statut+='<div class="placeholder-card"><div class="placeholder-icon">⚙️</div>Aucun équipement trouvé pour ce site</div>';
   }else{
     statut+='<div style="display:flex;flex-direction:column;gap:6px">';
     equips.forEach(function(e){
-      var re=rondeJ&&rondesEq.find(function(r){return r.ronde_id===rondeJ.id&&r.equipement_id===e.id;});
+      var vs=vueStatMap[e.id];
       var s,sc,dot;
-      if(!rondeJ){s='Pas de ronde';sc='var(--text3)';dot='⚪';}
-      else if(!re){s='—';sc='var(--text3)';dot='⚫';}
-      else if(re.statut==='valide'){s='OK';sc='var(--vert)';dot='🟢';}
-      else if(re.statut==='en_cours'){s='En cours';sc='var(--orange)';dot='🟡';}
-      else{s='En attente';sc='var(--orange)';dot='🟡';}
+      if(!vs||vs.statut_couleur==='gris'){s='Aucune donnée';sc='var(--text3)';dot='⚫';}
+      else if(vs.statut_couleur==='rouge'){s=vs.statut_label;sc='var(--rouge)';dot='🔴';}
+      else if(vs.statut_couleur==='orange'){s=vs.statut_label;sc='var(--orange)';dot='🟠';}
+      else if(vs.statut_couleur==='vert'){s='OK';sc='var(--vert)';dot='🟢';}
+      else if(vs.statut_couleur==='jaune'){s=vs.statut_label;sc='var(--amber)';dot='🟡';}
+      else{s='—';sc='var(--text3)';dot='⚪';}
       var tNom=(e.types_equipements&&e.types_equipements.nom)||'';
       var tIcon=_TYPE_ICONS[tNom]||'⚙️';
       // Recommandations et dernière saisie
@@ -747,8 +783,6 @@ async function _rtAccueil(session,sid,cid){
       var ls=eqReco.lastSaisie;
       var today=new Date().toISOString().split('T')[0];
       var lsOld=ls?new Date(ls.t).toISOString().split('T')[0]<today:false;
-      // Si pas de reco mais pas de saisie aujourd'hui → statut orange
-      if(lsOld&&!topReco&&s==='OK'){sc='var(--orange)';dot='🟡';s='Inactif';}
       statut+='<div class="eq-card" style="flex-direction:column;align-items:stretch;gap:6px">'+
         '<div style="display:flex;align-items:center;gap:10px">'+
           '<span style="font-size:18px">'+tIcon+'</span>'+
