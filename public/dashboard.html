@@ -5074,7 +5074,7 @@ async function _openRapportHebdo(period){
 
     // ── Source 1 : rondes (ronde_equipement_id) ──
     if(eqIds.length){
-      var allLastRE=await supaGet('rondes_equipements','equipement_id=in.('+eqIds.join(',')+')'+'&statut=eq.valide&select=id,equipement_id,valide_at&order=valide_at.desc&limit='+eqIds.length*5);
+      var allLastRE=await supaGet('rondes_equipements','equipement_id=in.('+eqIds.join(',')+')'+'&statut=eq.valide&valide_at=not.is.null&select=id,equipement_id,valide_at&order=valide_at.desc&limit='+eqIds.length*5);
       var seenEq=new Set();var topREIds=[];
       allLastRE.forEach(function(re){if(!seenEq.has(re.equipement_id)){seenEq.add(re.equipement_id);topREIds.push(re.id);lastRepsByEq[re.equipement_id]={valide_at:re.valide_at,re_id:re.id,vals:[]};}});
       if(topREIds.length){
