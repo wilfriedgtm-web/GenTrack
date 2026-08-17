@@ -1175,7 +1175,8 @@ async function _rtAlertes(sid,cid){
         '</div>'+
         '<div style="display:flex;gap:6px;margin-top:10px">'+
           (a.type==='signalement'||a.type_alerte==='signalement'?
-            '<button onclick="navTo(\'signalements\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid '+bd+';background:none;font-size:11px;color:'+bl+';cursor:pointer">Voir signalements</button>':'')+
+            '<button onclick="navTo(\'signalements\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid '+bd+';background:none;font-size:11px;color:'+bl+';cursor:pointer">Voir signalements</button>':
+            '<button onclick="_sgCreerDepuisAlerte(\''+sid+'\',\''+a.id+'\','+JSON.stringify(a.message||'')+',\''+bl+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid '+bd+';background:none;font-size:11px;color:'+bl+';font-weight:600;cursor:pointer">＋ Signalement</button>')+
           '<button onclick="_resolveAlerte(\''+a.id+'\')" style="flex:1;padding:6px;border-radius:6px;border:none;background:'+bl+';color:white;font-size:11px;font-weight:600;cursor:pointer">✓ Résolu</button>'+
         '</div>'+
       '</div>';
@@ -1870,6 +1871,45 @@ async function _sgCreerManuelSubmit(sid){
   var par=(document.getElementById('sg-m-par').value||'').trim()||null;
   if(!desc)return;
   await supaPost('signalements',{groupe_id:sid,equipement_id:equipId,type:type,description:desc,signale_par:par,statut:'ouvert',source:'manuel'});
+  _closeCfgModal();
+  if(_session)renderRespTech(_session,'signalements');
+}
+
+function _sgCreerDepuisAlerte(sid,alerteId,message,color){
+  supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc').then(function(equips){
+    var eqOpts='<option value="">— Aucun / Général —</option>'+equips.map(function(e){return '<option value="'+e.id+'">'+escape_html(e.nom)+'</option>';}).join('');
+    var typeOpts=Object.keys(_SG_TYPES).map(function(k){return '<option value="'+k+'">'+_SG_TYPES[k]+'</option>';}).join('');
+    _showCfgModal(
+      '<h3 style="font-size:16px;font-weight:700;margin-bottom:4px">📍 Créer un signalement</h3>'+
+      '<div style="font-size:11px;color:var(--text3);margin-bottom:16px">Depuis une alerte automatique</div>'+
+      '<div style="display:flex;flex-direction:column;gap:12px">'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">ÉQUIPEMENT</label>'+
+        '<select id="sg-a-equip" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px">'+eqOpts+'</select></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">TYPE</label>'+
+        '<select id="sg-a-type" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px">'+typeOpts+'</select></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">DESCRIPTION</label>'+
+        '<textarea id="sg-a-desc" rows="3" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;resize:none">'+escape_html(message)+'</textarea></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">SIGNALÉ PAR</label>'+
+        '<input id="sg-a-par" type="text" value="'+escape_html((_session&&_session.contact&&_session.contact.nom)||'')+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;margin-top:16px">'+
+        '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
+        '<button onclick="_sgCreerDepuisAlerteSubmit(\''+sid+'\',\''+alerteId+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--amber);color:var(--dark);cursor:pointer">Créer</button>'+
+      '</div>'
+    );
+  });
+}
+
+async function _sgCreerDepuisAlerteSubmit(sid,alerteId){
+  var desc=(document.getElementById('sg-a-desc').value||'').trim();
+  var type=document.getElementById('sg-a-type').value;
+  var equipId=document.getElementById('sg-a-equip').value||null;
+  var par=(document.getElementById('sg-a-par').value||'').trim()||null;
+  if(!desc)return;
+  await Promise.all([
+    supaPost('signalements',{groupe_id:sid,equipement_id:equipId,type:type,description:desc,signale_par:par,statut:'ouvert',source:'alerte'}),
+    supaPatch('alertes',alerteId,{resolue:true})
+  ]);
   _closeCfgModal();
   if(_session)renderRespTech(_session,'signalements');
 }
