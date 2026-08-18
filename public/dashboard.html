@@ -5223,7 +5223,8 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     var cap=parseFloat(c.capacite_litres);
     if(isNaN(niveau)||isNaN(cap))return;
     var pct=Math.round(niveau/cap*100);
-    var autoJ=consoTotale>0?Math.round(niveau/(consoTotale*8)*10)/10:null;
+    var consoH=parseFloat(c.conso_theorique_lh)||65;
+    var autoJ=consoH>0?Math.round(niveau/(consoH*8)*10)/10:null;
     var etat=pct<=20?'critique (⚠️ commande urgente requise)':pct<=40?'à surveiller':' satisfaisant';
     narEquip+=(c.nom||'La cuve')+' est à '+pct+'% de capacité ('+niveau+'L / '+cap+'L). État '+etat+'.'+( autoJ?' Autonomie estimée : ~'+autoJ+' jour'+(autoJ>1?'s':'')+'.' :'')+' ';
   });
