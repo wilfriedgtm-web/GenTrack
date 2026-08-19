@@ -2015,74 +2015,122 @@ function _sgDetail(id){
   _showCfgModal('<h3 style="font-size:15px;font-weight:700;margin-bottom:4px">🔍 Détail du signalement</h3>'+html);
 }
 
-function _sgAffecter(id){
-  var r=window._sgRows&&window._sgRows[id];
-  if(!r)return;
-  var sid=_session&&_session.site_ids&&_session.site_ids[0];
-  if(!sid)return;
-  supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,whatsapp,role&order=nom.asc').then(function(contacts){
-    if(!contacts.length){
-      alert('Aucun contact configuré pour ce site. Ajoutez des contacts dans Config > Contacts.');
-      return;
-    }
-    var contactsHtml=contacts.map(function(c){
-      return '<div onclick="_sgAffecterSelect(\''+id+'\',\''+escape_html(c.nom)+'\',\''+escape_html(c.whatsapp||'')+'\',this)" style="padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:border-color 0.15s" data-id="'+c.id+'">'+
-        '<div style="width:34px;height:34px;border-radius:50%;background:var(--amber-pale);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--amber-dark);flex-shrink:0">'+escape_html(c.nom.charAt(0).toUpperCase())+'</div>'+
-        '<div><div style="font-size:13px;font-weight:600;color:var(--text)">'+escape_html(c.nom)+'</div>'+
-        '<div style="font-size:11px;color:var(--text3)">'+escape_html(c.role||'')+(c.whatsapp?'  📱 '+escape_html(c.whatsapp):'')+'</div></div>'+
-      '</div>';
-    }).join('');
-    var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
-    var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
-    var desc=r.description||'';
-    _showCfgModal(
-      '<h3 style="font-size:15px;font-weight:700;margin-bottom:4px">👷 Affecter le signalement</h3>'+
-      '<div style="font-size:12px;color:var(--text2);margin-bottom:16px">'+escape_html(typeLabel)+(eqNom?' · '+escape_html(eqNom):'')+'</div>'+
-      '<div style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;margin-bottom:16px">'+contactsHtml+'</div>'+
-      '<div id="sg-aff-selected" style="display:none;background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:8px;padding:10px 12px;font-size:13px;font-weight:600;color:var(--amber-dark);margin-bottom:12px"></div>'+
-      '<div style="display:flex;gap:8px">'+
-        '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
-        '<button id="sg-aff-btn" onclick="_sgAffecterConfirm(\''+id+'\')" disabled style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--amber);color:var(--dark);cursor:pointer;opacity:0.4">Affecter & WhatsApp →</button>'+
-      '</div>'
-    );
-  });
+var _sgAffecterChosen={nom:'',wa:''};
+
+function _sgAffecterMsg(r,instr,rapportUrl){
+  var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
+  var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
+  return '🔧 *Intervention requise — GenTrack*\n\n'+
+    '📍 *'+typeLabel+(eqNom?' · '+eqNom:'')+'*\n'+
+    (r.lieu?'📍 Lieu : '+r.lieu+'\n':'')+
+    '📝 '+r.description+
+    (instr?'\n\n📋 *Instructions :*\n'+instr:'')+
+    '\n\n✅ Rapport d\'intervention :\n'+rapportUrl;
 }
 
-var _sgAffecterChosen={nom:'',wa:''};
+function _sgAffecterUpdatePreview(id){
+  var r=window._sgRows&&window._sgRows[id];
+  if(!r)return;
+  var instr=(document.getElementById('sg-aff-instr')||{}).value||'';
+  var rapportUrl=location.origin+location.pathname.replace('dashboard.html','rapport.html')+'?sg='+id;
+  var el=document.getElementById('sg-aff-preview');
+  if(el)el.textContent=_sgAffecterMsg(r,instr.trim(),rapportUrl);
+}
 
 function _sgAffecterSelect(id,nom,wa,el){
   _sgAffecterChosen={nom:nom,wa:wa};
-  // highlight selected
-  document.querySelectorAll('[data-id]').forEach(function(d){d.style.borderColor='var(--border)';d.style.background='white';});
-  el.style.borderColor='var(--amber)';el.style.background='var(--amber-pale)';
-  var sel=document.getElementById('sg-aff-selected');
-  if(sel){sel.style.display='block';sel.textContent='✓ '+nom+(wa?'  📱 '+wa:'');}
+  document.querySelectorAll('[data-cid]').forEach(function(d){
+    d.style.borderColor='var(--border)';d.style.background='white';
+    var av=d.querySelector('.sg-aff-av');
+    if(av){av.style.background='var(--bleu-pale)';av.style.color='var(--bleu)';}
+  });
+  el.style.borderColor='#378ADD';el.style.background='#E6F1FB';
+  var av=el.querySelector('.sg-aff-av');
+  if(av){av.style.background='#378ADD';av.style.color='white';}
   var btn=document.getElementById('sg-aff-btn');
   if(btn){btn.disabled=false;btn.style.opacity='1';}
+}
+
+function _sgAffecter(id){
+  var r=window._sgRows&&window._sgRows[id];
+  if(!r)return;
+  var sid=r.groupe_id||(_session&&_session.site_ids&&_session.site_ids[0]);
+  if(!sid)return;
+  _sgAffecterChosen={nom:'',wa:''};
+
+  supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&role=eq.technicien&select=id,nom,whatsapp&order=nom.asc').then(function(techniciens){
+    // Fallback sur tous les contacts si aucun technicien
+    var doRender=function(contacts){
+      if(!contacts||!contacts.length){
+        _showCfgModal('<p style="font-size:13px;color:var(--text2);padding:8px">Aucun contact technicien configuré pour ce site.</p><div style="margin-top:12px"><button onclick="_closeCfgModal()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">Fermer</button></div>');
+        return;
+      }
+      var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
+      var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
+      var rapportUrl=location.origin+location.pathname.replace('dashboard.html','rapport.html')+'?sg='+id;
+
+      var contactsHtml=contacts.map(function(c){
+        var ini=c.nom.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+        return '<div onclick="_sgAffecterSelect(\''+id+'\',\''+escape_html(c.nom)+'\',\''+escape_html(c.whatsapp||'')+'\',this)" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px" data-cid="'+c.id+'">'+
+          '<div class="sg-aff-av" style="width:32px;height:32px;border-radius:50%;background:var(--bleu-pale);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--bleu);flex-shrink:0">'+escape_html(ini)+'</div>'+
+          '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(c.nom)+'</div>'+
+          '<div style="font-size:11px;color:var(--text3)">Technicien'+(c.whatsapp?' · '+escape_html(c.whatsapp):'')+'</div></div>'+
+        '</div>';
+      }).join('');
+
+      _showCfgModal(
+        '<h3 style="font-size:15px;font-weight:600;margin-bottom:4px">Affecter le signalement</h3>'+
+        '<div style="font-size:12px;color:var(--text2);margin-bottom:14px">'+escape_html(typeLabel)+(eqNom?' · '+escape_html(eqNom):'')+'</div>'+
+
+        // Contexte + photo
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Signalement</div>'+
+        '<div style="display:flex;gap:10px;align-items:flex-start;background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:14px">'+
+          '<div style="font-size:12px;color:var(--text2);line-height:1.5;flex:1">'+escape_html(r.description||'')+'</div>'+
+          (r.photo_url?'<a href="'+r.photo_url+'" target="_blank"><img src="'+r.photo_url+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--border);flex-shrink:0" onerror="this.style.display=\'none\'"></a>':'')+
+        '</div>'+
+
+        // Techniciens
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Technicien</div>'+
+        contactsHtml+
+
+        // Instructions
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin:12px 0 6px">Instructions</div>'+
+        '<textarea id="sg-aff-instr" oninput="_sgAffecterUpdatePreview(\''+id+'\')" rows="3" placeholder="Ex : Vérifier le circuit avant d\'intervenir. Tester 2h après réparation." style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;resize:none;font-family:inherit;outline:none"></textarea>'+
+
+        // Aperçu WA
+        '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-top:10px">'+
+          '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Aperçu message WhatsApp</div>'+
+          '<div id="sg-aff-preview" style="font-size:12px;color:var(--text2);line-height:1.7;white-space:pre-wrap">'+escape_html(_sgAffecterMsg(r,'',rapportUrl))+'</div>'+
+          (r.photo_url?'<div style="margin-top:6px;background:var(--rouge-pale);border-radius:6px;padding:5px 8px;font-size:11px;color:var(--rouge)">📎 Photo du signalement jointe</div>':'')+
+        '</div>'+
+
+        '<div style="display:flex;gap:8px;margin-top:14px">'+
+          '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;font-weight:600;background:white;cursor:pointer;color:var(--dark)">Annuler</button>'+
+          '<button id="sg-aff-btn" onclick="_sgAffecterConfirm(\''+id+'\')" disabled style="flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:#25D366;color:white;cursor:pointer;opacity:0.4">📱 Envoyer via WA</button>'+
+        '</div>'
+      );
+    };
+    if(techniciens&&techniciens.length)doRender(techniciens);
+    else supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,whatsapp,role&order=nom.asc').then(doRender);
+  });
 }
 
 async function _sgAffecterConfirm(id){
   var r=window._sgRows&&window._sgRows[id];
   if(!r||!_sgAffecterChosen.nom)return;
-  // Patch signalement
-  await supaPatch('signalements',id,{assigne_a:_sgAffecterChosen.nom,statut:'en_cours'});
-  // Construire message WhatsApp
-  var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
-  var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
-  var lieu=r.lieu||'';
+  var instr=((document.getElementById('sg-aff-instr')||{}).value||'').trim();
   var rapportUrl=location.origin+location.pathname.replace('dashboard.html','rapport.html')+'?sg='+id;
-  var msg='🔧 *Intervention requise — GenTrack*\n\n'+
-    '📍 *Type :* '+typeLabel+'\n'+
-    (eqNom?'⚙️ *Équipement :* '+eqNom+'\n':'')+
-    (lieu?'📍 *Lieu :* '+lieu+'\n':'')+
-    '📝 *Détail :* '+r.description+'\n\n'+
-    '✅ Une fois terminé, soumettez votre rapport ici :\n'+rapportUrl;
+  var msg=_sgAffecterMsg(r,instr,rapportUrl);
+  await supaPatch('signalements',id,{assigne_a:_sgAffecterChosen.nom,statut:'en_cours'});
   _closeCfgModal();
   if(_sgAffecterChosen.wa){
     var waNum=_sgAffecterChosen.wa.replace(/\D/g,'');
     window.open('https://wa.me/'+waNum+'?text='+encodeURIComponent(msg),'_blank');
   }
-  if(_session)renderRespTech(_session,'signalements');
+  if(_session){
+    if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'signalements');
+    else renderRespTech(_session,'signalements');
+  }
 }
 
 /* ══════════════════════════════════════
