@@ -5293,7 +5293,19 @@ async function _openRapportHebdo(period){
           q.unite||'',
           re.statut||''
         ]);
+        // historique cuve depuis rondes
+        if(eq&&eq.capacite_litres&&q.texte.toLowerCase().indexOf('niveau')>=0){
+          var niv=parseFloat(r.valeur);
+          if(!isNaN(niv)){
+            var ts=ro.date_ronde+'T06:00:00Z';
+            var eqId=re.equipement_id;
+            if(!cuveHistory[eqId])cuveHistory[eqId]={nom:eq.nom,cap:parseFloat(eq.capacite_litres),points:[]};
+            if(!cuveHistory[eqId].points.some(function(p){return p.t.startsWith(ro.date_ronde);}))
+              cuveHistory[eqId].points.push({t:ts,v:niv});
+          }
+        }
       });
+      Object.values(cuveHistory).forEach(function(h){h.points.sort(function(a,b){return a.t<b.t?-1:1;});});
     }
 
     var html=_buildRapportPro(siteNom,periodeStr,period,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows);
