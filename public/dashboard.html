@@ -2031,7 +2031,7 @@ async function _rtMaintenances(sid){
   if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
 
   // Lecture depuis la vue unifiée (signalements + vidanges + pleins + maintenances)
-  var query='site_id=eq.'+sid+'&order=date_ref.desc&limit=200&select=id,type,titre,description,date_ref,equipement_nom,cout,statut,intervenant,notes,created_at,source,photo_url';
+  var query='site_id=eq.'+sid+'&order=date_ref.desc&limit=200&select=id,type,titre,description,date_ref,equipement_nom,cout,statut,intervenant,notes,created_at,source,photo_url,photo_url_signalement';
   if(_mntFilter!=='tous')query+='&type=eq.'+_mntFilter;
   var rows=await supaGet('vue_journal_maintenance',query);
 
@@ -2080,7 +2080,10 @@ async function _rtMaintenances(sid){
             '</div>'+
             (r.equipement_nom?'<div style="font-size:12px;color:var(--text2);margin-bottom:4px">'+escape_html(r.equipement_nom)+'</div>':'')+
             (r.description?'<div style="font-size:13px;color:var(--text);margin-bottom:6px;line-height:1.5">'+escape_html(r.description)+'</div>':'')+
-            (r.photo_url?'<div style="margin-bottom:6px"><a href="'+r.photo_url+'" target="_blank"><img src="'+r.photo_url+'" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid var(--border);cursor:pointer" onerror="this.style.display=\'none\'"></a></div>':'')+
+            (r.photo_url_signalement||r.photo_url?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">'+
+              (r.photo_url_signalement?'<div style="flex:1;min-width:120px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Avant</div><a href="'+r.photo_url_signalement+'" target="_blank"><img src="'+r.photo_url_signalement+'" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer" onerror="this.parentElement.parentElement.style.display=\'none\'"></a></div>':'')+
+              (r.photo_url?'<div style="flex:1;min-width:120px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">'+(r.photo_url_signalement?'Après':'Photo')+'</div><a href="'+r.photo_url+'" target="_blank"><img src="'+r.photo_url+'" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer" onerror="this.parentElement.parentElement.style.display=\'none\'"></a></div>':'')+
+            '</div>':'')+
             '<div style="font-size:11px;color:var(--text3);display:flex;flex-wrap:wrap;gap:10px">'+
               (dateStr?'<span>📅 '+dateStr+'</span>':'')+
               (r.intervenant?'<span>👷 '+escape_html(r.intervenant)+'</span>':'')+
