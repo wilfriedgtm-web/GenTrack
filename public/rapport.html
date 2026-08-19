@@ -336,13 +336,16 @@ async function _submit(){
     // Note complète : travaux + durée si renseignée
     var noteComplete=travaux+(duree?' (Durée : '+duree+'h)':'');
 
-    // 1. Marquer signalement résolu
+    // 1. Marquer signalement résolu + fermer l'alerte liée
     await supaPatch('signalements',_sg.id,{
       statut:'resolu',
       note_resolution:noteComplete,
       cout_intervention:cout,
       resolved_by:tech,
       resolved_at:now
+    });
+    supa('alertes','signalement_id=eq.'+_sg.id+'&resolue=eq.false&select=id').then(function(alertes){
+      if(alertes&&alertes.length)alertes.forEach(function(a){supaPatch('alertes',a.id,{resolue:true});});
     });
 
     // 2. Créer fiche maintenance

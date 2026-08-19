@@ -284,7 +284,7 @@ async function _submit(){
       if(upRes.ok)photoUrl=SUPA_URL+'/storage/v1/object/public/gentrack-photos/'+fname;
     }
 
-    await supaPost('signalements',{
+    var newSg=await supaPost('signalements',{
       groupe_id:_groupeId,
       equipement_id:equipId||null,
       signale_par:prenom||null,
@@ -296,13 +296,14 @@ async function _submit(){
       source:'formulaire'
     });
 
-    // Also create alerte for immediate visibility in dashboard
+    // Créer l'alerte liée au signalement (signalement_id permet de la fermer auto à la résolution)
     await supaPost('alertes',{
       groupe_id:_groupeId,
       type:'signalement',
       severite:'warning',
       message:(prenom?prenom+' — ':'')+(_typeLabels[_selectedType]||_selectedType)+(lieu?' ('+lieu+')':'')+' : '+desc,
       type_alerte:'signalement',
+      signalement_id:newSg&&newSg.id?newSg.id:null,
       lue:false,
       resolue:false
     });

@@ -1869,6 +1869,10 @@ async function _sgResoudreSubmit(id){
   var cout=coutStr&&!isNaN(parseFloat(coutStr))?parseFloat(coutStr):null;
   var nom=_session&&_session.contact&&_session.contact.nom?_session.contact.nom:null;
   await supaPatch('signalements',id,{statut:'resolu',note_resolution:note,cout_intervention:cout,resolved_by:nom,resolved_at:new Date().toISOString()});
+  // Fermer l'alerte liée automatiquement
+  supaGet('alertes','signalement_id=eq.'+id+'&resolue=eq.false&select=id').then(function(alertes){
+    if(alertes&&alertes.length)alertes.forEach(function(a){supaPatch('alertes',a.id,{resolue:true});});
+  });
   _closeCfgModal();
 
   // Si c'est une panne, proposer de créer l'entrée maintenance
