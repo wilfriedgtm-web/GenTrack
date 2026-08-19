@@ -1685,7 +1685,7 @@ async function _rtSignalements(sid){
   var dc=document.getElementById('dash-content-main');
   if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
 
-  var query='groupe_id=eq.'+sid+'&order=created_at.desc&limit=100&select=id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,created_at,equipement_id,source,photo_url,equipements(nom)';
+  var query='groupe_id=eq.'+sid+'&order=created_at.desc&limit=100&select=id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,created_at,equipement_id,source,photo_url,equipements(nom),maintenances(photo_url,prestataire)';
   if(_sgFilter!=='tous')query+='&statut=eq.'+_sgFilter;
   var rows=await supaGet('signalements',query);
 
@@ -1721,15 +1721,25 @@ async function _rtSignalements(sid){
               '<span style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:20px;background:'+st.bg+';color:'+st.color+';font-weight:700">'+st.label+'</span>'+
             '</div>'+
             '<div style="font-size:13px;color:var(--text);margin-bottom:8px;line-height:1.5">'+escape_html(r.description)+'</div>'+
+            (r.photo_url?'<div style="margin-bottom:8px"><a href="'+r.photo_url+'" target="_blank"><img src="'+r.photo_url+'" style="max-width:100%;max-height:180px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer" onerror="this.style.display=\'none\'"></a></div>':'')+
             '<div style="font-size:11px;color:var(--text3)">'+
               (r.signale_par?'👤 '+escape_html(r.signale_par)+'  ':'')+
               (r.lieu?'📍 '+escape_html(r.lieu)+'  ':'')+
               '🕐 '+date+
               (r.source==='formulaire'?'  📱 Formulaire':r.source==='seuil_releve'?'  📈 Seuil auto':'')+
             '</div>'+
-            (r.assigne_a?'<div style="margin-top:6px;font-size:12px;background:var(--amber-pale);border-radius:6px;padding:5px 10px;color:var(--amber-dark);font-weight:600;display:inline-block">👷 Affecté à '+escape_html(r.assigne_a)+'</div>':'')+
-            (r.note_resolution?'<div style="margin-top:8px;font-size:12px;background:var(--vert-pale);border-radius:8px;padding:8px 10px;color:var(--vert)">✅ '+escape_html(r.note_resolution)+(r.resolved_by?' · '+escape_html(r.resolved_by):'')+'</div>':'')+
-            (r.cout_intervention?'<div style="margin-top:6px;font-size:12px;font-weight:600;color:var(--text)">💰 '+Number(r.cout_intervention).toLocaleString('fr-FR')+' FCFA</div>':'')+
+            (r.assigne_a&&r.statut!=='resolu'?'<div style="margin-top:6px;font-size:12px;background:var(--amber-pale);border-radius:6px;padding:5px 10px;color:var(--amber-dark);font-weight:600;display:inline-block">👷 Affecté à '+escape_html(r.assigne_a)+'</div>':'')+
+            (r.statut==='resolu'?(function(){
+              var mnt=r.maintenances&&r.maintenances[0]?r.maintenances[0]:null;
+              var photoApres=mnt&&mnt.photo_url?mnt.photo_url:null;
+              var tech=r.resolved_by||(mnt&&mnt.prestataire)||null;
+              return '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">'+
+                '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--vert);margin-bottom:6px">✅ Résolution'+(tech?' · '+escape_html(tech):'')+'</div>'+
+                (r.note_resolution?'<div style="font-size:12px;color:var(--text);margin-bottom:6px;line-height:1.5">'+escape_html(r.note_resolution)+'</div>':'')+
+                (r.cout_intervention?'<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">💰 '+Number(r.cout_intervention).toLocaleString('fr-FR')+' FCFA</div>':'')+
+                (photoApres?'<a href="'+photoApres+'" target="_blank"><img src="'+photoApres+'" style="max-width:100%;max-height:180px;object-fit:cover;border-radius:8px;border:1px solid var(--vert-border);cursor:pointer" onerror="this.style.display=\'none\'"></a>':'')+
+              '</div>';
+            })():'')+
           '</div>'+
         '</div>'+
         '<div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);flex-wrap:wrap">'+
