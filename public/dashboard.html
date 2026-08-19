@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GenTrack Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@300;400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,300,0,0&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -59,7 +59,7 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .nav-item{display:flex;align-items:center;gap:10px;padding:11px 20px;color:#AAA;font-size:13.5px;cursor:pointer;transition:all 0.15s;border-left:3px solid transparent;border-top:none;border-right:none;border-bottom:none;background:none;width:100%;text-align:left}
 .nav-item:hover{color:white;background:#1a1a18}
 .nav-item.active{color:var(--amber);border-left-color:var(--amber);background:#1a1a18}
-.nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+.nav-icon{font-family:'Material Symbols Outlined';font-size:18px;font-weight:300;width:20px;text-align:center;flex-shrink:0;line-height:1}
 .nav-badge{background:var(--rouge);color:white;font-size:10px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:auto}
 .sidebar-user{padding:16px 20px;border-top:1px solid rgba(255,255,255,0.07)}
 .persona-chip{background:#1e1e1c;border-radius:8px;padding:8px 12px}
@@ -80,13 +80,15 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .mobile-header-logo{font-size:18px;font-weight:700;letter-spacing:.06em;color:white}
 .mobile-header-logo span{color:var(--amber)}
 .mobile-header-role{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-top:2px}
-.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--dark);z-index:100;border-top:1px solid rgba(255,255,255,0.08);padding-bottom:env(safe-area-inset-bottom,0px)}
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--dark);z-index:100;border-top:1px solid rgba(255,255,255,0.06);padding-bottom:env(safe-area-inset-bottom,0px)}
 .mobile-nav-inner{display:flex;height:var(--nav-h)}
-.mobile-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:rgba(255,255,255,0.35);font-size:10px;font-weight:500;cursor:pointer;border:none;background:none;transition:color 0.15s;border-top:2px solid transparent;position:relative;padding:0 4px;-webkit-tap-highlight-color:transparent}
-.mobile-nav-item.active{color:var(--amber);border-top-color:var(--amber)}
-.mobile-nav-icon{font-size:20px;line-height:1}
-.mobile-nav-label{font-size:10px;font-weight:500;white-space:nowrap}
-.mobile-nav-badge{position:absolute;top:8px;left:calc(50% + 4px);width:8px;height:8px;border-radius:50%;background:var(--rouge);border:2px solid var(--dark)}
+.mobile-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:rgba(255,255,255,0.35);font-size:10px;font-weight:500;cursor:pointer;border:none;background:none;transition:color 0.15s;position:relative;padding:0 2px;-webkit-tap-highlight-color:transparent}
+.mobile-nav-item.active{color:var(--amber)}
+.mobile-nav-pill{width:52px;height:30px;border-radius:15px;display:flex;align-items:center;justify-content:center;transition:background 0.15s}
+.mobile-nav-item.active .mobile-nav-pill{background:rgba(196,154,28,0.16)}
+.mobile-nav-icon{font-family:'Material Symbols Outlined';font-size:22px;line-height:1;font-weight:300}
+.mobile-nav-label{font-size:10px;font-weight:500;white-space:nowrap;letter-spacing:.01em}
+.mobile-nav-badge{position:absolute;top:6px;left:calc(50% + 6px);width:7px;height:7px;border-radius:50%;background:var(--rouge);border:1.5px solid var(--dark)}
 /* Plus panel */
 .plus-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:150}
 .plus-overlay.open{display:block}
@@ -96,7 +98,7 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .plus-panel-item{display:flex;align-items:center;gap:16px;padding:14px 28px;color:rgba(255,255,255,0.82);font-size:14px;font-weight:500;cursor:pointer;border:none;background:none;width:100%;text-align:left;transition:background 0.12s;-webkit-tap-highlight-color:transparent}
 .plus-panel-item:active{background:rgba(255,255,255,0.07)}
 .plus-panel-item.active-item{color:var(--amber)}
-.plus-panel-icon{font-size:20px;width:28px;text-align:center;flex-shrink:0}
+.plus-panel-icon{font-family:'Material Symbols Outlined';font-size:22px;font-weight:300;width:28px;text-align:center;flex-shrink:0;line-height:1}
 .plus-panel-sep{height:1px;background:rgba(255,255,255,0.07);margin:4px 28px}
 .plus-panel-badge{margin-left:auto;font-size:10px;padding:2px 8px;border-radius:10px;background:var(--rouge);color:white;font-weight:700}
 @media(max-width:768px){
@@ -470,17 +472,21 @@ function logout(){clearSession();renderInvalidLink();}
 
 /* ── LAYOUT ── */
 function buildNavItems(role){
-  var items=[{id:'accueil',icon:'🏠',label:'Accueil'},{id:'alertes',icon:'🔔',label:'Alertes',badge:true},{id:'historique',icon:'📊',label:'Historique'}];
+  var items=[
+    {id:'accueil',icon:'home',label:'Accueil'},
+    {id:'alertes',icon:'notifications',label:'Alertes',badge:true},
+    {id:'historique',icon:'bar_chart',label:'Historique'}
+  ];
   if(role==='resp_tech'){
-    items.push({id:'releves',icon:'📋',label:'Relevés'});
-    items.push({id:'signalements',icon:'📍',label:'Signalements'});
-    items.push({id:'maintenances',icon:'🔧',label:'Maintenance'});
-    items.push({id:'config',icon:'⚙️',label:'Config'});
+    items.push({id:'signalements',icon:'location_on',label:'Signalements'});
+    items.push({id:'maintenances',icon:'build',label:'Maintenance'});
+    items.push({id:'releves',icon:'schedule',label:'Relevés'});
+    items.push({id:'config',icon:'settings',label:'Config'});
   }
   if(role==='dir_tech'){
-    items.push({id:'signalements',icon:'📍',label:'Signalements'});
-    items.push({id:'maintenances',icon:'🔧',label:'Maintenance'});
-    items.push({id:'rapport',icon:'📊',label:'Rapport conso'});
+    items.push({id:'signalements',icon:'location_on',label:'Signalements'});
+    items.push({id:'maintenances',icon:'build',label:'Maintenance'});
+    items.push({id:'rapport',icon:'summarize',label:'Rapport conso'});
   }
   return items;
 }
@@ -511,20 +517,21 @@ function buildMobileNav(role,activeNav,alerteBadge){
   var fixed,plusIds;
   if(role==='dir_tech'){
     fixed=[
-      {id:'accueil',icon:'🏠',label:'Accueil'},
-      {id:'alertes',icon:'🔔',label:'Alertes',badge:alerteBadge},
-      {id:'signalements',icon:'📍',label:'Signalements'},
-      {id:'__plus__',icon:'☰',label:'Plus'}
+      {id:'accueil',icon:'home',label:'Accueil'},
+      {id:'alertes',icon:'notifications',label:'Alertes',badge:alerteBadge},
+      {id:'signalements',icon:'location_on',label:'Signalements'},
+      {id:'__plus__',icon:'apps',label:'Plus'}
     ];
     plusIds=['historique','maintenances','rapport'];
   } else {
+    // resp_tech : signalements en accès direct, relevés dans Plus
     fixed=[
-      {id:'accueil',icon:'🏠',label:'Accueil'},
-      {id:'alertes',icon:'🔔',label:'Alertes',badge:alerteBadge},
-      {id:'releves',icon:'📋',label:'Relevés'},
-      {id:'__plus__',icon:'☰',label:'Plus'}
+      {id:'accueil',icon:'home',label:'Accueil'},
+      {id:'alertes',icon:'notifications',label:'Alertes',badge:alerteBadge},
+      {id:'signalements',icon:'location_on',label:'Signalements'},
+      {id:'__plus__',icon:'apps',label:'Plus'}
     ];
-    plusIds=['historique','signalements','maintenances','config'];
+    plusIds=['maintenances','releves','historique','config'];
   }
   var plusItems=allItems.filter(function(it){return plusIds.indexOf(it.id)!==-1;});
   var plusActive=plusItems.some(function(it){return it.id===activeNav;});
@@ -533,8 +540,10 @@ function buildMobileNav(role,activeNav,alerteBadge){
     var isPlus=it.id==='__plus__';
     var isActive=isPlus?plusActive:(it.id===activeNav);
     return '<button class="mobile-nav-item'+(isActive?' active':'')+'" onclick="'+(isPlus?'_togglePlusPanel()':'navTo(\''+it.id+'\')')+'" aria-label="'+it.label+'">'+
-      '<span class="mobile-nav-icon">'+it.icon+'</span>'+
-      (it.badge?'<span class="mobile-nav-badge"></span>':'')+
+      '<div class="mobile-nav-pill" style="position:relative">'+
+        '<span class="mobile-nav-icon">'+it.icon+'</span>'+
+        (it.badge?'<span class="mobile-nav-badge"></span>':'')+
+      '</div>'+
       '<span class="mobile-nav-label">'+it.label+'</span>'+
     '</button>';
   }).join('');
@@ -549,10 +558,10 @@ function buildMobileNav(role,activeNav,alerteBadge){
       }).join('')+
       (role==='resp_tech'?'<div class="plus-panel-sep"></div>'+
       '<button class="plus-panel-item" onclick="_openRapportHebdo(7);_togglePlusPanel()">'+
-        '<span class="plus-panel-icon">📄</span>Rapport hebdo'+
+        '<span class="plus-panel-icon" style="font-family:\'Material Symbols Outlined\';font-weight:300">description</span>Rapport hebdo'+
       '</button>'+
       '<button class="plus-panel-item" onclick="_openAfficheBotRT();_togglePlusPanel()">'+
-        '<span class="plus-panel-icon">📋</span>Affiche bot WhatsApp'+
+        '<span class="plus-panel-icon" style="font-family:\'Material Symbols Outlined\';font-weight:300">qr_code</span>Affiche bot WhatsApp'+
       '</button>':'')+
     '</div>';
 
