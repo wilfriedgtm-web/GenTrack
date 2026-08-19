@@ -203,7 +203,11 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .config-apply-btn:hover{background:var(--amber);color:white}
 /* CONFIG MODAL */
 .cfg-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:8000;display:flex;align-items:center;justify-content:center;animation:fadeIn .12s}
-.cfg-modal-box{background:white;border-radius:16px;padding:28px;width:440px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.cfg-modal-box{background:white;border-radius:16px;padding:24px;width:440px;max-width:92vw;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+@media(max-width:600px){
+  .cfg-modal-overlay{align-items:flex-end;}
+  .cfg-modal-box{width:100%;max-width:100%;border-radius:20px 20px 0 0;padding:20px 16px 28px;max-height:82vh;}
+}
 .cfg-modal-title{font-size:15px;font-weight:700;color:var(--dark);margin-bottom:20px;display:flex;align-items:center;gap:8px}
 .cfg-modal-footer{display:flex;gap:8px;margin-top:20px;justify-content:flex-end}
 .cfg-form-group{margin-bottom:14px}
@@ -1697,8 +1701,10 @@ async function _rtSignalements(sid){
   // KPIs mois courant
   var moisDebut=new Date(new Date().getFullYear(),new Date().getMonth(),1);
   var rowsMois=allRows.filter(function(r){return new Date(r.created_at)>=moisDebut;});
-  var totalCout=rowsMois.reduce(function(s,r){return s+(parseFloat(r.cout_intervention)||0);},0);
   var resolus=rowsMois.filter(function(r){return r.statut==='resolu';}).length;
+  // Coût = pannes résolues ce mois (peu importe quand signalées)
+  var resoludsMois=allRows.filter(function(r){return r.resolved_at&&new Date(r.resolved_at)>=moisDebut;});
+  var totalCout=resoludsMois.reduce(function(s,r){return s+(parseFloat(r.cout_intervention)||0);},0);
 
   var kpiHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'+
     '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
@@ -1709,7 +1715,7 @@ async function _rtSignalements(sid){
     '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
       '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Coût interventions</div>'+
       '<div style="font-size:20px;font-weight:800;color:var(--dark)">'+totalCout.toLocaleString('fr-FR')+'</div>'+
-      '<div style="font-size:11px;color:var(--text3)">FCFA ce mois</div>'+
+      '<div style="font-size:11px;color:var(--text3)">FCFA résolu ce mois</div>'+
     '</div>'+
   '</div>';
 
@@ -1990,6 +1996,7 @@ function _sgAffecterMsg(r,instr,rapportUrl){
     '📍 *'+typeLabel+(eqNom?' · '+eqNom:'')+'*\n'+
     (r.lieu?'📍 Lieu : '+r.lieu+'\n':'')+
     '📝 '+r.description+
+    (r.photo_url?'\n\n📸 Photo : '+r.photo_url:'')+
     (instr?'\n\n📋 *Instructions :*\n'+instr:'')+
     '\n\n✅ Rapport d\'intervention :\n'+rapportUrl;
 }
@@ -2067,7 +2074,7 @@ function _sgAffecter(id){
         '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-top:10px">'+
           '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Aperçu message WhatsApp</div>'+
           '<div id="sg-aff-preview" style="font-size:12px;color:var(--text2);line-height:1.7;white-space:pre-wrap">'+escape_html(_sgAffecterMsg(r,'',rapportUrl))+'</div>'+
-          (r.photo_url?'<div style="margin-top:6px;background:var(--rouge-pale);border-radius:6px;padding:5px 8px;font-size:11px;color:var(--rouge)">📎 Photo du signalement jointe</div>':'')+
+          (r.photo_url?'<div style="margin-top:6px;background:var(--bleu-pale);border-radius:6px;padding:5px 8px;font-size:11px;color:var(--bleu)">📸 Photo incluse dans le message</div>':'')+
         '</div>'+
 
         '<div style="display:flex;gap:8px;margin-top:14px">'+
@@ -2115,28 +2122,30 @@ async function _rtMaintenances(sid){
   var dc=document.getElementById('dash-content-main');
   if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
 
+  // Exclure source=signalement : les pannes brutes vivent dans l'onglet Signalements
+  // Garder seulement vidanges, pleins, et fiches maintenances (incl. pannes résolues)
   var allRows=await supaGet('vue_journal_maintenance',
-    'site_id=eq.'+sid+'&order=date_ref.desc&limit=200'+
+    'site_id=eq.'+sid+'&source=neq.signalement&order=date_ref.desc&limit=200'+
     '&select=id,type,titre,description,date_ref,equipement_nom,cout,statut,intervenant,notes,created_at,source,photo_url'
   );
 
-  // KPIs mois courant — inclut les pannes pour les coûts financiers
+  // KPIs mois courant
   var moisDebut=new Date(new Date().getFullYear(),new Date().getMonth(),1);
   var rowsMois=allRows.filter(function(r){return new Date(r.created_at)>=moisDebut;});
   var totalCout=rowsMois.reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
-  var coutPannes=rowsMois.filter(function(r){return r.type==='panne';}).reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
   var nbOps=rowsMois.filter(function(r){return r.type!=='panne';}).length;
+  var nbPannesMnt=rowsMois.filter(function(r){return r.type==='panne';}).length;
 
   var kpiHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'+
     '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
-      '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Ce mois</div>'+
+      '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Coût ce mois</div>'+
       '<div style="font-size:20px;font-weight:800;color:var(--dark)">'+totalCout.toLocaleString('fr-FR')+'</div>'+
-      '<div style="font-size:11px;color:var(--text3)">FCFA'+(coutPannes>0?' (dont '+coutPannes.toLocaleString('fr-FR')+' pannes)':'')+'</div>'+
+      '<div style="font-size:11px;color:var(--text3)">FCFA'+(nbPannesMnt>0?' (dont '+nbPannesMnt+' pannes)':'')+'</div>'+
     '</div>'+
     '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
       '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Opérations</div>'+
       '<div style="font-size:20px;font-weight:800;color:var(--dark)">'+nbOps+'</div>'+
-      '<div style="font-size:11px;color:var(--text3)">ce mois (hors pannes)</div>'+
+      '<div style="font-size:11px;color:var(--text3)">vidanges / ravitaillements ce mois</div>'+
     '</div>'+
   '</div>';
 
