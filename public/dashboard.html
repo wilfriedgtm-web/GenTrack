@@ -1688,7 +1688,7 @@ async function _rtSignalements(sid){
   // Fetch all for KPIs + analytics, filter client-side
   var allRows=await supaGet('signalements',
     'groupe_id=eq.'+sid+'&order=created_at.desc&limit=200'+
-    '&select=id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,created_at,source,photo_url,equipements(nom),maintenances(photo_url,prestataire)'
+    '&select=id,groupe_id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,created_at,source,photo_url,equipement_id,equipements(nom),maintenances(photo_url,prestataire)'
   );
 
   window._sgRows={};
@@ -1831,12 +1831,6 @@ function _setSgFilter(f){
   else renderRespTech(_session,'signalements');
 }
 
-async function _sgEnCours(id){
-  await supaPatch('signalements',id,{statut:'en_cours'});
-  if(!_session)return;
-  if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'signalements');
-  else renderRespTech(_session,'signalements');
-}
 
 function _sgResoudre(id){
   _showCfgModal(
@@ -1903,7 +1897,8 @@ async function _sgCreerMaintenance(sgId){
     statut:'realise',
     cout:cout,
     prestataire:prest,
-    created_by:nom
+    created_by:nom,
+    signalement_id:sgId
   });
   _closeCfgModal();
   if(_session)renderRespTech(_session,'signalements');
@@ -1985,35 +1980,6 @@ async function _sgCreerDepuisAlerteSubmit(sid,alerteId){
   if(_session)renderRespTech(_session,'signalements');
 }
 
-function _sgDetail(id){
-  var r=window._sgRows&&window._sgRows[id];
-  if(!r)return;
-  var st=_SG_STATUTS[r.statut]||_SG_STATUTS.ouvert;
-  var typeLabel=_SG_TYPES[r.type]||r.type||'Autre';
-  var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'—';
-  var date=r.created_at?new Date(r.created_at).toLocaleString('fr-FR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
-  var row=function(label,val){return val?'<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;gap:12px"><span style="font-size:11px;font-weight:700;color:var(--text3);min-width:110px;text-transform:uppercase">'+label+'</span><span style="font-size:13px;color:var(--text);flex:1">'+val+'</span></div>':'';};
-  var html=
-    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">'+
-      '<span style="font-size:15px;font-weight:700;color:var(--dark)">'+typeLabel+'</span>'+
-      '<span style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:20px;background:'+st.bg+';color:'+st.color+';font-weight:700">'+st.label+'</span>'+
-    '</div>'+
-    row('Description',escape_html(r.description))+
-    row('Équipement',escape_html(eqNom))+
-    row('Lieu',r.lieu?escape_html(r.lieu):null)+
-    row('Signalé par',r.signale_par?escape_html(r.signale_par):null)+
-    row('Source',r.source==='formulaire'?'📱 Formulaire QR':r.source==='seuil_releve'?'📈 Seuil automatique':'Manuel')+
-    row('Affecté à',r.assigne_a?'👷 '+escape_html(r.assigne_a):null)+
-    row('Date',date)+
-    (r.note_resolution?row('Note résolution','✅ '+escape_html(r.note_resolution)+(r.resolved_by?' ('+escape_html(r.resolved_by)+')':'')):'')+
-    (r.cout_intervention?row('Coût intervention',Number(r.cout_intervention).toLocaleString('fr-FR')+' FCFA'):'')+
-    (r.resolved_at?row('Résolu le',new Date(r.resolved_at).toLocaleString('fr-FR',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})):'')+
-    (r.photo_url?'<div style="margin-top:12px"><img src="'+r.photo_url+'" style="max-width:100%;border-radius:8px;border:1.5px solid var(--border)" onerror="this.parentElement.style.display=\'none\'"/><a href="'+r.photo_url+'" download target="_blank" style="display:inline-block;margin-top:8px;padding:6px 12px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;color:var(--text2);text-decoration:none">⬇️ Télécharger la photo</a></div>':'')+
-    '<div style="margin-top:16px">'+
-      '<button onclick="_closeCfgModal()" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Fermer</button>'+
-    '</div>';
-  _showCfgModal('<h3 style="font-size:15px;font-weight:700;margin-bottom:4px">🔍 Détail du signalement</h3>'+html);
-}
 
 var _sgAffecterChosen={nom:'',wa:''};
 
@@ -2136,7 +2102,14 @@ async function _sgAffecterConfirm(id){
 /* ══════════════════════════════════════
    MAINTENANCE
 ══════════════════════════════════════ */
-var _mntFilter='tous'; // tous | vidange | ravitaillement | maintenance
+var _mntFilter='tous'; // tous | vidange | ravitaillement | preventive
+
+var _MNT_TYPES={
+  panne:{label:'Panne / Réparation',icon:'🔧',color:'var(--rouge)',bg:'var(--rouge-pale)'},
+  vidange:{label:'Vidange',icon:'🛢️',color:'var(--orange)',bg:'var(--orange-pale)'},
+  ravitaillement:{label:'Ravitaillement',icon:'⛽',color:'var(--bleu)',bg:'var(--bleu-pale)'},
+  preventive:{label:'Maintenance préventive',icon:'📅',color:'var(--vert)',bg:'var(--vert-pale)'}
+};
 
 async function _rtMaintenances(sid){
   var dc=document.getElementById('dash-content-main');
@@ -2170,24 +2143,23 @@ async function _rtMaintenances(sid){
   // Exclure pannes des cards — elles vivent dans Signalements
   var nonPannes=allRows.filter(function(r){return r.type!=='panne';});
   var filtered=_mntFilter==='tous'?nonPannes:nonPannes.filter(function(r){
-    if(_mntFilter==='maintenance')return r.type==='maintenance';
     return r.type===_mntFilter;
   });
 
-  var counts={tous:nonPannes.length,vidange:0,ravitaillement:0,maintenance:0};
+  var counts={tous:nonPannes.length,vidange:0,ravitaillement:0,preventive:0};
   nonPannes.forEach(function(r){if(counts[r.type]!==undefined)counts[r.type]++;});
 
   var filterHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+
-    [['tous','Tous'],['vidange','Vidanges'],['ravitaillement','Ravitaillements'],['maintenance','Planifiées']].map(function(f){
+    [['tous','Tous'],['vidange','Vidanges'],['ravitaillement','Ravitaillements'],['preventive','Planifiées']].map(function(f){
       var active=_mntFilter===f[0];
       var n=counts[f[0]]||0;
       return '<button onclick="_setMntFilter(\''+f[0]+'\')" style="font-size:11px;font-weight:'+(active?'700':'500')+';padding:5px 12px;border-radius:20px;border:1.5px solid '+(active?'var(--amber)':'var(--border)')+';background:'+(active?'var(--amber-pale)':'white')+';color:'+(active?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+f[1]+(n?' ('+n+')':'')+'</button>';
     }).join('')+
   '</div>';
 
-  var typeIcons={vidange:'🛢️',ravitaillement:'⛽',maintenance:'📅',plein:'⛽'};
-  var typeBgs={vidange:'var(--orange-pale)',ravitaillement:'var(--bleu-pale)',maintenance:'var(--vert-pale)',plein:'var(--bleu-pale)'};
-  var typeColors={vidange:'var(--orange)',ravitaillement:'var(--bleu)',maintenance:'var(--vert)',plein:'var(--bleu)'};
+  var typeIcons={vidange:'🛢️',ravitaillement:'⛽',preventive:'📅',plein:'⛽'};
+  var typeBgs={vidange:'var(--orange-pale)',ravitaillement:'var(--bleu-pale)',preventive:'var(--vert-pale)',plein:'var(--bleu-pale)'};
+  var typeColors={vidange:'var(--orange)',ravitaillement:'var(--bleu)',preventive:'var(--vert)',plein:'var(--bleu)'};
 
   function renderMntCard(r){
     var src=r.type||r.source||'';
