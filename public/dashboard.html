@@ -652,7 +652,7 @@ async function _rtAccueil(session,sid,cid){
   var todayStart=today+'T00:00:00Z';
   var[rondes,equips,alertes,pannes,recoData,vueStat,relevesJour]=await Promise.all([
     supaGet('rondes','site_id=eq.'+sid+'&date_ronde=eq.'+today+'&select=id,frequence,date_ronde'),
-    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,ordre_ronde,type_id,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,date_dernier_vidange,types_equipements(nom)&order=ordre_ronde.asc'),
+    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,ordre_ronde,type_id,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,date_dernier_vidange,type_compteur_heures,types_equipements(nom)&order=ordre_ronde.asc'),
     supaGet('alertes','groupe_id=eq.'+sid+'&resolue=eq.false&select=id,type,severite,type_alerte,message,created_at&order=created_at.desc&limit=20'),
     supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&statut=neq.resolu&select=id,type,description,created_at,equipement_id,equipements(nom)&order=created_at.desc&limit=20'),
     _fetchRecoEquipements(sid),
@@ -946,9 +946,14 @@ function _buildVidangesSection(geEquips,geQs,vidangesHist){
     // Baseline = counter value at last oil change (set during onboarding or after declaring vidange)
     var baseline=e.heures_dernier_vidange!=null?parseFloat(e.heures_dernier_vidange):null;
     var lastVidDate=e.date_dernier_vidange||null;
+    var typeCompteur=e.type_compteur_heures||'cumule';
     var heuresDepuis=null;
-    if(currentH!=null&&baseline!=null){
-      heuresDepuis=Math.max(0,currentH-baseline);
+    if(typeCompteur==='depuis_entretien'){
+      // Le technicien saisit directement les heures depuis le dernier entretien
+      if(currentH!=null)heuresDepuis=Math.max(0,currentH);
+    } else {
+      // Heures cumulées : on soustrait la valeur au dernier vidange
+      if(currentH!=null&&baseline!=null)heuresDepuis=Math.max(0,currentH-baseline);
     }
     var pct=heuresDepuis!=null?Math.min(100,Math.round(heuresDepuis/seuil*100)):null;
     var col=pct!=null?(pct>=100?'var(--rouge)':pct>=80?'var(--orange)':'var(--vert)'):'var(--text3)';
@@ -2332,7 +2337,7 @@ async function _mntCreerSubmit(sid){
 async function _rtConfig(sid){
   _configCurrentSid=sid;
   var types=await supaGet('types_equipements','select=id,nom&order=nom');
-  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,actif_ronde,actif_releve,ordre_ronde,type_id,puissance_kva,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,prix_litre,types_equipements(nom)&order=ordre_ronde.asc');
+  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,actif_ronde,actif_releve,ordre_ronde,type_id,puissance_kva,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,prix_litre,type_compteur_heures,types_equipements(nom)&order=ordre_ronde.asc');
   // Populate cache for safe onclick lookup (évite l'échappement multi-niveau)
   _configEquipCache={};
   equips.forEach(function(e){_configEquipCache[e.id]=e;});
@@ -3311,14 +3316,26 @@ function _openAddEquipModal(){
           '<div style="display:flex;gap:10px">'+
             '<div class="cfg-form-group" style="flex:1;margin-bottom:8px"><label class="cfg-form-label">Puissance (kVA)</label>'+
               '<input id="eq-new-kva" class="cfg-form-input" type="number" placeholder="1400" /></div>'+
-            '<div class="cfg-form-group" style="flex:1;margin-bottom:8px"><label class="cfg-form-label">Conso (L/h)</label>'+
-              '<input id="eq-new-conso" class="cfg-form-input" type="number" step="0.1" placeholder="65" /></div>'+
-          '</div>'+
-          '<div style="display:flex;gap:10px">'+
-            '<div class="cfg-form-group" style="flex:1;margin-bottom:8px"><label class="cfg-form-label">Capacité réservoir (L)</label>'+
+            '<div class="cfg-form-group" style="flex:1;margin-bottom:8px"><label class="cfg-form-label">Réservoir (L)</label>'+
               '<input id="eq-new-capa" class="cfg-form-input" type="number" placeholder="500" /></div>'+
-            '<div class="cfg-form-group" style="flex:1;margin-bottom:8px"><label class="cfg-form-label">Seuil vidange (h)</label>'+
-              '<input id="eq-new-seuil" class="cfg-form-input" type="number" placeholder="250" /></div>'+
+          '</div>'+
+          '<div class="cfg-form-group" style="margin-bottom:8px"><label class="cfg-form-label">Rappel vidange</label>'+
+            '<select id="eq-new-seuil" class="cfg-form-input" onchange="var c=document.getElementById(\'eq-new-seuil-custom\');c.style.display=this.value===\'0\'?\'block\':\'none\'">'+
+              '<option value="">— Pas de suivi —</option>'+
+              '<option value="250">Toutes les 250 h</option>'+
+              '<option value="500">Toutes les 500 h</option>'+
+              '<option value="750">Toutes les 750 h</option>'+
+              '<option value="1000">Toutes les 1000 h</option>'+
+              '<option value="0">Personnalisé…</option>'+
+            '</select>'+
+            '<input id="eq-new-seuil-custom" class="cfg-form-input" type="number" placeholder="Entrez le seuil en heures" style="margin-top:6px;display:none" />'+
+          '</div>'+
+          '<div class="cfg-form-group" style="margin-bottom:8px"><label class="cfg-form-label">Type de compteur horaire</label>'+
+            '<select id="eq-new-type-compteur" class="cfg-form-input">'+
+              '<option value="cumule">Heures cumulées (total affiché)</option>'+
+              '<option value="depuis_entretien">Heures depuis entretien (remis à 0)</option>'+
+            '</select>'+
+            '<div style="font-size:10px;color:var(--text3);margin-top:3px">Si vous ne savez pas, gardez "Heures cumulées"</div>'+
           '</div>'+
         '</div>'+
         // Champs Cuve
@@ -3388,11 +3405,12 @@ async function _duplicateEquip(eqId){
 function _openEditEquipFromCache(eqId){
   var e=_configEquipCache[eqId];
   if(!e){return;}
-  _openEditEquipModal(eqId,e.nom,e.actif,e.actif_ronde!==false,e.actif_releve!==false,e.type_id||'',e.seuil_vidange_heures||null,e.heures_dernier_vidange||null,e.puissance_kva||null,e.conso_theorique_lh||null,e.capacite_litres||null,e.prix_litre||null);
+  _openEditEquipModal(eqId,e.nom,e.actif,e.actif_ronde!==false,e.actif_releve!==false,e.type_id||'',e.seuil_vidange_heures||null,e.heures_dernier_vidange||null,e.puissance_kva||null,e.conso_theorique_lh||null,e.capacite_litres||null,e.prix_litre||null,e.type_compteur_heures||'cumule');
 }
-function _openEditEquipModal(eqId, nom, actif, actifRonde, actifReleve, typeId, seuilVidange, heuresDernierVidange, puissanceKva, consoLh, capaciteLitres, prixLitre){
+function _openEditEquipModal(eqId, nom, actif, actifRonde, actifReleve, typeId, seuilVidange, heuresDernierVidange, puissanceKva, consoLh, capaciteLitres, prixLitre, typeCompteur){
   if(actifRonde===undefined)actifRonde=true;
   if(actifReleve===undefined)actifReleve=true;
+  typeCompteur=typeCompteur||'cumule';
   var GE_TYPE_ID='98849793-9201-4adf-aec2-a4a08587c4e2';
   var CUVE_TYPE_ID='de5519d0-363b-4628-b872-2dcf01859002';
   var isGE=(typeId===GE_TYPE_ID);
@@ -3400,6 +3418,13 @@ function _openEditEquipModal(eqId, nom, actif, actifRonde, actifReleve, typeId, 
   var geFields='';
   var cuveFields='';
   if(isGE){
+    // Seuil select
+    var seuilPresets=[250,500,750,1000];
+    var seuilIsCustom=seuilVidange&&seuilPresets.indexOf(parseInt(seuilVidange))===-1;
+    var seuilOpts=
+      '<option value="">— Pas de suivi —</option>'+
+      seuilPresets.map(function(v){return '<option value="'+v+'"'+(parseInt(seuilVidange)===v?' selected':'')+'>Toutes les '+v+' h</option>';}).join('')+
+      '<option value="0"'+(seuilIsCustom?' selected':'')+'>Personnalisé…</option>';
     geFields=
       '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">'+
         '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">⚡ Groupe électrogène</div>'+
@@ -3409,29 +3434,35 @@ function _openEditEquipModal(eqId, nom, actif, actifRonde, actifReleve, typeId, 
             '<input id="eq-edit-kva" class="cfg-form-input" type="number" step="1" placeholder="ex: 1400" value="'+(puissanceKva||'')+'" />'+
           '</div>'+
           '<div class="cfg-form-group" style="flex:1;margin-bottom:0">'+
-            '<label class="cfg-form-label">Conso (L/h)</label>'+
-            '<input id="eq-edit-conso" class="cfg-form-input" type="number" step="0.1" placeholder="ex: 65" value="'+(consoLh||'')+'" />'+
-          '</div>'+
-        '</div>'+
-        '<div style="display:flex;gap:10px;margin-bottom:10px">'+
-          '<div class="cfg-form-group" style="flex:1;margin-bottom:0">'+
-            '<label class="cfg-form-label">Capacité réservoir (L)</label>'+
+            '<label class="cfg-form-label">Réservoir (L)</label>'+
             '<input id="eq-edit-capa" class="cfg-form-input" type="number" step="10" placeholder="ex: 500" value="'+(capaciteLitres||'')+'" />'+
           '</div>'+
-          '<div class="cfg-form-group" style="flex:1;margin-bottom:0">'+
-            '<label class="cfg-form-label">Seuil vidange (h)</label>'+
-            '<input id="eq-edit-seuil" class="cfg-form-input" type="number" placeholder="ex: 250" value="'+(seuilVidange||'')+'" />'+
-          '</div>'+
         '</div>'+
         '<div class="cfg-form-group">'+
-          '<label class="cfg-form-label">Compteur à la dernière vidange</label>'+
-          '<input id="eq-edit-baseline" class="cfg-form-input" type="number" step="0.1" placeholder="ex: 2830" value="'+(heuresDernierVidange||'')+'" />'+
-          '<div style="font-size:10px;color:var(--text3);margin-top:3px">Valeur du compteur le jour de la dernière vidange</div>'+
+          '<label class="cfg-form-label">Rappel vidange</label>'+
+          '<select id="eq-edit-seuil" class="cfg-form-input" onchange="var c=document.getElementById(\'eq-edit-seuil-custom\');c.style.display=this.value===\'0\'?\'block\':\'none\'">'+seuilOpts+'</select>'+
+          '<input id="eq-edit-seuil-custom" class="cfg-form-input" type="number" placeholder="Entrez le seuil en heures" style="margin-top:6px;display:'+(seuilIsCustom?'block':'none')+'" value="'+(seuilIsCustom?seuilVidange:'')+'" />'+
         '</div>'+
         '<div class="cfg-form-group">'+
-          '<label class="cfg-form-label">Prix carburant (FCFA/L)</label>'+
+          '<label class="cfg-form-label">Type de compteur horaire</label>'+
+          '<select id="eq-edit-type-compteur" class="cfg-form-input" onchange="var w=document.getElementById(\'eq-edit-baseline-wrap\');if(w)w.style.display=this.value===\'cumule\'?\'block\':\'none\'">'+
+            '<option value="cumule"'+(typeCompteur==='cumule'?' selected':'')+'>Heures cumulées (total affiché)</option>'+
+            '<option value="depuis_entretien"'+(typeCompteur==='depuis_entretien'?' selected':'')+'>Heures depuis entretien (remis à 0)</option>'+
+          '</select>'+
+          '<div style="font-size:10px;color:var(--text3);margin-top:3px">Si vous ne savez pas, gardez "Heures cumulées"</div>'+
+        '</div>'+
+        '<div class="cfg-form-group" id="eq-edit-baseline-wrap" style="display:'+(typeCompteur==='cumule'?'block':'none')+'">'+
+          '<label class="cfg-form-label">Compteur au dernier vidange <span style="font-weight:400;color:var(--text3)">(optionnel)</span></label>'+
+          '<input id="eq-edit-baseline" class="cfg-form-input" type="number" step="0.1" placeholder="ex: 2830 h" value="'+(heuresDernierVidange||'')+'" />'+
+          '<div style="font-size:10px;color:var(--text3);margin-top:3px">Mis à jour automatiquement après chaque déclaration de vidange</div>'+
+        '</div>'+
+        '<div class="cfg-form-group">'+
+          '<label class="cfg-form-label">Conso (L/h) <span style="font-weight:400;color:var(--text3)">(optionnel)</span></label>'+
+          '<input id="eq-edit-conso" class="cfg-form-input" type="number" step="0.1" placeholder="ex: 65" value="'+(consoLh||'')+'" />'+
+        '</div>'+
+        '<div class="cfg-form-group">'+
+          '<label class="cfg-form-label">Prix carburant (FCFA/L) <span style="font-weight:400;color:var(--text3)">(optionnel)</span></label>'+
           '<input id="eq-edit-prix" class="cfg-form-input" type="number" step="1" placeholder="ex: 750" value="'+(prixLitre||'')+'" />'+
-          '<div style="font-size:10px;color:var(--text3);margin-top:3px">Utilisé pour calculer le coût automatiquement lors d\'un ravitaillement</div>'+
         '</div>'+
       '</div>';
   }
@@ -3503,15 +3534,24 @@ async function _saveEditEquip(eqId){
   var kvaEl=document.getElementById('eq-edit-kva');
   var consoEl=document.getElementById('eq-edit-conso');
   var capaEl=document.getElementById('eq-edit-capa');
-  var seuilEl=document.getElementById('eq-edit-seuil');
+  var seuilSel=document.getElementById('eq-edit-seuil');
+  var seuilCustomEl=document.getElementById('eq-edit-seuil-custom');
   var baselineEl=document.getElementById('eq-edit-baseline');
   var prixEl=document.getElementById('eq-edit-prix');
+  var typeCompteurEl=document.getElementById('eq-edit-type-compteur');
   if(kvaEl&&kvaEl.value!=='')body.puissance_kva=parseFloat(kvaEl.value);
   if(consoEl&&consoEl.value!=='')body.conso_theorique_lh=parseFloat(consoEl.value);
+  else if(consoEl)body.conso_theorique_lh=null;
   if(capaEl&&capaEl.value!=='')body.capacite_litres=parseFloat(capaEl.value);
-  if(seuilEl&&seuilEl.value!=='')body.seuil_vidange_heures=parseFloat(seuilEl.value);
+  if(seuilSel){
+    var seuilVal=seuilSel.value;
+    if(seuilVal===''||seuilVal===null){body.seuil_vidange_heures=null;}
+    else if(seuilVal==='0'){body.seuil_vidange_heures=seuilCustomEl&&seuilCustomEl.value!==''?parseInt(seuilCustomEl.value):null;}
+    else{body.seuil_vidange_heures=parseInt(seuilVal);}
+  }
   if(prixEl&&prixEl.value!=='')body.prix_litre=parseFloat(prixEl.value);
-  else if(prixEl)body.prix_litre=null; // effacer si champ vide
+  else if(prixEl)body.prix_litre=null;
+  if(typeCompteurEl)body.type_compteur_heures=typeCompteurEl.value||'cumule';
   if(baselineEl&&baselineEl.value!==''){
     body.heures_dernier_vidange=parseFloat(baselineEl.value);
     body.date_dernier_vidange=new Date().toISOString();
@@ -3553,9 +3593,11 @@ async function _saveNewEquip(){
   var modeleId=(document.getElementById('eq-new-modele')||{}).value||null;
   // Champs GE
   var kva=parseFloat((document.getElementById('eq-new-kva')||{}).value)||null;
-  var conso=parseFloat((document.getElementById('eq-new-conso')||{}).value)||null;
+  var conso=null; // calculé automatiquement
   var capa=parseInt((document.getElementById('eq-new-capa')||{}).value)||null;
-  var seuil=parseInt((document.getElementById('eq-new-seuil')||{}).value)||null;
+  var seuilSelVal=(document.getElementById('eq-new-seuil')||{}).value||'';
+  var seuil=seuilSelVal===''?null:seuilSelVal==='0'?parseInt((document.getElementById('eq-new-seuil-custom')||{}).value)||null:parseInt(seuilSelVal)||null;
+  var typeCompteurNew=(document.getElementById('eq-new-type-compteur')||{}).value||'cumule';
   // Champs Cuve
   var capaCuve=parseInt((document.getElementById('eq-new-capa-cuve')||{}).value)||null;
   var consoCuve=parseFloat((document.getElementById('eq-new-conso-cuve')||{}).value)||null;
@@ -3563,9 +3605,9 @@ async function _saveNewEquip(){
   var eqData={nom:nom.trim(),site_id:_configCurrentSid,type_id:typeId,marque:marque||null,actif:true,ordre_ronde:99};
   if(typeId===GE_TYPE_ID_CFG){
     if(kva)eqData.puissance_kva=kva;
-    if(conso)eqData.conso_theorique_lh=conso;
     if(capa)eqData.capacite_litres=capa;
     if(seuil)eqData.seuil_vidange_heures=seuil;
+    eqData.type_compteur_heures=typeCompteurNew;
   }
   if(typeId===CUVE_TYPE_ID_CFG){
     if(capaCuve)eqData.capacite_litres=capaCuve;
