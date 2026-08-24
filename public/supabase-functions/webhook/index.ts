@@ -1081,7 +1081,8 @@ async function handleMessage(from: string, bodyText: string) {
     }
 
     // RESOLU : si le contact a un signalement en_cours à son nom → envoyer lien rapport direct
-    if ((bodyText === 'resolu' || bodyText === 'résolu') && contact) {
+    const bodyNorm = bodyText.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    if (bodyNorm === 'resolu' && contact) {
       const contactNom = contact.nom;
       const sigEnCours = await db('signalements', {
         query: `&pris_en_charge_par=eq.${encodeURIComponent(contactNom)}&statut=eq.en_cours&limit=1`
