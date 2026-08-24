@@ -189,11 +189,12 @@ function supaPost(table,data){
     method:'POST',
     headers:{
       'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,
-      'Content-Type':'application/json','Prefer':'return=minimal'
+      'Content-Type':'application/json','Prefer':'return=representation'
     },
     body:JSON.stringify(data)
   }).then(function(r){
     if(!r.ok)return r.text().then(function(t){throw new Error(t);});
+    return r.json();
   });
 }
 
