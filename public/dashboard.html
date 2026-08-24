@@ -2445,7 +2445,7 @@ async function _rtConfig(sid){
 }
 
 async function _buildContactsTab(sid){
-  var contacts=await supaGet('contacts','site_id=eq.'+sid+'&select=id,nom,role,whatsapp,email,actif&order=nom.asc');
+  var contacts=await supaGet('contacts','site_id=eq.'+sid+'&select=id,nom,role,whatsapp,email,actif,notif_signalement&order=nom.asc');
   var ROLES={resp_tech:'⚙️ Resp. technique',dir_tech:'🏗️ Dir. technique',dir_ops:'📊 Dir. opérations',technicien:'🔧 Technicien',autre:'👤 Autre'};
 
   var byRole={};
@@ -2458,13 +2458,9 @@ async function _buildContactsTab(sid){
   var html='<div style="max-width:680px">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
       '<div style="font-size:12px;color:var(--text2);line-height:1.5">'+
-        'Gérez les personnes à contacter. Les contacts <strong>Resp. technique</strong> et <strong>Dir. technique</strong> avec un numéro WhatsApp reçoivent automatiquement les signalements.'+
+        'Gérez les personnes à contacter. Cochez <strong>Signalements WA</strong> sur un contact pour qu\'il reçoive les notifications WhatsApp lors d\'un signalement — peu importe son rôle.'+
       '</div>'+
       '<button class="cfg-btn-primary" style="white-space:nowrap;margin-left:16px" onclick="_openAddContactModal()">＋ Ajouter</button>'+
-    '</div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'+
-      '<div style="font-size:11px;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:6px;padding:5px 10px;font-weight:600">📲 Reçoivent les signalements WhatsApp</div>'+
-      '<div style="font-size:11px;background:#f4f5fa;color:#5a5f78;border:1px solid var(--border);border-radius:6px;padding:5px 10px">= Rôle Resp. tech ou Dir. tech + numéro WhatsApp renseigné</div>'+
     '</div>';
 
   if(!contacts.length){
@@ -2492,12 +2488,12 @@ async function _buildContactsTab(sid){
               (!c.whatsapp&&!c.email?'Aucun contact renseigné':'')+
             '</div>'+
           '</div>'+
-          ((c.actif&&c.whatsapp&&(c.role==='resp_tech'||c.role==='dir_tech'))?
-            '<span style="font-size:10px;font-weight:700;color:#2e7d32;background:#e8f5e9;border:1px solid #a5d6a7;padding:2px 8px;border-radius:10px;margin-right:4px">📲 Notifié</span>':'')+
+          (c.notif_signalement&&c.whatsapp&&c.actif?
+            '<span style="font-size:10px;font-weight:700;color:#2e7d32;background:#e8f5e9;border:1px solid #a5d6a7;padding:2px 8px;border-radius:10px;margin-right:4px">📲 Signalements</span>':'')+
           (c.actif?
             '<span style="font-size:10px;font-weight:700;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);padding:2px 8px;border-radius:10px">Actif</span>':
             '<span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--creme);border:1px solid var(--border);padding:2px 8px;border-radius:10px">Inactif</span>')+
-          '<button class="config-eq-edit-btn" style="opacity:1" onclick="_openEditContactModal(\''+c.id+'\',\''+escape_html(c.nom)+'\',\''+escape_html(c.role||'')+'\',\''+escape_html(c.whatsapp||'')+'\',\''+escape_html(c.email||'')+'\','+c.actif+')" title="Modifier">✏️</button>'+
+          '<button class="config-eq-edit-btn" style="opacity:1" onclick="_openEditContactModal(\''+c.id+'\',\''+escape_html(c.nom)+'\',\''+escape_html(c.role||'')+'\',\''+escape_html(c.whatsapp||'')+'\',\''+escape_html(c.email||'')+'\','+c.actif+','+!!c.notif_signalement+')" title="Modifier">✏️</button>'+
         '</div>';
       });
       html+='</div></div>';
@@ -2555,6 +2551,10 @@ function _openAddContactModal(){
       '<input id="ct-new-wa" class="cfg-form-input" placeholder="+221 77 000 00 00" /></div>'+
     '<div class="cfg-form-group"><label class="cfg-form-label">Email</label>'+
       '<input id="ct-new-email" class="cfg-form-input" placeholder="ibrahima@hotel.sn" /></div>'+
+    '<div class="cfg-form-group">'+
+      '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">'+
+        '<input type="checkbox" id="ct-new-notif-sg" /> <span>📲 Recevoir les signalements WhatsApp</span></label>'+
+    '</div>'+
     '<div class="cfg-modal-footer">'+
       '<button class="cfg-btn-secondary" onclick="_closeCfgModal()">Annuler</button>'+
       '<button class="cfg-btn-primary" onclick="_saveNewContact()">Ajouter</button>'+
@@ -2568,12 +2568,13 @@ async function _saveNewContact(){
   var role=(document.getElementById('ct-new-role')||{}).value||'autre';
   var wa=(document.getElementById('ct-new-wa')||{}).value||null;
   var email=(document.getElementById('ct-new-email')||{}).value||null;
+  var notifSg=!!(document.getElementById('ct-new-notif-sg')||{}).checked;
   _closeCfgModal();
-  await supaPost('contacts',{nom:nom.trim(),role:role,whatsapp:wa||null,email:email||null,site_id:_configCurrentSid,actif:true});
+  await supaPost('contacts',{nom:nom.trim(),role:role,whatsapp:wa||null,email:email||null,notif_signalement:notifSg,site_id:_configCurrentSid,actif:true});
   if(_session)renderRespTech(_session,'config');
 }
 
-function _openEditContactModal(cId,nom,role,wa,email,actif){
+function _openEditContactModal(cId,nom,role,wa,email,actif,notifSg){
   var roleOpts=['resp_tech','dir_tech','dir_ops','technicien','autre'].map(function(r){
     var labels={resp_tech:'Resp. technique',dir_tech:'Dir. technique',dir_ops:'Dir. opérations',technicien:'Technicien',autre:'Autre'};
     return '<option value="'+r+'"'+(r===role?' selected':'')+'>'+labels[r]+'</option>';
@@ -2588,6 +2589,10 @@ function _openEditContactModal(cId,nom,role,wa,email,actif){
       '<input id="ct-edit-wa" class="cfg-form-input" value="'+escape_html(wa)+'" /></div>'+
     '<div class="cfg-form-group"><label class="cfg-form-label">Email</label>'+
       '<input id="ct-edit-email" class="cfg-form-input" value="'+escape_html(email)+'" /></div>'+
+    '<div class="cfg-form-group">'+
+      '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">'+
+        '<input type="checkbox" id="ct-edit-notif-sg" '+(notifSg?'checked':'')+' /> <span>📲 Recevoir les signalements WhatsApp</span></label>'+
+    '</div>'+
     '<div class="cfg-form-group">'+
       '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">'+
         '<input type="checkbox" id="ct-edit-actif" '+(actif?'checked':'')+' /> Actif</label>'+
@@ -2605,9 +2610,10 @@ async function _saveEditContact(cId){
   var role=(document.getElementById('ct-edit-role')||{}).value||'autre';
   var wa=(document.getElementById('ct-edit-wa')||{}).value||null;
   var email=(document.getElementById('ct-edit-email')||{}).value||null;
+  var notifSg=!!(document.getElementById('ct-edit-notif-sg')||{}).checked;
   var actif=!!(document.getElementById('ct-edit-actif')||{}).checked;
   _closeCfgModal();
-  await supaPatch('contacts',cId,{nom:nom.trim(),role:role,whatsapp:wa||null,email:email||null,actif:actif});
+  await supaPatch('contacts',cId,{nom:nom.trim(),role:role,whatsapp:wa||null,email:email||null,notif_signalement:notifSg,actif:actif});
   if(_session)renderRespTech(_session,'config');
 }
 
