@@ -716,7 +716,7 @@ async function _rtAccueil(session,sid,cid){
   // Banner
   var banner='';
   if(nbAlertes>0){
-    banner='<div class="alert-banner"><div class="ab-icon">🚨</div><div class="ab-body"><div class="ab-title">'+nbAlertes+' alerte'+(nbAlertes>1?'s':'')+' active'+(nbAlertes>1?'s':'')+'</div><div class="ab-sub">Voir le détail ci-dessous</div></div></div>';
+    banner='<div class="alert-banner" style="cursor:pointer" onclick="document.getElementById(\'accueil-alertes\')&&document.getElementById(\'accueil-alertes\').scrollIntoView({behavior:\'smooth\',block:\'start\'})"><div class="ab-icon">🚨</div><div class="ab-body"><div class="ab-title">'+nbAlertes+' alerte'+(nbAlertes>1?'s':'')+' active'+(nbAlertes>1?'s':'')+'</div><div class="ab-sub">Voir le détail ↓</div></div></div>';
   }else if(rondeOk){
     banner='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Tout est OK</div><div class="ab-sub">Ronde journalière validée · '+equips.length+' équipements</div></div></div>';
   }else if(nbTot>0){
@@ -837,7 +837,7 @@ async function _rtAccueil(session,sid,cid){
   }
 
   // Alertes actives
-  var alertesHtml='<div class="section-title">Alertes actives</div>';
+  var alertesHtml='<div id="accueil-alertes" class="section-title">Alertes actives</div>';
   if(nbAlertes===0){
     alertesHtml+='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Aucune alerte</div><div class="ab-sub">Tous les systèmes sont opérationnels</div></div></div>';
   }else{
@@ -3897,7 +3897,7 @@ async function _dtAccueil(session,sids,cid){
 
   // Banner
   var banner=totalAlertes>0
-    ?'<div class="alert-banner"><div class="ab-icon">🚨</div><div class="ab-body"><div class="ab-title">'+totalAlertes+' alerte'+(totalAlertes>1?'s':'')+' active'+(totalAlertes>1?'s':'')+'</div><div class="ab-sub">Pannes ou alertes à traiter sur vos sites</div></div></div>'
+    ?'<div class="alert-banner" style="cursor:pointer" onclick="document.getElementById(\'accueil-alertes\')&&document.getElementById(\'accueil-alertes\').scrollIntoView({behavior:\'smooth\',block:\'start\'})"><div class="ab-icon">🚨</div><div class="ab-body"><div class="ab-title">'+totalAlertes+' alerte'+(totalAlertes>1?'s':'')+' active'+(totalAlertes>1?'s':'')+'</div><div class="ab-sub">Pannes ou alertes à traiter sur vos sites ↓</div></div></div>'
     :'<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Tous les sites opérationnels</div><div class="ab-sub">Aucune alerte active'+(confPct!==null?' · '+confPct+'% de conformité rondes':'')+'</div></div></div>';
 
   // KPIs
@@ -3946,7 +3946,7 @@ async function _dtAccueil(session,sids,cid){
   bloc1+='</div>';
 
   // Bloc 2 — Équipements en alerte
-  var bloc2='<div class="section-title">Équipements en alerte</div>';
+  var bloc2='<div id="accueil-alertes" class="section-title">Équipements en alerte</div>';
   if(totalAlertes===0){
     bloc2+='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Aucune alerte active</div><div class="ab-sub">Tous les équipements fonctionnent normalement</div></div></div>';
   }else{
