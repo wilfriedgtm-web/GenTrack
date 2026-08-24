@@ -135,7 +135,7 @@ body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
           <span class="cmd-tag">panne</span>
         </div>
       </div>
-      <div class="cmd-desc">Signalez une panne ou un dysfonctionnement sur un équipement. Le resp. technique est notifié immédiatement.</div>
+      <div class="cmd-desc">Signalez une panne ou un dysfonctionnement sur un équipement. Le resp. technique reçoit une notification WhatsApp avec un code de référence.</div>
       <div class="flow">
         <div class="flow-label">Exemple</div>
         <div class="flow-msg user">panne</div>
@@ -143,7 +143,7 @@ body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
         <div class="flow-msg user">1</div>
         <div class="flow-msg bot wa">📝 Décrivez le problème :</div>
         <div class="flow-msg user">Ne démarre plus, alarme rouge</div>
-        <div class="flow-msg bot wa">✅ Panne enregistrée. Le resp. tech est notifié.</div>
+        <div class="flow-msg bot wa">✅ Panne enregistrée — REF-1042<br/><em>Répondre OK REF-1042 pour prendre en charge</em></div>
       </div>
     </div>
 
@@ -214,6 +214,30 @@ body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
       </div>
     </div>
 
+    <!-- PRISE EN CHARGE -->
+    <div class="cmd-card" style="border-left:4px solid #25D366;grid-column:1/-1">
+      <div class="cmd-header">
+        <span class="cmd-icon">✅</span>
+        <div>
+          <div class="cmd-label">Prendre en charge un signalement</div>
+          <span class="cmd-tag" style="background:#e8f5e9;color:#1b7a4a">OK REF-XXXX</span>
+        </div>
+      </div>
+      <div class="cmd-desc">Le resp. technique reçoit une notification WhatsApp pour chaque signalement. Répondez <strong>OK REF-XXXX</strong> (avec le code reçu) pour indiquer que vous prenez en charge. Le dashboard se met à jour automatiquement et les autres contacts sont avertis.</div>
+      <div class="flow" style="flex-direction:row;flex-wrap:wrap;gap:12px;align-items:flex-start">
+        <div style="flex:1;min-width:200px">
+          <div class="flow-label">Notification reçue</div>
+          <div class="flow-msg bot wa" style="max-width:none">🚨 PANNE SIGNALÉE — GenTrack<br/><strong>Hôtel Pullman Dakar</strong><br/><br/>🔧 GE Principal<br/>⚠️ Ne démarre plus, alarme rouge<br/>👤 Signalé par : Moussa<br/>🕐 08:42<br/><br/><em>Répondre OK REF-1042 pour prendre en charge</em></div>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <div class="flow-label">Prise en charge</div>
+          <div class="flow-msg user" style="max-width:none">OK REF-1042</div>
+          <div class="flow-msg bot wa" style="max-width:none">✅ Pris en charge !<br/>📋 REF-1042<br/><br/>Tapez <strong>resolu</strong> quand c'est réglé.</div>
+          <div style="font-size:11px;color:#5A5F78;margin-top:6px;line-height:1.4">Les autres contacts reçoivent une confirmation de prise en charge. Le statut passe à "En cours" dans le dashboard.</div>
+        </div>
+      </div>
+    </div>
+
     <!-- RÉSOLU -->
     <div class="cmd-card resolu" style="grid-column:1/-1">
       <div class="cmd-header">
@@ -253,6 +277,7 @@ body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
       <div class="quick-item"><div class="quick-word">plein</div><div class="quick-desc">Ravitaillement cuve</div></div>
       <div class="quick-item"><div class="quick-word">panne</div><div class="quick-desc">Déclarer une panne</div></div>
       <div class="quick-item"><div class="quick-word">resolu</div><div class="quick-desc">Clôturer panne</div></div>
+      <div class="quick-item" style="background:#e8f5e9;border:1px solid #a5d6a7"><div class="quick-word" style="color:#1b7a4a">OK REF-…</div><div class="quick-desc">Prendre en charge</div></div>
       <div class="quick-item"><div class="quick-word">menu</div><div class="quick-desc">Afficher menu</div></div>
       <div class="quick-item"><div class="quick-word">aide</div><div class="quick-desc">Aide commandes</div></div>
       <div class="quick-item"><div class="quick-word">stop</div><div class="quick-desc">Annuler saisie</div></div>

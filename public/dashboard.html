@@ -1706,7 +1706,7 @@ async function _rtSignalements(sid){
   // Fetch all for KPIs + analytics, filter client-side
   var allRows=await supaGet('signalements',
     'groupe_id=eq.'+sid+'&order=created_at.desc&limit=200'+
-    '&select=id,groupe_id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,created_at,source,photo_url,equipement_id,equipements(nom),maintenances(photo_url,prestataire)'
+    '&select=id,groupe_id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,pris_en_charge_par,pris_en_charge_at,ref_code,created_at,source,photo_url,equipement_id,equipements(nom),maintenances(photo_url,prestataire)'
   );
 
   window._sgRows={};
@@ -1830,7 +1830,8 @@ async function _rtSignalements(sid){
           (r.lieu?'<span>📍 '+escape_html(r.lieu)+'</span>':'')+
           '<span>🕐 '+date+'</span>'+
         '</div>'+
-        (!resolu&&r.assigne_a?'<div style="margin-top:6px"><span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px;background:var(--amber-pale);color:var(--amber-dark)">👷 Affecté à '+escape_html(r.assigne_a)+'</span></div>':'')+
+        (r.ref_code?'<div style="margin-top:4px"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:5px;background:#f0f0f0;color:var(--text2);letter-spacing:.5px">'+escape_html(r.ref_code)+'</span></div>':'')+
+        (!resolu&&r.pris_en_charge_par?'<div style="margin-top:6px"><span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px;background:#e8f5e9;color:#2e7d32">✅ Pris en charge par '+escape_html(r.pris_en_charge_par)+'</span></div>':(!resolu&&r.assigne_a?'<div style="margin-top:6px"><span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px;background:var(--amber-pale);color:var(--amber-dark)">👷 Affecté à '+escape_html(r.assigne_a)+'</span></div>':''))+
         resolutionHtml+
         actionsHtml+
       '</div>';
@@ -1891,6 +1892,15 @@ async function _sgResoudreSubmit(id){
         '<input id="sg-mnt-prest" type="text" value="'+escape_html(r.assigne_a||'')+'" placeholder="Nom du technicien" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
         '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">COÛT RÉEL (FCFA)</label>'+
         '<input id="sg-mnt-cout" type="number" value="'+(cout||'')+'" placeholder="0 si gratuit" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">DURÉE D\'INTERVENTION</label>'+
+        '<div style="display:flex;gap:6px">'+
+          '<input id="sg-mnt-duree-val" type="number" min="1" placeholder="ex: 2" style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/>'+
+          '<select id="sg-mnt-duree-unite" style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px">'+
+            '<option value="heures">Heures</option>'+
+            '<option value="minutes">Minutes</option>'+
+            '<option value="jours">Jours</option>'+
+          '</select>'+
+        '</div></div>'+
       '</div>'+
       '<div style="display:flex;gap:8px">'+
         '<button onclick="_closeCfgModal();if(_session)renderRespTech(_session,\'signalements\')" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Non merci</button>'+
@@ -1910,6 +1920,9 @@ async function _sgCreerMaintenance(sgId){
   var prest=(document.getElementById('sg-mnt-prest').value||'').trim()||r.assigne_a||null;
   var coutStr=document.getElementById('sg-mnt-cout').value;
   var cout=coutStr&&!isNaN(parseFloat(coutStr))?parseFloat(coutStr):null;
+  var dureeValStr=document.getElementById('sg-mnt-duree-val').value;
+  var dureeVal=dureeValStr&&!isNaN(parseFloat(dureeValStr))?parseFloat(dureeValStr):null;
+  var dureeUnite=(document.getElementById('sg-mnt-duree-unite')||{}).value||'heures';
   var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
   await supaPost('maintenances',{
     groupe_id:sid,
@@ -1922,7 +1935,9 @@ async function _sgCreerMaintenance(sgId){
     cout:cout,
     prestataire:prest,
     created_by:nom,
-    signalement_id:sgId
+    signalement_id:sgId,
+    duree_valeur:dureeVal,
+    duree_unite:dureeVal?dureeUnite:null
   });
   _closeCfgModal();
   if(_session)renderRespTech(_session,'signalements');
@@ -2441,11 +2456,15 @@ async function _buildContactsTab(sid){
   });
 
   var html='<div style="max-width:680px">'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
       '<div style="font-size:12px;color:var(--text2);line-height:1.5">'+
-        'Gérez les personnes notifiées lors des alertes. Chaque contact recevra les alertes selon les canaux configurés dans l\'onglet Seuils.'+
+        'Gérez les personnes à contacter. Les contacts <strong>Resp. technique</strong> et <strong>Dir. technique</strong> avec un numéro WhatsApp reçoivent automatiquement les signalements.'+
       '</div>'+
       '<button class="cfg-btn-primary" style="white-space:nowrap;margin-left:16px" onclick="_openAddContactModal()">＋ Ajouter</button>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'+
+      '<div style="font-size:11px;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:6px;padding:5px 10px;font-weight:600">📲 Reçoivent les signalements WhatsApp</div>'+
+      '<div style="font-size:11px;background:#f4f5fa;color:#5a5f78;border:1px solid var(--border);border-radius:6px;padding:5px 10px">= Rôle Resp. tech ou Dir. tech + numéro WhatsApp renseigné</div>'+
     '</div>';
 
   if(!contacts.length){
@@ -2473,6 +2492,8 @@ async function _buildContactsTab(sid){
               (!c.whatsapp&&!c.email?'Aucun contact renseigné':'')+
             '</div>'+
           '</div>'+
+          ((c.actif&&c.whatsapp&&(c.role==='resp_tech'||c.role==='dir_tech'))?
+            '<span style="font-size:10px;font-weight:700;color:#2e7d32;background:#e8f5e9;border:1px solid #a5d6a7;padding:2px 8px;border-radius:10px;margin-right:4px">📲 Notifié</span>':'')+
           (c.actif?
             '<span style="font-size:10px;font-weight:700;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);padding:2px 8px;border-radius:10px">Actif</span>':
             '<span style="font-size:10px;font-weight:700;color:var(--text3);background:var(--creme);border:1px solid var(--border);padding:2px 8px;border-radius:10px">Inactif</span>')+
@@ -3683,16 +3704,19 @@ async function _saveNewQ(eqId){
   if(!texte||!texte.trim()){alert('Question requise');return;}
   var freqs=['qf-j','qf-h','qf-m'].map(function(id){var el=document.getElementById(id);return el&&el.checked?el.value:null;}).filter(Boolean);
   if(!freqs.length)freqs=['journalier'];
-  var minVal=document.getElementById('q-new-min').value;
-  var maxVal=document.getElementById('q-new-max').value;
+  var typeReponse=(document.getElementById('q-new-type')||{value:'numerique'}).value||'numerique';
+  var unite=(document.getElementById('q-new-unite')||{}).value||null;
+  var minVal=(document.getElementById('q-new-min')||{value:''}).value;
+  var maxVal=(document.getElementById('q-new-max')||{value:''}).value;
+  var exemple=(document.getElementById('q-new-exemple')||{}).value||null;
   _closeCfgModal();
   await supaPost('questions',{
     equipement_id:eqId,texte:texte.trim(),
-    type_reponse:document.getElementById('q-new-type').value||'numerique',
-    unite:document.getElementById('q-new-unite').value||null,
+    type_reponse:typeReponse,
+    unite:unite,
     seuil_min:minVal!==''?parseFloat(minVal):null,
     seuil_max:maxVal!==''?parseFloat(maxVal):null,
-    exemple:document.getElementById('q-new-exemple').value||null,
+    exemple:exemple,
     frequences:freqs,ordre:99,actif:true
   });
   if(_session)renderRespTech(_session,'config');
@@ -4123,7 +4147,7 @@ async function _dtSignalements(sids){
   var sidStr=sids.join(',');
   var sites=await supaGet('sites','id=in.('+sidStr+')&select=id,nom');
   var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
-  var query='groupe_id=in.('+sidStr+')&order=created_at.desc&limit=200&select=id,groupe_id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,created_at,photo_url,equipements(nom)';
+  var query='groupe_id=in.('+sidStr+')&order=created_at.desc&limit=200&select=id,groupe_id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,pris_en_charge_par,pris_en_charge_at,ref_code,created_at,photo_url,equipements(nom)';
   if(_dtSgFilter!=='tous')query+='&statut=eq.'+_dtSgFilter;
   var rows=await supaGet('signalements',query);
   var counts={tous:rows.length,ouvert:0,en_cours:0,resolu:0};

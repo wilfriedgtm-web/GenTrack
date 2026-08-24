@@ -16,7 +16,7 @@ const TWILIO_SID  = Deno.env.get('TWILIO_SID')   || '';
 const TWILIO_TOKEN= Deno.env.get('TWILIO_TOKEN') || '';
 const TWILIO_FROM = Deno.env.get('TWILIO_NUMBER')|| 'whatsapp:+14155238886';
 const ANON_KEY    = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
-const BASE_URL    = 'https://gen-track-git-master-wilfriedgtm-webs-projects.vercel.app';
+const BASE_URL    = 'https://gen-track.vercel.app';
 
 // ── DB helper ─────────────────────────────────────────────────────────────────
 async function db(table: string, opts: any = {}) {
@@ -34,6 +34,30 @@ async function db(table: string, opts: any = {}) {
   });
   if (res.status === 204) return [];
   return res.json();
+}
+
+// ── Upload photo Twilio → Supabase Storage ────────────────────────────────────
+async function uploadPhoto(mediaUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(mediaUrl, {
+      headers: { 'Authorization': `Basic ${btoa(`${TWILIO_SID}:${TWILIO_TOKEN}`)}` }
+    });
+    if (!res.ok) { console.error('Photo fetch failed:', res.status); return null; }
+    const contentType = res.headers.get('content-type') || 'image/jpeg';
+    const ext = contentType.includes('png') ? 'png' : contentType.includes('gif') ? 'gif' : 'jpg';
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const arrayBuffer = await res.arrayBuffer();
+    const up = await fetch(`${SUPA_URL}/storage/v1/object/gentrack-photos/signalements/${filename}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`,
+        'Content-Type': contentType, 'x-upsert': 'true'
+      },
+      body: arrayBuffer
+    });
+    if (!up.ok) { console.error('Storage upload failed:', await up.text()); return null; }
+    return `${SUPA_URL}/storage/v1/object/public/gentrack-photos/signalements/${filename}`;
+  } catch (e) { console.error('uploadPhoto error:', e); return null; }
 }
 
 // ── Twilio ────────────────────────────────────────────────────────────────────
@@ -581,7 +605,7 @@ async function demarrerPlein(phone: string, contact: any, site: any): Promise<an
 }
 
 // ── Gestionnaire des états partagés ──────────────────────────────────────────
-async function handleStates(phone: string, msg: string, bodyText: string, contact: any, site: any, state: string, sd: any): Promise<any> {
+async function handleStates(phone: string, msg: string, bodyText: string, contact: any, site: any, state: string, sd: any, mediaUrl = ''): Promise<any> {
   const siteNom = site?.nom || sd.site_nom || '';
   const today = getToday();
 
@@ -793,17 +817,23 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
 
   if (state === 'panne_description') {
     const desc = bodyText.trim();
-    if (desc.length < 10) return sendWA(phone, `❌ Description trop courte. Donnez plus de détails :\n_(minimum 10 caractères)_`);
+    // Accepter si texte suffisant OU si photo jointe
+    if (desc.length < 10 && !mediaUrl) return sendWA(phone, `❌ Description trop courte. Donnez plus de détails :\n_(minimum 10 caractères, ou joignez une photo)_`);
+
+    // Upload photo si présente
+    const photo_url = mediaUrl ? await uploadPhoto(mediaUrl) : null;
+    const finalDesc = desc.length >= 3 ? `${sd.panne_type_label} — ${desc}` : `${sd.panne_type_label} — Photo jointe`;
 
     // ── Écrire dans signalements (plus dans pannes) ──
     await db('signalements', { method: 'POST', body: {
       groupe_id: sd.site_id,
       equipement_id: sd.equipement_id || null,
       type: sd.panne_type_slug || 'panne',
-      description: `${sd.panne_type_label} — ${desc}`,
+      description: finalDesc,
       signale_par: contact.nom,
       statut: 'ouvert',
       source: 'bot',
+      photo_url: photo_url || null,
     }});
     await db('alertes', { method: 'POST', body: {
       groupe_id: sd.site_id,
@@ -1022,7 +1052,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
 }
 
 // ── Gestionnaire principal ────────────────────────────────────────────────────
-async function handleMessage(from: string, bodyText: string) {
+async function handleMessage(from: string, bodyText: string, mediaUrl = '') {
   const phone = from.replace('whatsapp:', '');
   const msg = bodyText.trim().toLowerCase();
   console.log(`=== From: ${phone} | Body: ${bodyText}`);
@@ -1056,7 +1086,7 @@ async function handleMessage(from: string, bodyText: string) {
       'plein_litres','plein_confirm_litres','plein_operateur',
     ];
     if (activeStates.includes(state)) {
-      return handleStates(phone, msg, bodyText, contact, site, state, sd);
+      return handleStates(phone, msg, bodyText, contact, site, state, sd, mediaUrl);
     }
 
     // Annuler / retour — disponible à tout moment dans n'importe quel flux
@@ -1126,9 +1156,11 @@ serve(async (req) => {
     const params = new URLSearchParams(text);
     const from = params.get('From') || '';
     const body = params.get('Body') || '';
-    console.log(`Webhook — From: ${from} | Body: ${body}`);
-    if (!from || !body) return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
-    handleMessage(from, body).catch(e => console.error('handleMessage error:', e));
+    const mediaUrl = params.get('MediaUrl0') || '';
+    const numMedia = parseInt(params.get('NumMedia') || '0');
+    console.log(`Webhook — From: ${from} | Body: ${body} | Media: ${numMedia}`);
+    if (!from || (!body && !mediaUrl)) return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
+    handleMessage(from, body, mediaUrl).catch(e => console.error('handleMessage error:', e));
     return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
   } catch (err) {
     console.error('Erreur webhook:', err);
