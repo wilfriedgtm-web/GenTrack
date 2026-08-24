@@ -36,30 +36,6 @@ async function db(table: string, opts: any = {}) {
   return res.json();
 }
 
-// ── Upload photo Twilio → Supabase Storage ────────────────────────────────────
-async function uploadPhoto(mediaUrl: string): Promise<string | null> {
-  try {
-    const res = await fetch(mediaUrl, {
-      headers: { 'Authorization': `Basic ${btoa(`${TWILIO_SID}:${TWILIO_TOKEN}`)}` }
-    });
-    if (!res.ok) { console.error('Photo fetch failed:', res.status); return null; }
-    const contentType = res.headers.get('content-type') || 'image/jpeg';
-    const ext = contentType.includes('png') ? 'png' : contentType.includes('gif') ? 'gif' : 'jpg';
-    const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const arrayBuffer = await res.arrayBuffer();
-    const up = await fetch(`${SUPA_URL}/storage/v1/object/gentrack-photos/signalements/${filename}`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`,
-        'Content-Type': contentType, 'x-upsert': 'true'
-      },
-      body: arrayBuffer
-    });
-    if (!up.ok) { console.error('Storage upload failed:', await up.text()); return null; }
-    return `${SUPA_URL}/storage/v1/object/public/gentrack-photos/signalements/${filename}`;
-  } catch (e) { console.error('uploadPhoto error:', e); return null; }
-}
-
 // ── Twilio ────────────────────────────────────────────────────────────────────
 async function sendWA(to: string, message: string) {
   const toFmt = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
@@ -605,7 +581,7 @@ async function demarrerPlein(phone: string, contact: any, site: any): Promise<an
 }
 
 // ── Gestionnaire des états partagés ──────────────────────────────────────────
-async function handleStates(phone: string, msg: string, bodyText: string, contact: any, site: any, state: string, sd: any, mediaUrl = ''): Promise<any> {
+async function handleStates(phone: string, msg: string, bodyText: string, contact: any, site: any, state: string, sd: any): Promise<any> {
   const siteNom = site?.nom || sd.site_nom || '';
   const today = getToday();
 
@@ -817,24 +793,20 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
 
   if (state === 'panne_description') {
     const desc = bodyText.trim();
-    // Accepter si texte suffisant OU si photo jointe
-    if (desc.length < 10 && !mediaUrl) return sendWA(phone, `❌ Description trop courte. Donnez plus de détails :\n_(minimum 10 caractères, ou joignez une photo)_`);
+    if (desc.length < 10) return sendWA(phone, `❌ Description trop courte. Donnez plus de détails :\n_(minimum 10 caractères)_`);
 
-    // Upload photo si présente
-    const photo_url = mediaUrl ? await uploadPhoto(mediaUrl) : null;
-    const finalDesc = desc.length >= 3 ? `${sd.panne_type_label} — ${desc}` : `${sd.panne_type_label} — Photo jointe`;
-
-    // ── Écrire dans signalements (plus dans pannes) ──
-    await db('signalements', { method: 'POST', body: {
+    // ── Écrire dans signalements ──
+    const sigRes = await db('signalements', { method: 'POST', body: {
       groupe_id: sd.site_id,
+      site_id: sd.site_id,
       equipement_id: sd.equipement_id || null,
       type: sd.panne_type_slug || 'panne',
-      description: finalDesc,
+      description: `${sd.panne_type_label} — ${desc}`,
       signale_par: contact.nom,
       statut: 'ouvert',
       source: 'bot',
-      photo_url: photo_url || null,
     }});
+    const refCode = (Array.isArray(sigRes) ? sigRes[0]?.ref_code : sigRes?.ref_code) || '';
     await db('alertes', { method: 'POST', body: {
       groupe_id: sd.site_id,
       type: 'panne',
@@ -844,11 +816,12 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     }}).catch(() => {});
     await setSession(phone, 'idle', {});
 
-    // Notifier resp_tech
+    // Notifier resp_tech + dir_tech
     const responsables = await db('contacts', {
       query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true`
     });
-    const alertMsg = `🚨 *PANNE SIGNALÉE — GenTrack*\n*${siteNom}*\n\n🔧 Équipement : *${sd.equip_nom}*\n⚠️ Type : *${sd.panne_type_label}*\n📝 Détail : ${desc}\n\n👤 Signalé par : ${contact.nom}\n🕐 ${today} ${getHeure()}\n\n_Tapez *aide* pour affecter._`;
+    const refLine = refCode ? `\n\n_Répondre *OK ${refCode}* pour prendre en charge._` : `\n\n_Tapez *resolu* pour clôturer._`;
+    const alertMsg = `🚨 *PANNE SIGNALÉE — GenTrack*\n*${siteNom}*\n\n🔧 Équipement : *${sd.equip_nom}*\n⚠️ Type : *${sd.panne_type_label}*\n📝 Détail : ${desc}\n\n👤 Signalé par : ${contact.nom}\n🕐 ${today} ${getHeure()}${refLine}`;
     const dejaEnvoyes = new Set<string>([phone]);
     if (Array.isArray(responsables)) {
       for (const r of responsables) {
@@ -1052,7 +1025,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
 }
 
 // ── Gestionnaire principal ────────────────────────────────────────────────────
-async function handleMessage(from: string, bodyText: string, mediaUrl = '') {
+async function handleMessage(from: string, bodyText: string) {
   const phone = from.replace('whatsapp:', '');
   const msg = bodyText.trim().toLowerCase();
   console.log(`=== From: ${phone} | Body: ${bodyText}`);
@@ -1076,6 +1049,56 @@ async function handleMessage(from: string, bodyText: string, mediaUrl = '') {
       return demarrerSaisie(phone, contact, site);
     }
 
+    // ── Prise en charge signalement : "OK REF-XXXX" ───────────────────────────
+    const okRefNorm = bodyText.trim().toUpperCase().replace(/\s+/g, ' ');
+    const okRefMatch = okRefNorm.match(/^OK\s+REF[-\s]?(\d+)$/);
+    const okRefCode = okRefMatch ? `REF-${okRefMatch[1]}` : null;
+    if (okRefMatch) {
+      const refCode = okRefCode;
+      const sigs = await db('signalements', { query: `&ref_code=eq.${refCode}&statut=eq.ouvert&limit=1` });
+      const sig = Array.isArray(sigs) ? sigs[0] : null;
+      if (!sig) return sendWA(phone, `❌ Signalement *${refCode}* introuvable ou déjà traité.`);
+      const preneurNom = contact?.nom || phone;
+      await db('signalements', { method: 'PATCH', query: `&id=eq.${sig.id}`, body: {
+        statut: 'en_cours',
+        assigne_a: preneurNom,
+        pris_en_charge_par: preneurNom,
+        pris_en_charge_at: new Date().toISOString(),
+      }});
+      const siteIdSig = sig.site_id || sig.groupe_id;
+      if (siteIdSig) {
+        const autresContacts = await db('contacts', { query: `&site_id=eq.${siteIdSig}&notif_signalement=eq.true&actif=eq.true` });
+        const notifPec = `ℹ️ *Prise en charge — GenTrack*\n\n📋 ${refCode}\n👷 *${preneurNom}* s'en occupe\n🕐 ${getHeure()}`;
+        if (Array.isArray(autresContacts)) {
+          for (const r of autresContacts) {
+            if (r.whatsapp && r.whatsapp !== phone) await sendWA(r.whatsapp, notifPec);
+          }
+        }
+      }
+      // Remettre session à idle
+      await db('sessions', { method: 'PATCH', query: `&phone=eq.${phone}`, body: { state: 'idle', data: null } });
+      return sendWA(phone, `✅ *Pris en charge !*\n📋 ${refCode}\n\nTapez *resolu* quand c'est réglé.`);
+    }
+
+    // RESOLU : si le contact a un signalement en_cours à son nom → envoyer lien rapport direct
+    if ((bodyText === 'resolu' || bodyText === 'résolu') && contact) {
+      const contactNom = contact.nom;
+      const sigEnCours = await db('signalements', {
+        query: `&pris_en_charge_par=eq.${encodeURIComponent(contactNom)}&statut=eq.en_cours&limit=1`
+      });
+      const sig = Array.isArray(sigEnCours) ? sigEnCours[0] : null;
+
+      if (sig) {
+        const appUrl = Deno.env.get('APP_URL') || 'https://gen-track.vercel.app';
+        const rapportUrl = `${appUrl}/rapport.html?sg=${sig.id}`;
+        await db('sessions', { method: 'PATCH', query: `&phone=eq.${phone}`, body: { state: 'idle', data: null } });
+        return sendWA(phone, `✅ *Clôturer l'intervention — GenTrack*\n\n📋 ${sig.ref_code || ''}\n\nRemplissez le rapport d'intervention :\n${rapportUrl}`);
+      } else {
+        await db('sessions', { method: 'PATCH', query: `&phone=eq.${phone}`, body: { state: 'idle', data: null } });
+        return sendWA(phone, `ℹ️ Aucun signalement en cours à votre nom.\n\nRépondez d'abord *OK REF-XXXX* (avec le code reçu) pour prendre en charge un signalement.`);
+      }
+    }
+
     // États de conversation actifs → déléguer
     const activeStates = [
       'saisie_choix_freq','saisie_choix_equip','saisie_question','saisie_followup',
@@ -1086,7 +1109,7 @@ async function handleMessage(from: string, bodyText: string, mediaUrl = '') {
       'plein_litres','plein_confirm_litres','plein_operateur',
     ];
     if (activeStates.includes(state)) {
-      return handleStates(phone, msg, bodyText, contact, site, state, sd, mediaUrl);
+      return handleStates(phone, msg, bodyText, contact, site, state, sd);
     }
 
     // Annuler / retour — disponible à tout moment dans n'importe quel flux
@@ -1156,11 +1179,9 @@ serve(async (req) => {
     const params = new URLSearchParams(text);
     const from = params.get('From') || '';
     const body = params.get('Body') || '';
-    const mediaUrl = params.get('MediaUrl0') || '';
-    const numMedia = parseInt(params.get('NumMedia') || '0');
-    console.log(`Webhook — From: ${from} | Body: ${body} | Media: ${numMedia}`);
-    if (!from || (!body && !mediaUrl)) return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
-    handleMessage(from, body, mediaUrl).catch(e => console.error('handleMessage error:', e));
+    console.log(`Webhook — From: ${from} | Body: ${body}`);
+    if (!from || !body) return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
+    handleMessage(from, body).catch(e => console.error('handleMessage error:', e));
     return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
   } catch (err) {
     console.error('Erreur webhook:', err);
