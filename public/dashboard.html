@@ -131,8 +131,12 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .eq-card-type{font-size:11px;color:var(--text3);margin-top:1px}
 .ronde-card{background:white;border:1.5px solid var(--border);border-radius:10px;padding:14px 16px}
 .alerte-card{border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px}
+.alerte-card.clickable{cursor:pointer;transition:opacity 0.12s}
+.alerte-card.clickable:hover{opacity:0.85}
 .alerte-card-titre{font-size:12px;font-weight:600}
 .alerte-card-msg{font-size:12px;color:var(--text2);margin-top:3px;line-height:1.4}
+@keyframes sg-flash{0%,20%{background-color:var(--amber-light)}100%{background-color:white}}
+.sg-highlight{animation:sg-flash 1.8s ease-out}
 .btn-traite{flex-shrink:0;background:var(--dark);color:white;border:none;border-radius:6px;padding:5px 10px;font-size:10px;font-weight:600;cursor:pointer;letter-spacing:0.3px;white-space:nowrap;transition:opacity 0.15s}
 .btn-traite:hover{opacity:0.75}
 .progress-bar-wrap{height:4px;background:var(--border);border-radius:2px;margin-top:10px}
@@ -455,6 +459,20 @@ function renderDashboard(s){
   else if(s.role==='dir_ops')renderDirOps(s,'accueil');
   else renderRespTech(s,'accueil');
 }
+// Navigate to a specific signalement card and highlight it
+function _goToSignalement(sgId){
+  _sgFilter='tous';
+  _dtSgFilter='tous';
+  navTo('signalements');
+  setTimeout(function(){
+    var el=document.getElementById('sg-card-'+sgId);
+    if(!el)return;
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+    el.classList.add('sg-highlight');
+    setTimeout(function(){el.classList.remove('sg-highlight');},1900);
+  },500);
+}
+
 function navTo(id){
   if(!_session)return;
   if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;}
@@ -838,11 +856,11 @@ async function _rtAccueil(session,sid,cid){
     });
     pannes.forEach(function(sg){
       var eqNom=sg.equipements&&sg.equipements.nom?' · '+sg.equipements.nom:'';
-      alertesHtml+='<div class="alerte-card" style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge)">'+
+      alertesHtml+='<div class="alerte-card clickable" style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge)" onclick="_goToSignalement(\''+sg.id+'\')">'+
         '<span style="font-size:15px">🔴</span>'+
         '<div style="flex:1"><div class="alerte-card-titre" style="color:var(--rouge)">Panne'+escape_html(eqNom)+'</div>'+
         '<div class="alerte-card-msg">'+escape_html(sg.description||'')+'</div></div>'+
-        '<button class="btn-traite" onclick="navTo(\'alertes\')">Voir →</button>'+
+        '<span style="font-size:14px;color:var(--text3)">›</span>'+
       '</div>';
     });
     alertesHtml+='</div>';
@@ -1818,7 +1836,7 @@ async function _rtSignalements(sid){
           '<button onclick="_sgResoudre(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Résoudre</button>'+
         '</div>':'';
 
-      return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+accent+'">'+
+      return '<div id="sg-card-'+r.id+'" style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+accent+'">'+
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'+
           '<span style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(typeLabel)+(eqNom?' · '+escape_html(eqNom):'')+'</span>'+
           '<span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:'+badgeBg+';color:'+badgeColor+'">'+badgeLabel+'</span>'+
@@ -4038,14 +4056,14 @@ function _buildAlerteCardsDT(alertes,pannes,fromNav,siteMap){
     var eqNom=p.equipements&&p.equipements.nom?' · '+p.equipements.nom:'';
     var sNom=siteMap&&p.groupe_id&&siteMap[p.groupe_id]?' · '+siteMap[p.groupe_id]:'';
     var ts=p.created_at?new Date(p.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-    h+='<div class="alerte-card" style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge)">'+
+    h+='<div class="alerte-card clickable" style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge)" onclick="_goToSignalement(\''+p.id+'\')">'+
       '<span style="font-size:16px;margin-top:1px">🔴</span>'+
       '<div style="flex:1">'+
         '<div class="alerte-card-titre" style="color:var(--rouge)">Panne'+escape_html(eqNom)+escape_html(sNom)+'</div>'+
         '<div class="alerte-card-msg">'+escape_html(p.description||'')+'</div>'+
         (ts?'<div style="font-size:10px;color:var(--text3);margin-top:4px">'+ts+'</div>':'')+
       '</div>'+
-      '<button class="btn-traite" onclick="_marquerTraiteDT(\'signalements\',\''+p.id+'\',\''+fromNav+'\')">✓ Résolu</button>'+
+      '<button class="btn-traite" onclick="event.stopPropagation();_marquerTraiteDT(\'signalements\',\''+p.id+'\',\''+fromNav+'\')">✓ Résolu</button>'+
     '</div>';
   });
   return h+'</div>';
@@ -4174,7 +4192,7 @@ async function _dtSignalements(sids){
       var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:null;
       var sNom=siteMap[r.groupe_id]||'';
       var date=r.created_at?new Date(r.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-      return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+st.color+'">'+
+      return '<div id="sg-card-'+r.id+'" style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+st.color+'">'+
         '<div style="display:flex;align-items:flex-start;gap:12px">'+
           '<div style="flex:1;min-width:0">'+
             '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">'+
