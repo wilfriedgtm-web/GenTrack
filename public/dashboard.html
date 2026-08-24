@@ -255,7 +255,6 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .dp-empty{padding:40px 20px;text-align:center;color:var(--text3);font-size:13px}
 .dp-loading{display:flex;align-items:center;justify-content:center;padding:48px;color:var(--text3);font-size:13px;gap:10px}
 .dp-spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin .7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
 .dp-ronde-status{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;border-radius:10px;padding:2px 8px;margin-left:auto}
 .dp-ronde-status.ok{background:var(--vert-pale);color:var(--vert);border:1px solid var(--vert-border)}
 .dp-ronde-status.nok{background:var(--creme);color:var(--text3);border:1px solid var(--border)}
@@ -352,15 +351,6 @@ async function supaPatch(table,id,data){
     if(!r.ok){var t=await r.text().catch(function(){return'';});console.error('[supaPatch]',table,r.status,t);}
     return r.ok;
   }catch(e){console.error('[supaPatch]',e);return false;}
-}
-async function supaUpdate(table,filter,data){
-  try{
-    await fetch(SUPA_URL+'/rest/v1/'+table+'?'+filter,{
-      method:'PATCH',
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify(data)
-    });
-  }catch(e){console.error('[supaUpdate]',e);}
 }
 async function supaPost(table,data){
   try{
@@ -1050,7 +1040,7 @@ function openDeclareVidange(eqId,eqNom,currentH){
     btn.disabled=true;btn.textContent='…';
     var now=new Date().toISOString();
     try{
-      await supaUpdate('equipements','id=eq.'+eqId,{
+      await supaPatch('equipements',eqId,{
         heures_dernier_vidange:currentH,
         date_dernier_vidange:now
       });

@@ -48,7 +48,7 @@ async function sendWA(to: string, message: string) {
     body: new URLSearchParams({ From: TWILIO_FROM, To: toFmt, Body: message }).toString()
   });
   const data = await res.json();
-  console.log('Twilio:', JSON.stringify(data).substring(0, 120));
+  if (!res.ok) console.error('Twilio error:', data?.code, data?.message);
   return data;
 }
 
@@ -1028,7 +1028,6 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
 async function handleMessage(from: string, bodyText: string) {
   const phone = from.replace('whatsapp:', '');
   const msg = bodyText.trim().toLowerCase();
-  console.log(`=== From: ${phone} | Body: ${bodyText}`);
 
   const contactRaw = await db('contacts', { query: `&whatsapp=eq.${encodeURIComponent(phone)}&actif=eq.true&limit=1` });
   const contact = Array.isArray(contactRaw) ? contactRaw[0] || null : null;
@@ -1180,7 +1179,6 @@ serve(async (req) => {
     const params = new URLSearchParams(text);
     const from = params.get('From') || '';
     const body = params.get('Body') || '';
-    console.log(`Webhook — From: ${from} | Body: ${body}`);
     if (!from || !body) return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
     handleMessage(from, body).catch(e => console.error('handleMessage error:', e));
     return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });

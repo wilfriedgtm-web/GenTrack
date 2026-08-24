@@ -305,7 +305,7 @@ async function _submit(){
       severite:'warning',
       message:(prenom?prenom+' — ':'')+(_typeLabels[_selectedType]||_selectedType)+(lieu?' ('+lieu+')':'')+' : '+desc,
       type_alerte:'signalement',
-      signalement_id:newSg&&newSg.id?newSg.id:null,
+      signalement_id:newSg&&(Array.isArray(newSg)?newSg[0]:newSg).id||null,
       lue:false,
       resolue:false
     });
