@@ -286,6 +286,7 @@ async function _submit(){
 
     var newSg=await supaPost('signalements',{
       groupe_id:_groupeId,
+      site_id:_groupeId,
       equipement_id:equipId||null,
       signale_par:prenom||null,
       lieu:lieu||null,
@@ -314,7 +315,7 @@ async function _submit(){
     fetch(SUPA_URL+'/functions/v1/notify-signalement',{
       method:'POST',
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({site_id:_groupeId,type:_selectedType,description:desc,signale_par:prenom||null,equipement_nom:equipNom,lieu:lieu||null})
+      body:JSON.stringify({site_id:_groupeId,type:_selectedType,description:desc,signale_par:prenom||null,equipement_nom:equipNom,lieu:lieu||null,ref_code:(newSg&&(Array.isArray(newSg)?newSg[0]:newSg).ref_code)||null})
     }).catch(function(){});
 
     document.getElementById('sg-main').style.display='none';
