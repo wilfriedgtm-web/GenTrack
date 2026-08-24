@@ -152,8 +152,15 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
           <input id="rp-cout" class="rp-input" type="number" placeholder="0" min="0"/>
         </div>
         <div>
-          <div class="rp-label">Durée (heures)</div>
-          <input id="rp-duree" class="rp-input" type="number" placeholder="Ex : 2" min="0" step="0.5"/>
+          <div class="rp-label">Durée</div>
+          <div style="display:flex;gap:6px">
+            <input id="rp-duree" class="rp-input" type="number" placeholder="Ex : 2" min="0" step="0.5" style="flex:1"/>
+            <select id="rp-duree-unite" class="rp-input" style="flex:1;padding:9px 10px">
+              <option value="heures">Heures</option>
+              <option value="minutes">Minutes</option>
+              <option value="jours">Jours</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
@@ -296,6 +303,7 @@ async function _submit(){
   var cout=coutStr&&!isNaN(parseFloat(coutStr))?parseFloat(coutStr):null;
   var dureeStr=document.getElementById('rp-duree').value;
   var duree=dureeStr&&!isNaN(parseFloat(dureeStr))?parseFloat(dureeStr):null;
+  var dureeUnite=(document.getElementById('rp-duree-unite')||{}).value||'heures';
   var errEl=document.getElementById('rp-error');
 
   if(!tech){
@@ -334,7 +342,8 @@ async function _submit(){
     }
 
     // Note complète : travaux + durée si renseignée
-    var noteComplete=travaux+(duree?' (Durée : '+duree+'h)':'');
+    var dureeLabel=duree?(duree+' '+(dureeUnite==='heures'?'h':dureeUnite==='minutes'?'min':'j')):'';
+    var noteComplete=travaux+(dureeLabel?' (Durée : '+dureeLabel+')'  :'');
 
     // 1. Marquer signalement résolu + fermer l'alerte liée
     await supaPatch('signalements',_sg.id,{
@@ -362,7 +371,9 @@ async function _submit(){
       prestataire:tech,
       created_by:tech,
       photo_url:photoUrl||null,
-      signalement_id:_sg.id
+      signalement_id:_sg.id,
+      duree_valeur:duree||null,
+      duree_unite:duree?dureeUnite:null
     });
 
     // 3. Masquer form, afficher confirmation
@@ -381,7 +392,7 @@ async function _submit(){
         '👷 *Technicien :* '+tech+'\n'+
         '📝 *Travaux :* '+travaux+'\n'+
         (cout?'💰 *Coût :* '+cout.toLocaleString('fr-FR')+' FCFA\n':'')+
-        (duree?'⏱ *Durée :* '+duree+'h\n':'')+
+        (duree?'⏱ *Durée :* '+dureeLabel+'\n':'')+
         '\nSignalement clôturé.';
     }
   }catch(e){
