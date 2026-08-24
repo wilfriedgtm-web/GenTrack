@@ -7,7 +7,7 @@
 | **Zone géographique** | Afrique francophone subsaharienne |
 | **Siège** | Dakar, Sénégal |
 | **Repo GitHub** | wilfriedgtm-web/GenTrack · branche main |
-| **Version** | v2.0 — Août 2026 |
+| **Version** | v2.1 — Août 2026 |
 
 # **Sommaire**
 
@@ -109,9 +109,10 @@ Le technicien envoie des messages WhatsApp simples. Le bot guide chaque action p
 
 **Resp. technique (resp_tech) — son site, vue complète :**
 
-- **Accueil** — état temps réel des GE (statut, dernier relevé, anomalies, vidanges à venir), niveau cuve carburant (%, litres, autonomie en jours), relevés horaires du jour
-- **Signalements** — liste filtrée (ouverts / en cours / résolus), détail complet (description, équipement, photos, note résolution, coût), affecter à un technicien avec lien WA, clôturer, créer manuellement
-- **Historique** — maintenances réalisées / planifiées, vidanges, ravitaillements — photos consultables et téléchargeables
+- **Accueil** — statut composite des équipements (rouge/orange/vert/jaune/gris selon signalements + rondes + relevés, avec légende couleurs), niveau cuve carburant (%, litres, autonomie en jours), relevés horaires du jour, KPIs alertes actives
+- **Alertes** — alertes actives (seuils dépassés, pannes, anomalies) + historique 30j. Chaque alerte de seuil propose "+ Signalement" (pré-rempli, résolution automatique de l'alerte à la création)
+- **Signalements** — liste filtrée (ouverts / en cours / résolus), détail complet (description, équipement, photos, note résolution, coût), affecter à un technicien avec lien WA, clôturer, créer manuellement. Résolution d'une panne → création automatique d'une fiche maintenance
+- **Maintenance** — journal unifié chronologique : pannes résolues, vidanges, ravitaillements, interventions techniques. Filtres par type. Vue via `vue_journal_maintenance`
 - **Relevés** — historique relevés horaires, détail par créneau
 - **Rondes** — journal des rondes, détail complet par équipement (toutes réponses)
 - **Config** — gestion équipements (actif/inactif ronde/relevé, seuils, conso, capacité, kVA), questions par équipement, contacts WhatsApp, QR code signalement, affiche signalement imprimable, affiche bot WhatsApp imprimable, planning rondes (jour/fréquence), rapport hebdomadaire
@@ -217,11 +218,19 @@ Le technicien envoie des messages WhatsApp simples. Le bot guide chaque action p
 | `releves_horaires` | Sessions de relevé horaire — token, site_id, statut, expires_at |
 | `alertes_destinataires` | Destinataires personnalisés par équipement pour alertes seuil |
 
+## **Vues SQL**
+
+| **Vue** | **Description** |
+| --- | --- |
+| `vue_statut_equipements` | Statut composite par équipement : priorité rouge (signalement ouvert/en_cours) > orange (résolu <48h, période surveillance) > vert (ronde validée aujourd'hui) > jaune (relevé récent <24h) > gris |
+| `vue_journal_maintenance` | Journal unifié : UNION ALL de signalements résolus + vidanges + pleins + maintenances. Colonnes communes : id, type, titre, description, date_ref, equipement_id/nom, cout, statut, intervenant, source |
+
 ## **État des clients — Août 2026**
 
 | **Client** | **Sites** | **Statut** |
 | --- | --- | --- |
-| **Mangalis** | Noom Abidjan, Seen Abidjan | En production — rondes actives |
+| **Mangalis** | Noom Abidjan | Équipements + questions configurés (eau, électricité, ECS). GE en attente infos client. Prêt pour démarrage rondes. |
+| **Mangalis** | Seen Abidjan | Compte créé — contacts WhatsApp à configurer |
 | **Azalaï Dakar** | Azalaï Hotel Dakar | En production — G1, G2, Cuve actifs |
 | **Pullman Dakar Teranga** | Pullman Dakar (Accor) | Démo faite — accord pilote — compte nettoyé, prêt pour config réelle |
 
@@ -420,6 +429,106 @@ Répondre en moins de 4h en semaine, toujours en français, toujours avec une so
 
 - Toutes les données de test supprimées (rondes, réponses, signalements, maintenances, pleins, alertes, relevés)
 - Compte vierge, prêt pour la configuration réelle avec les équipements de Ndiaga Diouf
+
+---
+
+## **Ce qui a été livré — Session 2 (Août 2026)**
+
+### **Statut équipements composite — dashboard accueil**
+
+- Le statut de chaque équipement est maintenant calculé en combinant les 3 sources : rondes, relevés horaires et signalements
+- Priorité : 🔴 rouge (signalement ouvert/en_cours) > 🟠 orange (signalement résolu depuis <48h, surveillance) > 🟢 vert (ronde validée aujourd'hui) > 🟡 jaune (relevé récent <24h) > ⚫ gris (aucune donnée)
+- Vue SQL `vue_statut_equipements` créée (3 CTEs : sig, ronde_ok, releve_eq via reponses→questions)
+- Légende couleurs ajoutée sur l'accueil
+- Relevés horaires du jour affichés dans "Ma journée"
+
+### **Journal maintenance unifié — onglet Maintenance**
+
+- L'onglet Maintenance est devenu un journal chronologique complet : pannes résolues, vidanges, ravitaillements, interventions techniques
+- Vue SQL `vue_journal_maintenance` créée (UNION ALL des 4 sources)
+- Filtres par type : tous / panne / vidange / ravitaillement / maintenance
+- Séparation claire des onglets : Alertes (à traiter) / Signalements (historique incidents) / Maintenance (journal financier)
+
+### **Auto-création maintenance à la résolution d'une panne**
+
+- Quand un signalement de type panne est résolu depuis le dashboard, une fiche maintenance est automatiquement créée dans le journal
+
+### **Bouton "+ Signalement" depuis les alertes**
+
+- Dans le tab Alertes, chaque alerte de seuil (valeur hors plage) affiche un bouton "+ Signalement"
+- Le modal s'ouvre pré-rempli avec le message de l'alerte
+- À la création du signalement, l'alerte est automatiquement marquée résolue
+
+### **Fix relevé horaire — double envoi**
+
+- Problème : premier envoi échouait, second fonctionnait (création de doublons en base)
+- Correction DB : contrainte `UNIQUE(releve_id, question_id)` ajoutée sur `reponses` (après nettoyage des doublons existants)
+- Correction code : `supaPost` remplacé par `supaUpsert` avec `resolution=ignore-duplicates` dans `releve.html`
+
+### **Noom Abidjan — configuration initiale**
+
+- Équipements créés à partir des fichiers Excel fournis : eau froide, eau chaude (ECS), électricité par réseau/compteur
+- Questions configurées pour rondes et relevés horaires (valeurs, seuils, fréquences)
+- GE non configurés — en attente infos client (nombre, marque/puissance, compteur horaire, intervalle vidange)
+- Willo ajouté comme resp_tech et tech pour tests (retiré des hôtels Madame T)
+- Données de test nettoyées après validation (rondes, relevés, signalements, alertes, maintenances)
+
+### **DB — migrations appliquées**
+
+- Vue `vue_statut_equipements`
+- Vue `vue_journal_maintenance`
+- Contrainte `UNIQUE(releve_id, question_id)` sur `reponses`
+
+---
+
+---
+
+## **Ce qui a été livré — Session 3 (Août 2026)**
+
+### **Notifications WhatsApp signalements — refonte complète**
+
+- Colonne `notif_signalement` (boolean, default false) ajoutée sur la table `contacts` — n'importe quel rôle peut recevoir les notifications, indépendamment du rôle
+- Edge Function `notify-signalement` v6 : filtre sur `notif_signalement=true` (plus de filtre par rôle), photo incluse en lien texte (`📷 Photo : <url>`), lien rapport REF (`📌 Réf : *REF-XXXX* / Répondez *OK REF-XXXX* pour prendre en charge`), lien dashboard pour resp_tech et dir_tech uniquement
+- Dashboard Config contacts : badge "📲 Signalements" visible, checkbox dans l'ajout/édition d'un contact
+- `signalement.html` : changé `Prefer: return=minimal` → `return=representation` pour récupérer le `ref_code` après INSERT ; payload notify enrichi avec `ref_code`, `photo_url`, `signalement_id`
+
+### **Bot WhatsApp — nouvelles commandes (webhook v86)**
+
+- **`OK REF-XXXX`** : prise en charge d'un signalement par le technicien — regex flexible (case insensitive, avec ou sans tiret/espace), met à jour `pris_en_charge_par` + `pris_en_charge_at` + `statut=en_cours`, notifie les contacts `notif_signalement=true`, reset session idle
+- **`resolu`** : normalisation accents (résolu / Résolu / RESOLU / resolut → même traitement), cherche un signalement `en_cours` avec `pris_en_charge_par = nom du technicien`, envoie directement le lien `rapport.html?sg=<id>` sans étapes intermédiaires
+- APP_URL corrigé (`https://gen-track.vercel.app`) dans webhook et notify-signalement
+- Session reset to idle systématique après OK REF processing
+
+### **Dashboard — cartes signalements enrichies**
+
+- `ref_code` affiché sur chaque carte (badge gris)
+- `pris_en_charge_par` affiché (badge vert "✅ Pris en charge par X"), fallback sur `assigne_a` (badge amber "👷 Affecté à X")
+- Durée intervention : champ valeur + sélecteur unité (heures / minutes / jours) dans le modal maintenance et dans `rapport.html`
+- `duree_valeur` + `duree_unite` écrits dans la table `maintenances`
+
+### **Dashboard — UX navigation alertes**
+
+- Bandeau "🚨 X alertes actives" sur l'accueil → cliquable, scroll smooth vers la section alertes de la même page
+- Carte panne sur l'accueil → cliquable, bascule sur l'onglet Signalements, scroll + flash doré vers la carte du signalement concerné
+- `id="sg-card-<id>"` ajouté sur chaque carte signalement (resp_tech + dir_tech)
+- Bouton "✓ Résolu" conservé avec `event.stopPropagation()` pour ne pas déclencher la navigation
+
+### **Affiche bot — mise à jour**
+
+- Section "Prise en charge" ajoutée : explication du flux `OK REF-XXXX`, exemple de notification reçue, notification envoyée après prise en charge
+
+### **DB — migrations appliquées**
+
+- `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS notif_signalement boolean NOT NULL DEFAULT false`
+- Willo ajouté comme technicien chez Madame T Dakar avec `notif_signalement=true`, `whatsapp=+33658150628`
+- Ancien contact Willo resp_tech : `whatsapp` mis à NULL (contact conservé car référencé dans rondes)
+
+### **Versions Edge Functions**
+
+| Fonction | Version | Changement principal |
+| --- | --- | --- |
+| `webhook` | v86 | Normalisation accents résolu, regex OK REF flexible, prise en charge bot |
+| `notify-signalement` | v6 | Photo lien texte, filtre notif_signalement, APP_URL correct, lien dashboard managers |
 
 ---
 
