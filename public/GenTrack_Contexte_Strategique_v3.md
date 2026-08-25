@@ -7,7 +7,7 @@
 | **Zone géographique** | Afrique francophone subsaharienne |
 | **Siège** | Dakar, Sénégal |
 | **Repo GitHub** | wilfriedgtm-web/GenTrack · branche main |
-| **Version** | v1.5 — Août 2026 |
+| **Version** | v2.0 — Août 2026 |
 
 # **Sommaire**
 
@@ -140,7 +140,7 @@ GenTrack est une solution SaaS de gestion opérationnelle des équipements criti
 | --- | --- |
 | **Frontend** | Vercel — HTML vanilla + JS, pas de framework |
 | **Base de données** | Supabase (PostgreSQL) — auth, storage, realtime |
-| **Bot WhatsApp** | Twilio + Edge Functions Supabase (Deno / TypeScript) |
+| **Bot WhatsApp** | Twilio + Edge Functions Supabase (Deno / TypeScript) — numéro production +19843418695 |
 | **Repo & CI/CD** | GitHub wilfriedgtm-web/GenTrack · branche main = prod |
 | **Fonctions serverless** | Edge Functions Supabase (Deno runtime) |
 
@@ -168,6 +168,7 @@ GenTrack est une solution SaaS de gestion opérationnelle des équipements criti
 | **alertes** | Alertes actives par client |
 | **pannes** | Incidents signalés — résolution et coût associé |
 | **vidanges** | Historique des vidanges par équipement |
+| **signalements** | Incidents signalés par réception/gardiens — type, description, lieu, statut, ref_code, assigne_a, pris_en_charge_at |
 
 ## **Tables Supabase — Ancien système (désactivé)**
 
@@ -184,38 +185,47 @@ Ces tables existent encore en base pour conserver l'historique mais ne sont plus
 
 | **Client** | **Sites** | **Système** | **Statut** |
 | --- | --- | --- | --- |
-| **Mangalis** | Noom Abidjan, Seen Abidjan | Nouveau ✅ | En production — rondes actives |
-| **Azalaï Dakar** | Azalaï Hotel Dakar | Nouveau ✅ | Migré — G1, G2, Cuve carburant actifs |
-| **Pullman Dakar Teranga** | Pullman Dakar (Accor) | Nouveau ✅ | Prospect actif — démo 04/08/2026, accord de principe pilote |
+| **Mangalis** | Noom Abidjan, Seen Abidjan, Noom Sea Plaza | Nouveau ✅ | En production — rondes actives. Noom Sea Plaza configuré (équipements + questions), contacts à ajouter après appel Kha Lo |
+| **Azalaï Dakar** | Azalaï Hotel Dakar | Nouveau ✅ | Migré — G1, G2, Cuve carburant actifs. Signalements activés |
+| **Pullman Dakar Teranga** | Pullman Dakar (Accor) | Nouveau ✅ | Prospect actif — démo 04/08/2026, accord de principe pilote. Guides opérateurs livrés |
 | **ONOMO** | — | — | Supprimé (prospect inactif) |
 
 ## **Edge Functions Supabase**
 
-### **webhook (v64)**
+### **webhook (v89)**
 
-Bot WhatsApp principal, déclenché par Twilio à chaque message entrant.
+Bot WhatsApp principal, déclenché par Twilio à chaque message entrant. Numéro production : +19843418695.
 
 - Identification du contact entrant et routage par rôle
 - Rondes structurées : questions par équipement, réponses enregistrées dans `reponses`
 - Pannes, résolu et vidange 100% sur nouveau système (`equipements`) — plus de dépendance à `groupes`
 - Filtrage des équipements par site_id du technicien
 - Notifications pannes vers resp_tech/dir_tech via table `contacts`
+- Commande `signalement` : réception/gardiens signalent un incident libre (type, description, lieu) → créé dans `signalements` → ref_code généré → resp_tech notifié WhatsApp
 
-### **rappel (v6)**
+### **rappel (v19)**
 
 Cron horaire (toutes les heures). Chaque site reçoit son rappel à son `heure_rappel` UTC configurée en base (défaut : 8h UTC = 9h Dakar). Configurable par site depuis l'admin.
 
 - Alertes autonomie carburant (< 40% attention, < 20% critique) → resp_tech + dir_tech
 - Alertes vidange imminente (< 20h restantes) → resp_tech
 - Rappel ronde du jour aux techniciens si la ronde n'est pas encore complète
+- **Rate limiting** : alertes `critique` max toutes les 6h (`heureUTC % 6 === 0`), `attention` max toutes les 12h (`heureUTC % 12 === 0`) — évite le spam
 - Tout sur le nouveau système (equipements / rondes / reponses)
 
-### **rapport-hebdo (v6)**
+### **rapport-hebdo (v11)**
 
 Cron hebdomadaire déclenché chaque lundi à 8h UTC. Tout sur le nouveau système.
 
 - Bilan de la semaine envoyé aux resp_tech et dir_tech par site
 - Heures de marche GE, niveau huile, alerte vidange, niveau cuve, autonomie estimée, taux de saisie, pannes
+
+### **notify-signalement (v8)**
+
+Déclenchée à chaque nouveau signalement créé via le bot ou le dashboard.
+
+- Notifie le resp_tech du site par WhatsApp avec type, lieu, description et ref_code
+- Permet au resp_tech de répondre "OK REF-XXXX" pour prise en charge
 
 ### **notify-ravitaillement**
 
@@ -268,6 +278,13 @@ Déclenchée à la création d'un client — envoie les messages de bienvenue à
 - ✅ Anomalies self-explanatory — `buildAnomaliesNew` affiche désormais `val (attendu : [valeur_attendue])` pour les questions choix, rendant chaque anomalie compréhensible sans contexte
 - ✅ Vidange fix — compteur restant calculé depuis la dernière vidange (`compteur - heures_au_moment`), GE1 affiche correctement 0/250h post-vidange
 - ✅ Démo Pullman Dakar Teranga (04/08/2026) — première démo groupe hôtelier Accor, accord de principe pilote obtenu avec Ndiaga Diouf (Adjoint RT)
+- ✅ **Module Signalements complet** — table `signalements`, commande bot `signalement` (choix type → description → lieu → ref_code auto), edge function `notify-signalement` v8, réponse "OK REF-XXXX" par resp_tech pour prise en charge, dashboard affichage statut + durée
+- ✅ **Types d'équipements étendus** — ajout 'Compteur / Énergie' et 'Onduleur / UPS' dans `types_equipements`
+- ✅ **Noom Sea Plaza configuré** — site Mangalis créé, 4 équipements insérés (GE, Cuve carburant 1 & 2, Compteur), questions configurées par type, hebdo_actif activé. Contacts en attente appel Kha Lo
+- ✅ **Migration numéro WhatsApp production** — abandon sandbox Twilio +14155238886, passage au numéro GenTrack +19843418695. Webhook Twilio WhatsApp Sender configuré. Tous les fichiers (HTML, edge functions) mis à jour
+- ✅ **Rate limiting rappels** — alertes critique max toutes les 6h, attention max toutes les 12h — évite le spam sans changement de schéma DB
+- ✅ **Guides opérateurs Pullman livrés** — guide-responsable + guide-technicien mis à jour (nouveau numéro, sans sandbox), déployés en production
+- ✅ **Codebase propre** — zéro référence à l'ancien sandbox dans tout le code, signalements test Azalaï supprimés, push GitHub + Vercel production à jour
 
 ---
 

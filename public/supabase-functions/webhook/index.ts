@@ -1066,10 +1066,10 @@ async function handleMessage(from: string, bodyText: string) {
       }});
       const siteIdSig = sig.site_id || sig.groupe_id;
       if (siteIdSig) {
-        const autresContacts = await db('contacts', { query: `&site_id=eq.${siteIdSig}&notif_signalement=eq.true&actif=eq.true` });
+        const responsables = await db('contacts', { query: `&site_id=eq.${siteIdSig}&role=in.(resp_tech,dir_tech)&actif=eq.true` });
         const notifPec = `ℹ️ *Prise en charge — GenTrack*\n\n📋 ${refCode}\n👷 *${preneurNom}* s'en occupe\n🕐 ${getHeure()}`;
-        if (Array.isArray(autresContacts)) {
-          for (const r of autresContacts) {
+        if (Array.isArray(responsables)) {
+          for (const r of responsables) {
             if (r.whatsapp && r.whatsapp !== phone) await sendWA(r.whatsapp, notifPec);
           }
         }
