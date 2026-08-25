@@ -164,7 +164,8 @@ serve(async (_req) => {
     }
 
     // ── 2. RAPPEL RONDE JOURNALIÈRE ──────────────────────────────
-    const heureRappel = site.heure_rappel ?? 8; // heure UTC configurée par site
+    // heure_rappel peut être "08:00" ou "8" — on extrait juste l'entier
+    const heureRappel = parseInt(String(site.heure_rappel ?? '8'));
     if (site.journalier_actif && heureUTC === heureRappel && techniciens.length) {
       // Ne pas envoyer si la ronde est déjà complète
       const rondesDuJour = await dbGet('rondes',
@@ -198,7 +199,8 @@ serve(async (_req) => {
     }
 
     // ── 3. RAPPEL RELEVÉ HORAIRE (toutes les 3h, 6h–21h UTC) ────
-    if (site.releve_horaire_actif && heureUTC % 3 === 0 && heureUTC >= 6 && heureUTC <= 21) {
+    // Pas de colonne releve_horaire_actif sur sites — on vérifie les équipements directement
+    if (heureUTC % 3 === 0 && heureUTC >= 6 && heureUTC <= 21) {
       const equipsReleve = equipements.filter((e: any) => e.actif_releve);
       if (equipsReleve.length && techniciens.length) {
         const link = await getReleveLink(site.id);
