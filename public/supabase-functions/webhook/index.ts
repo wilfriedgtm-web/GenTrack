@@ -14,7 +14,7 @@ const SUPA_URL    = Deno.env.get('SUPABASE_URL')    || 'https://zbpoxjlkqxnqjzxo
 const SUPA_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY') || '';
 const TWILIO_SID  = Deno.env.get('TWILIO_SID')   || '';
 const TWILIO_TOKEN= Deno.env.get('TWILIO_TOKEN') || '';
-const TWILIO_FROM = Deno.env.get('TWILIO_NUMBER')|| 'whatsapp:+14155238886';
+const TWILIO_FROM = Deno.env.get('TWILIO_NUMBER')|| 'whatsapp:+19843418695';
 const ANON_KEY    = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
 const BASE_URL    = 'https://gen-track.vercel.app';
 

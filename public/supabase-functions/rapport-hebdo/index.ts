@@ -9,7 +9,7 @@ const SUPA_URL    = Deno.env.get('SUPABASE_URL')              || 'https://zbpoxj
 const SUPA_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY') || '';
 const TWILIO_SID  = Deno.env.get('TWILIO_SID')               || '';
 const TWILIO_TOKEN= Deno.env.get('TWILIO_TOKEN')              || '';
-const TWILIO_FROM = Deno.env.get('TWILIO_NUMBER')             || 'whatsapp:+14155238886';
+const TWILIO_FROM = Deno.env.get('TWILIO_NUMBER')             || 'whatsapp:+19843418695';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
