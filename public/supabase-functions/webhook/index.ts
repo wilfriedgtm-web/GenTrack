@@ -586,7 +586,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
   const today = getToday();
 
   // ── Annuler — prioritaire sur tout autre état ─────────────
-  if (['annuler', 'annule', 'retour', 'stop', 'cancel', '0'].includes(msg)) {
+  if (['annuler', 'annule', 'retour', 'stop', 'cancel'].includes(msg)) {
     await setSession(phone, 'idle', {});
     return sendWA(phone, `❌ Action annulée.\n\nTapez *aide* pour les commandes.`);
   }
@@ -1113,7 +1113,7 @@ async function handleMessage(from: string, bodyText: string) {
     }
 
     // Annuler / retour — disponible à tout moment dans n'importe quel flux
-    if (['annuler', 'annule', 'retour', 'stop', 'cancel', '0'].includes(msg)) {
+    if (['annuler', 'annule', 'retour', 'stop', 'cancel'].includes(msg)) {
       await setSession(phone, 'idle', {});
       return sendWA(phone, `❌ Action annulée.\n\nTapez *aide* pour les commandes.`);
     }
