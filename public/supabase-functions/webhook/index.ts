@@ -175,23 +175,24 @@ async function getFrequencesDisponibles(site: any): Promise<string[]> {
   const equipsRonde = await db('equipements', { query: `&site_id=eq.${site.id}&actif=eq.true&actif_ronde=eq.true` });
   const nbEquip = Array.isArray(equipsRonde) ? equipsRonde.length : 0;
 
-  // Relevé horaire — jamais bloqué, si au moins un équipement actif_releve
-  if (site.releve_horaire_actif !== false) {
-    const equipsReleve = await db('equipements', { query: `&site_id=eq.${site.id}&actif=eq.true&actif_releve=eq.true&limit=1` });
-    if (Array.isArray(equipsReleve) && equipsReleve.length > 0) freqs.push('releve_horaire');
-  }
-
   const periodMap: Record<string, string> = {
     journalier: getToday(),
     hebdo:      getStartOfWeek(),
     mensuel:    getStartOfMonth(),
   };
 
+  // Rondes d'abord (journalier, hebdo, mensuel)
   for (const freq of ['journalier', 'hebdo', 'mensuel'] as string[]) {
     const isActif = freq === 'journalier' ? site.journalier_actif : freq === 'hebdo' ? site.hebdo_actif : site.mensuel_actif;
     if (!isActif) continue;
     const complete = await rondeCompleteDepuis(site.id, freq, periodMap[freq], nbEquip);
     if (!complete) freqs.push(freq);
+  }
+
+  // Relevé horaire en dernier (option #2 ou plus)
+  if (site.releve_horaire_actif !== false) {
+    const equipsReleve = await db('equipements', { query: `&site_id=eq.${site.id}&actif=eq.true&actif_releve=eq.true&limit=1` });
+    if (Array.isArray(equipsReleve) && equipsReleve.length > 0) freqs.push('releve_horaire');
   }
 
   return freqs;

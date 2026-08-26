@@ -1,9 +1,10 @@
 // supabase/functions/rappel/index.ts
 // GenTrack — Rappels automatiques
-// v7 — Nouveau modèle (sites/equipements/contacts/reponses)
-//      · Rappel ronde journalière à heure_rappel du site
-//      · Rappel relevé horaire toutes les 3h (6h–21h UTC)
-//      · Alertes autonomie carburant (toutes les heures)
+// v20 — Nouveaux horaires fixes
+//      · Rappel ronde journalière à 7h UTC
+//      · Rappel ronde hebdo le lundi à 7h UTC
+//      · Rappel relevé horaire à 10h, 14h et 18h UTC
+//      · Alertes autonomie carburant (toutes les heures, rate-limited)
 // Cron : toutes les heures
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -69,8 +70,16 @@ async function sendWA(to: string, message: string): Promise<boolean> {
 }
 
 function getUTCHour(): number { return new Date().getUTCHours(); }
+function getUTCDay(): number { return new Date().getUTCDay(); } // 0=dim, 1=lun
 function getToday(): string {
   return new Date().toLocaleDateString('fr-CA', { timeZone: 'Africa/Dakar' });
+}
+function getStartOfWeek(): string {
+  const d = new Date();
+  const day = d.getUTCDay(); // 0=dim
+  const diff = (day === 0 ? -6 : 1 - day); // lundi = début de semaine
+  d.setUTCDate(d.getUTCDate() + diff);
+  return d.toISOString().slice(0, 10);
 }
 
 // Dernière valeur enregistrée pour une question contenant un mot-clé
@@ -106,8 +115,9 @@ async function getReleveLink(siteId: string): Promise<string | null> {
 
 serve(async (_req) => {
   const heureUTC = getUTCHour();
+  const jourUTC  = getUTCDay();
   const today    = getToday();
-  const stats    = { rappels_ronde: 0, rappels_releve: 0, alertes_carburant: 0, erreurs: 0 };
+  const stats    = { rappels_ronde: 0, rappels_releve: 0, rappels_hebdo: 0, alertes_carburant: 0, erreurs: 0 };
 
   const sites = await dbGet('sites', '&actif=eq.true');
 
@@ -167,17 +177,14 @@ serve(async (_req) => {
       }
     }
 
-    // ── 2. RAPPEL RONDE JOURNALIÈRE ──────────────────────────────
-    // heure_rappel peut être "08:00" ou "8" — on extrait juste l'entier
-    const heureRappel = parseInt(String(site.heure_rappel ?? '8'));
-    if (site.journalier_actif && heureUTC === heureRappel && techniciens.length) {
-      // Ne pas envoyer si la ronde est déjà complète
+    // ── 2. RAPPEL RONDE JOURNALIÈRE (7h UTC) ─────────────────────
+    if (site.journalier_actif && heureUTC === 7 && techniciens.length) {
       const rondesDuJour = await dbGet('rondes',
         `&site_id=eq.${site.id}&date_ronde=eq.${today}&frequence=eq.journalier`
       );
       let rondeComplete = false;
       if (rondesDuJour.length) {
-        const valides     = await dbGet('rondes_equipements', `&ronde_id=eq.${rondesDuJour[0].id}&statut=eq.valide`);
+        const valides       = await dbGet('rondes_equipements', `&ronde_id=eq.${rondesDuJour[0].id}&statut=eq.valide`);
         const nbEquipsRonde = equipements.filter((e: any) => e.actif_ronde !== false && e.capacite_litres == null).length;
         if (valides.length >= nbEquipsRonde) rondeComplete = true;
       }
@@ -202,9 +209,38 @@ serve(async (_req) => {
       }
     }
 
-    // ── 3. RAPPEL RELEVÉ HORAIRE (toutes les 3h, 6h–21h UTC) ────
-    // Pas de colonne releve_horaire_actif sur sites — on vérifie les équipements directement
-    if (heureUTC % 3 === 0 && heureUTC >= 6 && heureUTC <= 21) {
+    // ── 3. RAPPEL RONDE HEBDOMADAIRE (lundi 7h UTC) ───────────────
+    if (site.hebdo_actif && heureUTC === 7 && jourUTC === 1 && techniciens.length) {
+      const debutSemaine = getStartOfWeek();
+      const rondesHebdo  = await dbGet('rondes',
+        `&site_id=eq.${site.id}&date_ronde=gte.${debutSemaine}&frequence=eq.hebdo&order=created_at.desc&limit=1`
+      );
+      let rondeComplete = false;
+      if (rondesHebdo.length) {
+        const valides       = await dbGet('rondes_equipements', `&ronde_id=eq.${rondesHebdo[0].id}&statut=eq.valide`);
+        const nbEquipsRonde = equipements.filter((e: any) => e.actif_ronde !== false && e.capacite_litres == null).length;
+        if (valides.length >= nbEquipsRonde) rondeComplete = true;
+      }
+
+      if (!rondeComplete) {
+        const equipsRonde = equipements.filter((e: any) => e.actif_ronde !== false && e.capacite_litres == null);
+        const listeEquip  = equipsRonde.map((e: any) => `📟 ${e.nom}`).join('\n');
+
+        for (const tech of techniciens) {
+          const msg =
+            `📅 *GenTrack — Ronde hebdomadaire*\n\n` +
+            `Bonjour ${tech.nom || ''} ! *${site.nom}*\n\n` +
+            `C'est le début de semaine — pensez à la ronde hebdo :\n${listeEquip}\n\n` +
+            `• *saisie* — Lancer la ronde\n` +
+            `• *aide* — Toutes les commandes`;
+          const ok = await sendWA(tech.whatsapp, msg);
+          if (ok) stats.rappels_hebdo++; else stats.erreurs++;
+        }
+      }
+    }
+
+    // ── 4. RAPPEL RELEVÉ HORAIRE (10h, 14h, 18h UTC) ─────────────
+    if ([10, 14, 18].includes(heureUTC)) {
       const equipsReleve = equipements.filter((e: any) => e.actif_releve);
       if (equipsReleve.length && techniciens.length) {
         const link = await getReleveLink(site.id);
