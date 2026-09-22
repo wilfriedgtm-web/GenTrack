@@ -1892,17 +1892,18 @@ async function _rtSignalements(sid){
       var sgSid=r.groupe_id||(sid)||'';
       var sgRefJs=sgRef.replace(/'/g,"\\'");
       var actionsHtml=!resolu?
-        '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
+        '<div style="display:flex;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">'+
           (sgEnCours?
-            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
-              '<span style="font-size:11px;font-weight:600;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);border-radius:12px;padding:4px 12px">⚡ En cours · '+escape_html(sgPreneur||'')+'</span>'+
-              '<button onclick="_openPEC(\''+r.id+'\',\''+sgRefJs+'\',\''+sgSid+'\')" style="font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:12px;background:white;color:var(--text2);cursor:pointer">Réaffecter</button>'+
+            '<div style="display:flex;align-items:center;gap:6px;flex:1;background:var(--vert-pale);border:1px solid var(--vert-border);border-radius:8px;padding:6px 10px">'+
+              '<span style="font-size:18px">⚡</span>'+
+              '<div style="flex:1;min-width:0">'+
+                '<div style="font-size:10px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.04em">En cours</div>'+
+                '<div style="font-size:12px;color:var(--vert);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(sgPreneur||'')+'</div>'+
+              '</div>'+
+              '<button onclick="_openPEC(\''+r.id+'\',\''+sgRefJs+'\',\''+sgSid+'\')" style="font-size:11px;padding:4px 10px;border:1px solid var(--vert-border);border-radius:8px;background:white;color:var(--vert);cursor:pointer;white-space:nowrap;font-weight:600">↩ Changer</button>'+
             '</div>':
-            '<button onclick="_openPEC(\''+r.id+'\',\''+sgRefJs+'\',\''+sgSid+'\')" style="width:100%;padding:8px;border:1.5px solid var(--amber-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--amber-dark);background:var(--amber-pale);cursor:pointer;margin-bottom:8px">👤 Prendre en charge</button>')+
-          '<div style="display:flex;gap:8px">'+
-            '<button onclick="_sgAffecter(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:500;color:var(--text2);background:white;cursor:pointer">📱 Via WhatsApp</button>'+
-            '<button onclick="_sgResoudre(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Résoudre</button>'+
-          '</div>'+
+            '<button onclick="_openPEC(\''+r.id+'\',\''+sgRefJs+'\',\''+sgSid+'\')" style="flex:1;padding:8px;border:1.5px solid var(--amber-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--amber-dark);background:var(--amber-pale);cursor:pointer">👤 Prendre en charge</button>')+
+          '<button onclick="_sgResoudre(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Résoudre</button>'+
         '</div>':'';
 
       return '<div id="sg-card-'+r.id+'" style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+accent+'">'+
@@ -6108,8 +6109,8 @@ init();
 </script>
 
 <!-- Modal prise en charge -->
-<div id="pec-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.52);z-index:300;align-items:flex-end;justify-content:center" onclick="if(event.target===this)_closePEC()">
-  <div style="background:var(--creme);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto">
+<div id="pec-modal" class="cfg-modal-overlay" style="display:none" onclick="if(event.target===this)_closePEC()">
+  <div class="cfg-modal-box" style="background:var(--creme);max-width:420px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <div id="pec-title" style="font-size:14px;font-weight:700;color:var(--text)">Prendre en charge</div>
       <button onclick="_closePEC()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);line-height:1;padding:2px 6px">✕</button>
