@@ -2388,6 +2388,22 @@ function _demandeSelectType(t){
     btn.style.color=sel?'var(--amber-dark)':'var(--text2)';
     if(sel&&_DEMANDE_TYPES[k].unite){var u=document.getElementById('dm-unite');if(u&&!u.value)u.value=_DEMANDE_TYPES[k].unite;}
   });
+  // Afficher la ligne prix adaptée au type
+  var rowPL=document.getElementById('dm-row-prixl');
+  var rowCout=document.getElementById('dm-row-cout');
+  if(rowPL)rowPL.style.display=(t==='carburant'?'block':'none');
+  if(rowCout)rowCout.style.display=(t==='carburant'?'none':'block');
+  _dmUpdateCoutTotal();
+}
+function _dmUpdateCoutTotal(){
+  var qte=parseFloat((document.getElementById('dm-qte')||{}).value)||0;
+  var prix=parseFloat((document.getElementById('dm-prix-l')||{}).value)||0;
+  var calc=document.getElementById('dm-cout-calc');
+  if(!calc)return;
+  if(qte&&prix){
+    calc.textContent='= '+(qte*prix).toLocaleString('fr-FR')+' FCFA';
+    calc.style.color='var(--vert)';calc.style.fontWeight='700';
+  }else{calc.textContent='= —';calc.style.color='var(--text3)';calc.style.fontWeight='400';}
 }
 function _demandeSelectUrgence(u){
   _demandeUrgenceActuelle=u;
@@ -2511,9 +2527,22 @@ function _buildDemandeModalContent(){
     '<div style="display:flex;gap:6px;margin-bottom:12px">'+typesHtml+'</div>'+
     '<div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:12px">'+
       '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Quantité</div>'+
-      '<input id="dm-qte" type="number" value="'+qteDefaut+'" placeholder="Ex : 500" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none"></div>'+
+      '<input id="dm-qte" type="number" value="'+qteDefaut+'" placeholder="Ex : 500" oninput="_dmUpdateCoutTotal()" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none"></div>'+
       '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Unité</div>'+
       '<input id="dm-unite" type="text" value="'+escape_html(uniteDefaut)+'" placeholder="litres…" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none"></div>'+
+    '</div>'+
+    // Ligne prix carburant (visible seulement si type=carburant)
+    '<div id="dm-row-prixl" style="display:'+(typeDefaut==='carburant'?'block':'none')+';margin-bottom:12px">'+
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Prix / litre (FCFA)</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center">'+
+        '<input id="dm-prix-l" type="number" min="0" step="10" placeholder="Ex : 1 200" oninput="_dmUpdateCoutTotal()" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">'+
+        '<div id="dm-cout-calc" style="font-size:12px;color:var(--text3);padding:8px 4px;white-space:nowrap">= —</div>'+
+      '</div>'+
+    '</div>'+
+    // Ligne coût estimé (visible seulement si type ≠ carburant)
+    '<div id="dm-row-cout" style="display:'+(typeDefaut!=='carburant'?'block':'none')+';margin-bottom:12px">'+
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Coût estimé (FCFA)</div>'+
+      '<input id="dm-cout" type="number" min="0" step="1000" placeholder="Ex : 150 000" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">'+
     '</div>'+
     '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Urgence</div>'+
     '<div style="display:flex;gap:6px;margin-bottom:12px">'+urgHtml+'</div>'+
@@ -2560,6 +2589,12 @@ function _showDemandePreview(){
   window._dmCurrentDesc=desc;
   window._dmCurrentQte=qte;
   window._dmCurrentUnite=unite;
+  // Capture du coût
+  var prixL=parseFloat((document.getElementById('dm-prix-l')||{}).value)||null;
+  var coutManuel=parseFloat((document.getElementById('dm-cout')||{}).value)||null;
+  var cout=_demandeTypeActuel==='carburant'?(qte&&prixL?Math.round(qte*prixL):null):coutManuel;
+  window._dmCurrentCout=cout;
+  window._dmCurrentPrixL=_demandeTypeActuel==='carburant'?prixL:null;
 
   var urgColors={normal:'var(--vert)',urgent:'var(--amber)',critique:'var(--rouge)'};
   var urgCol=urgColors[_demandeUrgenceActuelle]||'var(--text)';
@@ -2588,6 +2623,8 @@ function _showDemandePreview(){
         '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-bottom:7px">Détail de la demande</div>'+
         '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Type</span><span>'+typeIcon+' '+escape_html(typeLabel)+'</span></div>'+
         (qte?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Quantité</span><span style="font-weight:700">'+qte.toLocaleString('fr-FR')+(unite?' '+escape_html(unite):'')+'</span></div>':'')+
+        (cout?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Coût estimé</span><span style="font-weight:700">'+cout.toLocaleString('fr-FR')+' FCFA</span></div>':'')+
+        (window._dmCurrentPrixL&&qte?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Prix/L</span><span>'+window._dmCurrentPrixL.toLocaleString('fr-FR')+' FCFA/L</span></div>':'')+
         '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Urgence</span><span style="font-weight:600;color:'+(urgCol.replace('var(--vert)','#3b6d11').replace('var(--amber)','#854f0b').replace('var(--rouge)','#a32d2d'))+'">'+_DEMANDE_URGENCE_LABELS[_demandeUrgenceActuelle]+'</span></div>'+
         (_dmCurrentEqNom?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Équipement</span><span>'+escape_html(_dmCurrentEqNom)+'</span></div>':'')+
         '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Demandé par</span><span>'+escape_html(auteurNom)+' — '+escape_html(roleName(auteurRole))+'</span></div>'+
@@ -2684,7 +2721,9 @@ async function _envoyerDemande(){
     destinataire_nom:null,
     destinataire_mail:null,
     note:ref,
-    date_envoi:new Date().toISOString()
+    date_envoi:new Date().toISOString(),
+    cout:window._dmCurrentCout||null,
+    prix_unitaire:window._dmCurrentPrixL||null
   });
   if(!inserted||!inserted.id){
     alert('❌ Erreur : la demande n\'a pas pu être enregistrée. Vérifiez votre connexion et réessayez.');
@@ -2758,7 +2797,14 @@ async function _demandePleinOui(){
     if(reps&&reps.length)currentNiveau=parseFloat(reps[0].valeur)||null;
   }
   var auteurNom=_session&&_session.contact&&_session.contact.nom?_session.contact.nom:'';
-  openDeclarePlein(d.equipement_id,eqNom,cap,currentNiveau,auteurNom,prixLitre);
+  // Utiliser le prix/L de la demande s'il existe
+  var demandePrixL=d.prix_unitaire||null;
+  openDeclarePlein(d.equipement_id,eqNom,cap,currentNiveau,auteurNom,demandePrixL);
+  // Pré-remplir le coût si demande a un coût total sans prix/L
+  if(d.cout&&!demandePrixL){
+    var coutEl=document.getElementById('mp-cout');
+    if(coutEl&&!coutEl.value)coutEl.value=d.cout;
+  }
   // Refresh commandes après fermeture du modal plein
   // openDeclarePlein gère son propre callback, on force un refresh sur fermeture
   var orig=document.getElementById('mp-confirm');
@@ -2795,7 +2841,8 @@ async function _demandeCreerMaintenance(d){
     date_intervention:new Date().toISOString().split('T')[0],
     date_realisee:new Date().toISOString().split('T')[0],
     notes:notes,
-    created_by:d.auteur_nom||null
+    created_by:d.auteur_nom||null,
+    cout:d.cout||null
   });
 }
 
@@ -2873,12 +2920,47 @@ async function _rtMaintenances(sid){
           (r.photo_url?'<div style="margin-top:8px"><a href="'+r.photo_url+'" target="_blank"><img src="'+r.photo_url+'" style="max-width:100%;max-height:160px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" onerror="this.style.display=\'none\'"></a></div>':'')+
         '</div>'+
       '</div>'+
-      (isPlanifie?'<div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
-        '<button onclick="_mntMarquerRealise(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Marquer réalisé</button>'+
-        '<button onclick="_mntAnnuler(\''+r.id+'\')" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;color:var(--text2);background:white;cursor:pointer">Annuler</button>'+
-      '</div>':'')+
+      '<div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
+        (isPlanifie?
+          '<button onclick="_mntMarquerRealise(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Marquer réalisé</button>'+
+          '<button onclick="_mntAnnuler(\''+r.id+'\')" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;color:var(--text2);background:white;cursor:pointer">Annuler</button>'
+          :
+          '<button onclick="_mntEditer(\''+r.id+'\',\''+escape_html(r.source||'maintenance')+'\','+(r.cout||0)+',\''+escape_html((r.notes||'').replace(/'/g,'\\\'').replace(/\n/g,' '))+'\')" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:11px;font-weight:600;color:var(--text2);background:white;cursor:pointer">✏️ Modifier</button>'
+        )+
+      '</div>'+
     '</div>';
   }
+function _mntEditer(id,source,currentCout,currentNotes){
+  _showCfgModal(
+    '<div style="font-size:15px;font-weight:700;margin-bottom:16px">✏️ Modifier l\'entrée</div>'+
+    '<div style="display:flex;flex-direction:column;gap:12px">'+
+      '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">COÛT (FCFA)</label>'+
+      '<input id="mnt-e-cout" type="number" min="0" step="1000" value="'+(currentCout||'')+'" placeholder="0" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+      (source==='maintenance'||source==='vidange'?
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">NOTES</label>'+
+        '<textarea id="mnt-e-notes" rows="3" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;resize:none;box-sizing:border-box">'+escape_html(currentNotes||'')+'</textarea></div>':'')+
+    '</div>'+
+    '<div style="display:flex;gap:8px;margin-top:16px">'+
+      '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:white;cursor:pointer;color:var(--text2)">Annuler</button>'+
+      '<button onclick="_mntEditerSauver(\''+id+'\',\''+source+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--dark);color:white;cursor:pointer">Enregistrer</button>'+
+    '</div>'
+  );
+}
+async function _mntEditerSauver(id,source){
+  var cout=parseFloat(document.getElementById('mnt-e-cout').value)||null;
+  var notesEl=document.getElementById('mnt-e-notes');
+  var notes=notesEl?notesEl.value.trim()||null:undefined;
+  var table=(source==='plein')?'pleins':(source==='vidange'?'vidanges':'maintenances');
+  var payload={cout:cout};
+  if(notes!==undefined&&(source==='maintenance'||source==='vidange'))payload.notes=notes;
+  var ok=await supaPatch(table,id,payload);
+  if(!ok){alert('Erreur lors de la mise à jour.');return;}
+  _closeCfgModal();
+  if(_session){
+    if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
+    else renderRespTech(_session,'maintenances');
+  }
+}
 
   var cardsHtml='';
   if(!filtered.length){
