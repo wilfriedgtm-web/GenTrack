@@ -1080,6 +1080,37 @@ async function handleMessage(from: string, bodyText: string) {
       return sendWA(phone, `✅ *Pris en charge !*\n📋 ${refCode}\n\nTapez *resolu* quand c'est réglé.`);
     }
 
+    // ── Affectation signalement : "AFFECTER REF-XXXX NomTech" ───────────────
+    const affecterMatch = bodyText.trim().match(/^affecter\s+(REF-?\d+)\s+(.+)$/i);
+    if (affecterMatch) {
+      const refCode = affecterMatch[1].toUpperCase().replace(/^REF(\d)/, 'REF-$1');
+      const techName = affecterMatch[2].trim();
+
+      const sigs = await db('signalements', { query: `&ref_code=eq.${refCode}&statut=in.(ouvert,en_cours)&limit=1` });
+      const sig = Array.isArray(sigs) ? sigs[0] : null;
+      if (!sig) return sendWA(phone, `❌ Signalement *${refCode}* introuvable ou déjà clôturé.`);
+
+      const techRaw = await db('contacts', { query: `&nom=ilike.${encodeURIComponent(techName)}&actif=eq.true&site_id=eq.${sig.site_id||sig.groupe_id}&limit=1` });
+      const tech = Array.isArray(techRaw) ? techRaw[0] : null;
+      if (!tech) return sendWA(phone, `❌ Contact *${techName}* introuvable sur ce site.`);
+
+      const assigneNom = contact?.nom || phone;
+      await db('signalements', { method: 'PATCH', query: `&id=eq.${sig.id}`, body: {
+        statut: 'en_cours',
+        assigne_a: tech.nom,
+        pris_en_charge_par: tech.nom,
+        pris_en_charge_at: new Date().toISOString(),
+      }});
+
+      // Notifier le tech
+      if (tech.whatsapp) {
+        const missionMsg = `🔧 *Mission assignée — GenTrack*\n\n📋 *${refCode}*\n📝 ${sig.description || '—'}\n\n👤 Assigné par : ${assigneNom}\n🕐 ${getHeure()}\n\n_Répondez *OK ${refCode}* pour confirmer la prise en charge._`;
+        await sendWA(tech.whatsapp, missionMsg);
+      }
+
+      return sendWA(phone, `✅ *${refCode}* affecté à *${tech.nom}*${tech.whatsapp ? ' — notifié 📲' : ' ⚠️ pas de WA configuré'}.`);
+    }
+
     // RESOLU : si le contact a un signalement en_cours à son nom → envoyer lien rapport direct
     const bodyNorm = bodyText.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     if (bodyNorm === 'resolu' && contact) {

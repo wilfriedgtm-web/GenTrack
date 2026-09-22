@@ -317,7 +317,7 @@ function _updateAlertPill(n){
   badges.forEach(function(b){b.style.display=n>0?'block':'none';});
 }
 function roleName(r){var m={dir_ops:'Directeur des opérations',dir_tech:'Directeur technique',resp_tech:'Responsable technique',technicien:'Technicien'};return m[r]||r;}
-function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',releves:'Relevés horaires',signalements:'Signalements',maintenances:'Maintenance',config:'Configuration',rapport:'Rapport conso'};return m[id]||'Accueil';}
+function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',releves:'Relevés horaires',signalements:'Signalements',maintenances:'Maintenance',config:'Configuration',rapport:'Rapport conso',commandes:'Commandes'};return m[id]||'Accueil';}
 function saveSession(s){_session=s;try{localStorage.setItem('gt_session',JSON.stringify(s));}catch(e){}}
 function loadStored(){try{return JSON.parse(localStorage.getItem('gt_session'));}catch(e){return null;}}
 function clearSession(){_session=null;try{localStorage.removeItem('gt_session');}catch(e){}}
@@ -488,6 +488,7 @@ function buildNavItems(role){
   if(role==='resp_tech'){
     items.push({id:'signalements',icon:'location_on',label:'Signalements'});
     items.push({id:'maintenances',icon:'build',label:'Maintenance'});
+    items.push({id:'commandes',icon:'shopping_cart',label:'Commandes'});
     items.push({id:'releves',icon:'schedule',label:'Relevés'});
     items.push({id:'config',icon:'settings',label:'Config'});
   }
@@ -647,6 +648,7 @@ async function _loadRT(session,nav){
     else if(nav==='releves')html=await _rtReleves(session,sid);
     else if(nav==='signalements')html=await _rtSignalements(sid);
     else if(nav==='maintenances')html=await _rtMaintenances(sid);
+    else if(nav==='commandes')html=await _rtCommandes(sid,session);
     else if(nav==='config')html=await _rtConfig(sid);
     el.innerHTML=html;
   }catch(e){
@@ -2106,6 +2108,42 @@ async function _sgCreerDepuisAlerteSubmit(sid,alerteId){
 
 
 var _sgAffecterChosen={nom:'',wa:''};
+var _sgAffecterPreviewId=null;
+var _sgAffecterPreviewNom=null;
+var _sgAffecterPreviewWa=null;
+
+function _sgAffecterPreview(sgId,techNom,techWa){
+  _sgAffecterPreviewId=sgId;
+  _sgAffecterPreviewNom=techNom;
+  _sgAffecterPreviewWa=techWa;
+  var r=window._sgRows&&window._sgRows[sgId];
+  var rapportUrl=location.origin+location.pathname.replace('dashboard.html','rapport.html')+'?sg='+sgId;
+  var msgPreview=r?_sgAffecterMsg(r,'',rapportUrl):'🔧 Mission assignée — GenTrack\n\nRépondez OK '+sgId+' pour confirmer.';
+  var hasWa=!!(techWa&&techWa.trim());
+  _showCfgModal(
+    '<div style="font-size:15px;font-weight:700;color:var(--dark);margin-bottom:4px">📱 Message WhatsApp</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">À envoyer à <strong>'+escape_html(techNom)+'</strong>'+(hasWa?'':' <span style="color:var(--rouge)">⚠️ pas de WA</span>')+'</div>'+
+    '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;font-size:11px;color:var(--dark);white-space:pre-wrap;line-height:1.55;margin-bottom:12px;max-height:160px;overflow-y:auto">'+escape_html(msgPreview)+'</div>'+
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Instructions supplémentaires (optionnel)</div>'+
+    '<textarea id="sg-affecter-instr" rows="2" placeholder="Ex : Apporter outillage spécifique, accès par la porte sud…" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;resize:none;font-family:inherit;outline:none;margin-bottom:12px;box-sizing:border-box"></textarea>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="_sgAffecterBackToList(\''+sgId+'\')" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:white;cursor:pointer;color:var(--text2)">← Retour</button>'+
+      '<button onclick="_sgAffecterConfirm()" style="flex:2;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:'+(hasWa?'#25D366':'var(--dark)')+';color:white;cursor:pointer">'+(hasWa?'📱 Envoyer WA':'✅ Affecter sans WA')+'</button>'+
+    '</div>'
+  );
+}
+
+function _sgAffecterBackToList(sgId){
+  _sgAffecter(sgId);
+}
+
+async function _sgAffecterConfirm(){
+  var sgId=_sgAffecterPreviewId;
+  var techNom=_sgAffecterPreviewNom;
+  var techWa=_sgAffecterPreviewWa;
+  var instr=((document.getElementById('sg-affecter-instr')||{}).value||'').trim();
+  await _sgAffecterDirect(sgId,techNom,techWa,instr);
+}
 
 function _sgAffecterMsg(r,instr,rapportUrl){
   var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
@@ -2150,7 +2188,7 @@ function _sgAffecter(id){
         var nomJs=c.nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
         var waJs=(c.whatsapp||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
         var hasWa=!!(c.whatsapp&&c.whatsapp.trim());
-        return '<button onclick="_sgAffecterDirect(\''+id+'\',\''+nomJs+'\',\''+waJs+'\')" style="width:100%;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;background:white;text-align:left">'+
+        return '<button onclick="_sgAffecterPreview(\''+id+'\',\''+nomJs+'\',\''+waJs+'\')" style="width:100%;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;background:white;text-align:left">'+
           '<div style="width:36px;height:36px;border-radius:50%;background:var(--bleu-pale);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--bleu);flex-shrink:0">'+escape_html(ini)+'</div>'+
           '<div style="flex:1">'+
             '<div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(c.nom)+'</div>'+
@@ -2181,10 +2219,10 @@ function _sgAffecter(id){
   }
 }
 
-async function _sgAffecterDirect(sgId,techNom,techWa){
+async function _sgAffecterDirect(sgId,techNom,techWa,instr){
   var r=window._sgRows&&window._sgRows[sgId];
   var rapportUrl=location.origin+location.pathname.replace('dashboard.html','rapport.html')+'?sg='+sgId;
-  var msg=r?_sgAffecterMsg(r,'',rapportUrl):'🔧 Mission assignée — GenTrack\n\nRépondez OK '+sgId+' pour confirmer.';
+  var msg=r?_sgAffecterMsg(r,instr||'',rapportUrl):'🔧 Mission assignée — GenTrack\n\nRépondez OK '+sgId+' pour confirmer.'+(instr?'\n\n📋 Instructions :\n'+instr:'');
   await supaPatch('signalements',sgId,{assigne_a:techNom,statut:'en_cours',pris_en_charge_par:techNom,pris_en_charge_at:new Date().toISOString()});
   _closeCfgModal();
   if(techWa){
@@ -2211,6 +2249,249 @@ var _MNT_TYPES={
   ravitaillement:{label:'Ravitaillement',icon:'⛽',color:'var(--bleu)',bg:'var(--bleu-pale)'},
   preventive:{label:'Maintenance préventive',icon:'📅',color:'var(--vert)',bg:'var(--vert-pale)'}
 };
+
+/* ══════════════════════════════════════
+   COMMANDES
+══════════════════════════════════════ */
+var _DEMANDE_TYPES={carburant:{label:'Carburant',icon:'⛽',unite:'litres'},piece:{label:'Pièce détachée',icon:'🔩',unite:'unités'},materiel:{label:'Matériel',icon:'📦',unite:'unités'},autre:{label:'Autre',icon:'📝',unite:''}};
+var _DEMANDE_URGENCES=['normal','urgent','critique'];
+var _DEMANDE_URGENCE_LABELS={normal:'Normal',urgent:'Urgent 🔶',critique:'Critique 🔴'};
+
+async function _rtCommandes(sid,session){
+  var dc=document.getElementById('dash-content-main');
+  if(dc){dc.style.padding='24px';dc.style.maxWidth='860px';}
+
+  var CUVE_TYPE='de5519d0-363b-4628-b872-2dcf01859002';
+  var[equips,demandes]=await Promise.all([
+    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,type_id,capacite_litres,conso_theorique_lh,types_equipements(nom)&order=ordre_ronde.asc'),
+    supaGet('demandes','site_id=eq.'+sid+'&order=created_at.desc&limit=40&select=*')
+  ]);
+
+  // Cuve data for pre-fill
+  var cuveEquips=equips.filter(function(e){return e.type_id===CUVE_TYPE;});
+  var cuveMap={};
+  if(cuveEquips.length){
+    var cuveIds=cuveEquips.map(function(e){return e.id;});
+    var cuveQs=await supaGet('questions','equipement_id=in.('+cuveIds.join(',')+')'+'&actif=eq.true&select=id,equipement_id,texte&order=ordre.asc');
+    var niveauQs=cuveQs.filter(function(q){return q.texte.toLowerCase().indexOf('niveau')>=0||q.texte.toLowerCase().indexOf('cuve')>=0;});
+    if(niveauQs.length){
+      var nQids=niveauQs.map(function(q){return q.id;});
+      var cuveReps=await supaGet('reponses','question_id=in.('+nQids.join(',')+')'+'&select=question_id,valeur,created_at&order=created_at.desc&limit=50');
+      var lastByQ={};
+      cuveReps.forEach(function(r){if(!lastByQ[r.question_id]||r.created_at>lastByQ[r.question_id].created_at)lastByQ[r.question_id]=r;});
+      niveauQs.forEach(function(q){
+        var niv=lastByQ[q.id]?parseFloat(lastByQ[q.id].valeur):null;
+        var eq=cuveEquips.find(function(e){return e.id===q.equipement_id;});
+        if(eq&&niv!=null){
+          var cap=eq.capacite_litres||10000;
+          cuveMap[eq.id]={niv:Math.round(niv),cap:cap,manque:Math.round(cap-niv),nom:eq.nom};
+        }
+      });
+    }
+  }
+  window._commandes_cuveMap=cuveMap;
+
+  // Demandes en attente
+  var enAttente=demandes.filter(function(d){return d.statut==='en_attente';});
+
+  // Header KPI
+  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">'+
+    '<div>'+
+      '<div style="font-size:18px;font-weight:800;color:var(--dark)">📦 Commandes</div>'+
+      '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+(enAttente.length?enAttente.length+' demande'+(enAttente.length>1?'s':'')+'  en attente':'Aucune demande en attente')+'</div>'+
+    '</div>'+
+    '<button onclick="_ouvrirNouvelleDemandeLibre(\''+sid+'\')" style="padding:8px 16px;background:var(--dark);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ Nouvelle demande</button>'+
+  '</div>';
+
+  // Équipements cards
+  h+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">Demande par équipement</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:22px">';
+  equips.forEach(function(eq){
+    var typeNom=eq.types_equipements&&eq.types_equipements.nom?eq.types_equipements.nom:'';
+    var icon=_TYPE_ICONS[typeNom]||'🔧';
+    var cv=cuveMap[eq.id]||null;
+    var eqJs=escape_html(eq.nom).replace(/'/g,"\\'");
+    h+='<button onclick="_ouvrirNouvelleDemandeEq(\''+sid+'\',\''+eq.id+'\',\''+eqJs+'\')" style="text-align:left;padding:14px;background:white;border:1.5px solid var(--border);border-radius:12px;cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--amber)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'+
+      '<div style="font-size:20px;margin-bottom:6px">'+icon+'</div>'+
+      '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:2px">'+escape_html(eq.nom)+'</div>'+
+      '<div style="font-size:10px;color:var(--text3)">'+escape_html(typeNom)+'</div>'+
+      (cv?'<div style="margin-top:6px;font-size:11px;color:var(--text2)">Niveau : <strong style="color:'+(cv.niv/cv.cap<0.3?'var(--rouge)':'var(--vert)')+'">'+cv.niv.toLocaleString('fr-FR')+' L</strong> · Manque '+cv.manque.toLocaleString('fr-FR')+' L</div>':'')+
+    '</button>';
+  });
+  h+='</div>';
+
+  // Historique demandes
+  h+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">Historique</div>';
+  if(!demandes.length){
+    h+='<div style="text-align:center;padding:32px;color:var(--text3);font-size:13px">Aucune demande envoyée</div>';
+  } else {
+    var STATUT_STYLE={en_attente:{label:'En attente',color:'var(--orange)',bg:'var(--orange-pale)'},approuve:{label:'Approuvé',color:'var(--vert)',bg:'var(--vert-pale)'},livre:{label:'Livré ✅',color:'var(--vert)',bg:'var(--vert-pale)'},annule:{label:'Annulé',color:'var(--text3)',bg:'#f5f5f5'}};
+    demandes.forEach(function(d){
+      var t=_DEMANDE_TYPES[d.type]||{label:d.type,icon:'📝'};
+      var u=STATUT_STYLE[d.statut]||STATUT_STYLE['en_attente'];
+      var date=d.created_at?new Date(d.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+      h+='<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:flex-start;gap:12px">'+
+        '<div style="font-size:22px;flex-shrink:0">'+t.icon+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'+
+            '<span style="font-size:12px;font-weight:700;color:var(--dark)">'+escape_html(t.label)+'</span>'+
+            (d.quantite?'<span style="font-size:11px;color:var(--text2)">· '+d.quantite+' '+(d.unite||'')+'</span>':'')+
+            '<span style="margin-left:auto;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;color:'+u.color+';background:'+u.bg+'">'+u.label+'</span>'+
+          '</div>'+
+          (d.description?'<div style="font-size:11px;color:var(--text2);margin-bottom:3px">'+escape_html(d.description.substring(0,80))+'</div>':'')+
+          '<div style="font-size:10px;color:var(--text3)">'+date+(d.destinataire_mail?' · ✉️ '+escape_html(d.destinataire_mail):'')+'</div>'+
+        '</div>'+
+      '</div>';
+    });
+  }
+  return h;
+}
+
+function _buildDemandeModal(sid,eqId,eqNom,cuveInfo){
+  var eqIdJs=(eqId||'').replace(/'/g,"\\'");
+  var eqNomJs=(eqNom||'').replace(/'/g,"\\'");
+  var typeDefaut=cuveInfo?'carburant':'autre';
+  var qteDefaut=cuveInfo?cuveInfo.manque:'';
+  var uniteDefaut=cuveInfo?'litres':'';
+
+  var typesHtml=Object.entries(_DEMANDE_TYPES).map(function(kv){
+    var k=kv[0],v=kv[1];
+    return '<button onclick="_demandeSelectType(\''+k+'\')" id="dm-type-'+k+'" style="flex:1;padding:8px 4px;border:1.5px solid '+(k===typeDefaut?'var(--amber)':'var(--border)')+';border-radius:8px;background:'+(k===typeDefaut?'var(--amber-pale)':'white')+';cursor:pointer;font-size:11px;font-weight:600;color:'+(k===typeDefaut?'var(--amber-dark)':'var(--text2)')+'">'+v.icon+'<br>'+v.label+'</button>';
+  }).join('');
+
+  return '<div style="font-size:15px;font-weight:700;color:var(--dark);margin-bottom:4px">📦 Nouvelle demande</div>'+
+    (eqNom?'<div style="font-size:12px;color:var(--text2);margin-bottom:12px">'+escape_html(eqNom)+'</div>':'<div style="margin-bottom:12px"></div>')+
+    (cuveInfo?'<div style="background:var(--orange-pale);border:1px solid var(--orange-border);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--orange);margin-bottom:12px">🛢️ Niveau actuel : <strong>'+cuveInfo.niv.toLocaleString('fr-FR')+' L</strong> sur '+cuveInfo.cap.toLocaleString('fr-FR')+' L · Manque <strong>'+cuveInfo.manque.toLocaleString('fr-FR')+' L</strong></div>':'')+
+
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Type</div>'+
+    '<div style="display:flex;gap:6px;margin-bottom:14px">'+typesHtml+'</div>'+
+
+    '<div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:12px">'+
+      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Quantité</div>'+
+      '<input id="dm-qte" type="number" value="'+qteDefaut+'" placeholder="Ex : 500" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none"></div>'+
+      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Unité</div>'+
+      '<input id="dm-unite" type="text" value="'+escape_html(uniteDefaut)+'" placeholder="litres…" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none"></div>'+
+    '</div>'+
+
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Urgence</div>'+
+    '<div style="display:flex;gap:6px;margin-bottom:12px">'+
+      _DEMANDE_URGENCES.map(function(u){
+        return '<button onclick="_demandeSelectUrgence(\''+u+'\')" id="dm-urg-'+u+'" style="flex:1;padding:7px;border:1.5px solid '+(u==='normal'?'var(--amber)':'var(--border)')+';border-radius:8px;background:'+(u==='normal'?'var(--amber-pale)':'white')+';cursor:pointer;font-size:11px;font-weight:600;color:'+(u==='normal'?'var(--amber-dark)':'var(--text2)')+'">'+_DEMANDE_URGENCE_LABELS[u]+'</button>';
+      }).join('')+
+    '</div>'+
+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'+
+      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Destinataire</div>'+
+      '<input id="dm-dest-nom" type="text" placeholder="Nom" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;outline:none"></div>'+
+      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Email</div>'+
+      '<input id="dm-dest-mail" type="email" placeholder="email@azalai.com" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;outline:none"></div>'+
+    '</div>'+
+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:white;cursor:pointer;color:var(--text2)">Annuler</button>'+
+      '<button onclick="_envoyerDemande(\''+sid+'\',\''+eqIdJs+'\',\''+eqNomJs+'\')" style="flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:var(--dark);color:white;cursor:pointer">✉️ Envoyer</button>'+
+    '</div>';
+}
+
+var _demandeTypeActuel='autre';
+var _demandeUrgenceActuelle='normal';
+
+function _demandeSelectType(t){
+  _demandeTypeActuel=t;
+  Object.keys(_DEMANDE_TYPES).forEach(function(k){
+    var btn=document.getElementById('dm-type-'+k);
+    if(!btn)return;
+    var sel=k===t;
+    btn.style.borderColor=sel?'var(--amber)':'var(--border)';
+    btn.style.background=sel?'var(--amber-pale)':'white';
+    btn.style.color=sel?'var(--amber-dark)':'var(--text2)';
+    if(sel&&_DEMANDE_TYPES[k].unite){
+      var uInput=document.getElementById('dm-unite');
+      if(uInput&&!uInput.value)uInput.value=_DEMANDE_TYPES[k].unite;
+    }
+  });
+}
+
+function _demandeSelectUrgence(u){
+  _demandeUrgenceActuelle=u;
+  _DEMANDE_URGENCES.forEach(function(k){
+    var btn=document.getElementById('dm-urg-'+k);
+    if(!btn)return;
+    var sel=k===u;
+    btn.style.borderColor=sel?'var(--amber)':'var(--border)';
+    btn.style.background=sel?'var(--amber-pale)':'white';
+    btn.style.color=sel?'var(--amber-dark)':'var(--text2)';
+  });
+}
+
+function _ouvrirNouvelleDemandeLibre(sid){
+  _demandeTypeActuel='autre';
+  _demandeUrgenceActuelle='normal';
+  _showCfgModal(_buildDemandeModal(sid,'','',null));
+}
+
+function _ouvrirNouvelleDemandeEq(sid,eqId,eqNom){
+  _demandeTypeActuel='autre';
+  _demandeUrgenceActuelle='normal';
+  var cuveInfo=(window._commandes_cuveMap&&window._commandes_cuveMap[eqId])||null;
+  if(cuveInfo)_demandeTypeActuel='carburant';
+  _showCfgModal(_buildDemandeModal(sid,eqId,eqNom,cuveInfo));
+}
+
+async function _envoyerDemande(sid,eqId,eqNom){
+  var qte=parseFloat((document.getElementById('dm-qte')||{}).value||'')||null;
+  var unite=((document.getElementById('dm-unite')||{}).value||'').trim();
+  var destNom=((document.getElementById('dm-dest-nom')||{}).value||'').trim();
+  var destMail=((document.getElementById('dm-dest-mail')||{}).value||'').trim();
+  if(!qte&&!_demandeTypeActuel){alert('Veuillez sélectionner un type.');return;}
+
+  var typeLabel=_DEMANDE_TYPES[_demandeTypeActuel]?_DEMANDE_TYPES[_demandeTypeActuel].label:_demandeTypeActuel;
+  var auteurNom=_session&&_session.contact&&_session.contact.nom?_session.contact.nom:'';
+  var auteurRole=_session&&_session.role?_session.role:'';
+  var today=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  // Body email
+  var bodyLines=[
+    'Demande : '+typeLabel,
+    eqNom?'Équipement : '+eqNom:'',
+    qte?'Quantité : '+qte+(unite?' '+unite:''):'',
+    'Urgence : '+(_DEMANDE_URGENCE_LABELS[_demandeUrgenceActuelle]||_demandeUrgenceActuelle),
+    '\n---',
+    'Demandé par : '+auteurNom+' ('+roleName(auteurRole)+')',
+    'Date : '+today
+  ].filter(function(l){return l.trim();}).join('\n');
+
+  var subject=encodeURIComponent('[GenTrack] Demande '+typeLabel+(eqNom?' — '+eqNom:'')+' | '+(destNom||'Direction'));
+
+  // Save to DB
+  await supaPost('demandes',{
+    site_id:sid,
+    equipement_id:eqId||null,
+    auteur_nom:auteurNom,
+    auteur_role:auteurRole,
+    type:_demandeTypeActuel,
+    description:null,
+    quantite:qte,
+    unite:unite||null,
+    urgence:_demandeUrgenceActuelle,
+    statut:'en_attente',
+    destinataire_nom:destNom||null,
+    destinataire_mail:destMail||null,
+    date_envoi:new Date().toISOString()
+  });
+
+  _closeCfgModal();
+
+  // Open mailto
+  if(destMail){
+    window.location.href='mailto:'+encodeURIComponent(destMail)+'?subject='+subject+'&body='+encodeURIComponent(bodyLines);
+  } else {
+    window.location.href='mailto:?subject='+subject+'&body='+encodeURIComponent(bodyLines);
+  }
+
+  // Refresh
+  if(_session)renderRespTech(_session,'commandes');
+}
 
 async function _rtMaintenances(sid){
   var dc=document.getElementById('dash-content-main');
