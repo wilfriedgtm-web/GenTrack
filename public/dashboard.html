@@ -1225,8 +1225,7 @@ async function _rtAlertes(sid,cid){
           (enCours?'<span style="font-size:10px;font-weight:600;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);border-radius:12px;padding:3px 9px;white-space:nowrap;flex-shrink:0">⚡ '+escape_html(preneur||'En cours')+'</span>':'')+
         '</div>'+
         '<div style="display:flex;gap:6px;margin-top:10px">'+
-          (!enCours?'<button onclick="_openPEC(\''+sg.id+'\',\''+escape_html(ref)+'\',\''+sid+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--rouge-border);background:none;font-size:11px;color:var(--rouge);font-weight:600;cursor:pointer">👤 Prendre en charge</button>':
-                    '<button onclick="navTo(\'signalements\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--rouge-border);background:none;font-size:11px;color:var(--rouge);cursor:pointer">Voir détail</button>')+
+          '<button onclick="_sgAffecter(\''+sg.id+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--rouge-border);background:none;font-size:11px;color:var(--rouge);font-weight:600;cursor:pointer">'+(!enCours?'👷 Affecter':'↩ Réaffecter')+'</button>'+
           '<button onclick="_resolveSg(\''+sg.id+'\')" style="flex:1;padding:6px;border-radius:6px;border:none;background:var(--rouge);color:white;font-size:11px;font-weight:600;cursor:pointer">✓ Résolu</button>'+
         '</div>'+
       '</div>';
@@ -1247,8 +1246,7 @@ async function _rtAlertes(sid,cid){
           (enCours?'<span style="font-size:10px;font-weight:600;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);border-radius:12px;padding:3px 9px;white-space:nowrap;flex-shrink:0">⚡ '+escape_html(preneur||'En cours')+'</span>':'')+
         '</div>'+
         '<div style="display:flex;gap:6px;margin-top:10px">'+
-          (!enCours?'<button onclick="_openPEC(\''+sg.id+'\',\''+escape_html(ref)+'\',\''+sid+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--orange-border);background:none;font-size:11px;color:var(--orange);font-weight:600;cursor:pointer">👤 Prendre en charge</button>':
-                    '<button onclick="navTo(\'signalements\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--orange-border);background:none;font-size:11px;color:var(--orange);cursor:pointer">Voir détail</button>')+
+          '<button onclick="_sgAffecter(\''+sg.id+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--orange-border);background:none;font-size:11px;color:var(--orange);font-weight:600;cursor:pointer">'+(!enCours?'👷 Affecter':'↩ Réaffecter')+'</button>'+
           '<button onclick="_resolveSg(\''+sg.id+'\')" style="flex:1;padding:6px;border-radius:6px;border:none;background:var(--orange);color:white;font-size:11px;font-weight:600;cursor:pointer">✓ Résolu</button>'+
         '</div>'+
       '</div>';
@@ -1900,9 +1898,9 @@ async function _rtSignalements(sid){
                 '<div style="font-size:10px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.04em">En cours</div>'+
                 '<div style="font-size:12px;color:var(--vert);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(sgPreneur||'')+'</div>'+
               '</div>'+
-              '<button onclick="_openPEC(\''+r.id+'\',\''+sgRefJs+'\',\''+sgSid+'\')" style="font-size:11px;padding:4px 10px;border:1px solid var(--vert-border);border-radius:8px;background:white;color:var(--vert);cursor:pointer;white-space:nowrap;font-weight:600">↩ Changer</button>'+
+              '<button onclick="_sgAffecter(\''+r.id+'\')" style="font-size:11px;padding:4px 10px;border:1px solid var(--vert-border);border-radius:8px;background:white;color:var(--vert);cursor:pointer;white-space:nowrap;font-weight:600">↩ Changer</button>'+
             '</div>':
-            '<button onclick="_openPEC(\''+r.id+'\',\''+sgRefJs+'\',\''+sgSid+'\')" style="flex:1;padding:8px;border:1.5px solid var(--amber-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--amber-dark);background:var(--amber-pale);cursor:pointer">👤 Prendre en charge</button>')+
+            '<button onclick="_sgAffecter(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--amber-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--amber-dark);background:var(--amber-pale);cursor:pointer">👷 Affecter</button>')+
           '<button onclick="_sgResoudre(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Résoudre</button>'+
         '</div>':'';
 
@@ -1919,7 +1917,6 @@ async function _rtSignalements(sid){
           '<span>🕐 '+date+'</span>'+
         '</div>'+
         (r.ref_code?'<div style="margin-top:4px"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:5px;background:#f0f0f0;color:var(--text2);letter-spacing:.5px">'+escape_html(r.ref_code)+'</span></div>':'')+
-        (!resolu&&r.pris_en_charge_par?'<div style="margin-top:6px"><span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px;background:#e8f5e9;color:#2e7d32">✅ Pris en charge par '+escape_html(r.pris_en_charge_par)+'</span></div>':(!resolu&&r.assigne_a?'<div style="margin-top:6px"><span style="font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px;background:var(--amber-pale);color:var(--amber-dark)">👷 Affecté à '+escape_html(r.assigne_a)+'</span></div>':''))+
         resolutionHtml+
         actionsHtml+
       '</div>';
@@ -2147,16 +2144,15 @@ function _sgAffecterSelect(id,nom,wa,el){
 
 function _sgAffecter(id){
   var r=window._sgRows&&window._sgRows[id];
-  if(!r)return;
-  var sid=r.groupe_id||(_session&&_session.site_ids&&_session.site_ids[0]);
-  if(!sid)return;
-  _sgAffecterChosen={nom:'',wa:''};
+  var _doAffecter=function(r){
+    var sid=r.groupe_id||(_session&&_session.site_ids&&_session.site_ids[0]);
+    if(!sid)return;
+    _sgAffecterChosen={nom:'',wa:''};
+    var ROLE_LABELS={technicien:'Technicien',resp_tech:'Resp. technique',dir_tech:'Dir. technique'};
 
-  supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&role=eq.technicien&select=id,nom,whatsapp&order=nom.asc').then(function(techniciens){
-    // Fallback sur tous les contacts si aucun technicien
-    var doRender=function(contacts){
+    supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&role=in.(technicien,resp_tech)&select=id,nom,whatsapp,role&order=role.asc,nom.asc').then(function(contacts){
       if(!contacts||!contacts.length){
-        _showCfgModal('<p style="font-size:13px;color:var(--text2);padding:8px">Aucun contact technicien configuré pour ce site.</p><div style="margin-top:12px"><button onclick="_closeCfgModal()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">Fermer</button></div>');
+        _showCfgModal('<p style="font-size:13px;color:var(--text2);padding:8px">Aucun contact configuré pour ce site.</p><div style="margin-top:12px"><button onclick="_closeCfgModal()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">Fermer</button></div>');
         return;
       }
       var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
@@ -2165,33 +2161,30 @@ function _sgAffecter(id){
 
       var contactsHtml=contacts.map(function(c){
         var ini=c.nom.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+        var roleLabel=ROLE_LABELS[c.role]||c.role||'';
         return '<div onclick="_sgAffecterSelect(\''+id+'\',\''+escape_html(c.nom)+'\',\''+escape_html(c.whatsapp||'')+'\',this)" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px" data-cid="'+c.id+'">'+
           '<div class="sg-aff-av" style="width:32px;height:32px;border-radius:50%;background:var(--bleu-pale);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--bleu);flex-shrink:0">'+escape_html(ini)+'</div>'+
           '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(c.nom)+'</div>'+
-          '<div style="font-size:11px;color:var(--text3)">Technicien'+(c.whatsapp?' · '+escape_html(c.whatsapp):'')+'</div></div>'+
+          '<div style="font-size:11px;color:var(--text3)">'+escape_html(roleLabel)+(c.whatsapp?' · 📱':'')+'</div></div>'+
         '</div>';
       }).join('');
 
       _showCfgModal(
-        '<h3 style="font-size:15px;font-weight:600;margin-bottom:4px">Affecter le signalement</h3>'+
+        '<h3 style="font-size:15px;font-weight:600;margin-bottom:4px">Affecter · Prendre en charge</h3>'+
         '<div style="font-size:12px;color:var(--text2);margin-bottom:14px">'+escape_html(typeLabel)+(eqNom?' · '+escape_html(eqNom):'')+'</div>'+
 
-        // Contexte + photo
         '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Signalement</div>'+
         '<div style="display:flex;gap:10px;align-items:flex-start;background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:14px">'+
           '<div style="font-size:12px;color:var(--text2);line-height:1.5;flex:1">'+escape_html(r.description||'')+'</div>'+
           (r.photo_url?'<a href="'+r.photo_url+'" target="_blank"><img src="'+r.photo_url+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--border);flex-shrink:0" onerror="this.style.display=\'none\'"></a>':'')+
         '</div>'+
 
-        // Techniciens
-        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Technicien</div>'+
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Affecter à</div>'+
         contactsHtml+
 
-        // Instructions
-        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin:12px 0 6px">Instructions</div>'+
-        '<textarea id="sg-aff-instr" oninput="_sgAffecterUpdatePreview(\''+id+'\')" rows="3" placeholder="Ex : Vérifier le circuit avant d\'intervenir. Tester 2h après réparation." style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;resize:none;font-family:inherit;outline:none"></textarea>'+
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin:12px 0 6px">Instructions (optionnel)</div>'+
+        '<textarea id="sg-aff-instr" oninput="_sgAffecterUpdatePreview(\''+id+'\')" rows="2" placeholder="Ex : Vérifier le circuit avant d\'intervenir." style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;resize:none;font-family:inherit;outline:none"></textarea>'+
 
-        // Aperçu WA
         '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-top:10px">'+
           '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Aperçu message WhatsApp</div>'+
           '<div id="sg-aff-preview" style="font-size:12px;color:var(--text2);line-height:1.7;white-space:pre-wrap">'+escape_html(_sgAffecterMsg(r,'',rapportUrl))+'</div>'+
@@ -2200,13 +2193,20 @@ function _sgAffecter(id){
 
         '<div style="display:flex;gap:8px;margin-top:14px">'+
           '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;font-weight:600;background:white;cursor:pointer;color:var(--dark)">Annuler</button>'+
-          '<button id="sg-aff-btn" onclick="_sgAffecterConfirm(\''+id+'\')" disabled style="flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:#25D366;color:white;cursor:pointer;opacity:0.4">📱 Envoyer via WA</button>'+
+          '<button id="sg-aff-btn" onclick="_sgAffecterConfirm(\''+id+'\')" disabled style="flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:#25D366;color:white;cursor:pointer;opacity:0.4">📱 Envoyer via WhatsApp</button>'+
         '</div>'
       );
-    };
-    if(techniciens&&techniciens.length)doRender(techniciens);
-    else supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,whatsapp,role&order=nom.asc').then(doRender);
-  });
+    });
+  };
+  if(r){_doAffecter(r);}
+  else{
+    supaGet('signalements','id=eq.'+id+'&select=id,groupe_id,type,description,statut,photo_url,equipement_id,equipements(nom)').then(function(rows){
+      if(!rows||!rows.length)return;
+      if(!window._sgRows)window._sgRows={};
+      window._sgRows[id]=rows[0];
+      _doAffecter(rows[0]);
+    });
+  }
 }
 
 async function _sgAffecterConfirm(id){
@@ -2215,7 +2215,7 @@ async function _sgAffecterConfirm(id){
   var instr=((document.getElementById('sg-aff-instr')||{}).value||'').trim();
   var rapportUrl=location.origin+location.pathname.replace('dashboard.html','rapport.html')+'?sg='+id;
   var msg=_sgAffecterMsg(r,instr,rapportUrl);
-  await supaPatch('signalements',id,{assigne_a:_sgAffecterChosen.nom,statut:'en_cours'});
+  await supaPatch('signalements',id,{assigne_a:_sgAffecterChosen.nom,statut:'en_cours',pris_en_charge_par:_sgAffecterChosen.nom,pris_en_charge_at:new Date().toISOString()});
   _closeCfgModal();
   if(_sgAffecterChosen.wa){
     var waNum=_sgAffecterChosen.wa.replace(/\D/g,'');
@@ -4182,8 +4182,7 @@ function _buildAlerteCardsDT(alertes,pannes,fromNav,siteMap){
         (enCours?'<span style="font-size:10px;font-weight:600;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);border-radius:12px;padding:3px 9px;white-space:nowrap;flex-shrink:0">⚡ '+escape_html(preneur||'En cours')+'</span>':'')+
       '</div>'+
       '<div style="display:flex;gap:6px;margin-top:10px">'+
-        (!enCours?'<button onclick="_openPEC(\''+p.id+'\',\''+escape_html(ref)+'\',\''+p.groupe_id+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--rouge-border);background:none;font-size:11px;color:var(--rouge);font-weight:600;cursor:pointer">👤 Prendre en charge</button>':
-                  '<button onclick="_goToSignalement(\''+p.id+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--rouge-border);background:none;font-size:11px;color:var(--rouge);cursor:pointer">Voir détail</button>')+
+        '<button onclick="_sgAffecter(\''+p.id+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--rouge-border);background:none;font-size:11px;color:var(--rouge);font-weight:600;cursor:pointer">'+(!enCours?'👷 Affecter':'↩ Réaffecter')+'</button>'+
         '<button onclick="event.stopPropagation();_marquerTraiteDT(\'signalements\',\''+p.id+'\',\''+fromNav+'\')" style="flex:1;padding:6px;border-radius:6px;border:none;background:var(--rouge);color:white;font-size:11px;font-weight:600;cursor:pointer">✓ Résolu</button>'+
       '</div>'+
     '</div>';
