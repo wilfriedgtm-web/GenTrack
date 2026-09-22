@@ -2930,6 +2930,33 @@ async function _rtMaintenances(sid){
       '</div>'+
     '</div>';
   }
+
+  var cardsHtml='';
+  if(!filtered.length){
+    cardsHtml='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px;opacity:.4">🔧</div><div style="font-size:14px">Aucune opération.</div></div>';
+  } else {
+    var aVenir=filtered.filter(function(r){return r.statut==='planifie';});
+    var realises=filtered.filter(function(r){return r.statut!=='planifie';});
+    var aVenirHtml=aVenir.length?
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">À venir</div>'+
+      aVenir.map(renderMntCard).join('')+
+      (realises.length?'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin:14px 0 8px">Réalisées</div>':''):'';
+    cardsHtml=aVenirHtml+realises.map(renderMntCard).join('');
+  }
+
+  return '<div>'+kpiHtml+filterHtml+cardsHtml+
+    '<div style="text-align:center;margin-top:12px">'+
+      '<button onclick="_mntCreer(\''+sid+'\')" style="padding:9px 18px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:700;color:var(--dark);cursor:pointer">＋ Nouvelle opération</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function _setMntFilter(f){
+  _mntFilter=f;
+  if(!_session)return;
+  if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
+  else renderRespTech(_session,'maintenances');
+}
 function _mntEditer(id,source,currentCout,currentNotes){
   _showCfgModal(
     '<div style="font-size:15px;font-weight:700;margin-bottom:16px">✏️ Modifier l\'entrée</div>'+
@@ -2960,33 +2987,6 @@ async function _mntEditerSauver(id,source){
     if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
     else renderRespTech(_session,'maintenances');
   }
-}
-
-  var cardsHtml='';
-  if(!filtered.length){
-    cardsHtml='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px;opacity:.4">🔧</div><div style="font-size:14px">Aucune opération.</div></div>';
-  } else {
-    var aVenir=filtered.filter(function(r){return r.statut==='planifie';});
-    var realises=filtered.filter(function(r){return r.statut!=='planifie';});
-    var aVenirHtml=aVenir.length?
-      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">À venir</div>'+
-      aVenir.map(renderMntCard).join('')+
-      (realises.length?'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin:14px 0 8px">Réalisées</div>':''):'';
-    cardsHtml=aVenirHtml+realises.map(renderMntCard).join('');
-  }
-
-  return '<div>'+kpiHtml+filterHtml+cardsHtml+
-    '<div style="text-align:center;margin-top:12px">'+
-      '<button onclick="_mntCreer(\''+sid+'\')" style="padding:9px 18px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:700;color:var(--dark);cursor:pointer">＋ Nouvelle opération</button>'+
-    '</div>'+
-  '</div>';
-}
-
-function _setMntFilter(f){
-  _mntFilter=f;
-  if(!_session)return;
-  if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
-  else renderRespTech(_session,'maintenances');
 }
 
 function _mntMarquerRealise(id){
