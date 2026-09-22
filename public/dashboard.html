@@ -359,9 +359,13 @@ async function supaPost(table,data){
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
       body:JSON.stringify(data)
     });
-    var rows=await r.json();
-    return Array.isArray(rows)?rows[0]:rows;
-  }catch(e){return null;}
+    var payload=await r.json();
+    if(!r.ok){
+      console.error('[supaPost] '+table+' HTTP '+r.status, payload);
+      return null;
+    }
+    return Array.isArray(payload)?payload[0]:payload;
+  }catch(e){console.error('[supaPost] network error',e);return null;}
 }
 async function supaDelete(table,filter){
   try{
