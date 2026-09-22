@@ -497,6 +497,7 @@ function buildNavItems(role){
     items.push({id:'config',icon:'settings',label:'Config'});
   }
   if(role==='dir_tech'){
+    items.push({id:'comparaison',icon:'compare_arrows',label:'Comparaison'});
     items.push({id:'signalements',icon:'location_on',label:'Signalements'});
     items.push({id:'maintenances',icon:'build',label:'Maintenance'});
     items.push({id:'rapport',icon:'summarize',label:'Rapport conso'});
@@ -535,7 +536,7 @@ function buildMobileNav(role,activeNav,alerteBadge){
       {id:'signalements',icon:'location_on',label:'Signalements'},
       {id:'__plus__',icon:'apps',label:'Plus'}
     ];
-    plusIds=['historique','maintenances','rapport'];
+    plusIds=['comparaison','historique','maintenances','rapport'];
   } else {
     // resp_tech : signalements en accès direct, relevés dans Plus
     fixed=[
@@ -4413,6 +4414,7 @@ async function _loadDT(session,nav){
     var html='';
     if(nav==='accueil')html=await _dtAccueil(session,sids,cid);
     else if(nav==='alertes')html=await _dtAlertes(sids,cid);
+    else if(nav==='comparaison')html=await _dtComparaison(sids,session);
     else if(nav==='historique')html=await _dtHistorique(sids);
     else if(nav==='signalements')html=await _dtSignalements(sids);
     else if(nav==='maintenances')html=await _dtMaintenances(sids);
@@ -4627,6 +4629,218 @@ async function _dtAccueil(session,sids,cid){
   _updateAlertPill(totalAlertes);
   var recos=await _buildRecommandations(sids,siteMap);
   return banner+kpis+(recos?recos:'')+bloc1+bloc2+bloc3+bloc4;
+}
+
+/* ── COMPARAISON MULTI-SITES ── */
+async function _dtComparaison(sids,session){
+  if(!sids.length)return '<div class="placeholder-card"><div class="placeholder-icon">🏨</div>Aucun site configuré pour ce compte</div>';
+  var dc=document.getElementById('dash-content-main');
+  if(dc){dc.style.padding='24px';dc.style.maxWidth='1100px';}
+  var sidStr=sids.join(',');
+  var today=todayStr();
+  var since30=dateNJours(30);
+  var CUVE_TYPE='de5519d0-363b-4628-b872-2dcf01859002';
+
+  // Fetch parallèle de tout ce dont on a besoin
+  var[sites,equips,rondes,pannesActives,alertes,mnt30]=await Promise.all([
+    supaGet('sites','id=in.('+sidStr+')&select=id,nom&order=nom.asc'),
+    supaGet('equipements','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id,type_id'),
+    supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=eq.'+today+'&select=id,site_id,frequence'),
+    supaGet('signalements','groupe_id=in.('+sidStr+')&type=eq.panne&statut=neq.resolu&select=id,groupe_id&order=created_at.desc'),
+    supaGet('alertes','client_id=eq.'+session.client_id+'&resolue=eq.false&select=id,type,severite&order=created_at.desc'),
+    supaGet('maintenances','groupe_id=in.('+sidStr+')&created_at=gte.'+since30+'T00:00:00&select=id,groupe_id,statut&limit=200')
+  ]);
+
+  // Rondes équipements pour la conformité
+  var rIds=rondes.map(function(r){return r.id;});
+  var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,equipement_id,statut'):[];
+
+  // Niveaux cuves
+  var cuveEquips=equips.filter(function(e){return e.type_id===CUVE_TYPE;});
+  var cuveNivMap={};
+  if(cuveEquips.length){
+    var cIds=cuveEquips.map(function(e){return e.id;});
+    var cQs=await supaGet('questions','equipement_id=in.('+cIds.join(',')+')'+'&actif=eq.true&select=id,equipement_id,texte&order=ordre.asc');
+    var nQs=cQs.filter(function(q){return q.texte.toLowerCase().indexOf('niveau')>=0||q.texte.toLowerCase().indexOf('cuve')>=0;});
+    if(nQs.length){
+      var nQids=nQs.map(function(q){return q.id;});
+      var cReps=await supaGet('reponses','question_id=in.('+nQids.join(',')+')'+'&select=question_id,valeur,created_at&order=created_at.desc&limit=200');
+      var lastByQ={};
+      cReps.forEach(function(r){if(!lastByQ[r.question_id]||r.created_at>lastByQ[r.question_id].created_at)lastByQ[r.question_id]=r;});
+      nQs.forEach(function(q){
+        var eq=cuveEquips.find(function(e){return e.id===q.equipement_id;});
+        if(!eq)return;
+        var val=lastByQ[q.id]?parseFloat(lastByQ[q.id].valeur):null;
+        if(val!=null)cuveNivMap[eq.site_id]={niv:val,at:lastByQ[q.id].created_at};
+      });
+    }
+  }
+
+  // Regroupements par site
+  var eqBySite={};equips.forEach(function(e){eqBySite[e.site_id]=(eqBySite[e.site_id]||[]).concat(e);});
+  var pannesBySite={};pannesActives.forEach(function(p){pannesBySite[p.groupe_id]=(pannesBySite[p.groupe_id]||0)+1;});
+  var mntBySite={};mnt30.forEach(function(m){mntBySite[m.groupe_id]=(mntBySite[m.groupe_id]||0)+1;});
+  var rondesBySite={};rondes.forEach(function(r){(rondesBySite[r.site_id]=rondesBySite[r.site_id]||[]).push(r);});
+  var reByRonde={};rondesEq.forEach(function(re){(reByRonde[re.ronde_id]=reByRonde[re.ronde_id]||[]).push(re);});
+
+  // Scorecard par site
+  var rows=sites.map(function(site){
+    var sid=site.id;
+    var eqs=eqBySite[sid]||[];
+    var eqCount=eqs.length;
+    var pannes=pannesBySite[sid]||0;
+    var maintenance=mntBySite[sid]||0;
+
+    // Disponibilité équipements : % d'équipements sans panne active
+    var eqIds=eqs.map(function(e){return e.id;});
+    var pannesThisSite=pannesActives.filter(function(p){return p.groupe_id===sid;});
+    var dispoEq=eqCount>0?Math.round((eqCount-pannesThisSite.length)/eqCount*100):null;
+
+    // Conformité rondes du jour
+    var sRondes=rondesBySite[sid]||[];
+    var rondeJ=sRondes.find(function(r){return r.frequence==='journalier';});
+    var eqRJ=rondeJ?(reByRonde[rondeJ.id]||[]):[];
+    var valJ=eqRJ.filter(function(re){return re.statut==='valide';}).length;
+    var totJ=eqRJ.length;
+    var confJ=totJ>0?Math.round(valJ/totJ*100):null;
+    var rondeHebdo=sRondes.find(function(r){return r.frequence==='hebdo';});
+    var eqRH=rondeHebdo?(reByRonde[rondeHebdo.id]||[]):[];
+    var valH=eqRH.filter(function(re){return re.statut==='valide';}).length;
+    var totH=eqRH.length;
+    var confH=totH>0?Math.round(valH/totH*100):null;
+
+    // Cuve
+    var cuveInfo=cuveNivMap[sid]||null;
+
+    // Score synthétique pour le tri (0-100)
+    var score=100;
+    if(pannes>0)score-=pannes*15;
+    if(confJ!==null&&confJ<100)score-=(100-confJ)*0.3;
+    if(cuveInfo&&cuveInfo.niv<1500)score-=20;
+    score=Math.max(0,score);
+
+    return {site:site,eqCount:eqCount,pannes:pannes,dispoEq:dispoEq,confJ:confJ,confH:confH,valJ:valJ,totJ:totJ,valH:valH,totH:totH,cuveInfo:cuveInfo,maintenance:maintenance,score:score};
+  });
+
+  // Trier par score croissant (les plus critiques en haut)
+  rows.sort(function(a,b){return a.score-b.score;});
+
+  // Résumé global
+  var totalPannes=pannesActives.length;
+  var totalAlertes=alertes.length;
+  var avgConf=null;
+  var confRows=rows.filter(function(r){return r.confJ!==null;});
+  if(confRows.length)avgConf=Math.round(confRows.reduce(function(s,r){return s+r.confJ;},0)/confRows.length);
+  var sitesOk=rows.filter(function(r){return r.pannes===0&&(r.confJ===null||r.confJ===100);}).length;
+
+  // Statut global
+  var globalStatus=totalPannes===0&&(avgConf===null||avgConf===100)?'ok':'warn';
+  if(totalPannes>0)globalStatus='crit';
+
+  var h='';
+
+  // Banner global
+  var bannerBg=globalStatus==='ok'?'var(--vert-pale)':globalStatus==='crit'?'var(--rouge-pale)':'var(--amber-pale)';
+  var bannerIcon=globalStatus==='ok'?'✅':globalStatus==='crit'?'🔴':'⚠️';
+  var bannerText=globalStatus==='ok'?'Tous les sites opérationnels':totalPannes+' panne'+(totalPannes>1?'s':'')+' active'+(totalPannes>1?'s':'')+' sur le groupe';
+  h+='<div style="background:'+bannerBg+';border-radius:12px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px">'+
+    '<span style="font-size:22px">'+bannerIcon+'</span>'+
+    '<div>'+
+      '<div style="font-size:13px;font-weight:700;color:var(--dark)">'+bannerText+'</div>'+
+      '<div style="font-size:11px;color:var(--text2);margin-top:2px">'+sitesOk+'/'+sites.length+' sites sans anomalie'+(avgConf!==null?' · Conformité moy. rondes : '+avgConf+'%':'')+'</div>'+
+    '</div>'+
+  '</div>';
+
+  // KPIs
+  h+='<div class="kpi-grid" style="margin-bottom:20px">'+
+    '<div class="kpi"><div class="kpi-label">Sites suivis</div><div class="kpi-value">'+sites.length+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+(totalPannes>0?'var(--rouge)':'var(--vert)')+'">'+totalPannes+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+(avgConf===null?'var(--text3)':avgConf===100?'var(--vert)':avgConf>=80?'var(--amber)':'var(--rouge)')+'">'+( avgConf!==null?avgConf+'%':'—')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Maintenances 30j</div><div class="kpi-value">'+mnt30.length+'</div></div>'+
+  '</div>';
+
+  h+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:10px">Tableau de bord par site · '+new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})+'</div>';
+
+  // Tableau
+  h+='<div style="overflow-x:auto">';
+  h+='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  h+='<thead><tr style="text-align:left;border-bottom:2px solid var(--border)">';
+  ['Site','Équipements','Rondes auj.','Hebdo','Pannes actives','Dispo équip.','Cuve carburant','Maint. 30j','Statut'].forEach(function(col){
+    h+='<th style="padding:8px 12px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap">'+col+'</th>';
+  });
+  h+='</tr></thead><tbody>';
+
+  rows.forEach(function(r){
+    var site=r.site;
+
+    // Badge statut global
+    var statusColor=r.score>=80?'var(--vert)':r.score>=50?'var(--amber)':'var(--rouge)';
+    var statusBg=r.score>=80?'var(--vert-pale)':r.score>=50?'var(--amber-pale)':'var(--rouge-pale)';
+    var statusLabel=r.score>=80?'✅ OK':r.score>=50?'⚠️ Attention':'🔴 Critique';
+
+    // Conformité journalière
+    var confJCell='—';
+    if(r.confJ!==null){
+      var cJCol=r.confJ===100?'var(--vert)':r.confJ>=70?'var(--amber)':'var(--rouge)';
+      var cJBg=r.confJ===100?'var(--vert-pale)':r.confJ>=70?'var(--amber-pale)':'var(--rouge-pale)';
+      confJCell='<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:8px;background:'+cJBg+';color:'+cJCol+';font-weight:700">'+r.confJ+'% <span style="font-weight:400;font-size:10px">('+r.valJ+'/'+r.totJ+')</span></span>';
+    } else if(r.totJ===0&&rondesBySite[site.id]&&rondesBySite[site.id].length===0){
+      confJCell='<span style="color:var(--text3);font-size:11px">Pas de ronde</span>';
+    }
+
+    // Conformité hebdo
+    var confHCell='—';
+    if(r.confH!==null){
+      var cHCol=r.confH===100?'var(--vert)':r.confH>=70?'var(--amber)':'var(--rouge)';
+      var cHBg=r.confH===100?'var(--vert-pale)':r.confH>=70?'var(--amber-pale)':'var(--rouge-pale)';
+      confHCell='<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:8px;background:'+cHBg+';color:'+cHCol+';font-weight:700">'+r.confH+'%</span>';
+    }
+
+    // Pannes
+    var pannesCell=r.pannes===0
+      ?'<span style="color:var(--vert);font-weight:700">0</span>'
+      :'<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:8px;background:var(--rouge-pale);color:var(--rouge);font-weight:700">'+r.pannes+' panne'+(r.pannes>1?'s':'')+'</span>';
+
+    // Dispo équipements
+    var dispoCell='—';
+    if(r.dispoEq!==null){
+      var dCol=r.dispoEq===100?'var(--vert)':r.dispoEq>=70?'var(--amber)':'var(--rouge)';
+      dispoCell='<span style="font-weight:700;color:'+dCol+'">'+r.dispoEq+'%</span>';
+    }
+
+    // Cuve
+    var cuveCell='—';
+    if(r.cuveInfo){
+      // On a besoin de la capacité pour le % — fetch pas dispo ici, on affiche en litres
+      var cL=Math.round(r.cuveInfo.niv);
+      var cAge=r.cuveInfo.at?Math.round((new Date()-new Date(r.cuveInfo.at))/(3600000))+'h':'';
+      var cCol=cL<1500?'var(--rouge)':cL<3000?'var(--amber)':'var(--vert)';
+      cuveCell='<span style="font-weight:700;color:'+cCol+'">'+cL.toLocaleString('fr-FR')+' L</span>'+(cAge?'<br><span style="font-size:10px;color:var(--text3)">il y a '+cAge+'</span>':'');
+    }
+
+    h+='<tr style="border-bottom:1px solid var(--border);cursor:pointer" onmouseover="this.style.background=\'var(--creme)\'" onmouseout="this.style.background=\'\'" onclick="renderDirTechSite(_session,\''+site.id+'\',\''+escape_html(site.nom).replace(/'/g,"\\'")+'\',' +"'accueil')\">";
+    h+='<td style="padding:10px 12px;font-weight:700;color:var(--dark)">'+escape_html(site.nom)+'</td>';
+    h+='<td style="padding:10px 12px;color:var(--text2)">'+r.eqCount+'</td>';
+    h+='<td style="padding:10px 12px">'+confJCell+'</td>';
+    h+='<td style="padding:10px 12px">'+confHCell+'</td>';
+    h+='<td style="padding:10px 12px">'+pannesCell+'</td>';
+    h+='<td style="padding:10px 12px">'+dispoCell+'</td>';
+    h+='<td style="padding:10px 12px">'+cuveCell+'</td>';
+    h+='<td style="padding:10px 12px;color:var(--text2)">'+r.maintenance+'</td>';
+    h+='<td style="padding:10px 12px"><span style="padding:3px 10px;border-radius:8px;font-size:10px;font-weight:700;color:'+statusColor+';background:'+statusBg+'">'+statusLabel+'</span></td>';
+    h+='</tr>';
+  });
+
+  h+='</tbody></table></div>';
+
+  // Légende
+  h+='<div style="margin-top:16px;display:flex;gap:16px;flex-wrap:wrap">';
+  [{c:'var(--vert)',l:'OK — Aucune panne, rondes conformes'},{c:'var(--amber)',l:'Attention — Rondes incomplètes ou alerte mineure'},{c:'var(--rouge)',l:'Critique — Panne active ou cuve basse'}].forEach(function(leg){
+    h+='<div style="display:flex;align-items:center;gap:6px"><div style="width:10px;height:10px;border-radius:50%;background:'+leg.c+'"></div><span style="font-size:11px;color:var(--text2)">'+leg.l+'</span></div>';
+  });
+  h+='</div>';
+
+  return h;
 }
 
 async function _dtAlertes(sids,cid){
