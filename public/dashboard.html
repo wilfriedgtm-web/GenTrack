@@ -2128,73 +2128,45 @@ function _sgAffecterUpdatePreview(id){
   if(el)el.textContent=_sgAffecterMsg(r,instr.trim(),rapportUrl);
 }
 
-function _sgAffecterSelect(id,nom,wa,el){
-  _sgAffecterChosen={nom:nom,wa:wa};
-  document.querySelectorAll('[data-cid]').forEach(function(d){
-    d.style.borderColor='var(--border)';d.style.background='white';
-    var av=d.querySelector('.sg-aff-av');
-    if(av){av.style.background='var(--bleu-pale)';av.style.color='var(--bleu)';}
-  });
-  el.style.borderColor='#378ADD';el.style.background='#E6F1FB';
-  var av=el.querySelector('.sg-aff-av');
-  if(av){av.style.background='#378ADD';av.style.color='white';}
-  var btn=document.getElementById('sg-aff-btn');
-  if(btn){btn.disabled=false;btn.style.opacity='1';}
-}
 
 function _sgAffecter(id){
   var r=window._sgRows&&window._sgRows[id];
   var _doAffecter=function(r){
     var sid=r.groupe_id||(_session&&_session.site_ids&&_session.site_ids[0]);
     if(!sid)return;
-    _sgAffecterChosen={nom:'',wa:''};
     var ROLE_LABELS={technicien:'Technicien',resp_tech:'Resp. technique',dir_tech:'Dir. technique'};
+    var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
+    var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
 
     supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&role=in.(technicien,resp_tech)&select=id,nom,whatsapp,role&order=role.asc,nom.asc').then(function(contacts){
       if(!contacts||!contacts.length){
         _showCfgModal('<p style="font-size:13px;color:var(--text2);padding:8px">Aucun contact configuré pour ce site.</p><div style="margin-top:12px"><button onclick="_closeCfgModal()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">Fermer</button></div>');
         return;
       }
-      var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
-      var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
-      var rapportUrl=location.origin+location.pathname.replace('dashboard.html','rapport.html')+'?sg='+id;
 
       var contactsHtml=contacts.map(function(c){
         var ini=c.nom.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
         var roleLabel=ROLE_LABELS[c.role]||c.role||'';
-        return '<div onclick="_sgAffecterSelect(\''+id+'\',\''+escape_html(c.nom)+'\',\''+escape_html(c.whatsapp||'')+'\',this)" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px" data-cid="'+c.id+'">'+
-          '<div class="sg-aff-av" style="width:32px;height:32px;border-radius:50%;background:var(--bleu-pale);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--bleu);flex-shrink:0">'+escape_html(ini)+'</div>'+
-          '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(c.nom)+'</div>'+
-          '<div style="font-size:11px;color:var(--text3)">'+escape_html(roleLabel)+(c.whatsapp?' · 📱':'')+'</div></div>'+
-        '</div>';
+        var nomJs=c.nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        var waJs=(c.whatsapp||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        var hasWa=!!(c.whatsapp&&c.whatsapp.trim());
+        return '<button onclick="_sgAffecterDirect(\''+id+'\',\''+nomJs+'\',\''+waJs+'\')" style="width:100%;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;background:white;text-align:left">'+
+          '<div style="width:36px;height:36px;border-radius:50%;background:var(--bleu-pale);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--bleu);flex-shrink:0">'+escape_html(ini)+'</div>'+
+          '<div style="flex:1">'+
+            '<div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(c.nom)+'</div>'+
+            '<div style="font-size:11px;color:var(--text3)">'+escape_html(roleLabel)+'</div>'+
+          '</div>'+
+          (hasWa?'<span style="font-size:11px;font-weight:600;color:#25D366;background:#e8f5e9;border-radius:6px;padding:3px 8px">📱 WA</span>':'<span style="font-size:10px;color:var(--text3)">pas de WA</span>')+
+        '</button>';
       }).join('');
 
       _showCfgModal(
-        '<h3 style="font-size:15px;font-weight:600;margin-bottom:4px">Affecter · Prendre en charge</h3>'+
-        '<div style="font-size:12px;color:var(--text2);margin-bottom:14px">'+escape_html(typeLabel)+(eqNom?' · '+escape_html(eqNom):'')+'</div>'+
-
-        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Signalement</div>'+
-        '<div style="display:flex;gap:10px;align-items:flex-start;background:var(--bg);border-radius:10px;padding:10px 12px;margin-bottom:14px">'+
-          '<div style="font-size:12px;color:var(--text2);line-height:1.5;flex:1">'+escape_html(r.description||'')+'</div>'+
-          (r.photo_url?'<a href="'+r.photo_url+'" target="_blank"><img src="'+r.photo_url+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--border);flex-shrink:0" onerror="this.style.display=\'none\'"></a>':'')+
-        '</div>'+
-
-        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Affecter à</div>'+
+        '<div style="font-size:15px;font-weight:700;color:var(--dark);margin-bottom:4px">👷 Affecter</div>'+
+        '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">'+escape_html(typeLabel)+(eqNom?' · '+escape_html(eqNom):'')+'</div>'+
+        '<div style="font-size:11px;background:var(--bg);border-radius:8px;padding:8px 12px;color:var(--text2);margin-bottom:14px;line-height:1.5">'+escape_html((r.description||'').substring(0,120))+((r.description||'').length>120?'…':'')+'</div>'+
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">Sélectionner · WhatsApp envoyé automatiquement</div>'+
         contactsHtml+
-
-        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin:12px 0 6px">Instructions (optionnel)</div>'+
-        '<textarea id="sg-aff-instr" oninput="_sgAffecterUpdatePreview(\''+id+'\')" rows="2" placeholder="Ex : Vérifier le circuit avant d\'intervenir." style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;resize:none;font-family:inherit;outline:none"></textarea>'+
-
-        '<div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-top:10px">'+
-          '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Aperçu message WhatsApp</div>'+
-          '<div id="sg-aff-preview" style="font-size:12px;color:var(--text2);line-height:1.7;white-space:pre-wrap">'+escape_html(_sgAffecterMsg(r,'',rapportUrl))+'</div>'+
-          (r.photo_url?'<div style="margin-top:6px;background:var(--bleu-pale);border-radius:6px;padding:5px 8px;font-size:11px;color:var(--bleu)">📸 Photo incluse dans le message</div>':'')+
-        '</div>'+
-
-        '<div style="display:flex;gap:8px;margin-top:14px">'+
-          '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;font-weight:600;background:white;cursor:pointer;color:var(--dark)">Annuler</button>'+
-          '<button id="sg-aff-btn" onclick="_sgAffecterConfirm(\''+id+'\')" disabled style="flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:#25D366;color:white;cursor:pointer;opacity:0.4">📱 Envoyer via WhatsApp</button>'+
-        '</div>'
+        '<button onclick="_closeCfgModal()" style="width:100%;margin-top:6px;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:white;cursor:pointer;color:var(--text2)">Annuler</button>'
       );
     });
   };
@@ -2209,23 +2181,24 @@ function _sgAffecter(id){
   }
 }
 
-async function _sgAffecterConfirm(id){
-  var r=window._sgRows&&window._sgRows[id];
-  if(!r||!_sgAffecterChosen.nom)return;
-  var instr=((document.getElementById('sg-aff-instr')||{}).value||'').trim();
-  var rapportUrl=location.origin+location.pathname.replace('dashboard.html','rapport.html')+'?sg='+id;
-  var msg=_sgAffecterMsg(r,instr,rapportUrl);
-  await supaPatch('signalements',id,{assigne_a:_sgAffecterChosen.nom,statut:'en_cours',pris_en_charge_par:_sgAffecterChosen.nom,pris_en_charge_at:new Date().toISOString()});
+async function _sgAffecterDirect(sgId,techNom,techWa){
+  var r=window._sgRows&&window._sgRows[sgId];
+  var rapportUrl=location.origin+location.pathname.replace('dashboard.html','rapport.html')+'?sg='+sgId;
+  var msg=r?_sgAffecterMsg(r,'',rapportUrl):'🔧 Mission assignée — GenTrack\n\nRépondez OK '+sgId+' pour confirmer.';
+  await supaPatch('signalements',sgId,{assigne_a:techNom,statut:'en_cours',pris_en_charge_par:techNom,pris_en_charge_at:new Date().toISOString()});
   _closeCfgModal();
-  if(_sgAffecterChosen.wa){
-    var waNum=_sgAffecterChosen.wa.replace(/\D/g,'');
+  if(techWa){
+    var waNum=techWa.replace(/\D/g,'');
     window.open('https://wa.me/'+waNum+'?text='+encodeURIComponent(msg),'_blank');
   }
   if(_session){
-    if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'signalements');
-    else renderRespTech(_session,'signalements');
+    var nav=_pecFromNav||_currentNav||'alertes';
+    if(_doCurrentSite)renderDirOpsSite(_session,_doCurrentSite.id,_doCurrentSite.nom,nav);
+    else if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,nav);
+    else renderRespTech(_session,nav);
   }
 }
+
 
 /* ══════════════════════════════════════
    MAINTENANCE
