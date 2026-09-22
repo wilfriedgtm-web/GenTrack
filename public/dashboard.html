@@ -2256,6 +2256,13 @@ var _MNT_TYPES={
 var _DEMANDE_TYPES={carburant:{label:'Carburant',icon:'⛽',unite:'litres'},piece:{label:'Pièce détachée',icon:'🔩',unite:'unités'},materiel:{label:'Matériel',icon:'📦',unite:'unités'},autre:{label:'Autre',icon:'📝',unite:''}};
 var _DEMANDE_URGENCES=['normal','urgent','critique'];
 var _DEMANDE_URGENCE_LABELS={normal:'Normal',urgent:'Urgent 🔶',critique:'Critique 🔴'};
+var _demandeTypeActuel='autre';
+var _demandeUrgenceActuelle='normal';
+var _dmPannes=[];
+var _dmCurrentSid=null;
+var _dmCurrentEqId=null;
+var _dmCurrentEqNom=null;
+var _dmCuveInfo=null;
 
 async function _rtCommandes(sid,session){
   var dc=document.getElementById('dash-content-main');
@@ -2347,121 +2354,297 @@ async function _rtCommandes(sid,session){
   return h;
 }
 
-function _buildDemandeModal(sid,eqId,eqNom,cuveInfo){
-  var eqIdJs=(eqId||'').replace(/'/g,"\\'");
-  var eqNomJs=(eqNom||'').replace(/'/g,"\\'");
-  var typeDefaut=cuveInfo?'carburant':'autre';
-  var qteDefaut=cuveInfo?cuveInfo.manque:'';
-  var uniteDefaut=cuveInfo?'litres':'';
+/* ── helpers sélecteurs type/urgence ── */
+function _demandeSelectType(t){
+  _demandeTypeActuel=t;
+  Object.keys(_DEMANDE_TYPES).forEach(function(k){
+    var btn=document.getElementById('dm-type-'+k);if(!btn)return;
+    var sel=k===t;
+    btn.style.borderColor=sel?'var(--amber)':'var(--border)';
+    btn.style.background=sel?'var(--amber-pale)':'white';
+    btn.style.color=sel?'var(--amber-dark)':'var(--text2)';
+    if(sel&&_DEMANDE_TYPES[k].unite){var u=document.getElementById('dm-unite');if(u&&!u.value)u.value=_DEMANDE_TYPES[k].unite;}
+  });
+}
+function _demandeSelectUrgence(u){
+  _demandeUrgenceActuelle=u;
+  var COLS={normal:'var(--vert)',urgent:'var(--amber)',critique:'var(--rouge)'};
+  var BGES={normal:'var(--vert-pale)',urgent:'var(--amber-pale)',critique:'var(--rouge-pale)'};
+  _DEMANDE_URGENCES.forEach(function(k){
+    var btn=document.getElementById('dm-urg-'+k);if(!btn)return;
+    var sel=k===u;
+    btn.style.borderColor=sel?COLS[k]:'var(--border)';
+    btn.style.background=sel?BGES[k]:'white';
+    btn.style.color=sel?COLS[k]:'var(--text2)';
+  });
+}
+
+/* ── ouvrir modal demande ── */
+function _ouvrirNouvelleDemandeLibre(sid){
+  _demandeTypeActuel='autre';_demandeUrgenceActuelle='normal';
+  _dmCurrentSid=sid;_dmCurrentEqId='';_dmCurrentEqNom='';_dmCuveInfo=null;_dmPannes=[];
+  _showCfgModal(_buildDemandeModalContent());
+}
+
+function _ouvrirNouvelleDemandeEq(sid,eqId,eqNom){
+  _demandeTypeActuel='autre';_demandeUrgenceActuelle='normal';
+  _dmCurrentSid=sid;_dmCurrentEqId=eqId;_dmCurrentEqNom=eqNom;
+  _dmCuveInfo=(window._commandes_cuveMap&&window._commandes_cuveMap[eqId])||null;
+  if(_dmCuveInfo)_demandeTypeActuel='carburant';
+  _dmPannes=[];
+  _showCfgModal(_buildDemandeModalContent());
+  // Fetch pannes async and update rapport tab
+  supaGet('signalements','equipement_id=eq.'+eqId+'&order=created_at.desc&limit=5&select=id,ref_code,description,statut,created_at,resolved_at').then(function(rows){
+    _dmPannes=rows||[];
+    var rapportEl=document.getElementById('dm-rapport-body');
+    if(rapportEl)rapportEl.innerHTML=_buildRapportBody();
+  });
+}
+
+/* ── contenu onglet rapport ── */
+function _buildRapportBody(){
+  var cv=_dmCuveInfo;
+  var pannes=_dmPannes;
+  var now=new Date();
+  var j30=new Date(now-30*86400000);
+  var recent=pannes.filter(function(p){return new Date(p.created_at)>=j30;});
+  var h='';
+  if(cv){
+    var pct=Math.round(cv.niv/cv.cap*100);
+    var col=pct<30?'var(--rouge)':pct<60?'var(--amber)':'var(--vert)';
+    h+='<div style="background:var(--creme);border-radius:10px;padding:12px;margin-bottom:12px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'+
+        '<span style="font-size:11px;font-weight:700;color:var(--text2)">🛢️ Niveau cuve</span>'+
+        '<span style="font-size:13px;font-weight:700;color:'+col+'">'+cv.niv.toLocaleString('fr-FR')+' L · '+pct+'%</span>'+
+      '</div>'+
+      '<div style="height:6px;background:var(--border);border-radius:3px"><div style="width:'+pct+'%;height:100%;border-radius:3px;background:'+col+'"></div></div>'+
+      '<div style="font-size:11px;color:var(--text2);margin-top:5px">Capacité '+cv.cap.toLocaleString('fr-FR')+' L · Manque <strong>'+cv.manque.toLocaleString('fr-FR')+' L</strong></div>'+
+    '</div>';
+  }
+  // KPIs pannes
+  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">'+
+    '<div style="background:var(--creme);border-radius:8px;padding:10px;text-align:center"><div style="font-size:16px;font-weight:800;color:'+(recent.length>2?'var(--rouge)':recent.length>0?'var(--amber)':'var(--vert)')+'">'+recent.length+'</div><div style="font-size:10px;color:var(--text3)">pannes 30j</div></div>'+
+    '<div style="background:var(--creme);border-radius:8px;padding:10px;text-align:center"><div style="font-size:16px;font-weight:800;color:var(--text)">'+pannes.filter(function(p){return p.statut==='en_cours';}).length+'</div><div style="font-size:10px;color:var(--text3)">en cours</div></div>'+
+    '<div style="background:var(--creme);border-radius:8px;padding:10px;text-align:center"><div style="font-size:16px;font-weight:800;color:var(--text)">'+pannes.filter(function(p){return p.statut==='resolu';}).length+'</div><div style="font-size:10px;color:var(--text3)">résolues</div></div>'+
+  '</div>';
+  if(!pannes.length){
+    h+='<div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">Aucun signalement enregistré</div>';
+  } else {
+    pannes.forEach(function(p){
+      var d=new Date(p.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+      var col_s=p.statut==='en_cours'?'var(--orange)':p.statut==='resolu'?'var(--vert)':'var(--text3)';
+      h+='<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">'+
+        '<div style="width:7px;height:7px;border-radius:50%;background:'+col_s+';flex-shrink:0;margin-top:4px"></div>'+
+        '<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--text)">'+escape_html((p.description||'').substring(0,70))+'</div>'+
+          '<div style="font-size:10px;color:var(--text3);margin-top:1px">'+d+(p.ref_code?' · '+p.ref_code:'')+'</div></div>'+
+      '</div>';
+    });
+  }
+  return h;
+}
+
+/* ── construction du modal ── */
+function _buildDemandeModalContent(){
+  var eqNom=_dmCurrentEqNom;
+  var hasEq=!!(_dmCurrentEqId);
+  var cv=_dmCuveInfo;
+  var typeDefaut=_demandeTypeActuel;
+  var qteDefaut=cv?cv.manque:'';
+  var uniteDefaut=cv?'litres':'';
 
   var typesHtml=Object.entries(_DEMANDE_TYPES).map(function(kv){
     var k=kv[0],v=kv[1];
-    return '<button onclick="_demandeSelectType(\''+k+'\')" id="dm-type-'+k+'" style="flex:1;padding:8px 4px;border:1.5px solid '+(k===typeDefaut?'var(--amber)':'var(--border)')+';border-radius:8px;background:'+(k===typeDefaut?'var(--amber-pale)':'white')+';cursor:pointer;font-size:11px;font-weight:600;color:'+(k===typeDefaut?'var(--amber-dark)':'var(--text2)')+'">'+v.icon+'<br>'+v.label+'</button>';
+    var sel=k===typeDefaut;
+    return '<button onclick="_demandeSelectType(\''+k+'\')" id="dm-type-'+k+'" style="flex:1;padding:7px 4px;border:1.5px solid '+(sel?'var(--amber)':'var(--border)')+';border-radius:8px;background:'+(sel?'var(--amber-pale)':'white')+';cursor:pointer;font-size:11px;font-weight:600;color:'+(sel?'var(--amber-dark)':'var(--text2)')+'">'+v.icon+'<br>'+v.label+'</button>';
+  }).join('');
+  var urgHtml=_DEMANDE_URGENCES.map(function(u){
+    var COLS={normal:'var(--vert)',urgent:'var(--amber)',critique:'var(--rouge)'};
+    var BGES={normal:'var(--vert-pale)',urgent:'var(--amber-pale)',critique:'var(--rouge-pale)'};
+    var sel=u===_demandeUrgenceActuelle;
+    return '<button onclick="_demandeSelectUrgence(\''+u+'\')" id="dm-urg-'+u+'" style="flex:1;padding:7px;border:1.5px solid '+(sel?COLS[u]:'var(--border)')+';border-radius:8px;background:'+(sel?BGES[u]:'white')+';cursor:pointer;font-size:11px;font-weight:600;color:'+(sel?COLS[u]:'var(--text2)')+'">'+_DEMANDE_URGENCE_LABELS[u]+'</button>';
   }).join('');
 
-  return '<div style="font-size:15px;font-weight:700;color:var(--dark);margin-bottom:4px">📦 Nouvelle demande</div>'+
-    (eqNom?'<div style="font-size:12px;color:var(--text2);margin-bottom:12px">'+escape_html(eqNom)+'</div>':'<div style="margin-bottom:12px"></div>')+
-    (cuveInfo?'<div style="background:var(--orange-pale);border:1px solid var(--orange-border);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--orange);margin-bottom:12px">🛢️ Niveau actuel : <strong>'+cuveInfo.niv.toLocaleString('fr-FR')+' L</strong> sur '+cuveInfo.cap.toLocaleString('fr-FR')+' L · Manque <strong>'+cuveInfo.manque.toLocaleString('fr-FR')+' L</strong></div>':'')+
+  // Header
+  var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+    '<div style="font-size:15px;font-weight:700;color:var(--dark)">📦 Nouvelle demande</div>'+
+    '<button onclick="_closeCfgModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3);line-height:1;padding:2px 6px">✕</button>'+
+  '</div>'+
+  (eqNom?'<div style="font-size:12px;color:var(--text2);margin-bottom:10px">'+escape_html(eqNom)+'</div>':'<div style="margin-bottom:10px"></div>');
 
-    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Type</div>'+
-    '<div style="display:flex;gap:6px;margin-bottom:14px">'+typesHtml+'</div>'+
+  // Tabs (seulement si équipement)
+  if(hasEq){
+    h+='<div style="display:flex;border-bottom:1.5px solid var(--border);margin-bottom:12px" id="dm-tabs">'+
+      '<button id="dm-tab-rapport" onclick="_switchDemandeTab(\'rapport\')" style="flex:1;padding:8px;font-size:12px;font-weight:600;border:none;border-bottom:2px solid var(--dark);background:none;cursor:pointer;color:var(--dark)">Rapport</button>'+
+      '<button id="dm-tab-demande" onclick="_switchDemandeTab(\'demande\')" style="flex:1;padding:8px;font-size:12px;font-weight:600;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;color:var(--text3)">Ma demande</button>'+
+    '</div>'+
+    '<div id="dm-pane-rapport">'+
+      '<div id="dm-rapport-body">'+_buildRapportBody()+'</div>'+
+    '</div>'+
+    '<div id="dm-pane-demande" style="display:none">';
+  }
 
+  // Form
+  h+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Type</div>'+
+    '<div style="display:flex;gap:6px;margin-bottom:12px">'+typesHtml+'</div>'+
     '<div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:12px">'+
       '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Quantité</div>'+
       '<input id="dm-qte" type="number" value="'+qteDefaut+'" placeholder="Ex : 500" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none"></div>'+
       '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Unité</div>'+
       '<input id="dm-unite" type="text" value="'+escape_html(uniteDefaut)+'" placeholder="litres…" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none"></div>'+
     '</div>'+
-
     '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Urgence</div>'+
-    '<div style="display:flex;gap:6px;margin-bottom:12px">'+
-      _DEMANDE_URGENCES.map(function(u){
-        return '<button onclick="_demandeSelectUrgence(\''+u+'\')" id="dm-urg-'+u+'" style="flex:1;padding:7px;border:1.5px solid '+(u==='normal'?'var(--amber)':'var(--border)')+';border-radius:8px;background:'+(u==='normal'?'var(--amber-pale)':'white')+';cursor:pointer;font-size:11px;font-weight:600;color:'+(u==='normal'?'var(--amber-dark)':'var(--text2)')+'">'+_DEMANDE_URGENCE_LABELS[u]+'</button>';
-      }).join('')+
-    '</div>'+
-
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'+
-      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Destinataire</div>'+
-      '<input id="dm-dest-nom" type="text" placeholder="Nom" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;outline:none"></div>'+
-      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Email</div>'+
-      '<input id="dm-dest-mail" type="email" placeholder="email@azalai.com" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;outline:none"></div>'+
-    '</div>'+
-
+    '<div style="display:flex;gap:6px;margin-bottom:12px">'+urgHtml+'</div>'+
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Besoin / contexte</div>'+
+    '<textarea id="dm-desc" rows="3" placeholder="Décrivez votre besoin, le contexte, les contraintes…" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;resize:none;font-family:inherit;outline:none;margin-bottom:14px"></textarea>'+
     '<div style="display:flex;gap:8px">'+
       '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:white;cursor:pointer;color:var(--text2)">Annuler</button>'+
-      '<button onclick="_envoyerDemande(\''+sid+'\',\''+eqIdJs+'\',\''+eqNomJs+'\')" style="flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:var(--dark);color:white;cursor:pointer">✉️ Envoyer</button>'+
+      '<button onclick="_showDemandePreview()" style="flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:var(--dark);color:white;cursor:pointer">Prévisualiser →</button>'+
     '</div>';
+
+  if(hasEq)h+='</div>'; // close pane-demande
+  return h;
 }
 
-var _demandeTypeActuel='autre';
-var _demandeUrgenceActuelle='normal';
-
-function _demandeSelectType(t){
-  _demandeTypeActuel=t;
-  Object.keys(_DEMANDE_TYPES).forEach(function(k){
-    var btn=document.getElementById('dm-type-'+k);
-    if(!btn)return;
-    var sel=k===t;
-    btn.style.borderColor=sel?'var(--amber)':'var(--border)';
-    btn.style.background=sel?'var(--amber-pale)':'white';
-    btn.style.color=sel?'var(--amber-dark)':'var(--text2)';
-    if(sel&&_DEMANDE_TYPES[k].unite){
-      var uInput=document.getElementById('dm-unite');
-      if(uInput&&!uInput.value)uInput.value=_DEMANDE_TYPES[k].unite;
-    }
-  });
+function _switchDemandeTab(tab){
+  var rap=document.getElementById('dm-pane-rapport');
+  var dem=document.getElementById('dm-pane-demande');
+  var tR=document.getElementById('dm-tab-rapport');
+  var tD=document.getElementById('dm-tab-demande');
+  if(!rap||!dem)return;
+  if(tab==='rapport'){
+    rap.style.display='';dem.style.display='none';
+    if(tR){tR.style.borderBottomColor='var(--dark)';tR.style.color='var(--dark)';}
+    if(tD){tD.style.borderBottomColor='transparent';tD.style.color='var(--text3)';}
+  } else {
+    rap.style.display='none';dem.style.display='';
+    if(tD){tD.style.borderBottomColor='var(--dark)';tD.style.color='var(--dark)';}
+    if(tR){tR.style.borderBottomColor='transparent';tR.style.color='var(--text3)';}
+  }
 }
 
-function _demandeSelectUrgence(u){
-  _demandeUrgenceActuelle=u;
-  _DEMANDE_URGENCES.forEach(function(k){
-    var btn=document.getElementById('dm-urg-'+k);
-    if(!btn)return;
-    var sel=k===u;
-    btn.style.borderColor=sel?'var(--amber)':'var(--border)';
-    btn.style.background=sel?'var(--amber-pale)':'white';
-    btn.style.color=sel?'var(--amber-dark)':'var(--text2)';
-  });
-}
-
-function _ouvrirNouvelleDemandeLibre(sid){
-  _demandeTypeActuel='autre';
-  _demandeUrgenceActuelle='normal';
-  _showCfgModal(_buildDemandeModal(sid,'','',null));
-}
-
-function _ouvrirNouvelleDemandeEq(sid,eqId,eqNom){
-  _demandeTypeActuel='autre';
-  _demandeUrgenceActuelle='normal';
-  var cuveInfo=(window._commandes_cuveMap&&window._commandes_cuveMap[eqId])||null;
-  if(cuveInfo)_demandeTypeActuel='carburant';
-  _showCfgModal(_buildDemandeModal(sid,eqId,eqNom,cuveInfo));
-}
-
-async function _envoyerDemande(sid,eqId,eqNom){
+/* ── prévisualisation bon de commande ── */
+function _showDemandePreview(){
   var qte=parseFloat((document.getElementById('dm-qte')||{}).value||'')||null;
   var unite=((document.getElementById('dm-unite')||{}).value||'').trim();
-  var destNom=((document.getElementById('dm-dest-nom')||{}).value||'').trim();
-  var destMail=((document.getElementById('dm-dest-mail')||{}).value||'').trim();
-  if(!qte&&!_demandeTypeActuel){alert('Veuillez sélectionner un type.');return;}
+  var desc=((document.getElementById('dm-desc')||{}).value||'').trim();
+  var typeLabel=_DEMANDE_TYPES[_demandeTypeActuel]?_DEMANDE_TYPES[_demandeTypeActuel].label:_demandeTypeActuel;
+  var typeIcon=_DEMANDE_TYPES[_demandeTypeActuel]?_DEMANDE_TYPES[_demandeTypeActuel].icon:'📝';
+  var auteurNom=_session&&_session.contact&&_session.contact.nom?_session.contact.nom:'';
+  var auteurRole=_session&&_session.role?_session.role:'';
+  var today=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var ref='BC-'+new Date().getFullYear()+'-'+(('000'+Math.floor(Math.random()*9000+1000)).slice(-4));
+  window._dmCurrentBcRef=ref;
+  window._dmCurrentDesc=desc;
+  window._dmCurrentQte=qte;
+  window._dmCurrentUnite=unite;
 
+  var urgColors={normal:'var(--vert)',urgent:'var(--amber)',critique:'var(--rouge)'};
+  var urgCol=urgColors[_demandeUrgenceActuelle]||'var(--text)';
+  var cv=_dmCuveInfo;
+  var pannes=_dmPannes;
+  var now=new Date();var j30=new Date(now-30*86400000);
+  var recent=pannes.filter(function(p){return new Date(p.created_at)>=j30;});
+
+  var pannesHtml=pannes.slice(0,3).map(function(p){
+    var d=new Date(p.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+    return '<div style="display:flex;gap:6px;margin-bottom:4px;font-size:11px"><div style="width:6px;height:6px;border-radius:50%;background:#e24b4a;flex-shrink:0;margin-top:3px"></div><div>'+escape_html((p.description||'').substring(0,70))+(p.ref_code?' <span style="color:#aaa">· '+p.ref_code+'</span>':'')+'<span style="color:#999"> · '+d+'</span></div></div>';
+  }).join('');
+
+  var preview=
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
+      '<div style="font-size:14px;font-weight:700;color:var(--dark)">📄 Aperçu bon de commande</div>'+
+      '<button onclick="_closeCfgModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3)">✕</button>'+
+    '</div>'+
+    // PDF frame
+    '<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:20px;font-family:Georgia,serif;color:#1a1a1a;margin-bottom:12px">'+
+      '<div style="font-size:9px;font-weight:700;letter-spacing:.1em;color:#aaa;text-transform:uppercase;margin-bottom:12px">GenTrack · Azalaï Hotels Group</div>'+
+      '<div style="font-size:17px;font-weight:700;color:#111;margin-bottom:2px">Bon de commande '+escape_html(ref)+'</div>'+
+      '<div style="font-size:11px;color:#888;margin-bottom:16px">'+today+(auteurNom?' · '+escape_html(auteurNom):'')+'</div>'+
+
+      '<div style="border-top:1px solid #eee;padding-top:10px;margin-bottom:10px">'+
+        '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-bottom:7px">Détail de la demande</div>'+
+        '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Type</span><span>'+typeIcon+' '+escape_html(typeLabel)+'</span></div>'+
+        (qte?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Quantité</span><span style="font-weight:700">'+qte.toLocaleString('fr-FR')+(unite?' '+escape_html(unite):'')+'</span></div>':'')+
+        '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Urgence</span><span style="font-weight:600;color:'+(urgCol.replace('var(--vert)','#3b6d11').replace('var(--amber)','#854f0b').replace('var(--rouge)','#a32d2d'))+'">'+_DEMANDE_URGENCE_LABELS[_demandeUrgenceActuelle]+'</span></div>'+
+        (_dmCurrentEqNom?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Équipement</span><span>'+escape_html(_dmCurrentEqNom)+'</span></div>':'')+
+        '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Demandé par</span><span>'+escape_html(auteurNom)+' — '+escape_html(roleName(auteurRole))+'</span></div>'+
+      '</div>'+
+
+      (desc?'<div style="border-top:1px solid #eee;padding-top:10px;margin-bottom:10px">'+
+        '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-bottom:7px">Besoin exprimé</div>'+
+        '<div style="font-size:12px;color:#333;line-height:1.6;padding:8px;background:#f9f9f9;border-radius:4px">'+escape_html(desc)+'</div>'+
+      '</div>':'')+
+
+      (pannes.length||cv?'<div style="border-top:1px solid #eee;padding-top:10px">'+
+        '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-bottom:8px">Contexte équipement — 30 derniers jours</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px">'+
+          '<div style="text-align:center;padding:7px;background:#fff3f3;border-radius:4px"><div style="font-size:15px;font-weight:700;color:#a32d2d">'+recent.length+'</div><div style="font-size:9px;color:#888">pannes</div></div>'+
+          (cv?'<div style="text-align:center;padding:7px;background:#faf3e8;border-radius:4px"><div style="font-size:15px;font-weight:700;color:#854f0b">'+Math.round(cv.niv/cv.cap*100)+'%</div><div style="font-size:9px;color:#888">niveau cuve</div></div>':'<div></div>')+
+          '<div style="text-align:center;padding:7px;background:#f9f9f9;border-radius:4px"><div style="font-size:15px;font-weight:700;color:#444">'+pannes.filter(function(p){return p.statut==='resolu';}).length+'</div><div style="font-size:9px;color:#888">résolues</div></div>'+
+        '</div>'+
+        pannesHtml+
+      '</div>':'')+
+
+      '<div style="border-top:1px solid #eee;margin-top:14px;padding-top:10px;display:flex;justify-content:space-between;font-size:9px;color:#ccc">'+
+        '<span>GenTrack v2 · Azalaï Hotels Group</span><span>'+escape_html(ref)+' · Page 1/1</span>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="_dmRetourFormulaire()" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:white;cursor:pointer;color:var(--text2)">← Modifier</button>'+
+      '<button onclick="_envoyerDemande()" style="flex:2;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:var(--dark);color:white;cursor:pointer">✉️ Envoyer</button>'+
+    '</div>';
+
+  _showCfgModal(preview);
+}
+
+function _dmRetourFormulaire(){
+  _showCfgModal(_buildDemandeModalContent());
+  if(_dmCurrentEqId)_switchDemandeTab('demande');
+}
+
+/* ── envoi final ── */
+async function _envoyerDemande(){
+  var sid=_dmCurrentSid;
+  var eqId=_dmCurrentEqId;
+  var eqNom=_dmCurrentEqNom;
+  var qte=window._dmCurrentQte||null;
+  var unite=window._dmCurrentUnite||'';
+  var desc=window._dmCurrentDesc||'';
+  var ref=window._dmCurrentBcRef||('BC-'+new Date().getFullYear()+'-'+Date.now().toString().slice(-4));
   var typeLabel=_DEMANDE_TYPES[_demandeTypeActuel]?_DEMANDE_TYPES[_demandeTypeActuel].label:_demandeTypeActuel;
   var auteurNom=_session&&_session.contact&&_session.contact.nom?_session.contact.nom:'';
   var auteurRole=_session&&_session.role?_session.role:'';
   var today=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var cv=_dmCuveInfo;
+  var pannes=_dmPannes;
+  var j30=new Date(new Date()-30*86400000);
+  var recent=pannes.filter(function(p){return new Date(p.created_at)>=j30;});
 
-  // Body email
-  var bodyLines=[
-    'Demande : '+typeLabel,
-    eqNom?'Équipement : '+eqNom:'',
-    qte?'Quantité : '+qte+(unite?' '+unite:''):'',
-    'Urgence : '+(_DEMANDE_URGENCE_LABELS[_demandeUrgenceActuelle]||_demandeUrgenceActuelle),
-    '\n---',
+  // Corps email plain text
+  var lines=[
+    ref+' — Bon de commande GenTrack',
+    '═══════════════════════════════',
+    '',
+    'TYPE : '+typeLabel.toUpperCase(),
+    qte?'QUANTITÉ : '+qte.toLocaleString('fr-FR')+(unite?' '+unite:''):'',
+    'URGENCE : '+(_DEMANDE_URGENCE_LABELS[_demandeUrgenceActuelle]||_demandeUrgenceActuelle),
+    eqNom?'ÉQUIPEMENT : '+eqNom:'',
+    '',
+    desc?'BESOIN EXPRIMÉ :\n'+desc+'\n':'',
+    (pannes.length||cv)?'CONTEXTE ÉQUIPEMENT (30 derniers jours) :':'',
+    (pannes.length||cv)?'  - Pannes : '+recent.length:'',
+    cv?'  - Niveau cuve : '+Math.round(cv.niv/cv.cap*100)+'% ('+cv.niv.toLocaleString('fr-FR')+' L sur '+cv.cap.toLocaleString('fr-FR')+' L)':'',
+    pannes.length?pannes.slice(0,3).map(function(p){return '  · '+new Date(p.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+' — '+(p.description||'').substring(0,80);}).join('\n'):'',
+    '',
+    '───────────────────────────────',
     'Demandé par : '+auteurNom+' ('+roleName(auteurRole)+')',
-    'Date : '+today
-  ].filter(function(l){return l.trim();}).join('\n');
+    'Date : '+today,
+    'Réf. : '+ref,
+    '───────────────────────────────',
+    'GenTrack · Azalaï Hotels Group'
+  ].filter(function(l){return l!==null&&l!==undefined;}).join('\n');
 
-  var subject=encodeURIComponent('[GenTrack] Demande '+typeLabel+(eqNom?' — '+eqNom:'')+' | '+(destNom||'Direction'));
+  var subject=encodeURIComponent('[GenTrack] '+ref+' — '+typeLabel+(eqNom?' / '+eqNom:''));
 
   // Save to DB
   await supaPost('demandes',{
@@ -2470,26 +2653,18 @@ async function _envoyerDemande(sid,eqId,eqNom){
     auteur_nom:auteurNom,
     auteur_role:auteurRole,
     type:_demandeTypeActuel,
-    description:null,
+    description:desc||null,
     quantite:qte,
     unite:unite||null,
     urgence:_demandeUrgenceActuelle,
     statut:'en_attente',
-    destinataire_nom:destNom||null,
-    destinataire_mail:destMail||null,
+    destinataire_nom:null,
+    destinataire_mail:null,
     date_envoi:new Date().toISOString()
   });
 
   _closeCfgModal();
-
-  // Open mailto
-  if(destMail){
-    window.location.href='mailto:'+encodeURIComponent(destMail)+'?subject='+subject+'&body='+encodeURIComponent(bodyLines);
-  } else {
-    window.location.href='mailto:?subject='+subject+'&body='+encodeURIComponent(bodyLines);
-  }
-
-  // Refresh
+  window.location.href='mailto:?subject='+subject+'&body='+encodeURIComponent(lines);
   if(_session)renderRespTech(_session,'commandes');
 }
 
