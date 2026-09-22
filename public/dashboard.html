@@ -2697,22 +2697,83 @@ async function _envoyerDemande(){
 }
 
 /* ── gestion statut demandes ── */
+var _livreDemandeCache=null; // stocke la demande en attente du choix Plein
+
 async function _demandeChangerStatut(id,statut){
   var ok=await supaPatch('demandes',id,{statut:statut});
   if(!ok){alert('Erreur lors de la mise à jour du statut.');return;}
-  // Si livré → créer entrée maintenance
+
   if(statut==='livre'){
-    // Récupère la demande pour avoir tous les champs
     var rows=await supaGet('demandes','id=eq.'+id+'&select=*');
-    if(rows&&rows.length)await _demandeCreerMaintenance(rows[0]);
+    var demande=rows&&rows.length?rows[0]:null;
+    if(demande&&demande.type==='carburant'&&demande.equipement_id){
+      // Option A : proposer de loguer un Plein
+      _livreDemandeCache=demande;
+      var eqNomDisplay=demande.note?'('+demande.note+')':'';
+      _showCfgModal(
+        '<div style="text-align:center;padding:8px 0 4px">'+
+          '<div style="font-size:28px;margin-bottom:8px">⛽</div>'+
+          '<div style="font-size:15px;font-weight:800;color:var(--dark);margin-bottom:6px">Livraison confirmée</div>'+
+          '<div style="font-size:12px;color:var(--text2);margin-bottom:20px">Veux-tu loguer le Plein maintenant ?<br><span style="font-size:11px;color:var(--text3)">Cela enregistrera le niveau après livraison et le coût.</span></div>'+
+          '<div style="display:flex;gap:10px">'+
+            '<button onclick="_demandePleinNon()" style="flex:1;padding:11px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;background:white;cursor:pointer;color:var(--text2)">Non, plus tard</button>'+
+            '<button onclick="_demandePleinOui()" style="flex:1;padding:11px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:var(--amber);color:white;cursor:pointer">⛽ Loguer le Plein</button>'+
+          '</div>'+
+        '</div>'
+      );
+      return; // Le refresh se fait après le choix
+    }
+    // Non-carburant ou sans équipement → maintenance auto
+    if(demande)await _demandeCreerMaintenance(demande);
   }
-  // Refresh
-  if(_session){
-    var nav=_currentNav||'commandes';
-    if(_doCurrentSite)renderDirOpsSite(_session,_doCurrentSite.id,_doCurrentSite.nom,nav);
-    else if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,nav);
-    else renderRespTech(_session,'commandes');
+
+  _dtRefreshCommandes();
+}
+
+function _demandePleinNon(){
+  // Maintenance simple depuis la demande
+  _closeCfgModal();
+  if(_livreDemandeCache)_demandeCreerMaintenance(_livreDemandeCache);
+  _livreDemandeCache=null;
+  _dtRefreshCommandes();
+}
+
+async function _demandePleinOui(){
+  var d=_livreDemandeCache;
+  _closeCfgModal();
+  _livreDemandeCache=null;
+  if(!d||!d.equipement_id){_dtRefreshCommandes();return;}
+  // Récupérer infos équipement pour pré-remplir le modal Plein
+  var eqs=await supaGet('equipements','id=eq.'+d.equipement_id+'&select=id,nom,capacite_litres,conso_theorique_lh,types_equipements(nom)');
+  var eq=eqs&&eqs.length?eqs[0]:null;
+  var eqNom=eq?eq.nom:'Cuve carburant';
+  var cap=eq&&eq.capacite_litres?eq.capacite_litres:null;
+  // Niveau actuel depuis la dernière réponse question
+  var currentNiveau=null;
+  var prixLitre=null;
+  var qs=await supaGet('questions','equipement_id=eq.'+d.equipement_id+'&actif=eq.true&select=id,texte&order=ordre.asc');
+  var niveauQ=qs.find(function(q){return q.texte.toLowerCase().indexOf('niveau')>=0||q.texte.toLowerCase().indexOf('cuve')>=0;});
+  if(niveauQ){
+    var reps=await supaGet('reponses','question_id=eq.'+niveauQ.id+'&select=valeur,created_at&order=created_at.desc&limit=1');
+    if(reps&&reps.length)currentNiveau=parseFloat(reps[0].valeur)||null;
   }
+  var auteurNom=_session&&_session.contact&&_session.contact.nom?_session.contact.nom:'';
+  openDeclarePlein(d.equipement_id,eqNom,cap,currentNiveau,auteurNom,prixLitre);
+  // Refresh commandes après fermeture du modal plein
+  // openDeclarePlein gère son propre callback, on force un refresh sur fermeture
+  var orig=document.getElementById('mp-confirm');
+  if(orig){
+    var _origClick=orig.onclick;
+    orig.onclick=async function(){await _origClick.call(this);_dtRefreshCommandes();};
+  }
+}
+
+function _dtRefreshCommandes(){
+  if(!_session)return;
+  var nav=_currentNav||'commandes';
+  if(_doCurrentSite)renderDirOpsSite(_session,_doCurrentSite.id,_doCurrentSite.nom,nav);
+  else if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,nav);
+  else renderRespTech(_session,'commandes');
 }
 
 async function _demandeCreerMaintenance(d){
