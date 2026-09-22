@@ -625,8 +625,10 @@ function buildLayout(session,activeNav,contentHtml){
 var _TYPE_ICONS={'Groupe électrogène':'⚡','Cuve fioul':'🛢️','Chambre froide':'❄️','Groupe eau glacée':'💧'};
 var _FREQ_LABELS={journalier:'Ronde journalière',hebdo:'Ronde hebdomadaire',mensuel:'Ronde mensuelle',releve_horaire:'Relevé horaire'};
 
+var _currentNav='accueil';
 function renderRespTech(session,nav){
   nav=nav||'accueil';
+  _currentNav=nav;
   var skeleton='<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text3);font-size:13px"><span class="spinner"></span>Chargement des données...</div>';
   app().innerHTML=buildLayout(session,nav,skeleton);
   _loadRT(session,nav);
@@ -1328,8 +1330,9 @@ async function _resolveSg(id){
 }
 
 /* ── Prise en charge modal ── */
-var _pecSgId=null,_pecSid=null;
+var _pecSgId=null,_pecSid=null,_pecFromNav=null;
 async function _openPEC(sgId,refCode,siteId){
+  _pecFromNav=_currentNav||'alertes';
   _pecSgId=sgId;_pecSid=siteId;
   var modal=document.getElementById('pec-modal');
   var title=document.getElementById('pec-title');
@@ -1340,16 +1343,18 @@ async function _openPEC(sgId,refCode,siteId){
   modal.style.display='flex';
   var techs=await supaGet('contacts','site_id=eq.'+siteId+'&role=eq.technicien&select=nom&order=nom.asc');
   var moi=_session&&_session.contact&&_session.contact.nom?_session.contact.nom:'';
+  var moiJs=moi.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
   var h='';
   if(moi){
-    h+='<button onclick="_prendreEnCharge(\''+sgId+'\','+JSON.stringify(moi)+','+JSON.stringify(moi)+')" style="width:100%;text-align:left;padding:12px 16px;border:none;background:var(--amber-pale);border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--amber-dark);margin-bottom:8px">👤 Je prends en charge<br><span style="font-size:11px;font-weight:400;color:var(--text2)">'+escape_html(moi)+'</span></button>';
+    h+='<button onclick="_prendreEnCharge(\''+sgId+'\',\''+moiJs+'\',\''+moiJs+'\')" style="width:100%;text-align:left;padding:12px 16px;border:none;background:var(--amber-pale);border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--amber-dark);margin-bottom:8px">👤 Je prends en charge<br><span style="font-size:11px;font-weight:400;color:var(--text2)">'+escape_html(moi)+'</span></button>';
   }
   if(techs&&techs.length){
     var autresTechs=techs.filter(function(t){return t.nom!==moi;});
     if(autresTechs.length){
       h+='<div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin:10px 0 8px;text-align:center">— Affecter à —</div>';
       autresTechs.forEach(function(t){
-        h+='<button onclick="_prendreEnCharge(\''+sgId+'\','+JSON.stringify(moi||t.nom)+','+JSON.stringify(t.nom)+')" style="width:100%;text-align:left;padding:10px 16px;border:1px solid var(--border);background:white;border-radius:8px;cursor:pointer;font-size:13px;color:var(--text);margin-bottom:6px;display:block">'+escape_html(t.nom)+'</button>';
+        var tJs=t.nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        h+='<button onclick="_prendreEnCharge(\''+sgId+'\',\''+moiJs+'\',\''+tJs+'\')" style="width:100%;text-align:left;padding:10px 16px;border:1px solid var(--border);background:white;border-radius:8px;cursor:pointer;font-size:13px;color:var(--text);margin-bottom:6px;display:block">'+escape_html(t.nom)+'</button>';
       });
     }
   }
@@ -1364,9 +1369,10 @@ async function _prendreEnCharge(sgId,prisParNom,assigneANom){
   var now=new Date().toISOString();
   await supaPatch('signalements',sgId,{statut:'en_cours',pris_en_charge_par:prisParNom,assigne_a:assigneANom,pris_en_charge_at:now});
   if(!_session)return;
-  if(_doCurrentSite)renderDirOpsSite(_session,_doCurrentSite.id,_doCurrentSite.nom,'alertes');
-  else if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'alertes');
-  else renderRespTech(_session,'alertes');
+  var nav=_pecFromNav||'alertes';
+  if(_doCurrentSite)renderDirOpsSite(_session,_doCurrentSite.id,_doCurrentSite.nom,nav);
+  else if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,nav);
+  else renderRespTech(_session,nav);
 }
 
 async function _marquerTraite(table,id,fromNav){
@@ -1880,10 +1886,23 @@ async function _rtSignalements(sid){
           (r.cout_intervention?'<div style="font-size:12px;font-weight:700;color:var(--vert)">'+Number(r.cout_intervention).toLocaleString('fr-FR')+' FCFA</div>':'')+
         '</div>':'';
 
+      var sgEnCours=r.statut==='en_cours';
+      var sgPreneur=r.assigne_a||r.pris_en_charge_par||'';
+      var sgRef=r.ref_code||'';
+      var sgSid=r.groupe_id||(sid)||'';
+      var sgRefJs=sgRef.replace(/'/g,"\\'");
       var actionsHtml=!resolu?
-        '<div style="display:flex;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">'+
-          '<button onclick="_sgAffecter(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--amber-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--amber-dark);background:var(--amber-pale);cursor:pointer">👷 Affecter</button>'+
-          '<button onclick="_sgResoudre(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Résoudre</button>'+
+        '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
+          (sgEnCours?
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+              '<span style="font-size:11px;font-weight:600;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);border-radius:12px;padding:4px 12px">⚡ En cours · '+escape_html(sgPreneur||'')+'</span>'+
+              '<button onclick="_openPEC(\''+r.id+'\',\''+sgRefJs+'\',\''+sgSid+'\')" style="font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:12px;background:white;color:var(--text2);cursor:pointer">Réaffecter</button>'+
+            '</div>':
+            '<button onclick="_openPEC(\''+r.id+'\',\''+sgRefJs+'\',\''+sgSid+'\')" style="width:100%;padding:8px;border:1.5px solid var(--amber-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--amber-dark);background:var(--amber-pale);cursor:pointer;margin-bottom:8px">👤 Prendre en charge</button>')+
+          '<div style="display:flex;gap:8px">'+
+            '<button onclick="_sgAffecter(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:500;color:var(--text2);background:white;cursor:pointer">📱 Via WhatsApp</button>'+
+            '<button onclick="_sgResoudre(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Résoudre</button>'+
+          '</div>'+
         '</div>':'';
 
       return '<div id="sg-card-'+r.id+'" style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+accent+'">'+
@@ -3927,6 +3946,35 @@ async function _dtAccueil(session,sids,cid){
   var contacts=techIds.length?await supaGet('contacts','id=in.('+techIds.join(',')+')'+'&select=id,nom,site_id'):[];
   var contactMap={};contacts.forEach(function(c){contactMap[c.id]=c.nom;});
 
+  // Cuve carburant — fetch pour toutes les sites Dir Tech
+  var CUVE_TYPE_DT='de5519d0-363b-4628-b872-2dcf01859002';
+  var cuveBySite={};
+  var cuveEquipsDT=await supaGet('equipements','site_id=in.('+sidStr+')&type_id=eq.'+CUVE_TYPE_DT+'&actif=eq.true&select=id,site_id,nom,capacite_litres,conso_theorique_lh');
+  if(cuveEquipsDT.length){
+    var cuveIdsDT=cuveEquipsDT.map(function(e){return e.id;});
+    var cuveQsDT=await supaGet('questions','equipement_id=in.('+cuveIdsDT.join(',')+')'+'&actif=eq.true&select=id,equipement_id,texte,seuil_min&order=ordre.asc');
+    var cuveQIdsDT=cuveQsDT.map(function(q){return q.id;});
+    var _cuveData=await Promise.all([
+      cuveQIdsDT.length?supaGet('reponses','question_id=in.('+cuveQIdsDT.join(',')+')'+'&select=question_id,valeur,created_at&order=created_at.desc&limit=200'):Promise.resolve([]),
+      supaGet('pleins','equipement_id=in.('+cuveIdsDT.join(',')+')'+'&select=id,equipement_id,date,niveau_apres&order=date.desc&limit=20')
+    ]);
+    var cuveRepsDT=_cuveData[0],cuvePleinsDT=_cuveData[1];
+    var repByQDT={};
+    cuveRepsDT.forEach(function(r){if(!repByQDT[r.question_id]||r.created_at>repByQDT[r.question_id].created_at)repByQDT[r.question_id]=r;});
+    cuveQsDT.forEach(function(q){q._lastVal=repByQDT[q.id]?repByQDT[q.id].valeur:null;q._lastAt=repByQDT[q.id]?repByQDT[q.id].created_at:null;});
+    cuveEquipsDT.forEach(function(e){
+      var nQ=cuveQsDT.find(function(q){return q.equipement_id===e.id&&(q.texte.toLowerCase().indexOf('niveau')>=0||q.texte.toLowerCase().indexOf('cuve')>=0);});
+      var cap=e.capacite_litres||10000;var conso=e.conso_theorique_lh||65;
+      var niv=nQ&&nQ._lastVal!=null?parseFloat(nQ._lastVal):null;
+      var lp=cuvePleinsDT.find(function(p){return p.equipement_id===e.id;});
+      if(lp&&lp.niveau_apres!=null&&nQ&&nQ._lastAt&&lp.date>nQ._lastAt.slice(0,10))niv=parseFloat(lp.niveau_apres);
+      var pctCv=niv!=null?Math.min(100,Math.round(niv/cap*100)):null;
+      var autoCv=niv!=null?Math.round(niv/(conso*8)*10)/10:null;
+      var colCv=pctCv!=null?(pctCv<=20?'var(--rouge)':pctCv<=40?'var(--orange)':'var(--vert)'):'var(--text3)';
+      cuveBySite[e.site_id]={niv:niv,pct:pctCv,cap:cap,auto:autoCv,col:colCv,nom:e.nom};
+    });
+  }
+
   var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
   var eqBySite={};equips.forEach(function(e){eqBySite[e.site_id]=(eqBySite[e.site_id]||0)+1;});
   var pannesBySite={};pannes.forEach(function(p){pannesBySite[p.groupe_id]=(pannesBySite[p.groupe_id]||0)+1;});
@@ -3976,8 +4024,20 @@ async function _dtAccueil(session,sids,cid){
     else if(ok){rondeDisp='Complète';rondeCol='var(--vert)';}
     else{rondeDisp=val+'/'+tot+' · '+pct+'%';rondeCol='var(--amber)';}
     var sNomEsc=escape_html(sNom).replace(/'/g,"\\'");
+    var cvData=cuveBySite[sid]||null;
+    var cuveHtml=cvData?'<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'+
+        '<div style="font-size:10px;font-weight:500;color:var(--text2)">🛢️ '+escape_html(cvData.nom||'Cuve')+'</div>'+
+        (cvData.niv!=null?'<div style="font-size:10px;font-weight:700;color:'+cvData.col+'">'+Math.round(cvData.niv).toLocaleString('fr-FR')+' L'+(cvData.auto!=null?' · ~'+cvData.auto+' j':'')+'</div>':'<div style="font-size:10px;color:var(--text3)">Aucun relevé</div>')+
+      '</div>'+
+      (cvData.pct!=null?'<div style="height:3px;background:var(--border);border-radius:2px"><div style="width:'+cvData.pct+'%;height:100%;border-radius:2px;background:'+cvData.col+'"></div></div>':'')+
+    '</div>':'';
+    var sitePanneTop=pannes.filter(function(p){return p.groupe_id===sid;})[0]||null;
+    var topAlertHtml=sitePanneTop?'<div style="margin-top:6px;padding:5px 8px;background:var(--rouge-pale);border:1px solid var(--rouge-border);border-radius:6px;font-size:10px;color:var(--rouge)">'+
+      '🔴 '+(sitePanneTop.equipements&&sitePanneTop.equipements.nom?escape_html(sitePanneTop.equipements.nom)+' — ':'')+escape_html((sitePanneTop.description||'').substring(0,60))+((sitePanneTop.description||'').length>60?'…':'')+
+    '</div>':'';
     bloc1+='<div class="ronde-card" style="cursor:pointer" onclick="renderDirTechSite(_session,\''+sid+'\',\''+sNomEsc+'\',\'accueil\')">'+
-      '<div style="display:flex;align-items:center;gap:12px'+(pct!==null?';margin-bottom:10px':'')+'">'+
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:'+(pct!==null||cuveHtml||topAlertHtml?'10':'0')+'px">'+
         '<span style="font-size:20px">'+(ok?'✅':!rondeJ||tot===0?'📋':'🔄')+'</span>'+
         '<div style="flex:1">'+
           '<div style="font-size:13px;font-weight:600">'+escape_html(sNom)+'</div>'+
@@ -3991,6 +4051,7 @@ async function _dtAccueil(session,sids,cid){
         '</div>'+
       '</div>'+
       (pct!==null?'<div class="progress-bar-wrap"><div class="progress-bar" style="width:'+pct+'%;background:'+(ok?'var(--vert)':'var(--amber)')+'"></div></div>':'')+
+      cuveHtml+topAlertHtml+
     '</div>';
   });
   bloc1+='</div>';
@@ -4416,6 +4477,7 @@ function _dtSetRapportPeriod(n){_dtRapportPeriod=n;if(_session)renderDirTech(_se
 /* ── DIR TECH : détail site ── */
 function renderDirTechSite(session,sid,siteNom,nav){
   nav=nav||'accueil';
+  _currentNav=nav;
   _dtCurrentSite={id:sid,nom:siteNom};
   var skeleton='<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text3);font-size:13px"><span class="spinner"></span>Chargement...</div>';
   app().innerHTML=buildLayout(session,nav,skeleton);
