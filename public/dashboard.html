@@ -501,6 +501,7 @@ function buildNavItems(role){
     items.push({id:'comparaison',icon:'compare_arrows',label:'Comparaison'});
     items.push({id:'signalements',icon:'location_on',label:'Signalements'});
     items.push({id:'maintenances',icon:'build',label:'Maintenance'});
+    items.push({id:'fiabilite',icon:'analytics',label:'Fiabilité'});
     items.push({id:'rapport',icon:'summarize',label:'Rapport conso'});
   }
   return items;
@@ -537,7 +538,7 @@ function buildMobileNav(role,activeNav,alerteBadge){
       {id:'signalements',icon:'location_on',label:'Signalements'},
       {id:'__plus__',icon:'apps',label:'Plus'}
     ];
-    plusIds=['comparaison','historique','maintenances','rapport'];
+    plusIds=['comparaison','historique','maintenances','fiabilite','rapport'];
   } else {
     // resp_tech : signalements en accès direct, relevés dans Plus
     fixed=[
@@ -1317,7 +1318,8 @@ async function _resolveSg(id){
   var sgs=await supaGet('signalements','id=eq.'+id+'&select=id,type,description,groupe_id,equipement_id,cout_intervention,signale_par,lieu');
   var sg=sgs&&sgs[0];
   var now=new Date().toISOString();
-  await supaPatch('signalements',id,{statut:'resolu',resolved_at:now});
+  var resolvedByNom=(_session&&_session.contact&&_session.contact.nom)||null;
+  await supaPatch('signalements',id,{statut:'resolu',resolved_at:now,resolved_by:resolvedByNom});
   // Auto-créer entrée maintenance si c'est une panne
   if(sg&&sg.type==='panne'){
     var mnt={
@@ -2884,7 +2886,7 @@ async function _rtMonEquipe(sid,session){
     var tid=rondeToTech[re.ronde_id];if(!tid)return;
     ensureTech(tid);
     statsByTech[tid].reqTotal++;
-    if(re.statut==='ok')statsByTech[tid].reqOk++;
+    if(re.statut==='valide'||re.statut==='ok')statsByTech[tid].reqOk++;
   });
 
   // Pannes résolues par resolved_by (text) → match sur contact.nom
@@ -2919,7 +2921,7 @@ async function _rtMonEquipe(sid,session){
 
   // Global KPIs
   var totalRondes=rondes30.length;
-  var totalReqOk=rondesEq.filter(function(r){return r.statut==='ok';}).length;
+  var totalReqOk=rondesEq.filter(function(r){return r.statut==='valide'||r.statut==='ok';}).length;
   var conformGlob=rondesEq.length?Math.round(totalReqOk/rondesEq.length*100):null;
   var mttrMoyH=signalements30.filter(function(s){return s.resolved_at;}).length?
     signalements30.filter(function(s){return s.resolved_at;})
@@ -4759,6 +4761,7 @@ async function _loadDT(session,nav){
     else if(nav==='historique')html=await _dtHistorique(sids);
     else if(nav==='signalements')html=await _dtSignalements(sids);
     else if(nav==='maintenances')html=await _dtMaintenances(sids);
+    else if(nav==='fiabilite')html=await _dtFiabiliteMulti(sids,session);
     else if(nav==='rapport')html=await _dtRapport(sids,session);
     el.innerHTML=html;
   }catch(e){
@@ -5527,6 +5530,158 @@ async function _dtRapport(sids,session){
 }
 function _dtSetRapportPeriod(n){_dtRapportPeriod=n;if(_session)renderDirTech(_session,'rapport');}
 
+/* ── DIR TECH : Fiabilité ── */
+var _fiabPeriod=90;
+async function _dtFiabilite(sid){
+  var period=_fiabPeriod||90;
+  var cutoffTs=new Date(Date.now()-period*86400000).toISOString();
+  var[signalements,equipements]=await Promise.all([
+    supaGet('signalements','groupe_id=eq.'+sid+'&statut=eq.resolu&resolved_at=gte.'+cutoffTs+'&select=id,equipement_id,created_at,resolved_at,equipements(nom)&order=created_at.desc'),
+    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,type&order=nom.asc')
+  ]);
+  var eqMap={};equipements.forEach(function(e){eqMap[e.id]=e;});
+  var statsById={};
+  signalements.forEach(function(s){
+    var eid=s.equipement_id;if(!eid)return;
+    if(!statsById[eid])statsById[eid]={nb_pannes:0,ttrs:[],last_at:null};
+    statsById[eid].nb_pannes++;
+    if(s.created_at&&s.resolved_at){var ttr=(new Date(s.resolved_at)-new Date(s.created_at))/3600000;if(ttr>=0)statsById[eid].ttrs.push(ttr);}
+    if(!statsById[eid].last_at||s.created_at>statsById[eid].last_at)statsById[eid].last_at=s.created_at;
+  });
+  var rows=[];
+  Object.keys(statsById).forEach(function(eid){
+    var st=statsById[eid];var eq=eqMap[eid];
+    var nom=eq?eq.nom:'Équipement #'+eid.substring(0,8);
+    var mttr=st.ttrs.length?st.ttrs.reduce(function(a,b){return a+b;},0)/st.ttrs.length:null;
+    rows.push({eid:eid,nom:nom,nb_pannes:st.nb_pannes,mttr:mttr,mtbf:period/st.nb_pannes,last_at:st.last_at});
+  });
+  equipements.forEach(function(e){if(!statsById[e.id])rows.push({eid:e.id,nom:e.nom,nb_pannes:0,mttr:null,mtbf:null,last_at:null});});
+  rows.sort(function(a,b){return b.nb_pannes-a.nb_pannes;});
+  var totalPannes=signalements.length;
+  var allTtrs=signalements.filter(function(s){return s.created_at&&s.resolved_at;}).map(function(s){return(new Date(s.resolved_at)-new Date(s.created_at))/3600000;});
+  var avgMttr=allTtrs.length?allTtrs.reduce(function(a,b){return a+b;},0)/allTtrs.length:null;
+  var eqSains=rows.filter(function(r){return r.nb_pannes===0;}).length;
+  var eqTouches=rows.filter(function(r){return r.nb_pannes>0;}).length;
+  function fmtDur(h){if(h===null||h===undefined)return '—';if(h<1)return Math.round(h*60)+'min';if(h<48)return h.toFixed(1)+'h';return(h/24).toFixed(1)+'j';}
+  function fmtD(iso){if(!iso)return'—';return new Date(iso+'').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});}
+  function scoreCol(nb){if(nb===0)return'var(--vert)';if(nb<=1)return'#b45309';if(nb<=3)return'var(--orange)';return'var(--rouge)';}
+  var periodBtns=[30,90,180,365].map(function(p){return'<button onclick="_fiabSetPeriod('+p+')" style="padding:4px 10px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid '+(p===period?'var(--dark)':'var(--border)')+';background:'+(p===period?'var(--dark)':'transparent')+';color:'+(p===period?'var(--creme)':'var(--text2)')+'">'+p+'j</button>';}).join('');
+  var kpiCss='background:var(--creme);border:1px solid var(--border);border-radius:10px;padding:14px 16px;flex:1;min-width:120px;';
+  var kpiHtml='<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px">'+
+    [{icon:'🔴',label:'Pannes ('+period+'j)',val:totalPannes,sub:'signalements résolus'},
+     {icon:'⚠️',label:'Équipements touchés',val:eqTouches,sub:'sur '+equipements.length+' actifs'},
+     {icon:'⏱️',label:'MTTR moyen',val:fmtDur(avgMttr),sub:'temps de résolution'},
+     {icon:'✅',label:'Sans incident',val:eqSains,sub:'équipements fiables'}
+    ].map(function(k){return'<div style="'+kpiCss+'"><div style="font-size:18px;margin-bottom:4px">'+k.icon+'</div><div style="font-size:20px;font-weight:800;color:var(--dark);margin-bottom:2px">'+k.val+'</div><div style="font-size:10px;font-weight:600;color:var(--text2)">'+k.label+'</div><div style="font-size:10px;color:var(--text3)">'+k.sub+'</div></div>';}).join('')+'</div>';
+  var tableRows=rows.map(function(r){
+    var mtbfStr=r.mtbf?Math.round(r.mtbf)+'j':'—';
+    var mtbfCol=r.mtbf?(r.mtbf<15?'var(--rouge)':r.mtbf<30?'var(--orange)':'var(--vert)'):'var(--text3)';
+    return'<tr style="border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'var(--creme)\'" onmouseout="this.style.background=\'\'">'+
+      '<td style="padding:10px 12px;font-weight:600;color:var(--dark);font-size:13px">'+escape_html(r.nom)+'</td>'+
+      '<td style="padding:10px 12px;text-align:center"><span style="font-size:14px;font-weight:800;color:'+scoreCol(r.nb_pannes)+'">'+r.nb_pannes+'</span></td>'+
+      '<td style="padding:10px 12px;text-align:center;font-size:13px;font-weight:700;color:'+mtbfCol+'">'+mtbfStr+'</td>'+
+      '<td style="padding:10px 12px;text-align:center;font-size:13px;color:var(--text2)">'+fmtDur(r.mttr)+'</td>'+
+      '<td style="padding:10px 12px;text-align:center;font-size:12px;color:var(--text3)">'+fmtD(r.last_at)+'</td>'+
+    '</tr>';
+  }).join('');
+  return'<div style="max-width:900px;margin:0 auto">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">'+
+      '<div><div style="font-size:17px;font-weight:800;color:var(--dark)">📊 Fiabilité équipements</div>'+
+      '<div style="font-size:12px;color:var(--text3);margin-top:2px">MTBF · MTTR · Pannes sur la période sélectionnée</div></div>'+
+      '<div style="display:flex;gap:4px;align-items:center;background:var(--creme);border:1px solid var(--border);border-radius:8px;padding:4px">'+periodBtns+'</div>'+
+    '</div>'+
+    kpiHtml+
+    '<div style="background:white;border:1px solid var(--border);border-radius:12px;overflow:hidden">'+
+      '<table style="width:100%;border-collapse:collapse">'+
+        '<thead><tr style="background:var(--creme)">'+
+          '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">Équipement</th>'+
+          '<th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">Pannes</th>'+
+          '<th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">MTBF</th>'+
+          '<th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">MTTR moy.</th>'+
+          '<th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">Dernier incident</th>'+
+        '</tr></thead>'+
+        '<tbody>'+tableRows+'</tbody>'+
+      '</table>'+
+    '</div>'+
+    '<div style="margin-top:10px;padding:10px 14px;background:var(--creme);border-radius:8px;font-size:11px;color:var(--text3)">'+
+      '💡 <strong>MTBF</strong> (Temps moyen entre pannes) = période / nb pannes. '+
+      '<strong>MTTR</strong> (Temps moyen de résolution) = durée moyenne de traitement des signalements résolus.'+
+    '</div>'+
+  '</div>';
+}
+function _fiabSetPeriod(n){_fiabPeriod=n;if(_session&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'fiabilite');}
+
+async function _dtFiabiliteMulti(sids,session){
+  if(!sids.length)return'<div class="placeholder-card"><div class="placeholder-icon">📊</div>Aucun site configuré</div>';
+  var period=_fiabPeriod||90;
+  var cutoffTs=new Date(Date.now()-period*86400000).toISOString();
+  var sidStr=sids.join(',');
+  var[signalements,sites,equipements]=await Promise.all([
+    supaGet('signalements','groupe_id=in.('+sidStr+')&statut=eq.resolu&resolved_at=gte.'+cutoffTs+'&select=id,groupe_id,equipement_id,created_at,resolved_at&order=created_at.desc'),
+    supaGet('sites','id=in.('+sidStr+')&select=id,nom&order=nom.asc'),
+    supaGet('equipements','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id')
+  ]);
+  var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
+  var eqBySite={};equipements.forEach(function(e){eqBySite[e.site_id]=(eqBySite[e.site_id]||0)+1;});
+  var statsBySite={};
+  signalements.forEach(function(s){
+    var id=s.groupe_id;if(!statsBySite[id])statsBySite[id]={pannes:0,ttrs:[]};
+    statsBySite[id].pannes++;
+    if(s.created_at&&s.resolved_at){var ttr=(new Date(s.resolved_at)-new Date(s.created_at))/3600000;if(ttr>=0)statsBySite[id].ttrs.push(ttr);}
+  });
+  function fmtDur(h){if(h===null||h===undefined)return'—';if(h<1)return Math.round(h*60)+'min';if(h<48)return h.toFixed(1)+'h';return(h/24).toFixed(1)+'j';}
+  var totalPannes=signalements.length;
+  var allTtrs=signalements.filter(function(s){return s.created_at&&s.resolved_at;}).map(function(s){return(new Date(s.resolved_at)-new Date(s.created_at))/3600000;});
+  var avgMttr=allTtrs.length?allTtrs.reduce(function(a,b){return a+b;},0)/allTtrs.length:null;
+  var periodBtns=[30,90,180,365].map(function(p){return'<button onclick="_fiabSetPeriodGlobal('+p+')" style="padding:4px 10px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid '+(p===period?'var(--dark)':'var(--border)')+';background:'+(p===period?'var(--dark)':'transparent')+';color:'+(p===period?'var(--creme)':'var(--text2)')+'">'+p+'j</button>';}).join('');
+  var kpiCss='background:var(--creme);border:1px solid var(--border);border-radius:10px;padding:14px 16px;flex:1;min-width:120px;';
+  var kpiHtml='<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px">'+
+    [{icon:'🔴',label:'Total pannes ('+period+'j)',val:totalPannes,sub:'signalements résolus'},
+     {icon:'⏱️',label:'MTTR moyen global',val:fmtDur(avgMttr),sub:'temps de résolution'},
+     {icon:'🏨',label:'Hôtels',val:sites.length,sub:'sites surveillés'},
+     {icon:'⚙️',label:'Équipements actifs',val:equipements.length,sub:'sur tous les sites'}
+    ].map(function(k){return'<div style="'+kpiCss+'"><div style="font-size:18px;margin-bottom:4px">'+k.icon+'</div><div style="font-size:20px;font-weight:800;color:var(--dark);margin-bottom:2px">'+k.val+'</div><div style="font-size:10px;font-weight:600;color:var(--text2)">'+k.label+'</div><div style="font-size:10px;color:var(--text3)">'+k.sub+'</div></div>';}).join('')+'</div>';
+  var siteRows=sites.map(function(s){
+    var st=statsBySite[s.id]||{pannes:0,ttrs:[]};
+    var mttrAvg=st.ttrs.length?st.ttrs.reduce(function(a,b){return a+b;},0)/st.ttrs.length:null;
+    var mtbf=st.pannes>0?(period/st.pannes):null;
+    var pCol=st.pannes===0?'var(--vert)':st.pannes<=2?'#b45309':st.pannes<=5?'var(--orange)':'var(--rouge)';
+    var mCol=!mtbf?'var(--text3)':mtbf>=30?'var(--vert)':mtbf>=15?'var(--orange)':'var(--rouge)';
+    var snomEsc=escape_html(s.nom).replace(/'/g,"\\'");
+    return'<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="renderDirTechSite(_session,\''+s.id+'\',\''+snomEsc+'\',\'fiabilite\')" onmouseover="this.style.background=\'var(--creme)\'" onmouseout="this.style.background=\'\'">'+
+      '<td style="padding:10px 12px;font-weight:700;color:var(--dark)">'+escape_html(s.nom)+'</td>'+
+      '<td style="padding:10px 12px;text-align:center;font-size:14px;font-weight:800;color:'+pCol+'">'+st.pannes+'</td>'+
+      '<td style="padding:10px 12px;text-align:center;font-size:13px;font-weight:700;color:'+mCol+'">'+(mtbf?Math.round(mtbf)+'j':'—')+'</td>'+
+      '<td style="padding:10px 12px;text-align:center;font-size:13px;color:var(--text2)">'+fmtDur(mttrAvg)+'</td>'+
+      '<td style="padding:10px 12px;text-align:center;font-size:12px;color:var(--text3)">'+(eqBySite[s.id]||0)+'</td>'+
+    '</tr>';
+  }).join('');
+  return'<div style="max-width:900px;margin:0 auto">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">'+
+      '<div><div style="font-size:17px;font-weight:800;color:var(--dark)">📊 Fiabilité — Vue globale</div>'+
+      '<div style="font-size:12px;color:var(--text3);margin-top:2px">MTBF · MTTR par hôtel — Cliquez pour le détail par équipement</div></div>'+
+      '<div style="display:flex;gap:4px;align-items:center;background:var(--creme);border:1px solid var(--border);border-radius:8px;padding:4px">'+periodBtns+'</div>'+
+    '</div>'+
+    kpiHtml+
+    '<div style="background:white;border:1px solid var(--border);border-radius:12px;overflow:hidden">'+
+      '<table style="width:100%;border-collapse:collapse">'+
+        '<thead><tr style="background:var(--creme)">'+
+          '<th style="text-align:left;padding:8px 12px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">Hôtel</th>'+
+          '<th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">Pannes</th>'+
+          '<th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">MTBF</th>'+
+          '<th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">MTTR</th>'+
+          '<th style="text-align:center;padding:8px 12px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">Équipements</th>'+
+        '</tr></thead>'+
+        '<tbody>'+siteRows+'</tbody>'+
+      '</table>'+
+    '</div>'+
+    '<div style="margin-top:10px;padding:10px 14px;background:var(--creme);border-radius:8px;font-size:11px;color:var(--text3)">'+
+      '💡 <strong>MTBF</strong> = période / nb pannes. <strong>MTTR</strong> = durée moyenne de résolution. Cliquez un hôtel pour voir le détail par équipement.'+
+    '</div>'+
+  '</div>';
+}
+function _fiabSetPeriodGlobal(n){_fiabPeriod=n;if(_session)renderDirTech(_session,'fiabilite');}
+
 /* ── DIR TECH : détail site ── */
 function renderDirTechSite(session,sid,siteNom,nav){
   nav=nav||'accueil';
@@ -5551,6 +5706,7 @@ async function _loadDTSite(session,sid,siteNom,nav){
     else if(nav==='historique')html+=await _rtHistorique(sid);
     else if(nav==='signalements')html+=await _rtSignalements(sid);
     else if(nav==='maintenances')html+=await _rtMaintenances(sid);
+    else if(nav==='fiabilite')html+=await _dtFiabilite(sid);
     el.innerHTML=html;
   }catch(e){
     el.innerHTML='<div class="alert-banner" style="margin-top:12px"><div class="ab-icon">⚠️</div><div class="ab-body"><div class="ab-title">Erreur de chargement</div><div class="ab-sub">'+(e.message||'Vérifiez votre connexion')+'</div></div></div>';
