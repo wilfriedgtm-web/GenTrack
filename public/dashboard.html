@@ -2903,7 +2903,7 @@ async function _rtMaintenances(sid){
     var icon=typeIcons[src]||'🔧';
     var bg=typeBgs[src]||'var(--bg)';
     var isPlanifie=r.statut==='planifie';
-    var dateStr=r.date_ref?new Date(r.date_ref).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'';
+    var dateStr=r.date_ref?new Date(r.date_ref+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'';
     return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px'+(isPlanifie?';border-left:3px solid var(--amber)':'')+'">'+
       '<div style="display:flex;align-items:flex-start;gap:10px">'+
         '<div style="width:34px;height:34px;border-radius:50%;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">'+icon+'</div>'+
@@ -2983,10 +2983,7 @@ async function _mntEditerSauver(id,source){
   var ok=await supaPatch(table,id,payload);
   if(!ok){alert('Erreur lors de la mise à jour.');return;}
   _closeCfgModal();
-  if(_session){
-    if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
-    else renderRespTech(_session,'maintenances');
-  }
+  _mntRefresh();
 }
 
 function _mntMarquerRealise(id){
@@ -3007,20 +3004,28 @@ function _mntMarquerRealise(id){
   );
 }
 
+function _mntRefresh(){
+  if(!_session)return;
+  if(_doCurrentSite)renderDirOpsSite(_session,_doCurrentSite.id,_doCurrentSite.nom,'maintenances');
+  else if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
+  else renderRespTech(_session,'maintenances');
+}
+
 async function _mntMarquerRealiseSubmit(id){
   var date=document.getElementById('mnt-r-date').value||new Date().toISOString().split('T')[0];
   var coutStr=document.getElementById('mnt-r-cout').value;
   var cout=coutStr&&!isNaN(parseFloat(coutStr))?parseFloat(coutStr):null;
   var prest=(document.getElementById('mnt-r-prest').value||'').trim()||null;
-  await supaPatch('maintenances',id,{statut:'realise',date_intervention:date,cout:cout,prestataire:prest});
+  var ok=await supaPatch('maintenances',id,{statut:'realise',date_realisee:date,date_intervention:date,cout:cout,prestataire:prest});
+  if(!ok){alert('Erreur lors de la mise à jour.');return;}
   _closeCfgModal();
-  if(_session)renderRespTech(_session,'maintenances');
+  _mntRefresh();
 }
 
 async function _mntAnnuler(id){
   if(!confirm('Annuler cette opération planifiée ?'))return;
   await supaPatch('maintenances',id,{statut:'annule'});
-  if(_session)renderRespTech(_session,'maintenances');
+  _mntRefresh();
 }
 
 function _mntCreer(sid){
@@ -3071,12 +3076,14 @@ async function _mntCreerSubmit(sid){
   if(!titre&&type){titre=(_MNT_TYPES[type]&&_MNT_TYPES[type].label)||type;}
   await supaPost('maintenances',{
     groupe_id:sid,equipement_id:equipId,type:type,titre:titre,
-    description:desc,date_intervention:statut==='realise'?date:null,
+    description:desc,
+    date_intervention:statut==='realise'?date:date,
     date_planifiee:statut==='planifie'?date:null,
+    date_realisee:statut==='realise'?date:null,
     statut:statut,cout:cout,prestataire:prest,created_by:nom
   });
   _closeCfgModal();
-  if(_session)renderRespTech(_session,'maintenances');
+  _mntRefresh();
 }
 
 async function _rtConfig(sid){
