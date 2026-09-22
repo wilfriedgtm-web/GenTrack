@@ -2332,21 +2332,39 @@ async function _rtCommandes(sid,session){
   if(!demandes.length){
     h+='<div style="text-align:center;padding:32px;color:var(--text3);font-size:13px">Aucune demande envoyée</div>';
   } else {
-    var STATUT_STYLE={en_attente:{label:'En attente',color:'var(--orange)',bg:'var(--orange-pale)'},approuve:{label:'Approuvé',color:'var(--vert)',bg:'var(--vert-pale)'},livre:{label:'Livré ✅',color:'var(--vert)',bg:'var(--vert-pale)'},annule:{label:'Annulé',color:'var(--text3)',bg:'#f5f5f5'}};
+    var STATUT_STYLE={en_attente:{label:'En attente',color:'var(--orange)',bg:'var(--orange-pale)'},approuve:{label:'Approuvé',color:'#7c3aed',bg:'#f3e8ff'},livre:{label:'Livré ✅',color:'var(--vert)',bg:'var(--vert-pale)'},annule:{label:'Annulé',color:'var(--text3)',bg:'#f5f5f5'}};
+    var btnStyle='font-size:10px;font-weight:700;padding:4px 10px;border-radius:6px;border:1.5px solid;cursor:pointer;background:white;';
     demandes.forEach(function(d){
       var t=_DEMANDE_TYPES[d.type]||{label:d.type,icon:'📝'};
       var u=STATUT_STYLE[d.statut]||STATUT_STYLE['en_attente'];
       var date=d.created_at?new Date(d.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-      h+='<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:flex-start;gap:12px">'+
-        '<div style="font-size:22px;flex-shrink:0">'+t.icon+'</div>'+
-        '<div style="flex:1;min-width:0">'+
-          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'+
-            '<span style="font-size:12px;font-weight:700;color:var(--dark)">'+escape_html(t.label)+'</span>'+
-            (d.quantite?'<span style="font-size:11px;color:var(--text2)">· '+d.quantite+' '+(d.unite||'')+'</span>':'')+
-            '<span style="margin-left:auto;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;color:'+u.color+';background:'+u.bg+'">'+u.label+'</span>'+
+      var ref=d.note?'<span style="font-size:10px;color:var(--text3);font-family:monospace">'+escape_html(d.note)+'</span>':'';
+      // Boutons selon statut
+      var actions='';
+      if(d.statut==='en_attente'){
+        actions='<div style="display:flex;gap:6px;margin-top:8px">'+
+          '<button onclick="_demandeChangerStatut(\''+d.id+'\',\'approuve\')" style="'+btnStyle+'border-color:var(--vert);color:var(--vert)">✅ Approuver</button>'+
+          '<button onclick="_demandeChangerStatut(\''+d.id+'\',\'annule\')" style="'+btnStyle+'border-color:var(--rouge);color:var(--rouge)">❌ Annuler</button>'+
+        '</div>';
+      } else if(d.statut==='approuve'){
+        actions='<div style="display:flex;gap:6px;margin-top:8px">'+
+          '<button onclick="_demandeChangerStatut(\''+d.id+'\',\'livre\')" style="'+btnStyle+'border-color:var(--vert);color:var(--vert)">📦 Marquer livré</button>'+
+          '<button onclick="_demandeChangerStatut(\''+d.id+'\',\'annule\')" style="'+btnStyle+'border-color:var(--rouge);color:var(--rouge)">❌ Annuler</button>'+
+        '</div>';
+      }
+      h+='<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:8px">'+
+        '<div style="display:flex;align-items:flex-start;gap:12px">'+
+          '<div style="font-size:22px;flex-shrink:0">'+t.icon+'</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'+
+              '<span style="font-size:12px;font-weight:700;color:var(--dark)">'+escape_html(t.label)+'</span>'+
+              (d.quantite?'<span style="font-size:11px;color:var(--text2)">· '+d.quantite+' '+(d.unite||'')+'</span>':'')+
+              '<span style="margin-left:auto;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;color:'+u.color+';background:'+u.bg+'">'+u.label+'</span>'+
+            '</div>'+
+            (d.description?'<div style="font-size:11px;color:var(--text2);margin-bottom:3px">'+escape_html(d.description.substring(0,80))+'</div>':'')+
+            '<div style="font-size:10px;color:var(--text3);display:flex;gap:8px;align-items:center">'+date+ref+'</div>'+
+            actions+
           '</div>'+
-          (d.description?'<div style="font-size:11px;color:var(--text2);margin-bottom:3px">'+escape_html(d.description.substring(0,80))+'</div>':'')+
-          '<div style="font-size:10px;color:var(--text3)">'+date+(d.destinataire_mail?' · ✉️ '+escape_html(d.destinataire_mail):'')+'</div>'+
         '</div>'+
       '</div>';
     });
@@ -2646,8 +2664,8 @@ async function _envoyerDemande(){
 
   var subject=encodeURIComponent('[GenTrack] '+ref+' — '+typeLabel+(eqNom?' / '+eqNom:''));
 
-  // Save to DB
-  await supaPost('demandes',{
+  // Enregistrement DB — bloquant avec vérification
+  var inserted=await supaPost('demandes',{
     site_id:sid,
     equipement_id:eqId||null,
     auteur_nom:auteurNom,
@@ -2660,12 +2678,59 @@ async function _envoyerDemande(){
     statut:'en_attente',
     destinataire_nom:null,
     destinataire_mail:null,
+    note:ref,
     date_envoi:new Date().toISOString()
   });
+  if(!inserted||!inserted.id){
+    alert('❌ Erreur : la demande n\'a pas pu être enregistrée. Vérifiez votre connexion et réessayez.');
+    return;
+  }
 
   _closeCfgModal();
   window.location.href='mailto:?subject='+subject+'&body='+encodeURIComponent(lines);
   if(_session)renderRespTech(_session,'commandes');
+}
+
+/* ── gestion statut demandes ── */
+async function _demandeChangerStatut(id,statut){
+  var ok=await supaPatch('demandes',id,{statut:statut});
+  if(!ok){alert('Erreur lors de la mise à jour du statut.');return;}
+  // Si livré → créer entrée maintenance
+  if(statut==='livre'){
+    // Récupère la demande pour avoir tous les champs
+    var rows=await supaGet('demandes','id=eq.'+id+'&select=*');
+    if(rows&&rows.length)await _demandeCreerMaintenance(rows[0]);
+  }
+  // Refresh
+  if(_session){
+    var nav=_currentNav||'commandes';
+    if(_doCurrentSite)renderDirOpsSite(_session,_doCurrentSite.id,_doCurrentSite.nom,nav);
+    else if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,nav);
+    else renderRespTech(_session,'commandes');
+  }
+}
+
+async function _demandeCreerMaintenance(d){
+  // Mapping type demande → type maintenance
+  var typeMap={carburant:'ravitaillement',piece:'preventive',materiel:'preventive',autre:'preventive'};
+  var mntType=typeMap[d.type]||'preventive';
+  var typeLabel=_DEMANDE_TYPES[d.type]?_DEMANDE_TYPES[d.type].label:d.type;
+  var titre='Livraison '+typeLabel+(d.equipement_id?' — équipement':'');
+  var notes='Créé automatiquement depuis bon de commande '+(d.note||d.id)+'\nDemandé par : '+(d.auteur_nom||'')+' ('+roleName(d.auteur_role||'')+')'+(d.description?'\nBesoin : '+d.description:'');
+  await supaPost('maintenances',{
+    groupe_id:d.site_id,
+    equipement_id:d.equipement_id||null,
+    type:mntType,
+    titre:titre,
+    description:d.description||null,
+    quantite:d.quantite||null,
+    unite:d.unite||null,
+    statut:'realise',
+    date_intervention:new Date().toISOString().split('T')[0],
+    date_realisee:new Date().toISOString().split('T')[0],
+    notes:notes,
+    created_by:d.auteur_nom||null
+  });
 }
 
 async function _rtMaintenances(sid){
