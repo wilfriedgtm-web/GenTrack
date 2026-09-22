@@ -2860,21 +2860,28 @@ async function _rtMaintenances(sid){
   // KPIs mois courant
   var moisDebut=new Date(new Date().getFullYear(),new Date().getMonth(),1);
   var rowsMois=allRows.filter(function(r){return new Date(r.created_at)>=moisDebut;});
+  var rowsPannes=rowsMois.filter(function(r){return r.type==='panne';});
+  var rowsOps=rowsMois.filter(function(r){return r.type!=='panne';});
   var totalCout=rowsMois.reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
-  var nbOps=rowsMois.filter(function(r){return r.type!=='panne';}).length;
-  var nbPannesMnt=rowsMois.filter(function(r){return r.type==='panne';}).length;
+  var coutOps=rowsOps.reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
+  var coutPannes=rowsPannes.reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
+  var nbOps=rowsOps.length;
 
-  var kpiHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'+
-    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
-      '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Coût ce mois</div>'+
-      '<div style="font-size:20px;font-weight:800;color:var(--dark)">'+totalCout.toLocaleString('fr-FR')+'</div>'+
-      '<div style="font-size:11px;color:var(--text3)">FCFA'+(nbPannesMnt>0?' (dont '+nbPannesMnt+' pannes)':'')+'</div>'+
-    '</div>'+
-    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
-      '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Opérations</div>'+
-      '<div style="font-size:20px;font-weight:800;color:var(--dark)">'+nbOps+'</div>'+
-      '<div style="font-size:11px;color:var(--text3)">vidanges / ravitaillements ce mois</div>'+
-    '</div>'+
+  // Lignes détail coût
+  var detailLines=[];
+  if(coutOps>0)detailLines.push('<span>⚙️ '+coutOps.toLocaleString('fr-FR')+' opérations</span>');
+  if(coutPannes>0)detailLines.push('<span>🔴 '+coutPannes.toLocaleString('fr-FR')+' pannes</span>');
+
+  var kpiHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px">'+
+    '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Coût ce mois</div>'+
+    '<div style="font-size:22px;font-weight:800;color:var(--dark)">'+totalCout.toLocaleString('fr-FR')+' <span style="font-size:13px;font-weight:600;color:var(--text3)">FCFA</span></div>'+
+    (detailLines.length?'<div style="display:flex;gap:12px;margin-top:4px;font-size:11px;color:var(--text3)">'+detailLines.join('')+'</div>':
+      '<div style="font-size:11px;color:var(--text3)">Aucune dépense ce mois</div>')+
+  '</div>'+
+  '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px">'+
+    '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Opérations ce mois</div>'+
+    '<div style="font-size:22px;font-weight:800;color:var(--dark)">'+nbOps+'</div>'+
+    '<div style="font-size:11px;color:var(--text3)">vidanges · ravitaillements · maintenances</div>'+
   '</div>';
 
   // Exclure pannes des cards — elles vivent dans Signalements
