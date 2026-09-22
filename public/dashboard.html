@@ -493,6 +493,7 @@ function buildNavItems(role){
     items.push({id:'signalements',icon:'location_on',label:'Signalements'});
     items.push({id:'maintenances',icon:'build',label:'Maintenance'});
     items.push({id:'commandes',icon:'shopping_cart',label:'Commandes'});
+    items.push({id:'equipe',icon:'group',label:'Mon équipe'});
     items.push({id:'releves',icon:'schedule',label:'Relevés'});
     items.push({id:'config',icon:'settings',label:'Config'});
   }
@@ -654,6 +655,7 @@ async function _loadRT(session,nav){
     else if(nav==='signalements')html=await _rtSignalements(sid);
     else if(nav==='maintenances')html=await _rtMaintenances(sid);
     else if(nav==='commandes')html=await _rtCommandes(sid,session);
+    else if(nav==='equipe')html=await _rtMonEquipe(sid,session);
     else if(nav==='config')html=await _rtConfig(sid);
     el.innerHTML=html;
   }catch(e){
@@ -2844,6 +2846,176 @@ async function _demandeCreerMaintenance(d){
     created_by:d.auteur_nom||null,
     cout:d.cout||null
   });
+}
+
+/* ── Mon équipe (Resp Tech) ── */
+async function _rtMonEquipe(sid,session){
+  var dc=document.getElementById('dash-content-main');
+  if(dc){dc.style.padding='16px';dc.style.maxWidth='960px';}
+
+  var j30date=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
+  var j30ts=new Date(Date.now()-30*86400000).toISOString();
+
+  var [contacts,rondes30,signalements30,maintenances30]=await Promise.all([
+    supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,role&order=nom.asc'),
+    supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+j30date+'&select=id,date_ronde,frequence,technicien_id&order=date_ronde.desc'),
+    supaGet('signalements','groupe_id=eq.'+sid+'&statut=eq.resolu&resolved_at=gte.'+j30ts+'&select=id,equipement_id,created_at,resolved_at,resolved_by,equipements(nom)'),
+    supaGet('maintenances','groupe_id=eq.'+sid+'&statut=eq.realise&created_at=gte.'+j30ts+'&select=id,type,created_by,prestataire,cout')
+  ]);
+
+  // Conformité rondes
+  var rondesIds=rondes30.map(function(r){return r.id;});
+  var rondesEq=rondesIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rondesIds.join(',')+')'+'&select=ronde_id,statut'):[];
+
+  // Index ronde_id → technicien_id
+  var rondeToTech={};
+  rondes30.forEach(function(r){if(r.technicien_id)rondeToTech[r.id]=r.technicien_id;});
+
+  // Stats par tech (UUID)
+  var statsByTech={};
+  function ensureTech(tid){if(!statsByTech[tid])statsByTech[tid]={rondes:0,reqTotal:0,reqOk:0,pannes:0,mnt:0};}
+
+  rondes30.forEach(function(r){
+    if(!r.technicien_id)return;
+    ensureTech(r.technicien_id);
+    statsByTech[r.technicien_id].rondes++;
+  });
+  rondesEq.forEach(function(re){
+    var tid=rondeToTech[re.ronde_id];if(!tid)return;
+    ensureTech(tid);
+    statsByTech[tid].reqTotal++;
+    if(re.statut==='ok')statsByTech[tid].reqOk++;
+  });
+
+  // Pannes résolues par resolved_by (text) → match sur contact.nom
+  var contactByNom={};
+  contacts.forEach(function(c){contactByNom[c.nom.toLowerCase()]=c.id;});
+  signalements30.forEach(function(s){
+    if(!s.resolved_by)return;
+    var tid=contactByNom[(s.resolved_by||'').toLowerCase()];
+    if(!tid)return;
+    ensureTech(tid);
+    statsByTech[tid].pannes++;
+  });
+
+  // Maintenances par created_by (text)
+  maintenances30.forEach(function(m){
+    var nom=(m.created_by||m.prestataire||'').toLowerCase();
+    var tid=contactByNom[nom];
+    if(!tid)return;
+    ensureTech(tid);
+    statsByTech[tid].mnt++;
+  });
+
+  // MTTR par équipement
+  var mttrMap={};
+  signalements30.forEach(function(s){
+    if(!s.resolved_at||!s.created_at)return;
+    var h=(new Date(s.resolved_at)-new Date(s.created_at))/3600000;
+    var nom=(s.equipements&&s.equipements.nom)||'Inconnu';
+    if(!mttrMap[nom])mttrMap[nom]={total:0,count:0};
+    mttrMap[nom].total+=h;mttrMap[nom].count++;
+  });
+
+  // Global KPIs
+  var totalRondes=rondes30.length;
+  var totalReqOk=rondesEq.filter(function(r){return r.statut==='ok';}).length;
+  var conformGlob=rondesEq.length?Math.round(totalReqOk/rondesEq.length*100):null;
+  var mttrMoyH=signalements30.filter(function(s){return s.resolved_at;}).length?
+    signalements30.filter(function(s){return s.resolved_at;})
+      .reduce(function(s,r){return s+(new Date(r.resolved_at)-new Date(r.created_at))/3600000;},0)/
+    signalements30.filter(function(s){return s.resolved_at;}).length:null;
+
+  var kpiHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px">'+
+    [
+      {label:'Rondes',val:totalRondes,sub:'30 derniers jours',col:'var(--bleu)'},
+      {label:'Conformité',val:conformGlob!=null?conformGlob+'%':'—',sub:'points de contrôle ok',col:conformGlob>=80?'var(--vert)':conformGlob>=60?'var(--amber)':'var(--rouge)'},
+      {label:'Pannes résolues',val:signalements30.length,sub:'en 30 jours',col:'var(--vert)'},
+      {label:'MTTR moyen',val:mttrMoyH!=null?(mttrMoyH<48?Math.round(mttrMoyH)+'h':Math.round(mttrMoyH/24)+'j'):'—',sub:'temps résolution',col:mttrMoyH&&mttrMoyH<24?'var(--vert)':mttrMoyH&&mttrMoyH<72?'var(--amber)':'var(--rouge)'}
+    ].map(function(k){
+      return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
+        '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">'+k.label+'</div>'+
+        '<div style="font-size:22px;font-weight:800;color:'+k.col+'">'+k.val+'</div>'+
+        '<div style="font-size:10px;color:var(--text3)">'+k.sub+'</div>'+
+      '</div>';
+    }).join('')+
+  '</div>';
+
+  // Cards par technicien
+  var techs=contacts.filter(function(c){return c.role==='technicien'||c.role==='resp_tech';});
+  var techCards=techs.map(function(c){
+    var st=statsByTech[c.id]||{rondes:0,reqTotal:0,reqOk:0,pannes:0,mnt:0};
+    var conf=st.reqTotal?Math.round(st.reqOk/st.reqTotal*100):null;
+    var confCol=conf===null?'var(--text3)':conf>=80?'var(--vert)':conf>=60?'var(--amber)':'var(--rouge)';
+    var initials=c.nom.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);
+    var isResp=c.role==='resp_tech';
+    return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px;display:flex;gap:12px;align-items:flex-start;margin-bottom:10px">'+
+      '<div style="width:40px;height:40px;border-radius:50%;background:'+(isResp?'var(--amber-pale)':'var(--bleu-pale)')+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:'+(isResp?'var(--amber-dark)':'var(--bleu)')+';flex-shrink:0">'+initials+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">'+
+          '<span style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(c.nom)+'</span>'+
+          (isResp?'<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;background:var(--amber-pale);color:var(--amber-dark)">Chef</span>':'')+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+
+          '<div style="text-align:center;background:var(--creme);border-radius:8px;padding:8px 4px">'+
+            '<div style="font-size:16px;font-weight:800;color:var(--bleu)">'+st.rondes+'</div>'+
+            '<div style="font-size:9px;color:var(--text3);margin-top:1px">rondes</div>'+
+          '</div>'+
+          '<div style="text-align:center;background:var(--creme);border-radius:8px;padding:8px 4px">'+
+            '<div style="font-size:16px;font-weight:800;color:'+confCol+'">'+( conf!==null?conf+'%':'—')+'</div>'+
+            '<div style="font-size:9px;color:var(--text3);margin-top:1px">conformité</div>'+
+          '</div>'+
+          '<div style="text-align:center;background:var(--creme);border-radius:8px;padding:8px 4px">'+
+            '<div style="font-size:16px;font-weight:800;color:var(--vert)">'+st.pannes+'</div>'+
+            '<div style="font-size:9px;color:var(--text3);margin-top:1px">pannes rés.</div>'+
+          '</div>'+
+          '<div style="text-align:center;background:var(--creme);border-radius:8px;padding:8px 4px">'+
+            '<div style="font-size:16px;font-weight:800;color:var(--text)">'+st.mnt+'</div>'+
+            '<div style="font-size:9px;color:var(--text3);margin-top:1px">maintenances</div>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  if(!techs.length)techCards='<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px">Aucun technicien enregistré pour ce site.</div>';
+
+  // Table MTTR par équipement
+  var mttrRows=Object.keys(mttrMap).sort(function(a,b){return mttrMap[b].total/mttrMap[b].count-mttrMap[a].total/mttrMap[a].count;}).map(function(nom){
+    var d=mttrMap[nom];
+    var moy=d.total/d.count;
+    var moyStr=moy<48?Math.round(moy)+'h':(Math.round(moy/24)+'j');
+    var col=moy<24?'var(--vert)':moy<72?'var(--amber)':'var(--rouge)';
+    return '<tr>'+
+      '<td style="padding:8px 10px;font-size:12px;color:var(--text)">'+escape_html(nom)+'</td>'+
+      '<td style="padding:8px 10px;font-size:12px;text-align:center;color:var(--text2)">'+d.count+'</td>'+
+      '<td style="padding:8px 10px;font-size:13px;font-weight:700;text-align:center;color:'+col+'">'+moyStr+'</td>'+
+    '</tr>';
+  }).join('');
+
+  var mttrSection=mttrRows?
+    '<div style="margin-top:20px">'+
+      '<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:6px">⏱️ MTTR par équipement — 30j <span style="font-size:10px;font-weight:400;color:var(--text3)">(temps moyen de résolution)</span></div>'+
+      '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden">'+
+        '<table style="width:100%;border-collapse:collapse">'+
+          '<thead><tr style="background:var(--creme)">'+
+            '<th style="padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);text-align:left">Équipement</th>'+
+            '<th style="padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);text-align:center">Pannes rés.</th>'+
+            '<th style="padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);text-align:center">MTTR moy.</th>'+
+          '</tr></thead>'+
+          '<tbody>'+mttrRows+'</tbody>'+
+        '</table>'+
+      '</div>'+
+    '</div>':
+    '<div style="background:var(--creme);border-radius:10px;padding:16px;text-align:center;color:var(--text3);font-size:12px;margin-top:20px">Aucune panne résolue sur les 30 derniers jours.</div>';
+
+  return '<div>'+
+    '<div style="font-size:18px;font-weight:800;color:var(--dark);margin-bottom:16px">👥 Mon équipe</div>'+
+    kpiHtml+
+    '<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px">Techniciens — 30 derniers jours</div>'+
+    techCards+
+    mttrSection+
+  '</div>';
 }
 
 async function _rtMaintenances(sid){
