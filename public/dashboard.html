@@ -2861,7 +2861,7 @@ async function _rtMonEquipe(sid,session){
   var [contacts,rondes30,signalements30,maintenances30]=await Promise.all([
     supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,role&order=nom.asc'),
     supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+j30date+'&select=id,date_ronde,frequence,technicien_id&order=date_ronde.desc'),
-    supaGet('signalements','groupe_id=eq.'+sid+'&statut=eq.resolu&resolved_at=gte.'+j30ts+'&select=id,equipement_id,created_at,resolved_at,resolved_by,equipements(nom)'),
+    supaGet('signalements','groupe_id=eq.'+sid+'&statut=eq.resolu&resolved_at=gte.'+j30ts+'&select=id,equipement_id,created_at,resolved_at,resolved_by,assigne_a,pris_en_charge_par,equipements(nom)'),
     supaGet('maintenances','groupe_id=eq.'+sid+'&statut=eq.realise&created_at=gte.'+j30ts+'&select=id,type,created_by,prestataire,cout')
   ]);
 
@@ -2893,8 +2893,9 @@ async function _rtMonEquipe(sid,session){
   var contactByNom={};
   contacts.forEach(function(c){contactByNom[c.nom.toLowerCase()]=c.id;});
   signalements30.forEach(function(s){
-    if(!s.resolved_by)return;
-    var tid=contactByNom[(s.resolved_by||'').toLowerCase()];
+    var byNom=(s.resolved_by||s.assigne_a||s.pris_en_charge_par||'').toLowerCase().trim();
+    if(!byNom)return;
+    var tid=contactByNom[byNom];
     if(!tid)return;
     ensureTech(tid);
     statsByTech[tid].pannes++;
