@@ -1155,8 +1155,8 @@ async function _rtAlertes(sid,cid){
   var[actives,historique,anomalies,pannesActives]=await Promise.all([
     supaGet('alertes','groupe_id=eq.'+sid+'&resolue=eq.false&select=id,type,severite,type_alerte,message,created_at&order=created_at.desc&limit=50'),
     supaGet('alertes','groupe_id=eq.'+sid+'&resolue=eq.true&created_at=gte.'+cutoff30+'T00:00:00&select=id,type,severite,type_alerte,message,created_at&order=created_at.desc&limit=30'),
-    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.anomalie&statut=neq.resolu&select=id,description,equipement_id,created_at,equipements(nom)&order=created_at.desc&limit=20'),
-    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&statut=neq.resolu&select=id,description,equipement_id,created_at,equipements(nom)&order=created_at.desc&limit=20')
+    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.anomalie&statut=neq.resolu&select=id,description,equipement_id,created_at,ref_code,statut,pris_en_charge_par,assigne_a,equipements(nom)&order=created_at.desc&limit=20'),
+    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&statut=neq.resolu&select=id,description,equipement_id,created_at,ref_code,statut,pris_en_charge_par,assigne_a,equipements(nom)&order=created_at.desc&limit=20')
   ]);
 
   // marquer toutes les alertes actives comme lues
@@ -1210,12 +1210,21 @@ async function _rtAlertes(sid,cid){
     pannesActives.forEach(function(sg){
       var eqNom=sg.equipements&&sg.equipements.nom?sg.equipements.nom:'';
       var ts=sg.created_at?_relativeTime(sg.created_at):'';
+      var ref=sg.ref_code||'';
+      var enCours=sg.statut==='en_cours';
+      var preneur=sg.assigne_a||sg.pris_en_charge_par||'';
       h+='<div style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge);border-radius:10px;padding:12px 14px">'+
-        '<div style="font-size:11px;font-weight:600;color:var(--rouge);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">🔴 Panne'+(eqNom?' · '+escape_html(eqNom):'')+'</div>'+
-        '<div style="font-size:12px;color:var(--text);line-height:1.4">'+escape_html(sg.description||'')+'</div>'+
-        (ts?'<div style="font-size:10px;color:var(--text3);margin-top:5px">'+ts+'</div>':'')+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+          '<div style="flex:1">'+
+            '<div style="font-size:11px;font-weight:600;color:var(--rouge);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">🔴 Panne'+(eqNom?' · '+escape_html(eqNom):'')+'</div>'+
+            '<div style="font-size:12px;color:var(--text);line-height:1.4">'+escape_html(sg.description||'')+'</div>'+
+            '<div style="font-size:10px;color:var(--text3);margin-top:5px">'+(ts||'')+(ts&&ref?' · ':'')+escape_html(ref)+'</div>'+
+          '</div>'+
+          (enCours?'<span style="font-size:10px;font-weight:600;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);border-radius:12px;padding:3px 9px;white-space:nowrap;flex-shrink:0">⚡ '+escape_html(preneur||'En cours')+'</span>':'')+
+        '</div>'+
         '<div style="display:flex;gap:6px;margin-top:10px">'+
-          '<button onclick="navTo(\'signalements\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--rouge-border);background:none;font-size:11px;color:var(--rouge);cursor:pointer">Voir signalement</button>'+
+          (!enCours?'<button onclick="_openPEC(\''+sg.id+'\',\''+escape_html(ref)+'\',\''+sid+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--rouge-border);background:none;font-size:11px;color:var(--rouge);font-weight:600;cursor:pointer">👤 Prendre en charge</button>':
+                    '<button onclick="navTo(\'signalements\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--rouge-border);background:none;font-size:11px;color:var(--rouge);cursor:pointer">Voir détail</button>')+
           '<button onclick="_resolveSg(\''+sg.id+'\')" style="flex:1;padding:6px;border-radius:6px;border:none;background:var(--rouge);color:white;font-size:11px;font-weight:600;cursor:pointer">✓ Résolu</button>'+
         '</div>'+
       '</div>';
@@ -1223,12 +1232,21 @@ async function _rtAlertes(sid,cid){
     anomalies.forEach(function(sg){
       var eqNom=sg.equipements&&sg.equipements.nom?sg.equipements.nom:'';
       var ts=sg.created_at?_relativeTime(sg.created_at):'';
+      var ref=sg.ref_code||'';
+      var enCours=sg.statut==='en_cours';
+      var preneur=sg.assigne_a||sg.pris_en_charge_par||'';
       h+='<div style="background:var(--orange-pale);border:1px solid var(--orange-border);border-left:3px solid var(--orange);border-radius:10px;padding:12px 14px">'+
-        '<div style="font-size:11px;font-weight:600;color:var(--orange);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Anomalie ronde'+(eqNom?' · '+escape_html(eqNom):'')+'</div>'+
-        '<div style="font-size:12px;color:var(--text);line-height:1.4">'+escape_html(sg.description||'')+'</div>'+
-        (ts?'<div style="font-size:10px;color:var(--text3);margin-top:5px">'+ts+'</div>':'')+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
+          '<div style="flex:1">'+
+            '<div style="font-size:11px;font-weight:600;color:var(--orange);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px">Anomalie · '+(eqNom?escape_html(eqNom):'Ronde')+'</div>'+
+            '<div style="font-size:12px;color:var(--text);line-height:1.4">'+escape_html(sg.description||'')+'</div>'+
+            '<div style="font-size:10px;color:var(--text3);margin-top:5px">'+(ts||'')+(ts&&ref?' · ':'')+escape_html(ref)+'</div>'+
+          '</div>'+
+          (enCours?'<span style="font-size:10px;font-weight:600;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);border-radius:12px;padding:3px 9px;white-space:nowrap;flex-shrink:0">⚡ '+escape_html(preneur||'En cours')+'</span>':'')+
+        '</div>'+
         '<div style="display:flex;gap:6px;margin-top:10px">'+
-          '<button onclick="navTo(\'signalements\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--orange-border);background:none;font-size:11px;color:var(--orange);cursor:pointer">Voir signalement</button>'+
+          (!enCours?'<button onclick="_openPEC(\''+sg.id+'\',\''+escape_html(ref)+'\',\''+sid+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--orange-border);background:none;font-size:11px;color:var(--orange);font-weight:600;cursor:pointer">👤 Prendre en charge</button>':
+                    '<button onclick="navTo(\'signalements\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--orange-border);background:none;font-size:11px;color:var(--orange);cursor:pointer">Voir détail</button>')+
           '<button onclick="_resolveSg(\''+sg.id+'\')" style="flex:1;padding:6px;border-radius:6px;border:none;background:var(--orange);color:white;font-size:11px;font-weight:600;cursor:pointer">✓ Résolu</button>'+
         '</div>'+
       '</div>';
@@ -1307,6 +1325,48 @@ async function _resolveSg(id){
     await supaPost('maintenances',mnt);
   }
   navTo('alertes');
+}
+
+/* ── Prise en charge modal ── */
+var _pecSgId=null,_pecSid=null;
+async function _openPEC(sgId,refCode,siteId){
+  _pecSgId=sgId;_pecSid=siteId;
+  var modal=document.getElementById('pec-modal');
+  var title=document.getElementById('pec-title');
+  var list=document.getElementById('pec-tech-list');
+  if(!modal||!title||!list)return;
+  title.textContent='Prendre en charge · '+refCode;
+  list.innerHTML='<div style="text-align:center;padding:12px;color:var(--text3);font-size:12px">Chargement…</div>';
+  modal.style.display='flex';
+  var techs=await supaGet('contacts','site_id=eq.'+siteId+'&role=eq.technicien&select=nom&order=nom.asc');
+  var moi=_session&&_session.contact&&_session.contact.nom?_session.contact.nom:'';
+  var h='';
+  if(moi){
+    h+='<button onclick="_prendreEnCharge(\''+sgId+'\','+JSON.stringify(moi)+','+JSON.stringify(moi)+')" style="width:100%;text-align:left;padding:12px 16px;border:none;background:var(--amber-pale);border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--amber-dark);margin-bottom:8px">👤 Je prends en charge<br><span style="font-size:11px;font-weight:400;color:var(--text2)">'+escape_html(moi)+'</span></button>';
+  }
+  if(techs&&techs.length){
+    var autresTechs=techs.filter(function(t){return t.nom!==moi;});
+    if(autresTechs.length){
+      h+='<div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin:10px 0 8px;text-align:center">— Affecter à —</div>';
+      autresTechs.forEach(function(t){
+        h+='<button onclick="_prendreEnCharge(\''+sgId+'\','+JSON.stringify(moi||t.nom)+','+JSON.stringify(t.nom)+')" style="width:100%;text-align:left;padding:10px 16px;border:1px solid var(--border);background:white;border-radius:8px;cursor:pointer;font-size:13px;color:var(--text);margin-bottom:6px;display:block">'+escape_html(t.nom)+'</button>';
+      });
+    }
+  }
+  list.innerHTML=h||'<div style="padding:12px;color:var(--text3);font-size:12px;text-align:center">Aucun technicien trouvé</div>';
+}
+function _closePEC(){
+  var modal=document.getElementById('pec-modal');
+  if(modal)modal.style.display='none';
+}
+async function _prendreEnCharge(sgId,prisParNom,assigneANom){
+  _closePEC();
+  var now=new Date().toISOString();
+  await supaPatch('signalements',sgId,{statut:'en_cours',pris_en_charge_par:prisParNom,assigne_a:assigneANom,pris_en_charge_at:now});
+  if(!_session)return;
+  if(_doCurrentSite)renderDirOpsSite(_session,_doCurrentSite.id,_doCurrentSite.nom,'alertes');
+  else if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'alertes');
+  else renderRespTech(_session,'alertes');
 }
 
 async function _marquerTraite(table,id,fromNav){
@@ -4014,7 +4074,7 @@ async function _dtAlertes(sids,cid){
   var[sites,alertes,pannes]=await Promise.all([
     supaGet('sites','id=in.('+sidStr+')&select=id,nom'),
     supaGet('alertes','client_id=eq.'+cid+'&resolue=eq.false&select=id,type,severite,message,created_at&order=created_at.desc'),
-    supaGet('signalements','groupe_id=in.('+sidStr+')&type=eq.panne&statut=neq.resolu&select=id,groupe_id,type,description,created_at,equipements(nom)&order=created_at.desc&limit=50')
+    supaGet('signalements','groupe_id=in.('+sidStr+')&type=eq.panne&statut=neq.resolu&select=id,groupe_id,type,description,created_at,ref_code,statut,pris_en_charge_par,assigne_a,equipements(nom)&order=created_at.desc&limit=50')
   ]);
   var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
   if(alertes.length===0&&pannes.length===0){
@@ -4046,14 +4106,24 @@ function _buildAlerteCardsDT(alertes,pannes,fromNav,siteMap){
     var eqNom=p.equipements&&p.equipements.nom?' · '+p.equipements.nom:'';
     var sNom=siteMap&&p.groupe_id&&siteMap[p.groupe_id]?' · '+siteMap[p.groupe_id]:'';
     var ts=p.created_at?new Date(p.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-    h+='<div class="alerte-card clickable" style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge)" onclick="_goToSignalement(\''+p.id+'\')">'+
-      '<span style="font-size:16px;margin-top:1px">🔴</span>'+
-      '<div style="flex:1">'+
-        '<div class="alerte-card-titre" style="color:var(--rouge)">Panne'+escape_html(eqNom)+escape_html(sNom)+'</div>'+
-        '<div class="alerte-card-msg">'+escape_html(p.description||'')+'</div>'+
-        (ts?'<div style="font-size:10px;color:var(--text3);margin-top:4px">'+ts+'</div>':'')+
+    var ref=p.ref_code||'';
+    var enCours=p.statut==='en_cours';
+    var preneur=p.assigne_a||p.pris_en_charge_par||'';
+    h+='<div class="alerte-card" style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge);flex-direction:column;align-items:stretch;gap:0">'+
+      '<div style="display:flex;align-items:flex-start;gap:10px">'+
+        '<span style="font-size:16px;margin-top:1px">🔴</span>'+
+        '<div style="flex:1">'+
+          '<div class="alerte-card-titre" style="color:var(--rouge)">Panne'+escape_html(eqNom)+escape_html(sNom)+'</div>'+
+          '<div class="alerte-card-msg">'+escape_html(p.description||'')+'</div>'+
+          '<div style="font-size:10px;color:var(--text3);margin-top:4px">'+(ts||'')+(ts&&ref?' · ':'')+escape_html(ref)+'</div>'+
+        '</div>'+
+        (enCours?'<span style="font-size:10px;font-weight:600;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);border-radius:12px;padding:3px 9px;white-space:nowrap;flex-shrink:0">⚡ '+escape_html(preneur||'En cours')+'</span>':'')+
       '</div>'+
-      '<button class="btn-traite" onclick="event.stopPropagation();_marquerTraiteDT(\'signalements\',\''+p.id+'\',\''+fromNav+'\')">✓ Résolu</button>'+
+      '<div style="display:flex;gap:6px;margin-top:10px">'+
+        (!enCours?'<button onclick="_openPEC(\''+p.id+'\',\''+escape_html(ref)+'\',\''+p.groupe_id+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--rouge-border);background:none;font-size:11px;color:var(--rouge);font-weight:600;cursor:pointer">👤 Prendre en charge</button>':
+                  '<button onclick="_goToSignalement(\''+p.id+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--rouge-border);background:none;font-size:11px;color:var(--rouge);cursor:pointer">Voir détail</button>')+
+        '<button onclick="event.stopPropagation();_marquerTraiteDT(\'signalements\',\''+p.id+'\',\''+fromNav+'\')" style="flex:1;padding:6px;border-radius:6px;border:none;background:var(--rouge);color:white;font-size:11px;font-weight:600;cursor:pointer">✓ Résolu</button>'+
+      '</div>'+
     '</div>';
   });
   return h+'</div>';
@@ -5974,5 +6044,16 @@ async function _buildRecommandations(sids,siteMap){
 
 init();
 </script>
+
+<!-- Modal prise en charge -->
+<div id="pec-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.52);z-index:300;align-items:flex-end;justify-content:center" onclick="if(event.target===this)_closePEC()">
+  <div style="background:var(--creme);border-radius:20px 20px 0 0;padding:20px 20px 36px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div id="pec-title" style="font-size:14px;font-weight:700;color:var(--text)">Prendre en charge</div>
+      <button onclick="_closePEC()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);line-height:1;padding:2px 6px">✕</button>
+    </div>
+    <div id="pec-tech-list"></div>
+  </div>
+</div>
 </body>
 </html>
