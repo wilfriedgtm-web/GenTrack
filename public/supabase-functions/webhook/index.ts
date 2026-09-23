@@ -1117,9 +1117,9 @@ async function handleMessage(from: string, bodyText: string) {
     }
 
     // ── Affectation interactive : "AFFECTER REF-XXXX" (sans nom → menu) ─────
-    const affecterSimpleMatch = bodyText.trim().match(/^affecter\s+(REF-?\d+)$/i);
+    const affecterSimpleMatch = bodyText.trim().replace(/\s+/g,' ').match(/^aff[eé]ct[eé]r?\s+(?:ref)?[-\s]?(\d+)$/i);
     if (affecterSimpleMatch) {
-      const refCode = affecterSimpleMatch[1].toUpperCase().replace(/^REF(\d)/, 'REF-$1');
+      const refCode = 'REF-' + affecterSimpleMatch[1];
       const sigs = await db('signalements', { query: `&ref_code=eq.${refCode}&statut=in.(ouvert,en_cours)&limit=1` });
       const sig = Array.isArray(sigs) ? sigs[0] : null;
       if (!sig) return sendWA(phone, `❌ Signalement *${refCode}* introuvable ou déjà clôturé.`);
@@ -1149,9 +1149,9 @@ async function handleMessage(from: string, bodyText: string) {
     }
 
     // ── Affectation signalement : "AFFECTER REF-XXXX NomTech" ───────────────
-    const affecterMatch = bodyText.trim().match(/^affecter\s+(REF-?\d+)\s+(.+)$/i);
+    const affecterMatch = bodyText.trim().replace(/\s+/g,' ').match(/^aff[eé]ct[eé]r?\s+(?:ref)?[-\s]?(\d+)\s+(.+)$/i);
     if (affecterMatch) {
-      const refCode = affecterMatch[1].toUpperCase().replace(/^REF(\d)/, 'REF-$1');
+      const refCode = 'REF-' + affecterMatch[1];
       const techName = affecterMatch[2].trim();
 
       const sigs = await db('signalements', { query: `&ref_code=eq.${refCode}&statut=in.(ouvert,en_cours)&limit=1` });
