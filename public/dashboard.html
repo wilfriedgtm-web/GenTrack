@@ -2272,6 +2272,7 @@ var _dmPannes=[];
 var _dmCurrentSid=null;
 var _dmCurrentEqId=null;
 var _dmCurrentEqNom=null;
+var _dmCurrentSiteNom=null;
 var _dmCuveInfo=null;
 
 async function _rtCommandes(sid,session){
@@ -2279,10 +2280,12 @@ async function _rtCommandes(sid,session){
   if(dc){dc.style.padding='24px';dc.style.maxWidth='860px';}
 
   var CUVE_TYPE='de5519d0-363b-4628-b872-2dcf01859002';
-  var[equips,demandes]=await Promise.all([
+  var[equips,demandes,siteRows]=await Promise.all([
     supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,type_id,capacite_litres,conso_theorique_lh,types_equipements(nom)&order=ordre_ronde.asc'),
-    supaGet('demandes','site_id=eq.'+sid+'&order=created_at.desc&limit=40&select=*')
+    supaGet('demandes','site_id=eq.'+sid+'&order=created_at.desc&limit=40&select=*'),
+    supaGet('sites','id=eq.'+sid+'&select=nom&limit=1')
   ]);
+  _dmCurrentSiteNom=(siteRows&&siteRows.length)?siteRows[0].nom:null;
 
   // Cuve data for pre-fill
   var cuveEquips=equips.filter(function(e){return e.type_id===CUVE_TYPE;});
@@ -2690,6 +2693,7 @@ async function _envoyerDemande(){
     ref+' — Bon de commande GenTrack',
     '═══════════════════════════════',
     '',
+    _dmCurrentSiteNom?'HÔTEL : '+_dmCurrentSiteNom:'',
     'TYPE : '+typeLabel.toUpperCase(),
     qte?'QUANTITÉ : '+qte.toLocaleString('fr-FR')+(unite?' '+unite:''):'',
     'URGENCE : '+(_DEMANDE_URGENCE_LABELS[_demandeUrgenceActuelle]||_demandeUrgenceActuelle),
@@ -2706,10 +2710,10 @@ async function _envoyerDemande(){
     'Date : '+today,
     'Réf. : '+ref,
     '───────────────────────────────',
-    'GenTrack · Azalaï Hotels Group'
+    'GenTrack · '+(_dmCurrentSiteNom||'Azalaï Hotels Group')
   ].filter(function(l){return l!==null&&l!==undefined;}).join('\n');
 
-  var subject=encodeURIComponent('[GenTrack] '+ref+' — '+typeLabel+(eqNom?' / '+eqNom:''));
+  var subject=encodeURIComponent('[GenTrack] '+ref+' — '+(_dmCurrentSiteNom?_dmCurrentSiteNom+' — ':'')+typeLabel+(eqNom?' / '+eqNom:''));
 
   // Enregistrement DB — bloquant avec vérification
   var inserted=await supaPost('demandes',{
