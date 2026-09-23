@@ -5507,16 +5507,36 @@ async function _dtRapport(sids,session){
   rondes.forEach(function(r){if(sitesData[r.site_id])sitesData[r.site_id].rondes++;});
   var totLitres=0,totCarb=0,totPannes=0,totCoutPannes=0,totMnt=0;
   Object.values(sitesData).forEach(function(d){totLitres+=d.litres;totCarb+=d.coutCarb;totPannes+=d.pannes;totCoutPannes+=d.coutPannes;totMnt+=d.mntCout;});
-  var kpis='<div class="kpi-grid" style="margin-bottom:24px">'+
+  function dtKpiCol(val,s1,s2,inv){if(val===null||val===undefined)return'var(--text3)';if(inv)return val<=s1?'var(--vert)':val<=s2?'var(--amber)':'var(--rouge)';return val>=s2?'var(--vert)':val>=s1?'var(--amber)':'var(--rouge)';}
+  var kpis='<div class="kpi-grid" style="margin-bottom:16px">'+
     '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-trend">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+' FCFA':'Coût non saisi')+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Pannes</div><div class="kpi-value" style="color:'+(totPannes>0?'var(--rouge)':'var(--vert)')+'">'+totPannes+'</div><div class="kpi-trend">'+(totCoutPannes>0?totCoutPannes.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Maintenances</div><div class="kpi-value">'+totMnt.toLocaleString('fr-FR')+'</div><div class="kpi-trend">FCFA réalisées</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+dtKpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-trend">'+(totCoutPannes>0?totCoutPannes.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Coût maintenance</div><div class="kpi-value">'+totMnt.toLocaleString('fr-FR')+'</div><div class="kpi-trend">FCFA réalisées</div></div>'+
+  '</div>'+
+  '<div style="background:#FAFAF8;border:1px solid #E8DFD0;border-radius:10px;padding:12px 16px;margin-bottom:20px">'+
+    '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">📋 Référentiel de performance</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">'+
+      [
+        {label:'Pannes actives (total)',val:totPannes,statut:totPannes===0?'✓ Bon':totPannes<=3?'⚠ À surveiller':'✗ Critique',col:totPannes===0?'#2D7A4F':totPannes<=3?'#C49A1C':'#C0392B',norme:'Cible : 0 panne active'},
+        {label:'Coût total (carb. + mnt.)',val:(totCarb+totMnt).toLocaleString('fr-FR')+' FCFA',statut:'',col:'var(--text2)',norme:'Carburant + maintenance'},
+        {label:'Sites en alerte',val:sids.filter(function(sid){var d=sitesData[sid];return d.pannes>0;}).length+' / '+sids.length,statut:sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===0?'✓ Tous bons':sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===1?'⚠ 1 site':'✗ Plusieurs',col:sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===0?'#2D7A4F':sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===1?'#C49A1C':'#C0392B',norme:'Sites avec pannes actives'},
+      ].map(function(r){return'<div style="background:white;border:1px solid #E8DFD0;border-radius:8px;padding:10px 12px">'+
+        '<div style="font-size:10px;color:var(--text3);margin-bottom:4px">'+r.label+'</div>'+
+        '<div style="font-size:16px;font-weight:800;color:var(--dark);margin-bottom:2px">'+r.val+'</div>'+
+        (r.statut?'<div style="font-size:11px;font-weight:700;color:'+r.col+'">'+r.statut+'</div>':'')+
+        '<div style="font-size:10px;color:var(--text3)">'+r.norme+'</div>'+
+      '</div>';}).join('')+
+    '</div>'+
   '</div>';
   var siteCards=sids.map(function(sid){
     var d=sitesData[sid];
     var total=d.coutCarb+d.coutPannes+d.mntCout;
-    return '<div style="background:white;border:1.5px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:12px">'+
-      '<div style="font-size:14px;font-weight:700;color:var(--dark);margin-bottom:14px">🏨 '+escape_html(d.nom)+'</div>'+
+    var siteStatut=d.pannes===0?['🟢 Bon','#2D7A4F']:d.pannes<=2?['🟡 À surveiller','#C49A1C']:['🔴 Critique','#C0392B'];
+    return '<div style="background:white;border:1.5px solid '+(d.pannes>=3?'#FDECEA':d.pannes>0?'#FEF3E2':'var(--border)')+';border-radius:14px;padding:18px 20px;margin-bottom:12px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
+        '<div style="font-size:14px;font-weight:700;color:var(--dark)">🏨 '+escape_html(d.nom)+'</div>'+
+        '<div style="font-size:12px;font-weight:700;color:'+siteStatut[1]+'">'+siteStatut[0]+'</div>'+
+      '</div>'+
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">'+
         '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Carburant</div><div style="font-size:18px;font-weight:800;color:var(--dark)">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div style="font-size:11px;color:var(--text3)">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' FCFA':'Coût non saisi')+'</div></div>'+
         '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Pannes</div><div style="font-size:18px;font-weight:800;color:'+(d.pannes>0?'var(--rouge)':'var(--vert)')+'">'+d.pannes+'</div><div style="font-size:11px;color:var(--text3)">'+(d.coutPannes>0?d.coutPannes.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
@@ -6482,6 +6502,60 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
     '<div class="kpi"><div class="kpi-label">Coût total</div><div class="kpi-value">'+(totCarb+totMntCout>0?(totCarb+totMntCout).toLocaleString('fr-FR'):'—')+'</div><div class="kpi-sub">FCFA (carburant + maintenance)</div></div>'+
   '</div>';
 
+  // ── Tableau de bord par site ──
+  h+='<h2>Tableau de bord par hôtel</h2>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px"><thead><tr>'+
+      '<th style="text-align:left;padding:8px 12px;background:#F0EBE3;color:var(--text2);font-weight:600">Hôtel</th>'+
+      '<th style="padding:8px 12px;background:#F0EBE3;color:var(--text2);font-weight:600;text-align:center">Rondes</th>'+
+      '<th style="padding:8px 12px;background:#F0EBE3;color:var(--text2);font-weight:600;text-align:center">Pannes actives</th>'+
+      '<th style="padding:8px 12px;background:#F0EBE3;color:var(--text2);font-weight:600;text-align:center">Carburant</th>'+
+      '<th style="padding:8px 12px;background:#F0EBE3;color:var(--text2);font-weight:600;text-align:center">Coût total</th>'+
+      '<th style="padding:8px 12px;background:#F0EBE3;color:var(--text2);font-weight:600;text-align:center">Statut</th>'+
+    '</tr></thead><tbody>'+
+    sites.map(function(site,i){
+      var d=siteData[site.id];
+      var sConf=d.rondesTot>0?Math.round(d.rondesVal/d.rondesTot*100):null;
+      var total=d.coutCarb+d.mntCout+d.panneCout;
+      var critique=sConf!==null&&sConf<70||d.pannes>=3;
+      var excellent=(sConf===null||sConf>=90)&&d.pannes===0;
+      var score=critique?'🔴 Critique':excellent?'🟢 Bon':'🟡 À surveiller';
+      var scoreCol=critique?'#C0392B':excellent?'#2D7A4F':'#C49A1C';
+      return '<tr style="background:'+(i%2?'#FAFAF8':'white')+';border-bottom:1px solid #F0EBE3">'+
+        '<td style="padding:9px 12px;font-weight:700;color:var(--dark)">'+escape_html(site.nom)+'</td>'+
+        '<td style="padding:9px 12px;text-align:center;font-weight:700;color:'+kpiCol(sConf,70,90,false)+'">'+(sConf!==null?sConf+'%':'—')+'</td>'+
+        '<td style="padding:9px 12px;text-align:center;font-weight:700;color:'+kpiCol(d.pannes,1,3,true)+'">'+d.pannes+'</td>'+
+        '<td style="padding:9px 12px;text-align:center;color:var(--text2)">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</td>'+
+        '<td style="padding:9px 12px;text-align:center;color:var(--text2)">'+(total>0?total.toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+        '<td style="padding:9px 12px;text-align:center;font-weight:700;color:'+scoreCol+'">'+score+'</td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table>';
+
+  // ── Référentiel normes ──
+  h+='<div style="margin:0 0 24px;background:#FAFAF8;border:1px solid #E8DFD0;border-radius:10px;padding:16px 20px;page-break-inside:avoid">'+
+    '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">📋 Référentiel de performance</div>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+      '<thead><tr>'+
+        '<th style="text-align:left;padding:6px 10px;background:#F0EBE3;color:var(--text2);font-weight:600">Indicateur</th>'+
+        '<th style="padding:6px 10px;background:#E8F5EE;color:#2D7A4F;font-weight:700;text-align:center">✓ Bon</th>'+
+        '<th style="padding:6px 10px;background:#FEF3E2;color:#C49A1C;font-weight:700;text-align:center">⚠ À surveiller</th>'+
+        '<th style="padding:6px 10px;background:#FDECEA;color:#C0392B;font-weight:700;text-align:center">✗ Critique</th>'+
+        '<th style="padding:6px 10px;background:#F0EBE3;color:var(--text2);font-weight:600;text-align:center">Valeur portfolio</th>'+
+      '</tr></thead><tbody>'+
+      [
+        {label:'Conformité rondes (global)',bon:'≥ 90%',surv:'70 – 89%',crit:'< 70%',val:confPct!==null?confPct+'%':'—',col:kpiCol(confPct,70,90,false)},
+        {label:'Pannes actives (total)',bon:'0',surv:'1 – 3',crit:'≥ 4',val:String(totPannes),col:kpiCol(totPannes,1,4,true)},
+        {label:'Sites en état critique',bon:'0',surv:'1',crit:'≥ 2',val:String(sites.filter(function(s){var d=siteData[s.id];var sConf=d.rondesTot>0?Math.round(d.rondesVal/d.rondesTot*100):null;return(sConf!==null&&sConf<70)||d.pannes>=3;}).length),col:kpiCol(sites.filter(function(s){var d=siteData[s.id];var sConf=d.rondesTot>0?Math.round(d.rondesVal/d.rondesTot*100):null;return(sConf!==null&&sConf<70)||d.pannes>=3;}).length,1,2,true)},
+      ].map(function(r,i){return'<tr style="background:'+(i%2?'#FAFAF8':'white')+'">'+
+        '<td style="padding:7px 10px;font-weight:500;color:var(--dark)">'+escape_html(r.label)+'</td>'+
+        '<td style="padding:7px 10px;text-align:center;color:#2D7A4F">'+r.bon+'</td>'+
+        '<td style="padding:7px 10px;text-align:center;color:#C49A1C">'+r.surv+'</td>'+
+        '<td style="padding:7px 10px;text-align:center;color:#C0392B">'+r.crit+'</td>'+
+        '<td style="padding:7px 10px;text-align:center;font-weight:800;color:'+r.col+'">'+r.val+'</td>'+
+      '</tr>';}).join('')+
+    '</tbody></table>'+
+  '</div>';
+
   // Synthèse narrative
   h+='<h2>Synthèse de direction</h2>'+
     '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
@@ -6772,6 +6846,13 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   var cuves=equips.filter(function(e){return e.capacite_litres!=null;});
   var ges=equips.filter(function(e){return e.conso_theorique_lh!=null&&e.capacite_litres==null;});
 
+  // ── MTTR & niveaux cuves ──
+  var sgsResolus=signalements.filter(function(s){return s.statut==='resolu'&&s.resolved_at&&s.created_at;});
+  var mttrH=sgsResolus.length?sgsResolus.reduce(function(sum,s){return sum+(new Date(s.resolved_at)-new Date(s.created_at))/3600000;},0)/sgsResolus.length:null;
+  function fmtDur(h){if(h===null||h===undefined)return'—';if(h<1)return Math.round(h*60)+'min';if(h<48)return h.toFixed(1)+'h';return(h/24).toFixed(1)+'j';}
+  var niveauCuveMin=null;
+  cuves.forEach(function(c){var lr=lastRepsByEq[c.id];if(!lr||!lr.vals)return;var niveauEntry=lr.vals.find(function(v){return v.texte.toLowerCase().includes('niveau');});if(!niveauEntry)return;var pct=Math.round(parseFloat(niveauEntry.valeur)/parseFloat(c.capacite_litres)*100);if(niveauCuveMin===null||pct<niveauCuveMin)niveauCuveMin=pct;});
+
   // ── Narratives auto-générées ──
   // Résumé global
   var narResume=(period===7?'Semaine':period===14?'Quinzaine':'Mois')+' du '+periodeStr+'. ';
@@ -6921,6 +7002,33 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     '<div class="kpi"><div class="kpi-label">Signalements actifs</div><div class="kpi-value" style="color:'+kpiCol(nbSgOuverts,1,3,true)+'">'+nbSgOuverts+'</div><div class="kpi-sub">'+nbSgResolus+' résolu(s) cette semaine</div></div>'+
     '<div class="kpi"><div class="kpi-label">Interventions</div><div class="kpi-value">'+nbMaintenances+'</div><div class="kpi-sub">'+(coutTotal>0?coutTotal.toLocaleString('fr-FR')+' FCFA':'Aucun coût enregistré')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Équipements actifs</div><div class="kpi-value">'+equips.length+'</div><div class="kpi-sub">'+ges.length+' groupe(s) · '+cuves.length+' cuve(s)</div></div>'+
+    '<div class="kpi"><div class="kpi-label">MTTR moyen</div><div class="kpi-value" style="color:'+(mttrH===null?'var(--text3)':mttrH<24?'var(--vert)':mttrH<72?'var(--amber)':'var(--rouge)')+'">'+fmtDur(mttrH)+'</div><div class="kpi-sub">'+(sgsResolus.length>0?sgsResolus.length+' résolution(s)':'Aucune résolution')+'</div></div>'+
+  '</div>';
+
+  // ── Référentiel normes ──
+  h+='<div style="margin:0 0 24px;background:#FAFAF8;border:1px solid #E8DFD0;border-radius:10px;padding:16px 20px;page-break-inside:avoid">'+
+    '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">📋 Référentiel de performance</div>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
+      '<thead><tr>'+
+        '<th style="text-align:left;padding:6px 10px;background:#F0EBE3;color:var(--text2);font-weight:600">Indicateur</th>'+
+        '<th style="padding:6px 10px;background:#E8F5EE;color:#2D7A4F;font-weight:700;text-align:center">✓ Bon</th>'+
+        '<th style="padding:6px 10px;background:#FEF3E2;color:#C49A1C;font-weight:700;text-align:center">⚠ À surveiller</th>'+
+        '<th style="padding:6px 10px;background:#FDECEA;color:#C0392B;font-weight:700;text-align:center">✗ Critique</th>'+
+        '<th style="padding:6px 10px;background:#F0EBE3;color:var(--text2);font-weight:600;text-align:center">Valeur actuelle</th>'+
+      '</tr></thead><tbody>'+
+      [
+        {label:'Conformité rondes',bon:'≥ 90%',surv:'70 – 89%',crit:'< 70%',val:tauxRondes!==null?tauxRondes+'%':'—',col:kpiCol(tauxRondes,70,90,false)},
+        {label:'Pannes / signalements actifs',bon:'0',surv:'1 – 2',crit:'≥ 3',val:String(nbSgOuverts),col:kpiCol(nbSgOuverts,1,3,true)},
+        {label:'Durée moy. résolution (MTTR)',bon:'< 24h',surv:'24 – 72h',crit:'> 72h',val:fmtDur(mttrH),col:mttrH===null?'var(--text3)':mttrH<24?'var(--vert)':mttrH<72?'var(--amber)':'var(--rouge)'},
+        {label:'Niveau mini. cuves',bon:'≥ 40%',surv:'20 – 39%',crit:'< 20%',val:niveauCuveMin!==null?niveauCuveMin+'%':'—',col:niveauCuveMin===null?'var(--text3)':niveauCuveMin>=40?'var(--vert)':niveauCuveMin>=20?'var(--amber)':'var(--rouge)'},
+      ].map(function(r,i){return'<tr style="background:'+(i%2?'#FAFAF8':'white')+'">'+
+        '<td style="padding:7px 10px;font-weight:500;color:var(--dark)">'+escape_html(r.label)+'</td>'+
+        '<td style="padding:7px 10px;text-align:center;color:#2D7A4F">'+r.bon+'</td>'+
+        '<td style="padding:7px 10px;text-align:center;color:#C49A1C">'+r.surv+'</td>'+
+        '<td style="padding:7px 10px;text-align:center;color:#C0392B">'+r.crit+'</td>'+
+        '<td style="padding:7px 10px;text-align:center;font-weight:800;color:'+r.col+'">'+r.val+'</td>'+
+      '</tr>';}).join('')+
+    '</tbody></table>'+
   '</div>';
 
   // Résumé
@@ -7002,16 +7110,19 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   if(signalements.length>0){
     var typeLabels={panne:'⚡ Panne',anomalie:'👁 Anomalie',autre:'📝 Autre'};
     var statutLabels={ouvert:'En cours',en_cours:'En cours',resolu:'Résolu'};
-    h+='<table><thead><tr><th>Type</th><th>Description</th><th>Signalé par</th><th>Date</th><th>Statut</th><th>Coût</th></tr></thead><tbody>';
+    h+='<table><thead><tr><th>Type</th><th>Description</th><th>Signalé par</th><th>Date</th><th>Statut</th><th>Durée résol.</th><th>Coût</th></tr></thead><tbody>';
     signalements.forEach(function(s){
       var ts=new Date(s.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
       var resolu=s.statut==='resolu';
+      var dureeH=resolu&&s.resolved_at&&s.created_at?(new Date(s.resolved_at)-new Date(s.created_at))/3600000:null;
+      var dureeCol=dureeH===null?'var(--text3)':dureeH<24?'var(--vert)':dureeH<72?'var(--amber)':'var(--rouge)';
       h+='<tr>'+
         '<td style="white-space:nowrap">'+escape_html(typeLabels[s.type]||s.type)+'</td>'+
-        '<td style="max-width:280px">'+escape_html((s.description||'').substring(0,80))+'</td>'+
+        '<td style="max-width:240px">'+escape_html((s.description||'').substring(0,70))+'</td>'+
         '<td style="font-size:11px;color:var(--text2)">'+escape_html(s.signale_par||'—')+'</td>'+
         '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
         '<td>'+(resolu?'<span class="badge badge-ok">Résolu</span>':'<span class="badge badge-ko">En cours</span>')+'</td>'+
+        '<td style="font-size:11px;font-weight:600;color:'+dureeCol+'">'+(dureeH!==null?fmtDur(dureeH):'—')+'</td>'+
         '<td style="font-size:11px">'+(s.cout_intervention?s.cout_intervention.toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
       '</tr>';
     });
