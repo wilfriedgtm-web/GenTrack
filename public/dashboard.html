@@ -300,6 +300,7 @@ var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
 var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
 var _session=null;
 var _dtCurrentSite=null;
+var _dtCmdActiveSite=null;
 var _doCurrentSite=null;
 var _histPeriod=30;
 var _configSelectedEqId=null;
@@ -5804,26 +5805,43 @@ async function _dtEquipe(sids,session){
 async function _dtCommandesDT(sids,session){
   if(!sids.length)return'<div class="placeholder-card"><div class="placeholder-icon">📦</div>Aucun site configuré</div>';
   var sidStr=sids.join(',');
-  var[demandes,sites]=await Promise.all([
-    supaGet('demandes','site_id=in.('+sidStr+')&order=created_at.desc&limit=80&select=*'),
-    supaGet('sites','id=in.('+sidStr+')&select=id,nom'),
-  ]);
+  var sites=await supaGet('sites','id=in.('+sidStr+')&select=id,nom&order=nom.asc');
   var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
 
+  // Onglets hôtels
+  var tabBase='padding:6px 14px;font-size:11px;font-weight:700;border-radius:20px;border:1.5px solid;cursor:pointer;transition:all .15s;white-space:nowrap;';
+  var tabOn=tabBase+'background:var(--dark);color:white;border-color:var(--dark);';
+  var tabOff=tabBase+'background:white;color:var(--text2);border-color:var(--border);';
+  var tabs='<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;margin-bottom:20px;-webkit-overflow-scrolling:touch">'+
+    '<button onclick="_dtCmdActiveSite=null;renderDirTech(_session,\'commandes\')" style="'+(_dtCmdActiveSite===null?tabOn:tabOff)+'">🌐 Toutes</button>';
+  sites.forEach(function(s){
+    var active=_dtCmdActiveSite===s.id;
+    tabs+='<button onclick="_dtCmdActiveSite=\''+s.id+'\';renderDirTech(_session,\'commandes\')" style="'+(active?tabOn:tabOff)+'">🏨 '+escape_html(s.nom)+'</button>';
+  });
+  tabs+='</div>';
+
+  var h='<div style="max-width:860px"><div style="font-size:18px;font-weight:800;color:var(--dark);margin-bottom:16px">📦 Commandes</div>'+tabs;
+
+  // Vue hôtel sélectionné → expérience complète comme resp_tech
+  if(_dtCmdActiveSite){
+    var siteContent=await _rtCommandes(_dtCmdActiveSite,session);
+    return h+siteContent+'</div>';
+  }
+
+  // Vue globale toutes les demandes
+  var demandes=await supaGet('demandes','site_id=in.('+sidStr+')&order=created_at.desc&limit=80&select=*');
   var enAttente=demandes.filter(function(d){return d.statut==='en_attente';});
   var approuvees=demandes.filter(function(d){return d.statut==='approuve';});
   var livrees=demandes.filter(function(d){return d.statut==='livre';});
 
-  var h='<div style="font-size:18px;font-weight:800;color:var(--dark);margin-bottom:4px">📦 Commandes</div>'+
-    '<div style="font-size:12px;color:var(--text2);margin-bottom:20px">Toutes les demandes — multi-sites</div>'+
-    '<div class="kpi-grid" style="margin-bottom:20px">'+
-      '<div class="kpi"><div class="kpi-label">En attente</div><div class="kpi-value" style="color:'+(enAttente.length>0?'var(--orange)':'var(--vert)')+'">'+enAttente.length+'</div><div class="kpi-trend">À approuver</div></div>'+
-      '<div class="kpi"><div class="kpi-label">Approuvées</div><div class="kpi-value" style="color:var(--vert)">'+approuvees.length+'</div><div class="kpi-trend">En livraison</div></div>'+
-      '<div class="kpi"><div class="kpi-label">Livrées</div><div class="kpi-value">'+livrees.length+'</div><div class="kpi-trend">Complétées</div></div>'+
-      '<div class="kpi"><div class="kpi-label">Total</div><div class="kpi-value">'+demandes.length+'</div><div class="kpi-trend">Toutes demandes</div></div>'+
-    '</div>';
+  h+='<div class="kpi-grid" style="margin-bottom:20px">'+
+    '<div class="kpi"><div class="kpi-label">En attente</div><div class="kpi-value" style="color:'+(enAttente.length>0?'var(--orange)':'var(--vert)')+'">'+enAttente.length+'</div><div class="kpi-trend">À approuver</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Approuvées</div><div class="kpi-value" style="color:var(--vert)">'+approuvees.length+'</div><div class="kpi-trend">En livraison</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Livrées</div><div class="kpi-value">'+livrees.length+'</div><div class="kpi-trend">Complétées</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Total</div><div class="kpi-value">'+demandes.length+'</div><div class="kpi-trend">Toutes demandes</div></div>'+
+  '</div>';
 
-  if(!demandes.length)return h+'<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">Aucune demande enregistrée</div>';
+  if(!demandes.length){return h+'<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">Aucune demande enregistrée.<br><span style="font-size:11px">Sélectionnez un hôtel pour créer une commande.</span></div></div>';}
 
   var SSTAT={en_attente:{label:'En attente',color:'var(--orange)',bg:'var(--orange-pale)'},approuve:{label:'Approuvé',color:'#7c3aed',bg:'#f3e8ff'},livre:{label:'Livré ✅',color:'var(--vert)',bg:'var(--vert-pale)'},annule:{label:'Annulé',color:'var(--text3)',bg:'#f5f5f5'}};
   var btnSt='font-size:10px;font-weight:700;padding:4px 10px;border-radius:6px;border:1.5px solid;cursor:pointer;background:white;';
@@ -5862,7 +5880,7 @@ async function _dtCommandesDT(sids,session){
       '</div>'+
     '</div>';
   });
-  return'<div style="max-width:860px">'+h+'</div>';
+  return h+'</div>';
 }
 
 /* ── DIR TECH : détail site ── */
