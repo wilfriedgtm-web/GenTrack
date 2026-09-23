@@ -547,7 +547,7 @@ function buildMobileNav(role,activeNav,alerteBadge){
       {id:'signalements',icon:'location_on',label:'Signalements'},
       {id:'__plus__',icon:'apps',label:'Plus'}
     ];
-    plusIds=['maintenances','releves','historique','config'];
+    plusIds=['maintenances','commandes','equipe','releves','historique','config'];
   }
   var plusItems=allItems.filter(function(it){return plusIds.indexOf(it.id)!==-1;});
   var plusActive=plusItems.some(function(it){return it.id===activeNav;});
@@ -2862,7 +2862,7 @@ async function _rtMonEquipe(sid,session){
     supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,role&order=nom.asc'),
     supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+j30date+'&select=id,date_ronde,frequence,technicien_id&order=date_ronde.desc'),
     supaGet('signalements','groupe_id=eq.'+sid+'&statut=eq.resolu&resolved_at=gte.'+j30ts+'&select=id,equipement_id,created_at,resolved_at,resolved_by,assigne_a,pris_en_charge_par,equipements(nom)'),
-    supaGet('maintenances','groupe_id=eq.'+sid+'&statut=eq.realise&created_at=gte.'+j30ts+'&select=id,type,created_by,prestataire,cout')
+    supaGet('maintenances','groupe_id=eq.'+sid+'&statut=eq.realise&created_at=gte.'+j30ts+'&select=id,type,created_by,prestataire,cout,duree_valeur,duree_unite')
   ]);
 
   // Conformité rondes
@@ -2928,13 +2928,19 @@ async function _rtMonEquipe(sid,session){
     signalements30.filter(function(s){return s.resolved_at;})
       .reduce(function(s,r){return s+(new Date(r.resolved_at)-new Date(r.created_at))/3600000;},0)/
     signalements30.filter(function(s){return s.resolved_at;}).length:null;
+  // Durée d'intervention moyenne (depuis maintenances)
+  var mntAvecDuree=maintenances30.filter(function(m){return m.duree_valeur&&parseFloat(m.duree_valeur)>0;});
+  var dureesMoyH=mntAvecDuree.map(function(m){var v=parseFloat(m.duree_valeur);return m.duree_unite==='minutes'?v/60:v;});
+  var dureeMoyH=dureesMoyH.length?dureesMoyH.reduce(function(a,b){return a+b;},0)/dureesMoyH.length:null;
+  function fmtDuree(h){if(h===null)return'—';if(h<1)return Math.round(h*60)+'min';return h.toFixed(1)+'h';}
 
-  var kpiHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px">'+
+  var kpiHtml='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:20px">'+
     [
       {label:'Rondes',val:totalRondes,sub:'30 derniers jours',col:'var(--bleu)'},
       {label:'Conformité',val:conformGlob!=null?conformGlob+'%':'—',sub:'points de contrôle ok',col:conformGlob>=80?'var(--vert)':conformGlob>=60?'var(--amber)':'var(--rouge)'},
       {label:'Pannes résolues',val:signalements30.length,sub:'en 30 jours',col:'var(--vert)'},
-      {label:'MTTR moyen',val:mttrMoyH!=null?(mttrMoyH<48?Math.round(mttrMoyH)+'h':Math.round(mttrMoyH/24)+'j'):'—',sub:'temps résolution',col:mttrMoyH&&mttrMoyH<24?'var(--vert)':mttrMoyH&&mttrMoyH<72?'var(--amber)':'var(--rouge)'}
+      {label:'MTTR moyen',val:mttrMoyH!=null?(mttrMoyH<48?Math.round(mttrMoyH)+'h':Math.round(mttrMoyH/24)+'j'):'—',sub:'temps résolution',col:mttrMoyH&&mttrMoyH<24?'var(--vert)':mttrMoyH&&mttrMoyH<72?'var(--amber)':'var(--rouge)'},
+      {label:'Durée intervention',val:fmtDuree(dureeMoyH),sub:'moyenne ('+mntAvecDuree.length+' interventions)',col:dureeMoyH&&dureeMoyH<=4?'var(--vert)':dureeMoyH&&dureeMoyH<=8?'var(--amber)':'var(--text)'}
     ].map(function(k){
       return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
         '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">'+k.label+'</div>'+
