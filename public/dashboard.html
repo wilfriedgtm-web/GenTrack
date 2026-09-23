@@ -382,15 +382,16 @@ var _waCache={};
 async function init(){
   var urlParams=new URLSearchParams(window.location.search);
   var urlToken=urlParams.get('token');
+  var deepSgId=urlParams.get('sg')||null;
   if(urlToken){
     history.replaceState(null,'',window.location.pathname);
     var ok=await _validateToken(urlToken);
-    if(ok){renderDashboard(_session);return;}
+    if(ok){renderDashboard(_session);if(deepSgId)setTimeout(function(){_goToSignalement(deepSgId);},800);return;}
   }
   var stored=loadStored();
   if(stored&&stored.token){
     var ok2=await _validateToken(stored.token);
-    if(ok2){renderDashboard(_session);return;}
+    if(ok2){renderDashboard(_session);if(deepSgId)setTimeout(function(){_goToSignalement(deepSgId);},800);return;}
     clearSession();
   }
   renderInvalidLink();
