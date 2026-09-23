@@ -5523,7 +5523,7 @@ async function _dtRapport(sids,session){
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">'+
       [
         {label:'Pannes actives (total)',val:totPannes,statut:totPannes===0?'✓ Bon':totPannes<=3?'⚠ À surveiller':'✗ Critique',col:totPannes===0?'#2D7A4F':totPannes<=3?'#C49A1C':'#C0392B',norme:'Cible : 0 panne active'},
-        {label:'Coût total (carb. + mnt.)',val:(totCarb+totMnt).toLocaleString('fr-FR')+' FCFA',statut:'',col:'var(--text2)',norme:'Carburant + maintenance'},
+        {label:'Coût total (carb. + mnt. + pannes)',val:(totCarb+totMnt+totCoutPannes).toLocaleString('fr-FR')+' FCFA',statut:'',col:'var(--text2)',norme:'Carburant + maintenance + interventions'},
         {label:'Sites en alerte',val:sids.filter(function(sid){var d=sitesData[sid];return d.pannes>0;}).length+' / '+sids.length,statut:sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===0?'✓ Tous bons':sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===1?'⚠ 1 site':'✗ Plusieurs',col:sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===0?'#2D7A4F':sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===1?'#C49A1C':'#C0392B',norme:'Sites avec pannes actives'},
       ].map(function(r){return'<div style="background:white;border:1px solid #E8DFD0;border-radius:8px;padding:10px 12px">'+
         '<div style="font-size:10px;color:var(--text3);margin-bottom:4px">'+r.label+'</div>'+
