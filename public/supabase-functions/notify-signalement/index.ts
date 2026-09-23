@@ -98,15 +98,16 @@ serve(async (req) => {
     // Contacts ayant activé les notifications signalement
     const contacts = await supaGet('contacts', `&site_id=eq.${site_id}&notif_signalement=eq.true&actif=eq.true`);
 
-    // Ligne REF
-    const refLine = ref_code ? `\n📌 Réf : *${ref_code}*\nRépondez *OK ${ref_code}* pour prendre en charge.` : '';
+    // Ligne REF — version manager (avec option AFFECTER) et tech
+    const refLineManager = ref_code ? `\n📌 Réf : *${ref_code}*\nRépondez *OK ${ref_code}* pour PEC · ou *AFFECTER ${ref_code}* pour assigner à un tech.` : '';
+    const refLineTech    = ref_code ? `\n📌 Réf : *${ref_code}*\nRépondez *OK ${ref_code}* pour prendre en charge.` : '';
 
     // Lien photo
     const photoLine = photo_url ? `\n📷 Photo : ${photo_url}` : '';
 
-    // Lien dashboard (pour resp_tech et dir_tech)
+    // Lien dashboard avec deep link (pour resp_tech et dir_tech)
     const dashLine = signalement_id
-      ? `\n🔗 Dashboard : ${APP_URL}/dashboard.html`
+      ? `\n🔗 Dashboard : ${APP_URL}/dashboard.html?sg=${signalement_id}`
       : '';
 
     // Corps commun du message
@@ -131,7 +132,7 @@ serve(async (req) => {
         dejaEnvoyes.add(c.whatsapp);
 
         const isManager = c.role === 'resp_tech' || c.role === 'dir_tech';
-        const message   = base + photoLine + refLine + (isManager ? dashLine : '');
+        const message   = base + photoLine + (isManager ? refLineManager : refLineTech) + (isManager ? dashLine : '');
 
         await sendWA(c.whatsapp, message);
         sent++;
