@@ -821,7 +821,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     const responsables = await db('contacts', {
       query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true`
     });
-    const refLine = refCode ? `\n\n_Répondre *OK ${refCode}* pour prendre en charge._` : `\n\n_Tapez *resolu* pour clôturer._`;
+    const refLine = refCode ? `\n\n_Répondre *OK ${refCode}* pour PEC · ou *AFFECTER ${refCode}* pour assigner à un tech._` : `\n\n_Tapez *resolu* pour clôturer._`;
     const alertMsg = `🚨 *PANNE SIGNALÉE — GenTrack*\n*${siteNom}*\n\n🔧 Équipement : *${sd.equip_nom}*\n⚠️ Type : *${sd.panne_type_label}*\n📝 Détail : ${desc}\n\n👤 Signalé par : ${contact.nom}\n🕐 ${today} ${getHeure()}${refLine}`;
     const dejaEnvoyes = new Set<string>([phone]);
     if (Array.isArray(responsables)) {
@@ -1022,6 +1022,42 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     return sendWA(phone, `✅ *Ravitaillement enregistré !*\n\n🛢️ ${sd.cuve_nom}\n💧 ${sd.litres_ajoutes}L ajoutés — ${niveauL}L / ${cap}L (${pct}%) ${col}${autoJ ? `\n⏱️ Autonomie : ~${autoJ}j` : ''}${coutTxt}\n\n_Équipe notifiée 📲_`);
   }
 
+  // ── Affectation interactive : choix du tech ──────────────────────────────
+  if (state === 'affecter_choix') {
+    const techs: any[] = sd.techs || [];
+    const idx = parseInt(msg.trim()) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= techs.length)
+      return sendWA(phone, `Répondez avec un numéro entre 1 et ${techs.length}.`);
+    const tech = techs[idx];
+    const assigneNom = contact?.nom || phone;
+    await db('signalements', { method: 'PATCH', query: `&id=eq.${sd.sg_id}`, body: {
+      statut: 'en_cours',
+      assigne_a: tech.nom,
+      pris_en_charge_par: tech.nom,
+      pris_en_charge_at: new Date().toISOString(),
+    }});
+    if (tech.whatsapp) {
+      const missionLines = [
+        `🔧 *Mission assignée — GenTrack*`,
+        ``,
+        `📋 *${sd.sg_ref}*`,
+        sd.sg_equip ? `🔩 Équipement : *${sd.sg_equip}*` : null,
+        sd.sg_lieu ? `📍 Lieu : ${sd.sg_lieu}` : null,
+        `📝 ${sd.sg_desc}`,
+        sd.sg_signale_par ? `👤 Signalé par : ${sd.sg_signale_par}` : null,
+        sd.sg_photo ? `📷 Photo : ${sd.sg_photo}` : null,
+        ``,
+        `👤 Assigné par : ${assigneNom}`,
+        `🕐 ${getHeure()}`,
+        ``,
+        `_Répondez *OK ${sd.sg_ref}* pour confirmer la prise en charge._`,
+      ].filter((l): l is string => l !== null).join('\n');
+      await sendWA(tech.whatsapp, missionLines);
+    }
+    await setSession(phone, 'idle', {});
+    return sendWA(phone, `✅ *${sd.sg_ref}* affecté à *${tech.nom}*${tech.whatsapp ? ' — notifié 📲' : ' ⚠️ pas de WA configuré'}.`);
+  }
+
   return sendWA(phone, `Tapez *aide* pour les commandes.`);
 }
 
@@ -1078,6 +1114,38 @@ async function handleMessage(from: string, bodyText: string) {
       // Remettre session à idle
       await db('sessions', { method: 'PATCH', query: `&phone=eq.${phone}`, body: { state: 'idle', data: null } });
       return sendWA(phone, `✅ *Pris en charge !*\n📋 ${refCode}\n\nTapez *resolu* quand c'est réglé.`);
+    }
+
+    // ── Affectation interactive : "AFFECTER REF-XXXX" (sans nom → menu) ─────
+    const affecterSimpleMatch = bodyText.trim().match(/^affecter\s+(REF-?\d+)$/i);
+    if (affecterSimpleMatch) {
+      const refCode = affecterSimpleMatch[1].toUpperCase().replace(/^REF(\d)/, 'REF-$1');
+      const sigs = await db('signalements', { query: `&ref_code=eq.${refCode}&statut=in.(ouvert,en_cours)&limit=1` });
+      const sig = Array.isArray(sigs) ? sigs[0] : null;
+      if (!sig) return sendWA(phone, `❌ Signalement *${refCode}* introuvable ou déjà clôturé.`);
+      const siteIdSig = sig.site_id || sig.groupe_id;
+      // Nom équipement
+      let equipNom = '';
+      if (sig.equipement_id) {
+        const eqRaw = await db('equipements', { query: `&id=eq.${sig.equipement_id}&limit=1`, select: 'nom' });
+        equipNom = Array.isArray(eqRaw) && eqRaw[0] ? eqRaw[0].nom : '';
+      }
+      const techsRaw = await db('contacts', { query: `&site_id=eq.${siteIdSig}&role=eq.technicien&actif=eq.true&order=nom.asc` });
+      const techs = Array.isArray(techsRaw) ? techsRaw : [];
+      if (!techs.length) return sendWA(phone, `❌ Aucun technicien configuré pour ce site.`);
+      const liste = techs.map((t: any, i: number) => `*${i + 1}* — ${t.nom}`).join('\n');
+      await setSession(phone, 'affecter_choix', {
+        sg_id: sig.id,
+        sg_ref: refCode,
+        sg_desc: (sig.description || '—').substring(0, 100),
+        sg_equip: equipNom,
+        sg_lieu: sig.lieu || '',
+        sg_signale_par: sig.signale_par || '',
+        sg_photo: sig.photo_url || '',
+        site_id: siteIdSig,
+        techs: techs.map((t: any) => ({ nom: t.nom, whatsapp: t.whatsapp || null }))
+      });
+      return sendWA(phone, `🔧 *Affecter — ${refCode}*\n📝 ${(sig.description || '').substring(0, 60)}\n\nChoisir le technicien :\n\n${liste}\n\nRépondez avec le numéro.`);
     }
 
     // ── Affectation signalement : "AFFECTER REF-XXXX NomTech" ───────────────
@@ -1139,6 +1207,7 @@ async function handleMessage(from: string, bodyText: string) {
       'resolu_choix','resolu_note','resolu_cout','resolu_technicien','resolu_final',
       'vidange_equip','vidange_intervenant','vidange_confirm',
       'plein_litres','plein_confirm_litres','plein_operateur',
+      'affecter_choix',
     ];
     if (activeStates.includes(state)) {
       return handleStates(phone, msg, bodyText, contact, site, state, sd);
