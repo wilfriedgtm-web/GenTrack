@@ -459,13 +459,15 @@ function _goToSignalement(sgId){
   _sgFilter='tous';
   _dtSgFilter='tous';
   navTo('signalements');
-  setTimeout(function(){
+  var attempts=0;
+  function tryScroll(){
     var el=document.getElementById('sg-card-'+sgId);
-    if(!el)return;
+    if(!el){if(++attempts<15)setTimeout(tryScroll,300);return;}
     el.scrollIntoView({behavior:'smooth',block:'center'});
     el.classList.add('sg-highlight');
     setTimeout(function(){el.classList.remove('sg-highlight');},1900);
-  },500);
+  }
+  setTimeout(tryScroll,400);
 }
 
 function navTo(id){
