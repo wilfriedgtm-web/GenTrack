@@ -7749,10 +7749,13 @@ async function _energieSaveObjectifs(sid){
   var btn=document.getElementById('energie-obj-btn');
   if(btn){btn.disabled=true;btn.textContent='Enregistrement…';}
   var patches=fluides.map(function(f){
-    var inp=document.getElementById('eobj-inp-'+f.id);
-    if(!inp)return Promise.resolve();
-    var v=inp.value!==''?parseFloat(inp.value):null;
-    return supaPatch('energie_config',f.id,{objectif_mensuel:v,updated_at:new Date().toISOString()});
+    var inpObj=document.getElementById('eobj-inp-'+f.id);
+    var inpTarif=document.getElementById('etarif-inp-'+f.id);
+    if(!inpObj&&!inpTarif)return Promise.resolve();
+    var payload={updated_at:new Date().toISOString()};
+    if(inpObj)payload.objectif_mensuel=inpObj.value!==''?parseFloat(inpObj.value):null;
+    if(inpTarif)payload.tarif=inpTarif.value!==''?parseFloat(inpTarif.value):null;
+    return supaPatch('energie_config',f.id,payload);
   });
   await Promise.all(patches);
   if(btn){btn.disabled=false;btn.textContent='Enregistrer les objectifs';btn.style.background='var(--vert)';setTimeout(function(){btn.style.background='var(--amber)';},1500);}
@@ -7958,23 +7961,38 @@ async function _rtEnergie(sid){
   var nextMois=new Date(now.getFullYear(),now.getMonth()+1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
 
   var objPanelHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px;height:fit-content">'+
-    '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:4px">Objectifs mensuels</div>'+
-    '<div style="font-size:10px;color:var(--text3);margin-bottom:14px">'+escape_html(nextMois)+' · modifiables en cours de mois</div>'+
+    '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:2px">Objectifs &amp; budget</div>'+
+    '<div style="font-size:10px;color:var(--text3);margin-bottom:14px">'+escape_html(moisLabel.charAt(0).toUpperCase()+moisLabel.slice(1))+' · modifiables à tout moment</div>'+
     fluides.map(function(f){
-      return '<div style="margin-bottom:12px">'+
-        '<div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:5px;display:flex;align-items:center;gap:6px">'+
+      var budget=(f.tarif!=null&&f.objectif_mensuel!=null)?Math.round(f.tarif*f.objectif_mensuel):null;
+      return '<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">'+
+        '<div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:5px">'+
           '<span>'+_fluidIcon(f)+'</span><span style="text-transform:uppercase;letter-spacing:.4px">'+escape_html(f.nom)+'</span>'+
         '</div>'+
-        '<div style="display:flex;gap:6px;align-items:center">'+
+        // Objectif
+        '<div style="font-size:9px;color:var(--text3);margin-bottom:3px">Objectif mensuel</div>'+
+        '<div style="display:flex;gap:5px;align-items:center;margin-bottom:6px">'+
           '<input id="eobj-inp-'+f.id+'" type="number" value="'+(f.objectif_mensuel!=null?f.objectif_mensuel:'')+'" placeholder="—" '+
-            'style="flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;width:0;box-sizing:border-box" />'+
-          '<span style="font-size:10px;color:var(--text3);white-space:nowrap">'+(f.unite?escape_html(f.unite):'')+'</span>'+
+            'style="flex:1;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;width:0;box-sizing:border-box" />'+
+          '<span style="font-size:10px;color:var(--text3);white-space:nowrap">'+(f.unite?escape_html(f.unite):'u')+'</span>'+
         '</div>'+
+        // Tarif
+        '<div style="font-size:9px;color:var(--text3);margin-bottom:3px">Tarif unitaire</div>'+
+        '<div style="display:flex;gap:5px;align-items:center;margin-bottom:6px">'+
+          '<input id="etarif-inp-'+f.id+'" type="number" value="'+(f.tarif!=null?f.tarif:'')+'" placeholder="—" '+
+            'style="flex:1;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;width:0;box-sizing:border-box" />'+
+          '<span style="font-size:10px;color:var(--text3);white-space:nowrap">FCFA/'+(f.unite?escape_html(f.unite):'u')+'</span>'+
+        '</div>'+
+        // Budget calculé
+        (budget!=null?
+          '<div style="font-size:10px;color:var(--amber-dark);font-weight:600">Budget : '+budget.toLocaleString('fr-FR')+' FCFA</div>':
+          (f.tarif!=null||f.objectif_mensuel!=null?'<div style="font-size:10px;color:var(--text3)">Renseignez les deux champs pour voir le budget</div>':'')+
+        '')+
       '</div>';
     }).join('')+
     '<button id="energie-obj-btn" onclick="_energieSaveObjectifs(\''+sid+'\')" '+
       'style="width:100%;background:var(--amber);color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;margin-top:4px">'+
-      'Enregistrer les objectifs'+
+      '💾 Enregistrer objectifs &amp; tarifs'+
     '</button>'+
   '</div>';
 
@@ -8095,7 +8113,7 @@ async function _rtEnergie(sid){
    ⚡ ÉNERGIE CONFIG — Onglet config fluides
    ═══════════════════════════════════════════════════════ */
 // Colonnes : ordre | nom | unité | type | tarif | seuil | actif | suppr
-var _ECFG_COLS='30px 1fr 70px 90px 90px 90px 44px 44px';
+var _ECFG_COLS='30px 1fr 70px 90px 90px 90px 44px';
 
 async function _buildEnergieConfigTab(sid){
   var[fluides,relevesCheck]=await Promise.all([
@@ -8122,7 +8140,6 @@ async function _buildEnergieConfigTab(sid){
     '<div style="text-align:right">Tarif FCFA/u</div>'+
     '<div style="text-align:right">Seuil bas</div>'+
     '<div style="text-align:center">Actif</div>'+
-    '<div></div>'+
   '</div>';
 
   (fluides||[]).forEach(function(f){
@@ -8162,13 +8179,6 @@ async function _buildEnergieConfigTab(sid){
           '<span style="position:absolute;left:'+(f.actif?'15px':'2px')+';top:2px;width:14px;height:14px;background:white;border-radius:50%"></span>'+
         '</label>'+
       '</div>'+
-      // Supprimer
-      '<div style="text-align:center">'+
-        (hasDonnees?
-          '<span style="font-size:11px;color:var(--text3)" title="Données liées — suppression manuelle requise">🔒</span>':
-          '<button onclick="_energieDemanderSuppression(\''+sid+'\',\''+fJs+'\',\''+escape_html(f.nom)+'\')" '+
-            'style="background:none;border:none;cursor:pointer;color:var(--rouge);font-size:14px;padding:2px">🗑</button>')+
-      '</div>'+
     '</div>';
   });
 
@@ -8186,7 +8196,6 @@ async function _buildEnergieConfigTab(sid){
       'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" />'+
     '<input id="ecfg-new-seuil" type="number" placeholder="—" '+
       'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" />'+
-    '<div></div>'+
     '<div style="display:flex;gap:4px">'+
       '<button onclick="_energieConfirmerAjout(\''+sid+'\')" title="Valider" '+
         'style="background:var(--amber);color:white;border:none;border-radius:5px;width:20px;height:20px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">✓</button>'+
