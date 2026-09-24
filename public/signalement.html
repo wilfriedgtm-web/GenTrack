@@ -113,10 +113,22 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
       <input id="sg-prenom" class="sg-input" type="text" placeholder="Ex : Fatou, Ibrahima…" autocomplete="given-name"/>
     </div>
 
-    <!-- Lieu -->
-    <div class="sg-section">
-      <div class="sg-label">Lieu</div>
-      <input id="sg-lieu" class="sg-input" type="text" placeholder="Ex : Cuisine, Réception, Parking, Chambre 204…"/>
+    <!-- Zone / Lieu -->
+    <div class="sg-section" id="sg-zone-section">
+      <div class="sg-label">Zone / Lieu</div>
+      <!-- Mode pré-rempli (QR zone) -->
+      <div id="sg-zone-locked" style="display:none;background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:var(--radius-sm);padding:12px 14px;font-size:15px;font-weight:600;color:var(--dark);display:none;align-items:center;gap:8px">
+        <span>📍</span>
+        <span id="sg-zone-name-locked" style="flex:1"></span>
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--amber-dark);background:white;border-radius:5px;padding:2px 6px">QR</span>
+      </div>
+      <!-- Mode sélection libre -->
+      <div id="sg-zone-select-wrap">
+        <select id="sg-zone" class="sg-select" onchange="_onZoneChange(this.value)">
+          <option value="">— Sélectionner une zone —</option>
+        </select>
+      </div>
+      <input id="sg-lieu" class="sg-input" type="text" placeholder="Précision (optionnel) : ex. coin fenêtre, porte gauche…" style="margin-top:8px;font-size:13px;color:var(--text2)"/>
     </div>
 
     <!-- Équipement -->
@@ -175,6 +187,9 @@ var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 
 var _groupeId=null;
 var _equips=[];
+var _zones=[];
+var _selectedZoneId=null;
+var _lockedZoneId=null; // zone pré-remplie depuis URL ?zone=
 var _selectedType=null;
 var _photoFile=null;
 
@@ -206,22 +221,87 @@ async function init(){
   // Verify site exists
   var sites=await supa('sites','id=eq.'+siteId+'&select=nom');
   if(!sites||!sites[0]){_showInvalid();return;}
-  _groupeId=siteId; // groupe_id in signalements/alertes stores the site UUID
+  _groupeId=siteId;
 
   document.getElementById('sg-site-name').textContent=sites[0].nom||'';
 
-  // Load equipements
-  _equips=await supa('equipements','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,types_equipements(nom)&order=ordre_ronde.asc');
+  // Charger zones et équipements en parallèle
+  var results=await Promise.all([
+    supa('zones','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,etage,categorie&order=ordre.asc'),
+    supa('equipements','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id,types_equipements(nom)&order=ordre_ronde.asc')
+  ]);
+  _zones=results[0]||[];
+  _equips=results[1]||[];
+
+  // Peupler dropdown zones
+  var zSel=document.getElementById('sg-zone');
+  // Grouper par étage si présent
+  var etages={};
+  _zones.forEach(function(z){var e=z.etage||'';if(!etages[e])etages[e]=[];etages[e].push(z);});
+  Object.keys(etages).sort().forEach(function(e){
+    var grp=document.createElement('optgroup');
+    grp.label=e||'Sans étage';
+    etages[e].forEach(function(z){
+      var opt=document.createElement('option');
+      opt.value=z.id;
+      opt.textContent=z.nom;
+      grp.appendChild(opt);
+    });
+    zSel.appendChild(grp);
+  });
+  if(_zones.length===0){
+    var opt=document.createElement('option');
+    opt.value='';opt.textContent='— Aucune zone configurée —';opt.disabled=true;
+    zSel.appendChild(opt);
+  }
+
+  // Peupler dropdown équipements (tous)
+  _renderEquipOptions(null);
+
+  // Gestion param ?zone= (QR zone)
+  var zoneParam=params.get('zone');
+  if(zoneParam){
+    var foundZone=_zones.find(function(z){return z.id===zoneParam;});
+    if(foundZone){
+      _lockedZoneId=zoneParam;
+      _selectedZoneId=zoneParam;
+      // Afficher chip verrouillé
+      document.getElementById('sg-zone-locked').style.display='flex';
+      document.getElementById('sg-zone-name-locked').textContent=foundZone.nom+(foundZone.etage?' ('+foundZone.etage+')':'');
+      document.getElementById('sg-zone-select-wrap').style.display='none';
+      // Filtrer équipements sur cette zone
+      _renderEquipOptions(zoneParam);
+    }
+  }
+
+  document.getElementById('sg-loading').style.display='none';
+  document.getElementById('sg-main').style.display='block';
+}
+
+function _renderEquipOptions(zoneId){
   var sel=document.getElementById('sg-equip');
-  _equips.forEach(function(e){
+  var prevVal=sel.value;
+  // Vider sauf option vide
+  while(sel.options.length>1)sel.remove(1);
+  var list=_equips;
+  if(zoneId){
+    var filtered=_equips.filter(function(e){return e.zone_id===zoneId;});
+    if(filtered.length>0)list=filtered;
+    // Si aucun équip dans cette zone → on garde tout (pas de filtre inutile)
+  }
+  list.forEach(function(e){
     var opt=document.createElement('option');
     opt.value=e.id;
     opt.textContent=(e.types_equipements&&e.types_equipements.nom?e.types_equipements.nom+' — ':'')+e.nom;
     sel.appendChild(opt);
   });
+  // Rétablir valeur si toujours dans la liste
+  if(prevVal&&list.find(function(e){return e.id===prevVal;}))sel.value=prevVal;
+}
 
-  document.getElementById('sg-loading').style.display='none';
-  document.getElementById('sg-main').style.display='block';
+function _onZoneChange(zoneId){
+  _selectedZoneId=zoneId||null;
+  _renderEquipOptions(_selectedZoneId);
 }
 
 function _showInvalid(){
@@ -249,7 +329,7 @@ function _onPhotoChange(input){
 
 async function _submit(){
   var prenom=(document.getElementById('sg-prenom').value||'').trim();
-  var lieu=(document.getElementById('sg-lieu').value||'').trim();
+  var precision=(document.getElementById('sg-lieu').value||'').trim();
   var equipId=document.getElementById('sg-equip').value;
   var desc=(document.getElementById('sg-desc').value||'').trim();
   var errEl=document.getElementById('sg-error');
@@ -266,6 +346,15 @@ async function _submit(){
     return;
   }
   errEl.style.display='none';
+
+  // Construire le champ lieu depuis zone + précision
+  var zoneNom=null;
+  var zoneId=_selectedZoneId||_lockedZoneId||null;
+  if(zoneId){
+    var z=_zones.find(function(z){return z.id===zoneId;});
+    if(z)zoneNom=z.nom;
+  }
+  var lieuFinal=[zoneNom,precision].filter(Boolean).join(' — ')||null;
 
   var btn=document.getElementById('sg-submit-btn');
   btn.disabled=true;
@@ -288,9 +377,10 @@ async function _submit(){
     var newSg=await supaPost('signalements',{
       groupe_id:_groupeId,
       site_id:_groupeId,
+      zone_id:zoneId||null,
       equipement_id:equipId||null,
       signale_par:prenom||null,
-      lieu:lieu||null,
+      lieu:lieuFinal,
       type:_selectedType,
       description:desc,
       photo_url:photoUrl,
@@ -298,25 +388,28 @@ async function _submit(){
       source:'formulaire'
     });
 
-    // Créer l'alerte liée au signalement (signalement_id permet de la fermer auto à la résolution)
+    var sgId=newSg&&(Array.isArray(newSg)?newSg[0]:newSg).id||null;
+    var sgRef=newSg&&(Array.isArray(newSg)?newSg[0]:newSg).ref_code||null;
+
+    // Créer l'alerte liée
     await supaPost('alertes',{
       groupe_id:_groupeId,
       type:'signalement',
       severite:'warning',
-      message:(prenom?prenom+' — ':'')+(_typeLabels[_selectedType]||_selectedType)+(lieu?' ('+lieu+')':'')+' : '+desc,
+      message:(prenom?prenom+' — ':'')+(_typeLabels[_selectedType]||_selectedType)+(lieuFinal?' ('+lieuFinal+')':'')+' : '+desc,
       type_alerte:'signalement',
-      signalement_id:newSg&&(Array.isArray(newSg)?newSg[0]:newSg).id||null,
+      signalement_id:sgId,
       lue:false,
       resolue:false
     });
 
-    // Notifier le resp_tech par WhatsApp (fire & forget)
+    // Notifier resp_tech (fire & forget)
     var equipNom=null;
     if(equipId){var eq=_equips.find(function(x){return x.id===equipId;});if(eq)equipNom=eq.nom;}
     fetch(SUPA_URL+'/functions/v1/notify-signalement',{
       method:'POST',
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({site_id:_groupeId,type:_selectedType,description:desc,signale_par:prenom||null,equipement_nom:equipNom,lieu:lieu||null,ref_code:(newSg&&(Array.isArray(newSg)?newSg[0]:newSg).ref_code)||null,photo_url:photoUrl||null,signalement_id:(newSg&&(Array.isArray(newSg)?newSg[0]:newSg).id)||null})
+      body:JSON.stringify({site_id:_groupeId,type:_selectedType,description:desc,signale_par:prenom||null,equipement_nom:equipNom,lieu:lieuFinal,ref_code:sgRef,photo_url:photoUrl||null,signalement_id:sgId})
     }).catch(function(){});
 
     document.getElementById('sg-main').style.display='none';
@@ -336,16 +429,23 @@ function _reset(){
   document.getElementById('sg-main').style.display='block';
   document.getElementById('sg-prenom').value='';
   document.getElementById('sg-lieu').value='';
-  document.getElementById('sg-equip').value='';
   document.getElementById('sg-desc').value='';
   document.querySelectorAll('.type-pill').forEach(function(b){b.classList.remove('selected');});
-  _selectedType=null;
-  _photoFile=null;
+  _selectedType=null;_photoFile=null;
   var preview=document.getElementById('sg-photo-preview');
   preview.src='';preview.style.display='none';
-  var zone=document.getElementById('sg-photo-zone');
-  zone.querySelector('.photo-zone-icon').textContent='📷';
-  zone.querySelector('.photo-zone-text').textContent='Appuyer pour prendre une photo';
+  var pzone=document.getElementById('sg-photo-zone');
+  pzone.querySelector('.photo-zone-icon').textContent='📷';
+  pzone.querySelector('.photo-zone-text').textContent='Appuyer pour prendre une photo';
+  // Réinitialiser zone seulement si pas de zone verrouillée par URL
+  if(!_lockedZoneId){
+    _selectedZoneId=null;
+    document.getElementById('sg-zone').value='';
+    _renderEquipOptions(null);
+  }else{
+    _renderEquipOptions(_lockedZoneId);
+    document.getElementById('sg-equip').value='';
+  }
 }
 
 init();

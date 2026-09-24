@@ -3429,6 +3429,56 @@ var _ZONE_EQ_TEMPLATES={
 
 var _ZONE_CATS=['Restauration','Hébergement','Loisirs','Spa','Casino','Accueil','Commerce','Bureaux','Technique','Circulation','Autre'];
 
+/* ── QR codes — génération et téléchargement ── */
+function _zonesEnsureQrLib(cb){
+  if(window.QRCode){cb();return;}
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  s.onload=function(){cb();};
+  s.onerror=function(){console.warn('QRCode lib failed to load');};
+  document.head.appendChild(s);
+}
+
+function _zonesRenderQRs(){
+  var sid=window._zonesQrSid;
+  var zones=window._zonesQrData||[];
+  if(!sid)return;
+  _zonesEnsureQrLib(function(){
+    if(!window.QRCode)return;
+    var origin=location.origin;
+    // QR général
+    var genEl=document.getElementById('zw-qr-general');
+    if(genEl&&!genEl.dataset.qrDone){
+      genEl.innerHTML='';
+      try{new QRCode(genEl,{text:origin+'/signalement.html?site='+sid,width:64,height:64,colorDark:'#12151E',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});}catch(e){}
+      genEl.dataset.qrDone='1';
+    }
+    // QR par zone
+    zones.forEach(function(z){
+      var el=document.getElementById('zw-qr-z-'+z.id);
+      if(el&&!el.dataset.qrDone){
+        el.innerHTML='';
+        try{new QRCode(el,{text:origin+'/signalement.html?site='+sid+'&zone='+z.id,width:80,height:80,colorDark:'#12151E',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});}catch(e){}
+        el.dataset.qrDone='1';
+      }
+    });
+  });
+}
+
+function _zonesDlQR(elId,filename){
+  var el=document.getElementById(elId);
+  if(!el)return;
+  // qrcode.js génère un canvas ET une img (fallback) — on préfère le canvas
+  var canvas=el.querySelector('canvas');
+  var dataUrl=canvas?canvas.toDataURL('image/png'):null;
+  if(!dataUrl){var img=el.querySelector('img');if(img)dataUrl=img.src;}
+  if(!dataUrl){alert('QR pas encore généré');return;}
+  var a=document.createElement('a');
+  a.href=dataUrl;
+  a.download=(filename||'qr-code').replace(/[^a-zA-Z0-9_-]/g,'-')+'.png';
+  a.click();
+}
+
 async function _buildZonesConfigTab(sid){
   _zonesWizardSid=sid;
   // Étape 0 — liste existante + upload
@@ -3470,7 +3520,46 @@ async function _buildZonesConfigTab(sid){
       '</div>';
     }
 
-    return listeHtml+
+    // Section QR codes
+    var qrSection='';
+    if(existingZones.length){
+      window._zonesQrData=existingZones;
+      window._zonesQrSid=sid;
+      var zoneQrItems=existingZones.map(function(z){
+        return '<div style="border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;background:white">'+
+          '<div id="zw-qr-z-'+z.id+'" style="margin:0 auto 6px;width:80px;height:80px;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:10px">...</div>'+
+          '<div style="font-size:10px;font-weight:600;color:var(--dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px" title="'+escape_html(z.nom)+'">'+escape_html(z.nom)+'</div>'+
+          (z.etage?'<div style="font-size:9px;color:var(--text3);margin-bottom:4px">'+escape_html(z.etage)+'</div>':'')+
+          '<button onclick="_zonesDlQR(\'zw-qr-z-'+z.id+'\',\''+escape_html(z.nom).replace(/'/g,'\\\'')+'\')" style="font-size:10px;padding:3px 8px;border:1px solid var(--border);border-radius:5px;background:white;color:var(--text2);cursor:pointer;font-family:inherit">↓ PNG</button>'+
+        '</div>';
+      }).join('');
+      qrSection='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px">'+
+        // Titre
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
+          '<div>'+
+            '<div style="font-size:12px;font-weight:700;color:var(--dark)">🔲 QR Codes de signalement</div>'+
+            '<div style="font-size:11px;color:var(--text3);margin-top:2px">À imprimer et afficher — scannés, ils ouvrent le formulaire de signalement</div>'+
+          '</div>'+
+        '</div>'+
+        // QR général hôtel
+        '<div style="border:1.5px solid var(--amber-border);border-radius:10px;background:var(--amber-pale);padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px">'+
+          '<div id="zw-qr-general" style="width:64px;height:64px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:white;border-radius:6px;color:var(--text3);font-size:10px">...</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:2px">QR Général — Réception / Personnel volant</div>'+
+            '<div style="font-size:10px;color:var(--text2)">Pas de zone pré-sélectionnée, l\'agent choisit depuis le formulaire</div>'+
+            '<div style="font-size:9px;color:var(--text3);margin-top:3px;word-break:break-all">{ORIGIN}/signalement.html?site='+sid+'</div>'+
+          '</div>'+
+          '<button onclick="_zonesDlQR(\'zw-qr-general\',\'QR-General\')" style="flex-shrink:0;padding:7px 12px;border:1.5px solid var(--amber);border-radius:7px;background:white;color:var(--amber-dark);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">↓ PNG</button>'+
+        '</div>'+
+        // QR par zone
+        '<div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px">QR par zone ('+existingZones.length+')</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px">'+zoneQrItems+'</div>'+
+        // Trigger auto-render via img onload (data URI = fire immédiatement après DOM insertion)
+        '<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:none" onload="_zonesRenderQRs()">'+
+      '</div>';
+    }
+
+    return listeHtml+qrSection+
       '<div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:8px">'+(existingZones.length?'Re-importer les zones':'Importer les zones depuis Excel')+'</div>'+
       '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">'+
         'Fichier Excel avec un onglet <strong>PARTIE COMMUNE</strong> et/ou <strong>CHAMBRE</strong>. '+
