@@ -3491,14 +3491,17 @@ async function _buildZonesConfigTab(sid){
     var typos=data.filter(function(z){return z.erreur==='typo';});
     var sansEtage=data.filter(function(z){return z.erreur==='etage_manquant';});
 
-    // Bandeau doublons supprimés
-    var dedupBanner=_zonesWizardDedupCount>0
-      ?'<div style="background:#f0faf4;border:1.5px solid #4caf50;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:#2e7d32">'+
-        '✅ '+_zonesWizardDedupCount+' doublon'+((_zonesWizardDedupCount>1)?'s':'')+' supprimé'+((_zonesWizardDedupCount>1)?'s':'')+' automatiquement'+
-      '</div>' : '';
+    var doubls=data.filter(function(z){return z.erreur==='doublon';});
 
-    // Bandeau alertes restantes (typos, étages manquants)
+    // Bandeau alertes (doublons + typos + étages manquants)
     var alertHtml='';
+    var dedupBanner='';
+    if(doubls.length){
+      dedupBanner='<div style="background:var(--rouge-pale);border:1.5px solid var(--rouge);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:var(--rouge);display:flex;align-items:center;gap:10px">'+
+        '<span style="flex:1">⚠️ '+doubls.length+' doublon'+(doubls.length>1?'s':'')+' détecté'+(doubls.length>1?'s':'')+' — vérifiez et supprimez si nécessaire</span>'+
+        '<button onclick="_zonesRemoveAllDoublons()" style="padding:5px 12px;border:none;border-radius:6px;background:var(--rouge);color:white;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">Supprimer les '+doubls.length+'</button>'+
+      '</div>';
+    }
     if(typos.length||sansEtage.length){
       alertHtml='<div style="background:var(--orange-pale);border:1.5px solid var(--orange);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:var(--orange)">'+
         '⚠️ '+(typos.length?typos.length+' typo'+(typos.length>1?'s':'')+' ':'')+
@@ -3527,9 +3530,11 @@ async function _buildZonesConfigTab(sid){
     var tableRows=data.map(function(z,i){
       var isSansEtage=z.erreur==='etage_manquant';
       var isTypo=z.erreur==='typo';
-      var bg=isSansEtage?'#fffde7':isTypo?'var(--orange-pale)':'';
-      var errBadge=isSansEtage
-        ?'<span class="zw-etage-badge" style="font-size:10px;font-weight:700;background:#fff3cd;color:#b45309;padding:2px 7px;border-radius:4px;margin-left:6px">Étage ?</span>'
+      var isDoublon=z.erreur==='doublon';
+      var bg=isDoublon?'var(--rouge-pale)':isSansEtage?'#fffde7':isTypo?'var(--orange-pale)':'';
+      var errBadge=isDoublon
+        ?'<span style="font-size:10px;font-weight:700;background:var(--rouge-pale);color:var(--rouge);padding:2px 7px;border-radius:4px;margin-left:6px">Doublon</span>'
+        :isSansEtage?'<span class="zw-etage-badge" style="font-size:10px;font-weight:700;background:#fff3cd;color:#b45309;padding:2px 7px;border-radius:4px;margin-left:6px">Étage ?</span>'
         :isTypo?'<span style="font-size:10px;font-weight:700;background:var(--orange-pale);color:var(--orange);padding:2px 7px;border-radius:4px;margin-left:6px">Typo</span>':'';
       return '<tr id="zw-row-'+i+'" style="background:'+bg+'">'+
         '<td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;min-width:90px">'+
@@ -3638,9 +3643,10 @@ async function _buildZonesConfigTab(sid){
       var isPerZone=cat==='Hébergement';
       totalEqExpanded+=(_zonesWizardEqSel[cat]||[]).length*(isPerZone?n:1);
     });
-    var dedupBanner3=_zonesWizardDedupCount>0
-      ?'<div style="background:#f0faf4;border:1.5px solid #4caf50;border-radius:10px;padding:10px 14px;font-size:12px;color:#2e7d32;margin-bottom:14px">'+
-        '✅ '+_zonesWizardDedupCount+' doublon'+((_zonesWizardDedupCount>1)?'s':'')+' supprimé'+((_zonesWizardDedupCount>1)?'s':'')+' à l\'import'+
+    var doublons3=_zonesWizardData.filter(function(z){return z.erreur==='doublon';});
+    var dedupBanner3=doublons3.length>0
+      ?'<div style="background:var(--rouge-pale);border:1.5px solid var(--rouge);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--rouge);margin-bottom:14px">'+
+        '⚠️ '+doublons3.length+' doublon'+(doublons3.length>1?'s':'')+' encore présent'+(doublons3.length>1?'s':'')+' — retournez à l\'étape 1 pour les retirer.'+
       '</div>':'';
 
     return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'+
@@ -3650,7 +3656,7 @@ async function _buildZonesConfigTab(sid){
       dedupBanner3+
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">'+
         '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">'+
-          '<div style="font-size:26px;font-weight:800;color:var(--dark)">'+totalZones+'</div>'+
+          '<div style="font-size:26px;font-weight:800;color:var(--dark)">'+(totalZones-doublons3.length)+'</div>'+
           '<div style="font-size:11px;color:var(--text2)">Zones à créer</div>'+
         '</div>'+
         '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">'+
@@ -3658,8 +3664,8 @@ async function _buildZonesConfigTab(sid){
           '<div style="font-size:11px;color:var(--text2)">Équipements à créer</div>'+
         '</div>'+
         '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">'+
-          '<div style="font-size:26px;font-weight:800;color:#4caf50">'+_zonesWizardDedupCount+'</div>'+
-          '<div style="font-size:11px;color:var(--text2)">Doublons retirés</div>'+
+          '<div style="font-size:26px;font-weight:800;color:'+(doublons3.length?'var(--rouge)':'var(--text3)')+'">'+doublons3.length+'</div>'+
+          '<div style="font-size:11px;color:var(--text2)">Doublons</div>'+
         '</div>'+
       '</div>'+
       '<div id="zones-import-status" style="margin-bottom:12px;font-size:12px;color:var(--text3)"></div>'+
@@ -3707,6 +3713,12 @@ function _zonesApplyBatchEtage(n){
     var alerts=document.querySelectorAll('[style*="orange"]');
     // Mise à jour propre : re-render léger du header count
   }
+}
+
+function _zonesRemoveAllDoublons(){
+  _zonesWizardData=_zonesWizardData.filter(function(z){return z.erreur!=='doublon';});
+  _zonesWizardDedupCount=0;
+  if(_session)renderRespTech(_session,'config');
 }
 
 function _zonesWizardToggleEq(cat,eq,on){
@@ -3857,11 +3869,9 @@ function _zonesHandleFile(file,sid){
               if(cn.length===0) continue;
               // Colonne ETAGE : contient 'ETAGE' et assez courte
               if(cn.indexOf('ETAGE')>=0&&cn.length<=20) foundE=ci;
-              // Colonne NOM/CHAMBRE/DESIGNATION
-              if(cn==='DESIGNATION'||cn.indexOf('DESIGNATION')===0||
-                 cn==='CHAMBRE'||cn.indexOf('CHAMBRE')===0||
-                 cn==='NCHAMBRE'||cn==='NOM'||
-                 cn.indexOf('DESIGNAT')===0) foundN=ci;
+              // Colonne NOM/CHAMBRE/DESIGNATION — accepte toute variante
+              // ex: "DESIGNATION", "N° DE CHAMBRE" → "NDECHAMBRE", "NOM", etc.
+              if(cn.indexOf('DESIGNATION')>=0||cn.indexOf('CHAMBRE')>=0||cn==='NOM') foundN=ci;
             }
             if(foundN>=0){
               nameCol=foundN;
@@ -3911,15 +3921,10 @@ function _zonesHandleFile(file,sid){
             var nameVal=(nameCol<drow.length?(drow[nameCol]+'').trim():'');
             if(etageVal)lastEtage=etageVal;
             if(!nameVal||nameVal.length<2)continue;
-            // Ignorer les lignes qui sont des sous-titres (tout en maj, pas de chiffre dans le nom)
-            if(/^[A-Z\s\-\_]{3,}$/.test(nameVal)&&nameVal===nameVal.toUpperCase()&&!/[0-9]/.test(nameVal)&&nameVal.length<30){
-              // Peut être un titre de section – vérifier si ça ressemble à un nom de zone réel
-              if(nameVal.length<5) continue; // trop court pour être un nom de zone
-            }
 
-            // Détecter doublon (on garde le premier, on skippe les suivants)
+            // Détecter doublon
             var key=(lastEtage||'')+'|'+nameVal.toLowerCase();
-            if(seen[key]){continue;} // skip doublon — compté plus bas
+            var isDup=!!seen[key];
             seen[key]=true;
 
             // Détecter typo simple
@@ -3942,70 +3947,13 @@ function _zonesHandleFile(file,sid){
               etage:lastEtage,
               categorie:cat,
               type:type,
-              erreur:lastEtage===null&&di>headerRow+2?'etage_manquant':(hasTypo?'typo':null)
+              erreur:isDup?'doublon':(lastEtage===null&&di>headerRow+2?'etage_manquant':(hasTypo?'typo':null))
             });
           }
         });
 
         if(!allZones.length){if(statusEl)statusEl.textContent='Aucune zone trouvée. Vérifiez le format du fichier.';return;}
-
-        // Compter les doublons qui ont été skippés (difference entre nb total et allZones)
-        // On réinitialise le compteur ici — les doublons ont déjà été exclus dans la boucle ci-dessus
-        // (on doit recalculer en reparsant le nb de lignes rejetées)
-        // Approche alternative : on compte les doublons en passant un deuxième compteur
-        // → En fait les doublons sont simplement sautés (continue), donc allZones est déjà dédupliqué.
-        // On calcule le nb de doublons en comparant avec un nouveau scan.
-        var rawSeen={};var rawCount=0;
-        allZones.forEach(function(z){
-          var k=(z.etage||'')+'|'+z.nom.toLowerCase();
-          rawSeen[k]=true; rawCount++;
-        });
-        // Le nombre de doublons est la différence — mais on n'a pas le total original ici.
-        // On stocke 0 pour l'instant (le vrai count est fait dans le second scan ci-dessous).
-        _zonesWizardDedupCount=0; // sera recalculé dans le second passage
-
-        // Deuxième passe pour vrai compte de doublons
-        // (on ne peut pas faire autrement sans refactorer la boucle)
-        // En pratique: on refait juste le décompte avec seen2
-        var seen2={};var dupCount2=0;
-        wb.SheetNames.forEach(function(sheetName){
-          var ws=wb.Sheets[sheetName];
-          var rows2=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
-          // Quick scan to find nameCol only
-          var hdr2=-1,nc2=-1,ec2=-1;
-          for(var ri2=0;ri2<Math.min(rows2.length,18);ri2++){
-            var r2=rows2[ri2];
-            for(var ci2=0;ci2<Math.min(r2.length,30);ci2++){
-              var cn2=_normCell(r2[ci2]);
-              if(cn2.indexOf('ETAGE')>=0&&cn2.length<=20) ec2=ci2;
-              if(cn2==='DESIGNATION'||cn2.indexOf('DESIGNATION')===0||cn2==='CHAMBRE'||cn2.indexOf('CHAMBRE')===0||cn2==='NOM') {nc2=ci2;hdr2=ri2;break;}
-            }
-            if(hdr2===ri2) break;
-          }
-          if(hdr2<0||nc2<0) return;
-          if(ec2<0){
-            for(var rr2=Math.max(0,hdr2-3);rr2<=Math.min(rows2.length-1,hdr2+1);rr2++){
-              if(rr2===hdr2) continue;
-              for(var cc3=0;cc3<Math.min(rows2[rr2].length,30);cc3++){
-                if(_normCell(rows2[rr2][cc3]).indexOf('ETAGE')>=0){ec2=cc3;break;}
-              }
-              if(ec2>=0) break;
-            }
-          }
-          var le2=null;
-          for(var di2=hdr2+1;di2<rows2.length;di2++){
-            var dr2=rows2[di2];
-            var ev2=(ec2>=0?(dr2[ec2]+'').trim():'')||null;
-            var nv2=(nc2<dr2.length?(dr2[nc2]+'').trim():'');
-            if(ev2)le2=ev2;
-            if(!nv2||nv2.length<2) continue;
-            var k2=(le2||'')+'|'+nv2.toLowerCase();
-            if(seen2[k2]) dupCount2++;
-            else seen2[k2]=true;
-          }
-        });
-        _zonesWizardDedupCount=dupCount2;
-
+        _zonesWizardDedupCount=allZones.filter(function(z){return z.erreur==='doublon';}).length;
         _zonesWizardData=allZones;
         _zonesWizardStep=1;
         _zonesWizardEqSel={};
