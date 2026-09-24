@@ -7807,7 +7807,7 @@ async function _rtEnergie(sid){
   _energieSidGlobal=sid;
 
   var[fluides,relevesRows,siteRows]=await Promise.all([
-    supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,seuil_alerte_bas,objectif_mensuel,ordre&order=ordre.asc'),
+    supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,seuil_alerte_bas,objectif_mensuel,capacite,ordre&order=ordre.asc'),
     supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+moisDebut+'&select=id,date_releve,valeurs,saisi_par,note&order=date_releve.asc&limit=62'),
     supaGet('sites','id=eq.'+sid+'&select=nom&limit=1')
   ]);
@@ -7903,61 +7903,88 @@ async function _rtEnergie(sid){
     var consoMois=consoMoisByFluide[f.id];
     var obj=f.objectif_mensuel?parseFloat(f.objectif_mensuel):null;
     var isInstant=f.type_valeur==='instantane';
-    var pct=(!isInstant&&obj&&consoMois!=null)?consoMois/obj:null;
+    var cap=f.capacite?parseFloat(f.capacite):null;
+    // Conso mensuelle pour instantanés : sommer les baisses quotidiennes × capacité
+    var consoInstant=null;
+    if(isInstant&&cap!=null){
+      var drops=0;
+      deltasByFluide[f.id].forEach(function(d){if(d<0)drops+=Math.abs(d);});
+      consoInstant=Math.round(drops/100*cap);
+    }
+    var consoAffichee=isInstant?consoInstant:consoMois;
     var tarif=f.tarif?parseFloat(f.tarif):null;
     var budget=obj&&tarif?obj*tarif:null;
-    var coutReel=(!isInstant&&consoMois!=null&&tarif)?consoMois*tarif:null;
+    var coutReel=consoAffichee!=null&&tarif?consoAffichee*tarif:null;
+    var pct=obj&&consoAffichee!=null?consoAffichee/obj:null;
     var deltaCout=budget&&coutReel?coutReel-budget:null;
-    var deltaSign=pct!=null?(pct>1?'↑':pct<0.95?'↓':''):null;
     var alerte=f.seuil_alerte_bas!=null&&lastVal!=null&&lastVal<f.seuil_alerte_bas;
-    var sur=!isInstant?(pct!=null&&pct>1):(lastVal!=null&&f.seuil_alerte_bas!=null&&lastVal<f.seuil_alerte_bas*1.15);
-    var barColor=alerte?'var(--rouge)':sur?'#E8841A':'#3B82F6';
-    var barPct=pct!=null?Math.min(100,Math.round(pct*100)):0;
+    var sur=pct!=null&&pct>1;
     var tileColor=alerte?'var(--rouge)':sur?'var(--amber-dark)':'var(--dark)';
-    // Jauge niveau pour fluides instantanés (%, L, etc.)
-    var isNiveau=isInstant&&lastVal!=null;
-    var niveauPct=isNiveau?Math.min(100,Math.max(0,lastVal)):0;
+    var deltaColor=pct==null?'var(--text3)':pct>1?'#E8841A':pct<0.95?'var(--vert)':'var(--text3)';
+    var restants=isInstant&&cap!=null&&lastVal!=null?Math.round(lastVal/100*cap):null;
+    // Barre de progression
+    var barPct=pct!=null?Math.min(100,Math.round(pct*100)):0;
+    var barColor=alerte?'var(--rouge)':sur?'#E8841A':'#3B82F6';
+    // Jauge niveau instantané
+    var niveauPct=isInstant&&lastVal!=null?Math.min(100,Math.max(0,lastVal)):0;
     var niveauColor=alerte?'var(--rouge)':sur?'#E8841A':'#22c55e';
 
     tilesHtml+=
-      '<div style="background:white;border:1.5px solid '+(alerte?'var(--rouge)':'var(--border)')+';border-radius:12px;padding:16px">'+
-        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
-          '<span style="font-size:20px">'+_fluidIcon(f)+'</span>'+
+      '<div style="background:white;border:1.5px solid '+(alerte?'var(--rouge)':'var(--border)')+';border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:0">'+
+        // En-tête
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+          '<span style="font-size:18px">'+_fluidIcon(f)+'</span>'+
           '<span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">'+escape_html(f.nom)+'</span>'+
+          (alerte?'<span style="margin-left:auto;font-size:10px;background:#fee2e2;color:var(--rouge);padding:2px 7px;border-radius:20px;font-weight:700">⚠ ALERTE</span>':'')+
         '</div>'+
-        '<div style="font-size:26px;font-weight:800;color:'+tileColor+';line-height:1">'+
-          (lastVal!=null?lastVal.toLocaleString('fr-FR'):'—')+
-          (f.unite&&lastVal!=null?'<span style="font-size:13px;font-weight:500;color:var(--text3);margin-left:4px">'+escape_html(f.unite)+'</span>':'')+
+        // Grand chiffre
+        '<div style="font-size:28px;font-weight:800;color:'+tileColor+';line-height:1.1">'+
+          (isInstant?
+            (lastVal!=null?lastVal.toLocaleString('fr-FR')+'<span style="font-size:14px;font-weight:500;color:var(--text3);margin-left:3px">%</span>':'—'):
+            (consoMois!=null?Math.round(consoMois).toLocaleString('fr-FR')+'<span style="font-size:13px;font-weight:500;color:var(--text3);margin-left:3px">'+(f.unite?escape_html(f.unite):'')+'</span>':'—')+
+          '')+
         '</div>'+
-        (consoMois!=null&&!isInstant?'<div style="font-size:10px;color:var(--text2);margin-top:4px">'+consoMois.toLocaleString('fr-FR')+(f.unite?' '+f.unite:'')+'<span style="color:var(--text3)"> ce mois</span></div>':'')+
-        (alerte?'<div style="font-size:10px;color:var(--rouge);font-weight:700;margin-top:4px">⚠️ Niveau bas — seuil '+f.seuil_alerte_bas+(f.unite?' '+f.unite:'')+'</div>':'')+
+        // Sous-titre
+        (isInstant&&restants!=null?
+          '<div style="font-size:10px;color:var(--text2);margin-top:3px">'+
+            restants.toLocaleString('fr-FR')+' L restants'+(cap?' · citerne '+cap.toLocaleString('fr-FR')+' L':'')+
+          '</div>':
+          (!isInstant&&consoMois!=null?
+            '<div style="font-size:10px;color:var(--text2);margin-top:3px">ce mois · dernier relevé : '+(lastVal!=null?lastVal.toLocaleString('fr-FR')+(f.unite?' '+f.unite:''):'—')+'</div>':
+          ''))+
         // Jauge niveau (instantané)
-        (isNiveau?'<div style="margin-top:10px">'+
-          '<div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;position:relative">'+
-            '<div style="height:10px;background:'+niveauColor+';border-radius:5px;width:'+niveauPct+'%;transition:width .4s"></div>'+
+        (isInstant?'<div style="margin-top:10px">'+
+          '<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">'+
+            '<div style="height:8px;background:'+niveauColor+';border-radius:4px;width:'+niveauPct+'%;transition:width .4s"></div>'+
           '</div>'+
-          '<div style="display:flex;justify-content:space-between;margin-top:5px;font-size:10px;color:var(--text3)">'+
-            '<span>0'+(f.unite?' '+f.unite:'')+'</span>'+
-            (f.seuil_alerte_bas!=null?'<span style="color:var(--rouge);font-weight:600">⚑ '+f.seuil_alerte_bas+(f.unite?' '+f.unite:'')+'</span>':'')+
-            '<span>100'+(f.unite?' '+f.unite:'')+'</span>'+
-          '</div>'+
+          (f.seuil_alerte_bas!=null?'<div style="font-size:9px;color:var(--rouge);margin-top:3px">⚑ Seuil alerte : '+f.seuil_alerte_bas+'%</div>':'')+
         '</div>':'')+
-        // Barre de progression vs objectif (index)
-        (!isNiveau&&obj?'<div style="margin-top:10px">'+
-          '<div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden">'+
-            '<div style="height:5px;background:'+barColor+';border-radius:3px;width:'+barPct+'%;transition:width .3s"></div>'+
+        // Objectif + conso + barre (les deux types)
+        (obj?'<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">'+
+          '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:4px">'+
+            '<span>'+(!isInstant?'Objectif mensuel':'Conso cible mois')+'</span>'+
+            '<span style="font-weight:600;color:var(--text2)">'+obj.toLocaleString('fr-FR')+(isInstant?' L':(f.unite?' '+f.unite:''))+'</span>'+
           '</div>'+
-          '<div style="display:flex;justify-content:space-between;margin-top:5px;font-size:10px;color:var(--text3)">'+
-            '<span>Obj. '+obj.toLocaleString('fr-FR')+(f.unite?' '+f.unite:'')+'</span>'+
-            (pct!=null?'<span style="color:'+barColor+';font-weight:700">'+(deltaSign||'')+Math.round(pct*100)+'%</span>':'')+
-          '</div>'+
-        '</div>':'')+
-        // Budget / coût
-        (budget||coutReel?'<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--text3)">'+
-          (budget?'<div style="display:flex;justify-content:space-between"><span>Budget</span><span style="font-weight:600;color:var(--text2)">'+Math.round(budget/1000)+'k FCFA</span></div>':'')+
-          (coutReel?'<div style="display:flex;justify-content:space-between"><span>Coût réel est.</span><span style="font-weight:600;color:var(--dark)">'+Math.round(coutReel/1000)+'k FCFA</span></div>':'')+
-          (deltaCout!=null?'<div style="margin-top:3px;font-weight:700;color:'+(deltaCout>0?'#E8841A':'var(--vert)')+'">'+
-            (deltaCout>0?'↑ +':'↓ ')+Math.abs(Math.round(deltaCout/1000))+'k FCFA vs budget'+
+          (!isInstant?'<div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:4px">'+
+            '<div style="height:4px;background:'+barColor+';border-radius:2px;width:'+barPct+'%;transition:width .3s"></div>'+
+          '</div>':'')+
+          (consoAffichee!=null&&isInstant?'<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:4px">'+
+            '<span>Conso ce mois</span><span style="font-weight:600;color:var(--dark)">'+consoAffichee.toLocaleString('fr-FR')+' L</span>'+
+          '</div>':'')+
+          (budget?'<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:2px">'+
+            '<span>Budget</span><span style="font-weight:600;color:var(--text2)">'+
+              (budget>=1000000?Math.round(budget/100000)/10+'M':Math.round(budget/1000)+'k')+' FCFA'+
+            '</span>'+
+          '</div>':'')+
+          (coutReel!=null?'<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:4px">'+
+            '<span>Coût réel est.</span><span style="font-weight:600;color:var(--dark)">'+
+              (coutReel>=1000000?Math.round(coutReel/100000)/10+'M':Math.round(coutReel/1000)+'k')+' FCFA'+
+            '</span>'+
+          '</div>':'')+
+          (pct!=null&&coutReel!=null?'<div style="font-size:10px;font-weight:700;color:'+deltaColor+'">'+
+            (pct>1?'↑ +':'↓ ')+Math.abs(Math.round((pct-1)*1000)/10)+'% vs objectif'+
+            (deltaCout!=null?' · '+(deltaCout>0?'+':'')+
+              (Math.abs(deltaCout)>=1000000?Math.round(Math.abs(deltaCout)/100000)/10+'M':Math.round(Math.abs(deltaCout)/1000)+'k')+' FCFA':'')+
           '</div>':'')+
         '</div>':'')+
       '</div>';
@@ -8129,11 +8156,11 @@ async function _rtEnergie(sid){
    ⚡ ÉNERGIE CONFIG — Onglet config fluides
    ═══════════════════════════════════════════════════════ */
 // Colonnes : ordre | nom | unité | type | tarif | seuil | actif | suppr
-var _ECFG_COLS='30px 1fr 70px 90px 90px 90px 44px';
+var _ECFG_COLS='30px 1fr 70px 90px 90px 90px 90px 44px';
 
 async function _buildEnergieConfigTab(sid){
   var[fluides,relevesCheck]=await Promise.all([
-    supaGet('energie_config','site_id=eq.'+sid+'&select=id,nom,unite,type_valeur,tarif,seuil_alerte_bas,actif,ordre&order=ordre.asc'),
+    supaGet('energie_config','site_id=eq.'+sid+'&select=id,nom,unite,type_valeur,tarif,seuil_alerte_bas,capacite,actif,ordre&order=ordre.asc'),
     supaGet('releves_energie','site_id=eq.'+sid+'&select=valeurs&limit=100')
   ]);
 
@@ -8155,6 +8182,7 @@ async function _buildEnergieConfigTab(sid){
     '<div>Type</div>'+
     '<div style="text-align:right">Tarif FCFA/u</div>'+
     '<div style="text-align:right">Seuil bas</div>'+
+    '<div style="text-align:right">Capacité</div>'+
     '<div style="text-align:center">Actif</div>'+
   '</div>';
 
@@ -8187,6 +8215,10 @@ async function _buildEnergieConfigTab(sid){
       '<input id="ecfg-seuil-'+f.id+'" type="number" value="'+(f.seuil_alerte_bas!=null?f.seuil_alerte_bas:'')+'" placeholder="—" '+
         'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" '+
         'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
+      // Capacité
+      '<input id="ecfg-cap-'+f.id+'" type="number" value="'+(f.capacite!=null?f.capacite:'')+'" placeholder="—" '+
+        'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" '+
+        'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
       // Toggle actif
       '<div style="text-align:center">'+
         '<label style="position:relative;display:inline-block;width:32px;height:18px">'+
@@ -8212,6 +8244,8 @@ async function _buildEnergieConfigTab(sid){
       'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" />'+
     '<input id="ecfg-new-seuil" type="number" placeholder="—" '+
       'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" />'+
+    '<input id="ecfg-new-cap" type="number" placeholder="—" '+
+      'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" />'+
     '<div style="display:flex;gap:4px">'+
       '<button onclick="_energieConfirmerAjout(\''+sid+'\')" title="Valider" '+
         'style="background:var(--amber);color:white;border:none;border-radius:5px;width:20px;height:20px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">✓</button>'+
@@ -8222,8 +8256,8 @@ async function _buildEnergieConfigTab(sid){
 
   h+='<div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between">'+
     '<div style="font-size:10px;color:var(--text3)">'+
-      '💡 <strong>Index</strong> : compteur croissant (kWh, m³). <strong>Instantané</strong> : valeur brute (%, L restants). '+
-      '<strong>Tarif</strong> : FCFA/unité pour le calcul du coût estimé. 🔒 = données existantes.'+
+      '💡 <strong>Index</strong> : compteur croissant (kWh, m³). <strong>Instantané</strong> : niveau brut (%). '+
+      '<strong>Capacité</strong> : volume total du réservoir (L) pour calcul litres restants &amp; conso. <strong>Tarif</strong> : FCFA/unité.'+
     '</div>'+
     '<button onclick="_energieAfficherAjout()" id="ecfg-btn-add" '+
       'style="flex-shrink:0;margin-left:16px;background:var(--amber);color:white;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">+ Ajouter</button>'+
@@ -8272,6 +8306,7 @@ async function _energieConfirmerAjout(sid){
     type_valeur:type?type.value:'index',
     tarif:tarif&&tarif.value!==''?parseFloat(tarif.value):null,
     seuil_alerte_bas:seuil&&seuil.value!==''?parseFloat(seuil.value):null,
+    capacite:(function(){var c=document.getElementById('ecfg-new-cap');return c&&c.value!==''?parseFloat(c.value):null;})(),
     actif:true,
     ordre:nextOrdre
   };
@@ -8289,6 +8324,7 @@ async function _energieSauvegarder(sid,fid){
   var type=document.getElementById('ecfg-type-'+fid);
   var tarif=document.getElementById('ecfg-tarif-'+fid);
   var seuil=document.getElementById('ecfg-seuil-'+fid);
+  var capEl=document.getElementById('ecfg-cap-'+fid);
   if(!nom)return;
   var payload={
     nom:nom.value.trim()||'Fluide',
@@ -8296,6 +8332,7 @@ async function _energieSauvegarder(sid,fid){
     type_valeur:type?type.value:'index',
     tarif:tarif&&tarif.value!==''?parseFloat(tarif.value):null,
     seuil_alerte_bas:seuil&&seuil.value!==''?parseFloat(seuil.value):null,
+    capacite:capEl&&capEl.value!==''?parseFloat(capEl.value):null,
     updated_at:new Date().toISOString()
   };
   await supaPatch('energie_config',fid,payload);
