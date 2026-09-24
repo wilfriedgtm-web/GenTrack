@@ -681,7 +681,7 @@ async function _rtAccueil(session,sid,cid){
   var todayStart=today+'T00:00:00Z';
   var[rondes,equips,alertes,pannes,recoData,vueStat,relevesJour]=await Promise.all([
     supaGet('rondes','site_id=eq.'+sid+'&date_ronde=eq.'+today+'&select=id,frequence,date_ronde'),
-    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,ordre_ronde,type_id,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,date_dernier_vidange,type_compteur_heures,types_equipements(nom)&order=ordre_ronde.asc'),
+    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&or=(actif_ronde.eq.true,actif_releve.eq.true)&select=id,nom,ordre_ronde,type_id,actif_ronde,actif_releve,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,date_dernier_vidange,type_compteur_heures,types_equipements(nom)&order=ordre_ronde.asc'),
     supaGet('alertes','groupe_id=eq.'+sid+'&resolue=eq.false&select=id,type,severite,type_alerte,message,created_at&order=created_at.desc&limit=20'),
     supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&statut=neq.resolu&select=id,type,description,created_at,equipement_id,equipements(nom)&order=created_at.desc&limit=20'),
     _fetchRecoEquipements(sid),
@@ -743,7 +743,7 @@ async function _rtAccueil(session,sid,cid){
   if(nbAlertes>0){
     banner='<div class="alert-banner" style="cursor:pointer" onclick="document.getElementById(\'accueil-alertes\')&&document.getElementById(\'accueil-alertes\').scrollIntoView({behavior:\'smooth\',block:\'start\'})"><div class="ab-icon">🚨</div><div class="ab-body"><div class="ab-title">'+nbAlertes+' alerte'+(nbAlertes>1?'s':'')+' active'+(nbAlertes>1?'s':'')+'</div><div class="ab-sub">Voir le détail ↓</div></div></div>';
   }else if(rondeOk){
-    banner='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Tout est OK</div><div class="ab-sub">Ronde journalière validée · '+equips.length+' équipements</div></div></div>';
+    banner='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Tout est OK</div><div class="ab-sub">Ronde journalière validée · '+equips.length+' équipement'+(equips.length>1?'s':'')+' en suivi</div></div></div>';
   }else if(nbTot>0){
     banner='<div class="alert-banner warn"><div class="ab-icon">⏳</div><div class="ab-body"><div class="ab-title">Ronde en cours</div><div class="ab-sub">'+nbVal+'/'+nbTot+' équipements validés</div></div></div>';
   }else{
@@ -753,7 +753,7 @@ async function _rtAccueil(session,sid,cid){
   // KPIs
   var rondeDisp=nbTot>0?(nbVal+'/'+nbTot):'—';
   var kpis='<div class="kpi-grid">'+
-    '<div class="kpi"><div class="kpi-label">Équipements</div><div class="kpi-value">'+equips.length+'</div><div class="kpi-trend">Ce site</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Équip. en suivi</div><div class="kpi-value">'+equips.length+'</div><div class="kpi-trend">Rondes + relevés</div></div>'+
     '<div class="kpi"><div class="kpi-label">Ronde du jour</div><div class="kpi-value" style="color:'+(rondeOk?'var(--vert)':nbTot===0?'var(--text2)':'var(--orange)')+'">'+rondeDisp+'</div><div class="kpi-trend">'+(rondeOk?'Validée':nbTot===0?'Non commencée':'En cours')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Alertes actives</div><div class="kpi-value" style="color:'+(nbAlertes>0?'var(--rouge)':'var(--vert)')+'">'+nbAlertes+'</div><div class="kpi-trend">'+(nbAlertes>0?'À traiter':'RAS')+'</div></div>'+
   '</div>';
