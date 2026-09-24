@@ -306,6 +306,7 @@ var _histPeriod=30;
 var _configSelectedEqId=null;
 var _configCurrentTab='equipements';
 var _configEquipCache={}; // id → equip object, évite les problèmes d'échappement dans onclick
+var _configSecondaryCollapsed=true; // section équipements sans suivi, réduite par défaut
 
 function $id(id){return document.getElementById(id);}
 function app(){return $id('app');}
@@ -4128,34 +4129,64 @@ async function _rtConfig(sid){
     }
   }
 
-  // Group equipements by type
-  var byType={};
-  equips.forEach(function(e){
-    var tNom=(e.types_equipements&&e.types_equipements.nom)||'Autres';
-    if(!byType[tNom])byType[tNom]=[];
-    byType[tNom].push(e);
-  });
+  // Séparer équipements en suivi actif vs secondaires
+  var prioritaires=equips.filter(function(e){return e.actif_ronde||e.actif_releve;});
+  var secondaires=equips.filter(function(e){return !e.actif_ronde&&!e.actif_releve;});
+
+  // Helper: rend un groupe d'équipements groupé par type
+  function _cfgBuildEquipGroup(list){
+    var byT={};
+    list.forEach(function(e){
+      var tNom=(e.types_equipements&&e.types_equipements.nom)||'Autres';
+      if(!byT[tNom])byT[tNom]=[];
+      byT[tNom].push(e);
+    });
+    return Object.keys(byT).sort().map(function(tNom){
+      return '<div class="config-eq-section">'+escape_html(tNom)+'</div>'+
+        byT[tNom].map(function(e){
+          var icon=_TYPE_ICONS[(e.types_equipements&&e.types_equipements.nom)]||'⚙️';
+          var sel=e.id===_configSelectedEqId;
+          var suivi=e.actif_ronde&&e.actif_releve?'Ronde + Relevé':e.actif_ronde?'Ronde':e.actif_releve?'Relevé':'';
+          return '<div class="config-eq-item'+(sel?' selected':'')+(!e.actif?' cfg-eq-inactive':'')+'" onclick="_selectConfigEq(\''+e.id+'\')">'+
+            '<span class="config-eq-icon">'+icon+'</span>'+
+            '<div style="flex:1;min-width:0">'+
+              '<div class="config-eq-name" style="'+(e.actif?'':'color:var(--text3)')+'">'+escape_html(e.nom)+'</div>'+
+              '<div class="config-eq-type" style="'+(suivi?'color:var(--amber);font-weight:600':'')+'">'+escape_html(suivi||(e.actif?'Actif':'Inactif'))+'</div>'+
+            '</div>'+
+            '<button class="config-eq-edit-btn" onclick="event.stopPropagation();_duplicateEquip(\''+e.id+'\')" title="Dupliquer" style="font-size:14px">⧉</button>'+
+            '<button class="config-eq-edit-btn" onclick="event.stopPropagation();_openEditEquipFromCache(\''+e.id+'\')" title="Modifier">✏️</button>'+
+          '</div>';
+        }).join('');
+    }).join('');
+  }
+
   var typeOptsHtml=types.map(function(t){return '<option value="'+t.id+'">'+escape_html(t.nom)+'</option>';}).join('');
   var listHtml='<div class="config-equip-list">';
   if(equips.length===0){
     listHtml+='<div style="padding:24px 16px;text-align:center;color:var(--text3);font-size:12px"><div style="font-size:32px;margin-bottom:8px;opacity:.3">⚙️</div>Aucun équipement configuré</div>';
   } else {
-    Object.keys(byType).forEach(function(tNom){
-      listHtml+='<div class="config-eq-section">'+escape_html(tNom)+'</div>';
-      byType[tNom].forEach(function(e){
-        var icon=_TYPE_ICONS[(e.types_equipements&&e.types_equipements.nom)]||'⚙️';
-        var sel=e.id===_configSelectedEqId;
-        listHtml+='<div class="config-eq-item'+(sel?' selected':'')+(!e.actif?' cfg-eq-inactive':'')+'" onclick="_selectConfigEq(\''+e.id+'\')">'+
-          '<span class="config-eq-icon">'+icon+'</span>'+
-          '<div style="flex:1;min-width:0">'+
-            '<div class="config-eq-name" style="'+(e.actif?'':'color:var(--text3)')+'">'+escape_html(e.nom)+'</div>'+
-            '<div class="config-eq-type">'+(e.actif?'Actif':'Inactif')+'</div>'+
-          '</div>'+
-          '<button class="config-eq-edit-btn" onclick="event.stopPropagation();_duplicateEquip(\''+e.id+'\')" title="Dupliquer" style="font-size:14px">⧉</button>'+
-          '<button class="config-eq-edit-btn" onclick="event.stopPropagation();_openEditEquipFromCache(\''+e.id+'\')" title="Modifier">✏️</button>'+
-        '</div>';
-      });
-    });
+    // Groupe principal — équipements en suivi (ronde ou relevé)
+    if(prioritaires.length){
+      listHtml+=_cfgBuildEquipGroup(prioritaires);
+    } else {
+      // Pas de distinction si aucun n'a de suivi
+      listHtml+=_cfgBuildEquipGroup(equips);
+    }
+    // Section secondaire collapsible (chambres, équipements sans ronde/relevé)
+    if(secondaires.length&&prioritaires.length){
+      var secOpen=!_configSecondaryCollapsed;
+      // Auto-ouvrir si l'équipement sélectionné est dans les secondaires
+      if(_configSelectedEqId&&secondaires.find(function(e){return e.id===_configSelectedEqId;})){
+        secOpen=true;_configSecondaryCollapsed=false;
+      }
+      listHtml+='<div style="border-top:1.5px solid var(--border);margin:4px 0 0"></div>'+
+        '<button onclick="_configSecondaryCollapsed=!_configSecondaryCollapsed;renderRespTech(_session,\'config\')" '+
+          'style="width:100%;padding:8px 12px;border:none;background:none;text-align:left;cursor:pointer;font-size:10px;font-weight:700;color:var(--text3);display:flex;align-items:center;gap:6px;font-family:inherit;letter-spacing:.03em;text-transform:uppercase">'+
+          '<span style="display:inline-block;transform:rotate('+(secOpen?90:0)+'deg);transition:transform .2s;font-style:normal">▶</span>'+
+          '<span>'+secondaires.length+' équip.'+(secondaires.length>1?'s':'')+' sans suivi</span>'+
+        '</button>'+
+        (secOpen?'<div style="opacity:.75">'+_cfgBuildEquipGroup(secondaires)+'</div>':'');
+    }
   }
   listHtml+='<button class="config-add-eq-btn" onclick="_openAddEquipModal()">＋ Ajouter un équipement</button>';
   listHtml+='</div>';
