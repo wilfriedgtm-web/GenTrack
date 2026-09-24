@@ -7625,23 +7625,193 @@ async function _buildRecommandations(sids,siteMap){
 
 
 /* ═══════════════════════════════════════════════════════
+   ⚡ ÉNERGIE — Helpers globaux
+   ═══════════════════════════════════════════════════════ */
+var _energieCurrentFluide=null;
+var _energieBarData={};   // {fid: {days:[], vals:[], objJour:number}}
+var _energieFluides=[];
+var _energieReleves=[];
+var _energieSidGlobal=null;
+
+function _calcEnergieStatut(releve,fluides,prevReleve){
+  var worst='ok';
+  fluides.forEach(function(f){
+    var v=releve.valeurs&&releve.valeurs[f.id];
+    if(v==null)return;
+    v=parseFloat(v);
+    if(f.type_valeur==='instantane'){
+      if(f.seuil_alerte_bas!=null){
+        if(v<f.seuil_alerte_bas)worst='depassement';
+        else if(v<f.seuil_alerte_bas*1.15&&worst==='ok')worst='surveiller';
+      }
+    }else{
+      var pv=prevReleve&&prevReleve.valeurs&&prevReleve.valeurs[f.id];
+      if(pv!=null&&f.objectif_mensuel){
+        var delta=v-parseFloat(pv);
+        var objJ=f.objectif_mensuel/new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
+        if(delta>objJ*1.2)worst='depassement';
+        else if(delta>objJ&&worst==='ok')worst='surveiller';
+      }
+    }
+  });
+  return worst;
+}
+
+function _statutBadge(s){
+  if(s==='depassement')return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(220,50,50,.1);color:var(--rouge)">Dépassement</span>';
+  if(s==='surveiller')return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--amber-pale);color:var(--amber-dark)">À surveiller</span>';
+  return '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--vert-pale);color:var(--vert)">OK</span>';
+}
+
+function _renderEnergieChart(fid){
+  _energieCurrentFluide=fid;
+  var d=_energieBarData[fid];if(!d)return;
+  var el=document.getElementById('energie-chart-svg');if(!el)return;
+  // Update tab buttons
+  _energieFluides.forEach(function(f){
+    var btn=document.getElementById('echart-tab-'+f.id);
+    if(btn){
+      var active=f.id===fid;
+      btn.style.fontWeight=active?'700':'500';
+      btn.style.borderColor=active?'var(--amber)':'var(--border)';
+      btn.style.background=active?'var(--amber-pale)':'white';
+      btn.style.color=active?'var(--amber-dark)':'var(--text2)';
+    }
+  });
+  // Build SVG
+  var days=d.days,vals=d.vals,objJ=d.objJour;
+  var N=days.length;if(!N){el.innerHTML='';return;}
+  var W=560,H=130,PL=38,PR=12,PT=10,PB=28;
+  var chartW=W-PL-PR,chartH=H-PT-PB;
+  var maxV=Math.max.apply(null,vals.filter(function(v){return v!=null;}));
+  if(objJ)maxV=Math.max(maxV,objJ*1.1);
+  if(!maxV||maxV===0)maxV=1;
+  var BW=Math.max(4,Math.floor(chartW/N)-2);
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%" xmlns="http://www.w3.org/2000/svg">';
+  // Grid line at objective
+  if(objJ){
+    var objY=PT+chartH-(objJ/maxV)*chartH;
+    svg+='<line x1="'+PL+'" y1="'+objY.toFixed(1)+'" x2="'+(PL+chartW)+'" y2="'+objY.toFixed(1)+'" stroke="#E8841A" stroke-width="1.2" stroke-dasharray="4,3" opacity="0.7"/>';
+  }
+  // Axes
+  svg+='<line x1="'+PL+'" y1="'+PT+'" x2="'+PL+'" y2="'+(PT+chartH)+'" stroke="#e8e0d5" stroke-width="1"/>';
+  svg+='<line x1="'+PL+'" y1="'+(PT+chartH)+'" x2="'+(PL+chartW)+'" y2="'+(PT+chartH)+'" stroke="#e8e0d5" stroke-width="1"/>';
+  // Y labels
+  svg+='<text x="'+(PL-3)+'" y="'+(PT+5)+'" text-anchor="end" font-size="7" fill="#b0a090" font-family="Inter,sans-serif">'+Math.round(maxV).toLocaleString('fr-FR')+'</text>';
+  svg+='<text x="'+(PL-3)+'" y="'+(PT+chartH)+'" text-anchor="end" font-size="7" fill="#b0a090" font-family="Inter,sans-serif">0</text>';
+  // Bars + X labels
+  vals.forEach(function(v,i){
+    var x=PL+i*(chartW/N)+(chartW/N-BW)/2;
+    var barH=v!=null&&maxV>0?Math.max(2,(v/maxV)*chartH):0;
+    var y=PT+chartH-barH;
+    var isHigh=objJ&&v!=null&&v>objJ*1.2;
+    svg+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+BW+'" height="'+barH.toFixed(1)+'" rx="2" fill="'+(isHigh?'#E8841A':'#3B82F6')+'"/>';
+    // X label every 5 days or first/last
+    if(i===0||i===N-1||(i+1)%5===0){
+      svg+='<text x="'+(x+BW/2).toFixed(1)+'" y="'+(PT+chartH+11)+'" text-anchor="middle" font-size="6.5" fill="#b0a090" font-family="Inter,sans-serif">'+days[i].substring(8)+'</text>';
+    }
+  });
+  svg+='</svg>';
+  el.innerHTML=svg;
+  // Legend
+  var legEl=document.getElementById('energie-chart-legend');
+  if(legEl){
+    var f=_energieFluides.find(function(fl){return fl.id===fid;})||{};
+    legEl.innerHTML='<span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--text2)"><span style="width:12px;height:4px;border-radius:2px;background:#3B82F6;display:inline-block"></span>Réel'+(f.unite?' ('+escape_html(f.unite)+')':'')+'</span>'+
+      (objJ?'<span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--text2)"><span style="width:12px;height:0;border:1.5px dashed #E8841A;display:inline-block"></span>Objectif/jour</span>':'');
+  }
+}
+
+async function _energieEditNote(releveId,currentNote){
+  var span=document.getElementById('enote-span-'+releveId);
+  var cell=document.getElementById('enote-cell-'+releveId);
+  if(!cell)return;
+  var noteVal=currentNote||'';
+  cell.innerHTML='<input id="enote-inp-'+releveId+'" type="text" value="'+escape_html(noteVal)+'" placeholder="Note…" '+
+    'style="border:1px solid var(--amber);border-radius:5px;padding:3px 6px;font-size:10px;width:100%;box-sizing:border-box" '+
+    'onblur="_energieSaveNote(\''+releveId+'\',this.value)" '+
+    'onkeydown="if(event.key===\'Enter\')this.blur()" />';
+  var inp=document.getElementById('enote-inp-'+releveId);
+  if(inp){inp.focus();inp.select();}
+}
+
+async function _energieSaveNote(releveId,newNote){
+  await supaPatch('releves_energie',releveId,{note:newNote||null});
+  var cell=document.getElementById('enote-cell-'+releveId);
+  if(cell){
+    cell.innerHTML='<span id="enote-span-'+releveId+'" onclick="_energieEditNote(\''+releveId+'\',\''+escape_html(newNote||'')+'\''+')" '+
+      'style="cursor:pointer;color:'+(newNote?'var(--dark)':'var(--text3)')+';font-size:10px">'+(newNote?escape_html(newNote):'+ Note')+'</span>';
+  }
+}
+
+async function _energieSaveObjectifs(sid){
+  var fluides=_energieFluides;
+  var btn=document.getElementById('energie-obj-btn');
+  if(btn){btn.disabled=true;btn.textContent='Enregistrement…';}
+  var patches=fluides.map(function(f){
+    var inp=document.getElementById('eobj-inp-'+f.id);
+    if(!inp)return Promise.resolve();
+    var v=inp.value!==''?parseFloat(inp.value):null;
+    return supaPatch('energie_config',f.id,{objectif_mensuel:v,updated_at:new Date().toISOString()});
+  });
+  await Promise.all(patches);
+  if(btn){btn.disabled=false;btn.textContent='Enregistrer les objectifs';btn.style.background='var(--vert)';setTimeout(function(){btn.style.background='var(--amber)';},1500);}
+  // Refresh tiles
+  if(_session)navTo('energie');
+}
+
+function _exportEnergieCSV(){
+  var fluides=_energieFluides;
+  var releves=_energieReleves.slice().sort(function(a,b){return b.date_releve.localeCompare(a.date_releve);});
+  var headers=['Date','Saisi par'].concat(fluides.map(function(f){return f.nom+(f.unite?' ('+f.unite+')':'');})).concat(['Note','Statut']);
+  var rows=releves.map(function(r,i){
+    var prev=releves[i+1]||null;
+    var statut=_calcEnergieStatut(r,fluides,prev);
+    var statutLabel={ok:'OK',surveiller:'À surveiller',depassement:'Dépassement'}[statut];
+    var cols=[r.date_releve,r.saisi_par||''];
+    fluides.forEach(function(f){
+      var v=r.valeurs&&r.valeurs[f.id];
+      cols.push(v!=null?parseFloat(v):'');
+    });
+    cols.push(r.note||'');
+    cols.push(statutLabel);
+    return cols;
+  });
+  var csv=[headers].concat(rows).map(function(row){
+    return row.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');
+  }).join('\n');
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download='energie_'+(_energieSidGlobal||'export')+'_'+todayStr()+'.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ═══════════════════════════════════════════════════════
    ⚡ ÉNERGIE — Vue principale resp_tech
    ═══════════════════════════════════════════════════════ */
 async function _rtEnergie(sid){
   var dc=document.getElementById('dash-content-main');
-  if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
+  if(dc){dc.style.padding='24px';dc.style.maxWidth='980px';}
 
   var today=todayStr();
-  var moisDebut=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().split('T')[0];
-  var since30=dateNJours(30);
+  var now=new Date();
+  var moisDebut=new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0];
+  var daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  var since60=dateNJours(60);
+
+  _energieSidGlobal=sid;
 
   var[fluides,relevesRows,siteRows]=await Promise.all([
-    supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,seuil_alerte_bas,objectif_mensuel,ordre&order=ordre.asc'),
-    supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+since30+'&select=id,date_releve,valeurs,saisi_par&order=date_releve.desc&limit=60'),
+    supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,seuil_alerte_bas,objectif_mensuel,ordre&order=ordre.asc'),
+    supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+moisDebut+'&select=id,date_releve,valeurs,saisi_par,note&order=date_releve.asc&limit=62'),
     supaGet('sites','id=eq.'+sid+'&select=nom&limit=1')
   ]);
 
   var siteNom=siteRows&&siteRows.length?siteRows[0].nom:'';
+  _energieFluides=fluides||[];
+  _energieReleves=(relevesRows||[]);
 
   if(!fluides||!fluides.length){
     return '<div class="placeholder-card" style="margin-top:16px">'+
@@ -7651,203 +7821,272 @@ async function _rtEnergie(sid){
     '</div>';
   }
 
-  // ── Index relevés par date ──
+  // ── Index relevés (triés asc pour calcul delta) ──
+  var relevesAsc=(relevesRows||[]).slice().sort(function(a,b){return a.date_releve.localeCompare(b.date_releve);});
+  var relevesDesc=relevesAsc.slice().reverse();
   var releveByDate={};
-  (relevesRows||[]).forEach(function(r){releveByDate[r.date_releve]=r;});
+  relevesAsc.forEach(function(r){releveByDate[r.date_releve]=r;});
 
-  // ── KPI mois courant (conso = valeur du dernier relevé - premier relevé du mois pour index) ──
-  var relevesMois=(relevesRows||[]).filter(function(r){return r.date_releve>=moisDebut;});
-  var releves30=(relevesRows||[]);
+  var firstReleve=relevesAsc.length?relevesAsc[0]:null;
+  var lastReleve=relevesDesc.length?relevesDesc[0]:null;
 
-  // Pour chaque fluide : dernier relevé connu pour affichage tile
-  var lastReleve=releveByDate[releves30.length?releves30[0].date_releve:null]||null;
-  // Chercher le premier relevé du mois (dernier dans l'array car desc)
-  var firstMoisReleve=relevesMois.length?relevesMois[relevesMois.length-1]:null;
-  var lastMoisReleve=relevesMois.length?relevesMois[0]:null;
+  // ── Pré-calcul des deltas journaliers par fluide ──
+  // Pour index: delta = valeur[j] - valeur[j-1]; pour instantané: valeur brute
+  var deltasByFluide={};
+  fluides.forEach(function(f){
+    deltasByFluide[f.id]=[];
+    relevesAsc.forEach(function(r,i){
+      var v=r.valeurs&&r.valeurs[f.id];
+      if(v==null){deltasByFluide[f.id].push(null);return;}
+      v=parseFloat(v);
+      if(f.type_valeur==='index'){
+        var prev=null;
+        for(var k=i-1;k>=0;k--){
+          var pv=relevesAsc[k].valeurs&&relevesAsc[k].valeurs[f.id];
+          if(pv!=null){prev=parseFloat(pv);break;}
+        }
+        deltasByFluide[f.id].push(prev!=null?Math.max(0,v-prev):null);
+      }else{
+        deltasByFluide[f.id].push(v);
+      }
+    });
+  });
 
-  // ── Tiles par fluide ──
-  var tilesHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px">';
+  // ── Conso mois ──
+  var consoMoisByFluide={};
+  fluides.forEach(function(f){
+    if(f.type_valeur==='index'){
+      var vFirst=firstReleve&&firstReleve.valeurs&&firstReleve.valeurs[f.id];
+      var vLast=lastReleve&&lastReleve.valeurs&&lastReleve.valeurs[f.id];
+      consoMoisByFluide[f.id]=(vFirst!=null&&vLast!=null)?Math.max(0,parseFloat(vLast)-parseFloat(vFirst)):null;
+    }else{
+      var vL=lastReleve&&lastReleve.valeurs&&lastReleve.valeurs[f.id];
+      consoMoisByFluide[f.id]=vL!=null?parseFloat(vL):null;
+    }
+  });
+
+  // ── Préparer données graphique (globales pour _renderEnergieChart) ──
+  fluides.forEach(function(f,fi){
+    var objJ=f.objectif_mensuel?parseFloat(f.objectif_mensuel)/daysInMonth:null;
+    _energieBarData[f.id]={
+      days:relevesAsc.map(function(r){return r.date_releve;}),
+      vals:deltasByFluide[f.id],
+      objJour:objJ
+    };
+  });
+
+  // ── TILES ──
+  var FLUID_ICONS={
+    'electricite':'⚡','elec':'⚡','kWh':'⚡','kw':'⚡',
+    'eau':'💧','water':'💧','m3':'💧','m³':'💧',
+    'gasoil':'🛢️','diesel':'🛢️','carburant':'🛢️','fuel':'🛢️',
+    'gaz':'🔥','butane':'🔥','propane':'🔥','gas':'🔥',
+    'cos':'🔌','cos phi':'🔌'
+  };
+  function _fluidIcon(f){
+    var nom=(f.nom||'').toLowerCase();
+    var keys=Object.keys(FLUID_ICONS);
+    for(var i=0;i<keys.length;i++){if(nom.indexOf(keys[i])>=0)return FLUID_ICONS[keys[i]];}
+    return '📊';
+  }
+
+  var tilesHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px">';
   fluides.forEach(function(f){
     var lastVal=null;
-    // Chercher la dernière valeur pour ce fluide dans les relevés récents
-    for(var i=0;i<releves30.length;i++){
-      var v=releves30[i].valeurs&&releves30[i].valeurs[f.id];
+    for(var i=0;i<relevesDesc.length;i++){
+      var v=relevesDesc[i].valeurs&&relevesDesc[i].valeurs[f.id];
       if(v!=null){lastVal=parseFloat(v);break;}
     }
-    // Conso mois : pour index = dernier - premier du mois; pour instantane = dernier
-    var consoMois=null;
-    if(f.type_valeur==='index'&&firstMoisReleve&&lastMoisReleve){
-      var vFirst=firstMoisReleve.valeurs&&firstMoisReleve.valeurs[f.id];
-      var vLast=lastMoisReleve.valeurs&&lastMoisReleve.valeurs[f.id];
-      if(vFirst!=null&&vLast!=null)consoMois=parseFloat(vLast)-parseFloat(vFirst);
-    } else if(f.type_valeur==='instantane'&&lastVal!=null){
-      consoMois=lastVal;
-    }
-
+    var consoMois=consoMoisByFluide[f.id];
     var obj=f.objectif_mensuel?parseFloat(f.objectif_mensuel):null;
-    var pct=obj&&consoMois!=null?Math.round(consoMois/obj*100):null;
+    var pct=obj&&consoMois!=null?consoMois/obj:null;
+    var tarif=f.tarif?parseFloat(f.tarif):null;
+    var budget=obj&&tarif?obj*tarif:null;
+    var coutReel=consoMois!=null&&tarif?consoMois*tarif:null;
+    var deltaCout=budget&&coutReel?coutReel-budget:null;
+    var deltaSign=pct!=null?(pct>1?'↑':pct<0.95?'↓':''):null;
     var alerte=f.seuil_alerte_bas!=null&&lastVal!=null&&lastVal<f.seuil_alerte_bas;
+    var sur=f.type_valeur==='index'?(pct!=null&&pct>1):(pct!=null&&pct<0.8);
+    var barColor=alerte?'var(--rouge)':sur?'#E8841A':'#3B82F6';
+    var barPct=pct!=null?Math.min(100,Math.round(pct*100)):0;
+    var tileColor=alerte?'var(--rouge)':sur?'var(--amber-dark)':'var(--dark)';
 
-    var couleur=alerte?'var(--rouge)':pct==null?'var(--dark)':
-      (f.type_valeur==='index'?(pct<=100?'var(--vert)':pct<=115?'var(--amber-dark)':'var(--rouge)'):
-       (pct>=80?'var(--vert)':pct>=50?'var(--amber-dark)':'var(--rouge)'));
-    var badge=pct!=null?'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:'+(couleur==='var(--vert)'?'var(--vert-pale)':couleur==='var(--rouge)'?'rgba(220,50,50,.1)':'var(--amber-pale)')+';color:'+couleur+'">'+pct+'%'+(f.type_valeur==='index'?' conso':'')+'</span>':'';
-
-    tilesHtml+='<div style="background:white;border:1.5px solid '+(alerte?'var(--rouge)':'var(--border)')+';border-radius:12px;padding:14px 16px">'+
-      '<div style="font-size:11px;color:var(--text2);margin-bottom:4px">'+escape_html(f.nom)+(f.unite?' <span style="color:var(--text3)">('+escape_html(f.unite)+')</span>':'')+'</div>'+
-      '<div style="font-size:22px;font-weight:800;color:'+couleur+'">'+(lastVal!=null?lastVal.toLocaleString('fr-FR'):'—')+'</div>'+
-      (alerte?'<div style="font-size:10px;color:var(--rouge);font-weight:600;margin-top:2px">⚠️ Sous le seuil ('+f.seuil_alerte_bas+' '+( f.unite||'')+')</div>':'')+
-      (badge?'<div style="margin-top:6px">'+badge+'</div>':'')+
-      (obj&&consoMois!=null&&f.type_valeur==='index'?'<div style="font-size:10px;color:var(--text3);margin-top:3px">'+consoMois.toLocaleString('fr-FR')+' / '+obj.toLocaleString('fr-FR')+' '+( f.unite||'')+'</div>':'')+
-    '</div>';
+    tilesHtml+=
+      '<div style="background:white;border:1.5px solid '+(alerte?'var(--rouge)':'var(--border)')+';border-radius:12px;padding:16px">'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+          '<span style="font-size:20px">'+_fluidIcon(f)+'</span>'+
+          '<span style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">'+escape_html(f.nom)+'</span>'+
+        '</div>'+
+        '<div style="font-size:26px;font-weight:800;color:'+tileColor+';line-height:1">'+
+          (lastVal!=null?lastVal.toLocaleString('fr-FR'):'—')+
+          (f.unite&&lastVal!=null?'<span style="font-size:13px;font-weight:500;color:var(--text3);margin-left:4px">'+escape_html(f.unite)+'</span>':'')+
+        '</div>'+
+        (consoMois!=null&&f.type_valeur==='index'?'<div style="font-size:10px;color:var(--text2);margin-top:4px">'+consoMois.toLocaleString('fr-FR')+(f.unite?' '+f.unite:'')+'<span style="color:var(--text3)"> ce mois</span></div>':'')+
+        (alerte?'<div style="font-size:10px;color:var(--rouge);font-weight:700;margin-top:4px">⚠️ Sous seuil ('+f.seuil_alerte_bas+(f.unite?' '+f.unite:'')+')</div>':'')+
+        // Barre de progression
+        (obj?'<div style="margin-top:10px">'+
+          '<div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden">'+
+            '<div style="height:5px;background:'+barColor+';border-radius:3px;width:'+barPct+'%;transition:width .3s"></div>'+
+          '</div>'+
+          '<div style="display:flex;justify-content:space-between;margin-top:5px;font-size:10px;color:var(--text3)">'+
+            '<span>Obj. '+obj.toLocaleString('fr-FR')+(f.unite?' '+f.unite:'')+'</span>'+
+            (pct!=null?'<span style="color:'+barColor+';font-weight:700">'+(deltaSign||'')+Math.round(pct*100)+'%</span>':'')+
+          '</div>'+
+        '</div>':'')+
+        // Budget / coût
+        (budget||coutReel?'<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:10px;color:var(--text3)">'+
+          (budget?'<div style="display:flex;justify-content:space-between"><span>Budget</span><span style="font-weight:600;color:var(--text2)">'+Math.round(budget/1000)+'k FCFA</span></div>':'')+
+          (coutReel?'<div style="display:flex;justify-content:space-between"><span>Coût réel est.</span><span style="font-weight:600;color:var(--dark)">'+Math.round(coutReel/1000)+'k FCFA</span></div>':'')+
+          (deltaCout!=null?'<div style="margin-top:3px;font-weight:700;color:'+(deltaCout>0?'#E8841A':'var(--vert)')+'">'+
+            (deltaCout>0?'↑ +':'↓ ')+Math.abs(Math.round(deltaCout/1000))+'k FCFA vs budget'+
+          '</div>':'')+
+        '</div>':'')+
+      '</div>';
   });
   tilesHtml+='</div>';
 
-  // ── Graphique SVG lignes (30 jours, une courbe par fluide) ──
-  // On génère les 30 derniers jours
-  var days30=[];for(var di=29;di>=0;di--)days30.push(dateNJours(di));
+  // ── BAR CHART + PANEL OBJECTIFS (2 colonnes) ──
+  var chartTabsHtml=fluides.map(function(f){
+    var isFirst=fluides[0].id===f.id;
+    return '<button id="echart-tab-'+f.id+'" onclick="_renderEnergieChart(\''+f.id+'\')" '+
+      'style="font-size:11px;font-weight:'+(isFirst?'700':'500')+';padding:5px 12px;border-radius:20px;border:1.5px solid '+(isFirst?'var(--amber)':'var(--border)')+';background:'+(isFirst?'var(--amber-pale)':'white')+';color:'+(isFirst?'var(--amber-dark)':'var(--text2)')+';cursor:pointer;white-space:nowrap">'+
+      escape_html(f.nom)+
+    '</button>';
+  }).join('');
 
-  // Extraire les séries par fluide (valeurs brutes ou delta pour index)
-  var series=fluides.map(function(f){
-    var pts=days30.map(function(d){
-      var r=releveByDate[d];
-      if(!r||r.valeurs==null)return null;
-      var v=r.valeurs[f.id];
-      return v!=null?parseFloat(v):null;
-    });
-    // Pour type index : calculer delta j-1
-    if(f.type_valeur==='index'){
-      var deltas=pts.map(function(v,i){
-        if(v==null)return null;
-        var prev=null;
-        for(var k=i-1;k>=0;k--){if(pts[k]!=null){prev=pts[k];break;}}
-        return prev!=null?v-prev:null;
-      });
-      return{id:f.id,nom:f.nom,pts:deltas,unite:f.unite};
-    }
-    return{id:f.id,nom:f.nom,pts:pts,unite:f.unite};
-  });
+  var moisLabel=now.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  var nextMois=new Date(now.getFullYear(),now.getMonth()+1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
 
-  // SVG multi-lignes
-  var chartHtml='';
-  var W=520,H=120,PL=40,PR=20,PT=10,PB=30;
-  var chartW=W-PL-PR,chartH=H-PT-PB;
-  var N=30;
-  var COLORS=['#C49A1C','#2D7A4F','#3498DB','#E74C3C','#8E44AD','#D4761E'];
-
-  // Calcul des max par fluide pour normaliser ensemble
-  var allVals=series.reduce(function(acc,s){return acc.concat(s.pts.filter(function(v){return v!=null;}));},[] );
-  var maxVal=allVals.length?Math.max.apply(null,allVals):1;
-  if(maxVal===0)maxVal=1;
-
-  if(allVals.length){
-    var svgStr='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-height:160px" xmlns="http://www.w3.org/2000/svg">';
-    // Axes
-    svgStr+='<line x1="'+PL+'" y1="'+PT+'" x2="'+PL+'" y2="'+(PT+chartH)+'" stroke="#e0d9d0" stroke-width="1"/>';
-    svgStr+='<line x1="'+PL+'" y1="'+(PT+chartH)+'" x2="'+(PL+chartW)+'" y2="'+(PT+chartH)+'" stroke="#e0d9d0" stroke-width="1"/>';
-    // Labels axe Y
-    svgStr+='<text x="'+( PL-4)+'" y="'+(PT+4)+'" text-anchor="end" font-size="7" fill="#a0957e" font-family="Inter,sans-serif">'+Math.round(maxVal).toLocaleString('fr-FR')+'</text>';
-    svgStr+='<text x="'+(PL-4)+'" y="'+(PT+chartH)+'" text-anchor="end" font-size="7" fill="#a0957e" font-family="Inter,sans-serif">0</text>';
-    // Labels axe X (début, milieu, fin)
-    [0,14,29].forEach(function(idx){
-      var x=PL+idx*(chartW/(N-1));
-      var lbl=days30[idx].substring(5); // MM-DD
-      svgStr+='<text x="'+x+'" y="'+(PT+chartH+12)+'" text-anchor="middle" font-size="7" fill="#a0957e" font-family="Inter,sans-serif">'+lbl+'</text>';
-    });
-
-    series.forEach(function(s,si){
-      var col=COLORS[si%COLORS.length];
-      var ptCoords=s.pts.map(function(v,idx){
-        if(v==null)return null;
-        var x=PL+idx*(chartW/(N-1));
-        var y=PT+chartH-(v/maxVal)*chartH;
-        return[x,y];
-      });
-      // Polyline
-      var pathParts=[];
-      ptCoords.forEach(function(pt,idx){
-        if(!pt)return;
-        pathParts.push((pathParts.length===0?'M':'L')+pt[0].toFixed(1)+','+pt[1].toFixed(1));
-      });
-      if(pathParts.length>1){
-        svgStr+='<path d="'+pathParts.join(' ')+'" fill="none" stroke="'+col+'" stroke-width="1.5" stroke-linejoin="round"/>';
-      }
-      // Dots sur les points réels
-      ptCoords.forEach(function(pt){
-        if(!pt)return;
-        svgStr+='<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="2" fill="'+col+'"/>';
-      });
-    });
-
-    svgStr+='</svg>';
-
-    // Légende
-    var legendHtml='<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px">';
-    series.forEach(function(s,si){
-      legendHtml+='<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2)">'+
-        '<span style="width:16px;height:3px;border-radius:2px;background:'+COLORS[si%COLORS.length]+';display:inline-block"></span>'+
-        escape_html(s.nom)+(s.unite?' ('+escape_html(s.unite)+')':'')+
+  var objPanelHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px;height:fit-content">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:4px">Objectifs mensuels</div>'+
+    '<div style="font-size:10px;color:var(--text3);margin-bottom:14px">'+escape_html(nextMois)+' · modifiables en cours de mois</div>'+
+    fluides.map(function(f){
+      return '<div style="margin-bottom:12px">'+
+        '<div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:5px;display:flex;align-items:center;gap:6px">'+
+          '<span>'+_fluidIcon(f)+'</span><span style="text-transform:uppercase;letter-spacing:.4px">'+escape_html(f.nom)+'</span>'+
+        '</div>'+
+        '<div style="display:flex;gap:6px;align-items:center">'+
+          '<input id="eobj-inp-'+f.id+'" type="number" value="'+(f.objectif_mensuel!=null?f.objectif_mensuel:'')+'" placeholder="—" '+
+            'style="flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;width:0;box-sizing:border-box" />'+
+          '<span style="font-size:10px;color:var(--text3);white-space:nowrap">'+(f.unite?escape_html(f.unite):'')+'</span>'+
+        '</div>'+
       '</div>';
-    });
-    legendHtml+='</div>';
+    }).join('')+
+    '<button id="energie-obj-btn" onclick="_energieSaveObjectifs(\''+sid+'\')" '+
+      'style="width:100%;background:var(--amber);color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;margin-top:4px">'+
+      'Enregistrer les objectifs'+
+    '</button>'+
+  '</div>';
 
-    chartHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px">'+
-      '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:10px">📈 Évolution 30 jours</div>'+
-      svgStr+legendHtml+
-    '</div>';
-  }
+  var chartHtml='<div style="display:grid;grid-template-columns:1fr 240px;gap:16px;margin-bottom:20px;align-items:start">'+
+    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">'+
+        '<div style="font-size:12px;font-weight:700;color:var(--dark)">📈 '+escape_html(moisLabel.charAt(0).toUpperCase()+moisLabel.slice(1))+'</div>'+
+        '<div style="display:flex;gap:6px;flex-wrap:wrap">'+chartTabsHtml+'</div>'+
+      '</div>'+
+      '<div id="energie-chart-svg" style="min-height:80px"></div>'+
+      '<div id="energie-chart-legend" style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap"></div>'+
+    '</div>'+
+    objPanelHtml+
+  '</div>';
 
-  // ── Tableau des 30 derniers relevés ──
+  // ── TABLEAU ──
+  var todayReleve=releveByDate[today];
+  var nbReleves=relevesAsc.length;
+  var dayOfMonth=now.getDate();
+  var nbManquants=dayOfMonth-nbReleves;
+  var conformite=dayOfMonth>0?Math.round(nbReleves/dayOfMonth*100):100;
+
   var tblHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden">'+
-    '<div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--dark)">📋 Historique (30 jours)</div>'+
+    '<div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'+
+      '<div>'+
+        '<div style="font-size:12px;font-weight:700;color:var(--dark)">Relevés quotidiens — '+escape_html(moisLabel)+'</div>'+
+        '<div style="font-size:10px;color:var(--text3)">Toutes les saisies du mois</div>'+
+      '</div>'+
+      '<button onclick="_exportEnergieCSV()" style="font-size:11px;padding:5px 12px;border:1px solid var(--border);border-radius:8px;background:white;cursor:pointer;color:var(--text2)">Export CSV</button>'+
+    '</div>'+
     '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'+
     '<thead><tr style="background:var(--bg2)">'+
       '<th style="padding:8px 12px;text-align:left;color:var(--text2);font-weight:600;white-space:nowrap">Date</th>'+
-      '<th style="padding:8px 12px;text-align:left;color:var(--text2);font-weight:600;white-space:nowrap">Saisi par</th>'+
       fluides.map(function(f){
-        return '<th style="padding:8px 12px;text-align:right;color:var(--text2);font-weight:600;white-space:nowrap">'+
-          escape_html(f.nom)+(f.unite?' ('+escape_html(f.unite)+')':'')+
+        return '<th style="padding:8px 10px;text-align:right;color:var(--text2);font-weight:600;white-space:nowrap">'+
+          _fluidIcon(f)+' '+escape_html(f.nom)+(f.unite?' ('+escape_html(f.unite)+')':'')+
         '</th>';
       }).join('')+
+      '<th style="padding:8px 10px;text-align:left;color:var(--text2);font-weight:600;white-space:nowrap">Saisie par</th>'+
+      '<th style="padding:8px 10px;text-align:left;color:var(--text2);font-weight:600;white-space:nowrap">Note</th>'+
+      '<th style="padding:8px 10px;text-align:center;color:var(--text2);font-weight:600;white-space:nowrap">Statut</th>'+
     '</tr></thead><tbody>';
 
-  var sortedReleves=(releves30||[]).slice().sort(function(a,b){return b.date_releve.localeCompare(a.date_releve);});
-  if(!sortedReleves.length){
-    tblHtml+='<tr><td colspan="'+(2+fluides.length)+'" style="padding:24px;text-align:center;color:var(--text3)">Aucun relevé sur les 30 derniers jours</td></tr>';
+  if(!relevesDesc.length){
+    tblHtml+='<tr><td colspan="'+(3+fluides.length+2)+'" style="padding:24px;text-align:center;color:var(--text3)">Aucun relevé ce mois</td></tr>';
   }
-  sortedReleves.forEach(function(r,ri){
+  relevesDesc.forEach(function(r,ri){
     var isToday=r.date_releve===today;
-    tblHtml+='<tr style="border-top:1px solid var(--border);background:'+(ri%2===0?'white':'var(--bg)') + (isToday?';font-weight:700':'') + '">'+
-      '<td style="padding:8px 12px;white-space:nowrap;color:var(--dark)">'+
-        (isToday?'🟢 Aujourd\'hui':'')+ new Date(r.date_releve+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+
-      '</td>'+
-      '<td style="padding:8px 12px;color:var(--text2);white-space:nowrap">'+(r.saisi_par?escape_html(r.saisi_par):'—')+'</td>'+
-      fluides.map(function(f){
+    var prevR=ri<relevesDesc.length-1?relevesDesc[ri+1]:null;
+    var statut=_calcEnergieStatut(r,fluides,prevR);
+    var dateLabel=isToday?'<strong>'+new Date(r.date_releve+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</strong> <span style="font-size:9px;color:var(--vert);font-weight:700">Auj.</span>':
+      new Date(r.date_releve+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+
+    tblHtml+='<tr style="border-top:1px solid var(--border);background:'+(isToday?'#FFFEF5':'white')+'">'+
+      '<td style="padding:8px 12px;white-space:nowrap;color:var(--dark)">'+dateLabel+'</td>'+
+      fluides.map(function(f,fi){
         var v=r.valeurs&&r.valeurs[f.id];
         var vNum=v!=null?parseFloat(v):null;
+        var delta=deltasByFluide[f.id][relevesAsc.indexOf(r)];
         var alerte=f.seuil_alerte_bas!=null&&vNum!=null&&vNum<f.seuil_alerte_bas;
-        return '<td style="padding:8px 12px;text-align:right;color:'+(alerte?'var(--rouge)':vNum!=null?'var(--dark)':'var(--text3)')+'">'+
+        var deltaStr='';
+        if(delta!=null&&f.type_valeur==='index'){
+          var objJ=f.objectif_mensuel?parseFloat(f.objectif_mensuel)/daysInMonth:null;
+          var over=objJ&&delta>objJ*1.05;
+          deltaStr='<div style="font-size:9px;color:'+(over?'#E8841A':'var(--text3)')+'">'+delta.toLocaleString('fr-FR')+(f.unite?' '+f.unite:'')+'/j</div>';
+        }
+        return '<td style="padding:8px 10px;text-align:right;color:'+(alerte?'var(--rouge)':vNum!=null?'var(--dark)':'var(--text3)')+'">'+
           (vNum!=null?(alerte?'⚠️ ':'')+vNum.toLocaleString('fr-FR'):'—')+
+          deltaStr+
         '</td>';
       }).join('')+
+      '<td style="padding:8px 10px;color:var(--text2);white-space:nowrap;font-size:10px">'+(r.saisi_par?escape_html(r.saisi_par):'—')+'</td>'+
+      '<td id="enote-cell-'+r.id+'" style="padding:8px 10px;min-width:100px">'+
+        '<span id="enote-span-'+r.id+'" onclick="_energieEditNote(\''+r.id+'\',\''+escape_html(r.note||'')+'\''+')" '+
+          'style="cursor:pointer;color:'+(r.note?'var(--dark)':'var(--text3)')+';font-size:10px">'+(r.note?escape_html(r.note):'+ Note')+'</span>'+
+      '</td>'+
+      '<td style="padding:8px 10px;text-align:center">'+_statutBadge(statut)+'</td>'+
     '</tr>';
   });
 
-  tblHtml+='</tbody></table></div></div>';
-
-  // ── Header ──
-  var todayReleve=releveByDate[today];
-  var statutAujourdhui=todayReleve?
-    '<span style="font-size:11px;font-weight:700;color:var(--vert);background:var(--vert-pale);padding:3px 10px;border-radius:20px">✅ Relevé du jour saisi</span>':
-    '<span style="font-size:11px;font-weight:700;color:var(--amber-dark);background:var(--amber-pale);padding:3px 10px;border-radius:20px">⏳ Relevé du jour manquant</span>';
-
-  var headerHtml='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">'+
-    '<div>'+
-      '<div style="font-size:16px;font-weight:800;color:var(--dark)">⚡ Énergie</div>'+
-      '<div style="font-size:11px;color:var(--text3)">'+(siteNom?escape_html(siteNom)+' · ':'')+fluides.length+' fluide'+(fluides.length>1?'s':'')+' suivis</div>'+
+  tblHtml+='</tbody></table></div>'+
+    '<div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--text3)">'+
+      '<span>'+nbReleves+' relevé'+(nbReleves>1?'s':'')+' ce mois'+
+        (nbManquants>0?' · <span style="color:var(--rouge);font-weight:700">'+nbManquants+' manquant'+(nbManquants>1?'s':'')+'</span>':' · <span style="color:var(--vert);font-weight:700">0 manquant</span>')+
+      '</span>'+
+      '<span style="font-weight:700;color:'+(conformite>=95?'var(--vert)':conformite>=70?'var(--amber-dark)':'var(--rouge)')+'">'+
+        (conformite>=95?'✓ ':'')+'Conformité '+conformite+'%'+
+      '</span>'+
     '</div>'+
-    statutAujourdhui+
   '</div>';
+
+  // ── HEADER ──
+  var dernierSaisi=lastReleve?lastReleve.date_releve===''+today?'Aujourd\'hui à '+(lastReleve.saisi_par||''):
+    new Date(lastReleve.date_releve+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+' · '+(lastReleve.saisi_par||''):null;
+
+  var headerHtml='<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">'+
+    '<div>'+
+      '<div style="font-size:18px;font-weight:800;color:var(--dark)">Énergie</div>'+
+      '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+
+        escape_html(now.toLocaleDateString('fr-FR',{month:'long',year:'numeric'}))+
+        (siteNom?' · '+escape_html(siteNom):'')+
+      '</div>'+
+      (dernierSaisi?'<div style="font-size:11px;color:var(--text2);margin-top:4px">Relevé du jour : <strong>'+escape_html(dernierSaisi)+'</strong></div>':
+        '<div style="font-size:11px;color:var(--amber-dark);font-weight:600;margin-top:4px">⏳ Relevé du jour non saisi</div>')+
+    '</div>'+
+  '</div>';
+
+  // Init chart après rendu
+  setTimeout(function(){
+    _energieCurrentFluide=fluides[0]?fluides[0].id:null;
+    if(_energieCurrentFluide)_renderEnergieChart(_energieCurrentFluide);
+  },50);
 
   return headerHtml+tilesHtml+chartHtml+tblHtml;
 }
@@ -7855,132 +8094,188 @@ async function _rtEnergie(sid){
 /* ═══════════════════════════════════════════════════════
    ⚡ ÉNERGIE CONFIG — Onglet config fluides
    ═══════════════════════════════════════════════════════ */
+// Colonnes : ordre | nom | unité | type | tarif | seuil | actif | suppr
+var _ECFG_COLS='30px 1fr 70px 90px 90px 90px 44px 44px';
+
 async function _buildEnergieConfigTab(sid){
-  var fluides=await supaGet('energie_config','site_id=eq.'+sid+'&select=id,nom,unite,type_valeur,seuil_alerte_bas,objectif_mensuel,actif,ordre&order=ordre.asc');
+  var[fluides,relevesCheck]=await Promise.all([
+    supaGet('energie_config','site_id=eq.'+sid+'&select=id,nom,unite,type_valeur,tarif,seuil_alerte_bas,actif,ordre&order=ordre.asc'),
+    supaGet('releves_energie','site_id=eq.'+sid+'&select=valeurs&limit=100')
+  ]);
 
-  // Savoir quels fluides ont des données (pour bloquer la suppression)
   var fluidesAvecDonnees={};
-  if(fluides&&fluides.length){
-    var fIds=fluides.map(function(f){return f.id;});
-    var relevesCheck=await supaGet('releves_energie','site_id=eq.'+sid+'&select=valeurs&limit=100');
-    (relevesCheck||[]).forEach(function(r){
-      if(r.valeurs){Object.keys(r.valeurs).forEach(function(fid){fluidesAvecDonnees[fid]=true;});}
-    });
-  }
+  (relevesCheck||[]).forEach(function(r){
+    if(r.valeurs)Object.keys(r.valeurs).forEach(function(fid){fluidesAvecDonnees[fid]=true;});
+  });
 
-  var h='<div style="max-width:700px">';
-
-  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'+
-    '<div style="font-size:12px;color:var(--text2)">Configurez les fluides à suivre dans le relevé énergie quotidien (WhatsApp bot).</div>'+
-    '<button onclick="_energieAjouterFluide(\''+sid+'\')" style="flex-shrink:0;margin-left:16px;background:var(--amber);color:white;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">+ Ajouter fluide</button>'+
+  var h='<div style="max-width:760px">';
+  h+='<div style="font-size:12px;color:var(--text2);margin-bottom:16px">'+
+    'Configurez les fluides à suivre. Les objectifs mensuels sont définis directement dans l\'onglet Énergie.'+
   '</div>';
 
-  if(!fluides||!fluides.length){
-    h+='<div class="placeholder-card">'+
-      '<div class="placeholder-icon">⚡</div>'+
-      'Aucun fluide configuré.<br>'+
-      '<span style="font-size:11px;color:var(--text3)">Ajoutez des fluides pour démarrer le suivi énergie.</span>'+
-    '</div>';
-    return h+'</div>';
-  }
-
-  // En-têtes colonnes
-  h+='<div style="display:grid;grid-template-columns:30px 1fr 80px 80px 100px 100px 50px 70px;gap:6px;padding:0 4px 6px;font-size:10px;font-weight:700;color:var(--text3);border-bottom:1.5px solid var(--border);margin-bottom:6px">'+
-    '<div></div>'+
-    '<div>Nom</div>'+
+  // En-têtes
+  h+='<div style="display:grid;grid-template-columns:'+_ECFG_COLS+';gap:6px;padding:0 4px 6px;font-size:10px;font-weight:700;color:var(--text3);border-bottom:1.5px solid var(--border);margin-bottom:2px">'+
+    '<div style="text-align:center">#</div>'+
+    '<div>Nom du fluide</div>'+
     '<div>Unité</div>'+
     '<div>Type</div>'+
+    '<div style="text-align:right">Tarif FCFA/u</div>'+
     '<div style="text-align:right">Seuil bas</div>'+
-    '<div style="text-align:right">Obj. mensuel</div>'+
     '<div style="text-align:center">Actif</div>'+
     '<div></div>'+
   '</div>';
 
-  fluides.forEach(function(f){
+  (fluides||[]).forEach(function(f){
     var hasDonnees=!!fluidesAvecDonnees[f.id];
     var fJs=f.id.replace(/'/g,"\\'");
-    h+=
-      '<div id="ecfg-row-'+f.id+'" style="display:grid;grid-template-columns:30px 1fr 80px 80px 100px 100px 50px 70px;gap:6px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--border);background:'+(f.actif?'white':'var(--bg2)')+'" class="ecfg-row" data-id="'+f.id+'">'+
-
-        // Ordre drag handle (visuel)
-        '<div style="font-size:14px;color:var(--text3);text-align:center;cursor:default" title="Ordre: '+f.ordre+'">'+f.ordre+'</div>'+
-
-        // Nom
-        '<input id="ecfg-nom-'+f.id+'" type="text" value="'+escape_html(f.nom)+'" '+
-          'style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;width:100%;box-sizing:border-box" '+
-          'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
-
-        // Unité
-        '<input id="ecfg-unite-'+f.id+'" type="text" value="'+escape_html(f.unite||'')+'" placeholder="kWh, m³…" '+
-          'style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:11px;width:100%;box-sizing:border-box" '+
-          'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
-
-        // Type valeur
-        '<select id="ecfg-type-'+f.id+'" '+
-          'style="border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:11px;width:100%;box-sizing:border-box" '+
-          'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')">'+
-          '<option value="index"'+(f.type_valeur==='index'?' selected':'')+'>Index</option>'+
-          '<option value="instantane"'+(f.type_valeur==='instantane'?' selected':'')+'>Instantané</option>'+
-        '</select>'+
-
-        // Seuil bas
-        '<input id="ecfg-seuil-'+f.id+'" type="number" value="'+(f.seuil_alerte_bas!=null?f.seuil_alerte_bas:'')+'" placeholder="—" '+
-          'style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" '+
-          'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
-
-        // Objectif mensuel
-        '<input id="ecfg-obj-'+f.id+'" type="number" value="'+(f.objectif_mensuel!=null?f.objectif_mensuel:'')+'" placeholder="—" '+
-          'style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" '+
-          'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
-
-        // Toggle actif
-        '<div style="text-align:center">'+
-          '<label style="position:relative;display:inline-block;width:32px;height:18px">'+
-            '<input type="checkbox" '+(f.actif?'checked':'')+' onchange="_energieToggleActif(\''+sid+'\',\''+fJs+'\',this.checked)" style="opacity:0;width:0;height:0;position:absolute"/>'+
-            '<span style="position:absolute;inset:0;background:'+(f.actif?'var(--amber)':'#ccc')+';border-radius:18px;transition:.2s;cursor:pointer"></span>'+
-            '<span style="position:absolute;left:'+(f.actif?'15px':'2px')+';top:2px;width:14px;height:14px;background:white;border-radius:50%;transition:.2s"></span>'+
-          '</label>'+
-        '</div>'+
-
-        // Bouton suppression
-        '<div style="text-align:right">'+
-          (hasDonnees?
-            '<span style="font-size:9px;color:var(--text3)" title="Données existantes — suppression désactivée">🔒</span>':
-            '<button onclick="_energieDemanderSuppression(\''+sid+'\',\''+fJs+'\',\''+escape_html(f.nom)+'\')" '+
-              'style="background:none;border:none;cursor:pointer;color:var(--rouge);font-size:14px;padding:2px 6px" title="Supprimer">🗑</button>')+
-        '</div>'+
-      '</div>';
+    h+='<div id="ecfg-row-'+f.id+'" style="display:grid;grid-template-columns:'+_ECFG_COLS+';gap:6px;align-items:center;padding:7px 4px;border-bottom:1px solid var(--border);background:'+(f.actif?'white':'var(--bg2)')+'">'+
+      // Ordre
+      '<div style="font-size:11px;color:var(--text3);text-align:center">'+f.ordre+'</div>'+
+      // Nom
+      '<input id="ecfg-nom-'+f.id+'" type="text" value="'+escape_html(f.nom)+'" '+
+        'style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;width:100%;box-sizing:border-box" '+
+        'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
+      // Unité
+      '<input id="ecfg-unite-'+f.id+'" type="text" value="'+escape_html(f.unite||'')+'" placeholder="kWh…" '+
+        'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box" '+
+        'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
+      // Type
+      '<select id="ecfg-type-'+f.id+'" '+
+        'style="border:1px solid var(--border);border-radius:6px;padding:5px 5px;font-size:11px;width:100%;box-sizing:border-box" '+
+        'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')">'+
+        '<option value="index"'+(f.type_valeur==='index'?' selected':'')+'>Index</option>'+
+        '<option value="instantane"'+(f.type_valeur==='instantane'?' selected':'')+'>Instantané</option>'+
+      '</select>'+
+      // Tarif
+      '<input id="ecfg-tarif-'+f.id+'" type="number" value="'+(f.tarif!=null?f.tarif:'')+'" placeholder="—" '+
+        'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" '+
+        'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
+      // Seuil bas
+      '<input id="ecfg-seuil-'+f.id+'" type="number" value="'+(f.seuil_alerte_bas!=null?f.seuil_alerte_bas:'')+'" placeholder="—" '+
+        'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" '+
+        'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
+      // Toggle actif
+      '<div style="text-align:center">'+
+        '<label style="position:relative;display:inline-block;width:32px;height:18px">'+
+          '<input type="checkbox" '+(f.actif?'checked':'')+' onchange="_energieToggleActif(\''+sid+'\',\''+fJs+'\',this.checked)" style="opacity:0;width:0;height:0;position:absolute"/>'+
+          '<span style="position:absolute;inset:0;background:'+(f.actif?'var(--amber)':'#ccc')+';border-radius:18px;cursor:pointer"></span>'+
+          '<span style="position:absolute;left:'+(f.actif?'15px':'2px')+';top:2px;width:14px;height:14px;background:white;border-radius:50%"></span>'+
+        '</label>'+
+      '</div>'+
+      // Supprimer
+      '<div style="text-align:center">'+
+        (hasDonnees?
+          '<span style="font-size:11px;color:var(--text3)" title="Données liées — suppression manuelle requise">🔒</span>':
+          '<button onclick="_energieDemanderSuppression(\''+sid+'\',\''+fJs+'\',\''+escape_html(f.nom)+'\')" '+
+            'style="background:none;border:none;cursor:pointer;color:var(--rouge);font-size:14px;padding:2px">🗑</button>')+
+      '</div>'+
+    '</div>';
   });
 
-  h+='<div style="font-size:11px;color:var(--text3);margin-top:12px">'+
-    '💡 <strong>Index</strong> : valeur croissante (compteur). <strong>Instantané</strong> : valeur brute (%, pression…). '+
-    'Les modifications de nom et d\'unité sont rétrocompatibles. Le 🔒 indique un fluide ayant déjà des relevés.'+
+  // Ligne d'ajout inline (cachée par défaut)
+  h+='<div id="ecfg-add-row" style="display:none;grid-template-columns:'+_ECFG_COLS+';gap:6px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--amber);background:var(--amber-pale)">'+
+    '<div style="font-size:11px;color:var(--text3);text-align:center">✦</div>'+
+    '<input id="ecfg-new-nom" type="text" placeholder="Nom du fluide *" '+
+      'style="border:1px solid var(--amber);border-radius:6px;padding:5px 8px;font-size:12px;width:100%;box-sizing:border-box" />'+
+    '<input id="ecfg-new-unite" type="text" placeholder="kWh…" '+
+      'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box" />'+
+    '<select id="ecfg-new-type" style="border:1px solid var(--border);border-radius:6px;padding:5px 5px;font-size:11px;width:100%;box-sizing:border-box">'+
+      '<option value="index">Index</option><option value="instantane">Instantané</option>'+
+    '</select>'+
+    '<input id="ecfg-new-tarif" type="number" placeholder="—" '+
+      'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" />'+
+    '<input id="ecfg-new-seuil" type="number" placeholder="—" '+
+      'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" />'+
+    '<div></div>'+
+    '<div style="display:flex;gap:4px">'+
+      '<button onclick="_energieConfirmerAjout(\''+sid+'\')" title="Valider" '+
+        'style="background:var(--amber);color:white;border:none;border-radius:5px;width:20px;height:20px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">✓</button>'+
+      '<button onclick="_energieAnnulerAjout()" title="Annuler" '+
+        'style="background:white;color:var(--text3);border:1px solid var(--border);border-radius:5px;width:20px;height:20px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">✕</button>'+
+    '</div>'+
+  '</div>';
+
+  h+='<div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between">'+
+    '<div style="font-size:10px;color:var(--text3)">'+
+      '💡 <strong>Index</strong> : compteur croissant (kWh, m³). <strong>Instantané</strong> : valeur brute (%, L restants). '+
+      '<strong>Tarif</strong> : FCFA/unité pour le calcul du coût estimé. 🔒 = données existantes.'+
+    '</div>'+
+    '<button onclick="_energieAfficherAjout()" id="ecfg-btn-add" '+
+      'style="flex-shrink:0;margin-left:16px;background:var(--amber);color:white;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">+ Ajouter</button>'+
   '</div>';
 
   return h+'</div>';
+}
+
+function _energieAfficherAjout(){
+  var row=document.getElementById('ecfg-add-row');
+  if(row){
+    row.style.display='grid';
+    var inp=document.getElementById('ecfg-new-nom');
+    if(inp)inp.focus();
+    var btn=document.getElementById('ecfg-btn-add');
+    if(btn)btn.style.display='none';
+  }
+}
+
+function _energieAnnulerAjout(){
+  var row=document.getElementById('ecfg-add-row');
+  if(row)row.style.display='none';
+  var btn=document.getElementById('ecfg-btn-add');
+  if(btn)btn.style.display='';
+  ['nom','unite','type','tarif','seuil'].forEach(function(f){
+    var el=document.getElementById('ecfg-new-'+f);
+    if(el)el.value=f==='type'?'index':'';
+  });
+}
+
+async function _energieConfirmerAjout(sid){
+  var nom=document.getElementById('ecfg-new-nom');
+  if(!nom||!nom.value.trim()){if(nom)nom.focus();return;}
+  var unite=document.getElementById('ecfg-new-unite');
+  var type=document.getElementById('ecfg-new-type');
+  var tarif=document.getElementById('ecfg-new-tarif');
+  var seuil=document.getElementById('ecfg-new-seuil');
+
+  var existing=await supaGet('energie_config','site_id=eq.'+sid+'&select=ordre&order=ordre.desc&limit=1');
+  var nextOrdre=(existing&&existing.length?existing[0].ordre:0)+1;
+
+  var payload={
+    site_id:sid,
+    nom:nom.value.trim(),
+    unite:unite&&unite.value.trim()?unite.value.trim():null,
+    type_valeur:type?type.value:'index',
+    tarif:tarif&&tarif.value!==''?parseFloat(tarif.value):null,
+    seuil_alerte_bas:seuil&&seuil.value!==''?parseFloat(seuil.value):null,
+    actif:true,
+    ordre:nextOrdre
+  };
+  var ok=await supaPost('energie_config',payload);
+  if(ok){
+    if(_session)renderRespTech(_session,'config');
+  }else{
+    alert('Erreur lors de l\'ajout.');
+  }
 }
 
 async function _energieSauvegarder(sid,fid){
   var nom=document.getElementById('ecfg-nom-'+fid);
   var unite=document.getElementById('ecfg-unite-'+fid);
   var type=document.getElementById('ecfg-type-'+fid);
+  var tarif=document.getElementById('ecfg-tarif-'+fid);
   var seuil=document.getElementById('ecfg-seuil-'+fid);
-  var obj=document.getElementById('ecfg-obj-'+fid);
   if(!nom)return;
-
   var payload={
     nom:nom.value.trim()||'Fluide',
     unite:unite?unite.value.trim()||null:null,
     type_valeur:type?type.value:'index',
+    tarif:tarif&&tarif.value!==''?parseFloat(tarif.value):null,
     seuil_alerte_bas:seuil&&seuil.value!==''?parseFloat(seuil.value):null,
-    objectif_mensuel:obj&&obj.value!==''?parseFloat(obj.value):null,
     updated_at:new Date().toISOString()
   };
-
   await supaPatch('energie_config',fid,payload);
-  // Feedback visuel bref
   var row=document.getElementById('ecfg-row-'+fid);
-  if(row){var orig=row.style.background;row.style.background='var(--vert-pale)';setTimeout(function(){row.style.background=orig;},800);}
+  if(row){var orig=row.style.background;row.style.background='var(--vert-pale)';setTimeout(function(){row.style.background=orig;},600);}
 }
 
 async function _energieToggleActif(sid,fid,actif){
@@ -7988,39 +8283,10 @@ async function _energieToggleActif(sid,fid,actif){
   if(_session)renderRespTech(_session,'config');
 }
 
-async function _energieAjouterFluide(sid){
-  var nom=window.prompt('Nom du nouveau fluide (ex: Électricité K1, Eau potable…)');
-  if(!nom||!nom.trim())return;
-  var unite=window.prompt('Unité (ex: kWh, m³, %, ou laisser vide)','');
-  var typeRaw=window.prompt('Type de valeur :\n1 = Index (compteur croissant)\n2 = Instantané (valeur brute)','1');
-  var typeVal=typeRaw==='2'?'instantane':'index';
-
-  // Trouver le prochain ordre
-  var existing=await supaGet('energie_config','site_id=eq.'+sid+'&select=ordre&order=ordre.desc&limit=1');
-  var nextOrdre=(existing&&existing.length?existing[0].ordre:0)+1;
-
-  var payload={
-    site_id:sid,
-    nom:nom.trim(),
-    unite:unite&&unite.trim()?unite.trim():null,
-    type_valeur:typeVal,
-    actif:true,
-    ordre:nextOrdre
-  };
-  var ok=await supaPost('energie_config',payload);
-  if(ok){
-    if(_session)renderRespTech(_session,'config');
-  } else {
-    alert('Erreur lors de l\'ajout du fluide.');
-  }
-}
-
 function _energieDemanderSuppression(sid,fid,nom){
-  var msg='Supprimer le fluide "'+nom+'" ?\n\nCette action est irréversible si aucune donnée n\'est liée.';
-  if(!window.confirm(msg))return;
-  // On n'exécute pas le DELETE ici — on affiche le SQL pour l'admin
+  if(!window.confirm('Supprimer "'+nom+'" ? Cette action est irréversible.'))return;
   var sql='DELETE FROM energie_config WHERE id = \''+fid+'\';';
-  alert('Pour supprimer ce fluide, exécutez ce SQL dans Supabase :\n\n'+sql);
+  alert('Exécutez ce SQL dans Supabase :\n\n'+sql);
 }
 
 init();
