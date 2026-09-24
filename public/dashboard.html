@@ -474,7 +474,7 @@ function _goToSignalement(sgId){
 
 function navTo(id){
   if(!_session)return;
-  if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;}
+  if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;_zonesWizardStep=0;}
   if(_session.role==='resp_tech')renderRespTech(_session,id);
   else if(_session.role==='dir_tech'){
     if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,id);
@@ -3404,6 +3404,457 @@ async function _mntCreerSubmit(sid){
   _mntRefresh();
 }
 
+/* ══════════════════════════════════════
+   ZONES CONFIG — WIZARD IMPORT
+══════════════════════════════════════ */
+var _zonesWizardStep=0; // 0=liste 1=preview 2=equipements 3=confirm
+var _zonesWizardData=[]; // [{nom,etage,categorie,type,erreur}]
+var _zonesWizardEqSel={}; // {categorie:[nom_eq,...]}
+var _zonesWizardSid=null;
+
+var _ZONE_EQ_TEMPLATES={
+  'Restauration':['Climatisation','Réfrigérateur industriel','Lave-vaisselle','Four professionnel','Hotte d\'aspiration','Caisse enregistreuse'],
+  'Hébergement':['Climatisation','Télévision','Douche / baignoire','Coffre-fort','Minibar','Téléphone'],
+  'Loisirs':['Climatisation','Équipements fitness','Pompe de filtration','TV murale','Jacuzzi'],
+  'Spa':['Bain de vapeur','Sauna','Tables de massage','Climatisation','Jacuzzi','Chromothérapie'],
+  'Casino':['Tables de jeu','Machines à sous','Climatisation','Système de surveillance','Caisse'],
+  'Accueil':['Climatisation','Caisse / terminal','Système de téléphonie','Écran d\'affichage'],
+  'Commerce':['Climatisation','Caisse enregistreuse','Système de surveillance'],
+  'Bureaux':['Climatisation','Imprimante','Téléphone','Vidéoprojecteur'],
+  'Technique':['Tableau électrique','Groupe électrogène','Pompe à eau','Onduleur','Climatiseur industriel'],
+  'Circulation':['Ascenseur','Éclairage de secours','Caméra de surveillance'],
+  'Autre':[]
+};
+
+var _ZONE_CATS=['Restauration','Hébergement','Loisirs','Spa','Casino','Accueil','Commerce','Bureaux','Technique','Circulation','Autre'];
+
+async function _buildZonesConfigTab(sid){
+  _zonesWizardSid=sid;
+  // Étape 0 — liste existante + upload
+  if(_zonesWizardStep===0){
+    var existingZones=await supaGet('zones','site_id=eq.'+sid+'&order=categorie.asc,nom.asc&select=id,nom,etage,categorie,type,actif');
+    existingZones=existingZones||[];
+    var bycat={};
+    existingZones.forEach(function(z){var c=z.categorie||'Autre';if(!bycat[c])bycat[c]=[];bycat[c].push(z);});
+
+    var listeHtml='';
+    if(!existingZones.length){
+      listeHtml='<div style="text-align:center;padding:32px 24px;color:var(--text3);border:1.5px dashed var(--border);border-radius:12px;margin-bottom:20px">'+
+        '<div style="font-size:32px;margin-bottom:8px;opacity:.4">📍</div>'+
+        '<div style="font-size:13px;margin-bottom:4px">Aucune zone configurée</div>'+
+        '<div style="font-size:12px;color:var(--text3)">Importez votre fichier Excel pour commencer</div>'+
+      '</div>';
+    } else {
+      var zCount=existingZones.length;
+      listeHtml='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
+        '<div style="font-size:13px;font-weight:700;color:var(--dark)">'+zCount+' zones configurées</div>'+
+        '<button onclick="_zonesDeleteAll()" style="font-size:11px;padding:5px 12px;border:1.5px solid var(--rouge-border);border-radius:8px;background:var(--rouge-pale);color:var(--rouge);cursor:pointer;font-weight:600">🗑 Tout supprimer</button>'+
+      '</div>'+
+      '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px">'+
+        Object.keys(bycat).sort().map(function(cat){
+          return '<div>'+
+            '<div style="background:var(--bg);padding:7px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">'+escape_html(cat)+'</div>'+
+            bycat[cat].map(function(z,i){
+              return '<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:'+(i===0?'none':'1px solid var(--border)')+'">'+
+                '<span style="width:8px;height:8px;border-radius:50%;background:'+(z.actif?'var(--vert)':'var(--text3)')+';flex-shrink:0"></span>'+
+                '<div style="flex:1;min-width:0">'+
+                  '<div style="font-size:13px;font-weight:500;color:var(--dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(z.nom)+'</div>'+
+                  (z.etage?'<div style="font-size:11px;color:var(--text3)">'+escape_html(z.etage)+'</div>':'')+
+                '</div>'+
+                '<button onclick="_zonesDeleteOne(\''+z.id+'\')" style="font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:white;color:var(--text3);cursor:pointer">✕</button>'+
+              '</div>';
+            }).join('')+
+          '</div>';
+        }).join('')+
+      '</div>';
+    }
+
+    return listeHtml+
+      '<div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:8px">'+(existingZones.length?'Re-importer les zones':'Importer les zones depuis Excel')+'</div>'+
+      '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">'+
+        'Fichier Excel avec un onglet <strong>PARTIE COMMUNE</strong> et/ou <strong>CHAMBRE</strong>. '+
+        'Les colonnes ÉTAGE et DÉSIGNATION sont détectées automatiquement.'+
+      '</div>'+
+      '<label style="display:block;border:1.5px dashed var(--border);border-radius:12px;padding:28px;text-align:center;cursor:pointer;background:white" id="zones-drop-label">'+
+        '<input type="file" accept=".xlsx,.xls" style="display:none" onchange="_zonesHandleFile(this.files[0],\''+sid+'\')">'+
+        '<div style="font-size:28px;margin-bottom:8px;opacity:.5">📂</div>'+
+        '<div style="font-size:13px;font-weight:600;color:var(--dark)">Choisir un fichier Excel</div>'+
+        '<div style="font-size:11px;color:var(--text3);margin-top:4px">.xlsx · .xls</div>'+
+      '</label>'+
+      '<div id="zones-parse-status" style="margin-top:10px;font-size:12px;color:var(--text3)"></div>';
+  }
+
+  // Étape 1 — prévisualisation + corrections
+  if(_zonesWizardStep===1){
+    var data=_zonesWizardData;
+    var erreurs=data.filter(function(z){return z.erreur;});
+    var doubls=data.filter(function(z){return z.erreur==='doublon';});
+    var typos=data.filter(function(z){return z.erreur==='typo';});
+    var sansEtage=data.filter(function(z){return z.erreur==='etage_manquant';});
+
+    var alertHtml='';
+    if(erreurs.length){
+      alertHtml='<div style="background:var(--orange-pale);border:1.5px solid var(--orange);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--orange)">'+
+        '⚠️ '+erreurs.length+' problème'+(erreurs.length>1?'s':'')+' détecté'+(erreurs.length>1?'s':'')+' — '+
+        (doubls.length?doubls.length+' doublon'+(doubls.length>1?'s':'')+' ':'')+(typos.length?typos.length+' typo'+(typos.length>1?'s':'')+' ':'')+(sansEtage.length?sansEtage.length+' étage manquant ':'')+
+        '(corrigez ou ignorez)'+
+      '</div>';
+    }
+
+    var tableRows=data.map(function(z,i){
+      var isErr=z.erreur&&z.erreur!=='doublon';
+      var isDoublon=z.erreur==='doublon';
+      var bg=isDoublon?'var(--rouge-pale)':isErr?'var(--orange-pale)':'';
+      var errBadge=isDoublon?'<span style="font-size:10px;font-weight:700;background:var(--rouge-pale);color:var(--rouge);padding:2px 7px;border-radius:4px;margin-left:6px">Doublon</span>':
+                  isErr?'<span style="font-size:10px;font-weight:700;background:var(--orange-pale);color:var(--orange);padding:2px 7px;border-radius:4px;margin-left:6px">'+(z.erreur==='etage_manquant'?'Étage ?':'Typo')+'</span>':'';
+      return '<tr style="background:'+bg+'">'+
+        '<td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;min-width:80px">'+
+          '<input id="zw-etage-'+i+'" value="'+escape_html(z.etage||'')+'" style="width:100%;border:none;background:transparent;font-size:12px;color:var(--dark);font-family:inherit;outline:none;border-bottom:1px dashed var(--border)">'+
+        '</td>'+
+        '<td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px">'+
+          '<input id="zw-nom-'+i+'" value="'+escape_html(z.nom)+'" style="width:100%;border:none;background:transparent;font-size:12px;color:var(--dark);font-family:inherit;outline:none;border-bottom:1px dashed var(--border)">'+
+          errBadge+
+        '</td>'+
+        '<td style="padding:7px 10px;border-bottom:1px solid var(--border)">'+
+          '<select id="zw-cat-'+i+'" style="font-size:11px;border:1px solid var(--border);border-radius:5px;padding:3px 6px;background:white;color:var(--dark)">'+
+            _ZONE_CATS.map(function(c){return '<option value="'+c+'"'+(z.categorie===c?' selected':'')+'>'+c+'</option>';}).join('')+
+          '</select>'+
+        '</td>'+
+        '<td style="padding:7px 10px;border-bottom:1px solid var(--border);text-align:center">'+
+          '<button onclick="_zonesWizardRemoveRow('+i+')" style="font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:5px;background:white;color:var(--text3);cursor:pointer">✕</button>'+
+        '</td>'+
+      '</tr>';
+    }).join('');
+
+    return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'+
+        '<button onclick="_zonesWizardBack()" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:600;cursor:pointer">← Retour</button>'+
+        '<div style="flex:1;font-size:14px;font-weight:700;color:var(--dark)">'+data.length+' zones parsées</div>'+
+        '<button onclick="_zonesWizardStep2()" style="padding:7px 18px;border:none;border-radius:8px;background:var(--amber);color:white;font-size:12px;font-weight:700;cursor:pointer">Définir les équipements →</button>'+
+      '</div>'+
+      alertHtml+
+      '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;overflow-x:auto">'+
+        '<table style="width:100%;border-collapse:collapse">'+
+          '<thead><tr style="background:var(--bg)">'+
+            '<th style="padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);text-align:left;width:16%">Étage</th>'+
+            '<th style="padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);text-align:left">Désignation</th>'+
+            '<th style="padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);text-align:left;width:22%">Catégorie</th>'+
+            '<th style="padding:8px 10px;width:40px"></th>'+
+          '</tr></thead>'+
+          '<tbody>'+tableRows+'</tbody>'+
+        '</table>'+
+      '</div>';
+  }
+
+  // Étape 2 — équipements par catégorie
+  if(_zonesWizardStep===2){
+    var cats={};
+    _zonesWizardData.forEach(function(z){var c=z.categorie||'Autre';if(!cats[c])cats[c]=0;cats[c]++;});
+    var catKeys=Object.keys(cats);
+    // Init _zonesWizardEqSel si vide
+    catKeys.forEach(function(c){
+      if(!_zonesWizardEqSel[c]){
+        _zonesWizardEqSel[c]=(_ZONE_EQ_TEMPLATES[c]||[]).slice(0,4);
+      }
+    });
+
+    var cardsHtml=catKeys.map(function(cat){
+      var templates=_ZONE_EQ_TEMPLATES[cat]||[];
+      var selected=_zonesWizardEqSel[cat]||[];
+      var isPerZone=cat==='Hébergement';
+      var countZones=cats[cat];
+      var checkboxes=templates.map(function(eq){
+        var chk=selected.indexOf(eq)>=0?'checked':'';
+        var perTag=isPerZone?'<span style="font-size:10px;font-weight:700;background:var(--bleu-pale,#e3f2fd);color:var(--bleu,#1976d2);padding:1px 7px;border-radius:3px;margin-left:auto">×'+countZones+'</span>':'';
+        return '<label style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;color:var(--dark);cursor:pointer">'+
+          '<input type="checkbox" '+chk+' onchange="_zonesWizardToggleEq(\''+cat.replace(/'/g,"\\'")+'\',\''+eq.replace(/'/g,"\\'")+'\',this.checked)" style="accent-color:var(--amber);width:14px;height:14px">'+
+          escape_html(eq)+perTag+
+        '</label>';
+      }).join('');
+      var inputId='zw-eq-add-'+cat.replace(/[^a-z0-9]/gi,'_');
+      return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px">'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+          '<div style="width:30px;height:30px;border-radius:7px;background:var(--amber-pale);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">📍</div>'+
+          '<div>'+
+            '<div style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(cat)+'</div>'+
+            '<div style="font-size:11px;color:var(--text3)">'+countZones+' zone'+(countZones>1?'s':'')+(isPerZone?' · équipements par zone':'')+'</div>'+
+          '</div>'+
+        '</div>'+
+        checkboxes+
+        '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);display:flex;gap:6px">'+
+          '<input id="'+inputId+'" placeholder="Ajouter…" style="flex:1;border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;font-family:inherit;outline:none">'+
+          '<button onclick="_zonesWizardAddCustomEq(\''+cat.replace(/'/g,"\\'")+'\',\''+inputId+'\')" style="padding:5px 12px;border:1.5px solid var(--amber);border-radius:6px;background:var(--amber-pale);color:var(--amber-dark);font-size:12px;font-weight:600;cursor:pointer">＋</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+
+    return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'+
+        '<button onclick="_zonesWizardBack()" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:600;cursor:pointer">← Retour</button>'+
+        '<div style="flex:1;font-size:14px;font-weight:700;color:var(--dark)">Équipements par type de zone</div>'+
+        '<button onclick="_zonesWizardStep3()" style="padding:7px 18px;border:none;border-radius:8px;background:var(--amber);color:white;font-size:12px;font-weight:700;cursor:pointer">Vérifier et confirmer →</button>'+
+      '</div>'+
+      '<p style="font-size:12px;color:var(--text2);margin-bottom:16px;line-height:1.5">Sélectionnez les équipements présents dans chaque type de lieu. Les équipements marqués ×N seront créés pour chaque zone de ce type.</p>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+cardsHtml+'</div>';
+  }
+
+  // Étape 3 — confirmation
+  if(_zonesWizardStep===3){
+    var totalZones=_zonesWizardData.length;
+    var totalEq=0;
+    Object.values(_zonesWizardEqSel).forEach(function(eqs){totalEq+=eqs.length;});
+    // Équipements × zones pour Hébergement
+    var cats3={};
+    _zonesWizardData.forEach(function(z){var c=z.categorie||'Autre';if(!cats3[c])cats3[c]=0;cats3[c]++;});
+    var totalEqExpanded=0;
+    Object.keys(_zonesWizardEqSel).forEach(function(cat){
+      var n=cats3[cat]||1;
+      var isPerZone=cat==='Hébergement';
+      totalEqExpanded+=(_zonesWizardEqSel[cat]||[]).length*(isPerZone?n:1);
+    });
+    var doublons=_zonesWizardData.filter(function(z){return z.erreur==='doublon';});
+    var warnHtml=doublons.length?
+      '<div style="background:var(--orange-pale);border:1.5px solid var(--orange);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--orange);margin-bottom:14px">'+
+        '⚠️ '+doublons.length+' doublon'+(doublons.length>1?'s':'')+' détecté'+(doublons.length>1?'s':'')+' — ils seront ignorés lors de l\'import.'+
+      '</div>':'';
+
+    return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'+
+        '<button onclick="_zonesWizardBack()" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:600;cursor:pointer">← Retour</button>'+
+        '<div style="flex:1;font-size:14px;font-weight:700;color:var(--dark)">Confirmer l\'import</div>'+
+      '</div>'+
+      warnHtml+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">'+
+        '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">'+
+          '<div style="font-size:26px;font-weight:800;color:var(--dark)">'+(totalZones-doublons.length)+'</div>'+
+          '<div style="font-size:11px;color:var(--text2)">Zones à créer</div>'+
+        '</div>'+
+        '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">'+
+          '<div style="font-size:26px;font-weight:800;color:var(--amber)">'+totalEqExpanded+'</div>'+
+          '<div style="font-size:11px;color:var(--text2)">Équipements à créer</div>'+
+        '</div>'+
+        '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">'+
+          '<div style="font-size:26px;font-weight:800;color:var(--rouge)">'+doublons.length+'</div>'+
+          '<div style="font-size:11px;color:var(--text2)">Doublons ignorés</div>'+
+        '</div>'+
+      '</div>'+
+      '<div id="zones-import-status" style="margin-bottom:12px;font-size:12px;color:var(--text3)"></div>'+
+      '<div style="display:flex;gap:10px">'+
+        '<button onclick="_switchConfigTab(\'zones\')" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
+        '<button onclick="_zonesWizardImport()" style="flex:2;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--amber);color:white;cursor:pointer">🚀 Lancer l\'import</button>'+
+      '</div>';
+  }
+
+  return '';
+}
+
+// ── Wizard helpers ──
+function _zonesWizardBack(){_zonesWizardStep=Math.max(0,_zonesWizardStep-1);if(_session)renderRespTech(_session,'config');}
+
+function _zonesWizardRemoveRow(i){
+  _zonesWizardData.splice(i,1);
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _zonesWizardToggleEq(cat,eq,on){
+  if(!_zonesWizardEqSel[cat])_zonesWizardEqSel[cat]=[];
+  var arr=_zonesWizardEqSel[cat];
+  var idx=arr.indexOf(eq);
+  if(on&&idx<0)arr.push(eq);
+  else if(!on&&idx>=0)arr.splice(idx,1);
+}
+
+function _zonesWizardAddCustomEq(cat,inputId){
+  var inp=document.getElementById(inputId);
+  if(!inp)return;
+  var val=(inp.value||'').trim();
+  if(!val)return;
+  if(!_zonesWizardEqSel[cat])_zonesWizardEqSel[cat]=[];
+  if(_zonesWizardEqSel[cat].indexOf(val)<0)_zonesWizardEqSel[cat].push(val);
+  var templates=_ZONE_EQ_TEMPLATES[cat]||[];
+  if(templates.indexOf(val)<0)templates.push(val);
+  inp.value='';
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _zonesWizardStep2(){
+  // Lire les corrections du tableau (step 1 → step 2)
+  _zonesWizardData.forEach(function(z,i){
+    var etageEl=document.getElementById('zw-etage-'+i);
+    var nomEl=document.getElementById('zw-nom-'+i);
+    var catEl=document.getElementById('zw-cat-'+i);
+    if(etageEl)z.etage=(etageEl.value||'').trim()||null;
+    if(nomEl)z.nom=(nomEl.value||'').trim()||z.nom;
+    if(catEl)z.categorie=catEl.value||'Autre';
+    if(z.erreur==='typo')z.erreur=null; // considéré corrigé
+  });
+  // Retirer les doublons marqués
+  _zonesWizardData=_zonesWizardData.filter(function(z){return z.erreur!=='doublon';});
+  _zonesWizardStep=2;
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _zonesWizardStep3(){
+  _zonesWizardStep=3;
+  if(_session)renderRespTech(_session,'config');
+}
+
+async function _zonesWizardImport(){
+  var sid=_zonesWizardSid;
+  if(!sid)return;
+  var statusEl=document.getElementById('zones-import-status');
+  if(statusEl)statusEl.textContent='Import en cours…';
+
+  var zones=_zonesWizardData.filter(function(z){return z.erreur!=='doublon'&&z.nom;});
+  var created=[]; // [{zone_id, zone_nom, categorie}]
+
+  // Batch zones via fetch direct (array insert)
+  try{
+    var zoneRows=zones.map(function(z,i){
+      return {site_id:sid,nom:z.nom,etage:z.etage||null,categorie:z.categorie||'Autre',type:z.type||'espace_commun',actif:true,ordre:i};
+    });
+    var r=await fetch(window.SUPA_URL+'/rest/v1/zones',{
+      method:'POST',
+      headers:{'apikey':window.SUPA_KEY,'Authorization':'Bearer '+window.SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(zoneRows)
+    });
+    if(!r.ok){var e=await r.json();if(statusEl)statusEl.textContent='Erreur zones: '+(e.message||r.status);return;}
+    created=await r.json();
+  }catch(err){if(statusEl)statusEl.textContent='Erreur réseau: '+err.message;return;}
+
+  // Créer les équipements liés
+  var eqRows=[];
+  created.forEach(function(z){
+    var eqs=_zonesWizardEqSel[z.categorie]||[];
+    eqs.forEach(function(eqNom){
+      eqRows.push({site_id:sid,zone_id:z.id,nom:eqNom+' — '+z.nom,actif:true,actif_ronde:false,actif_releve:false,photo_requise:false,ordre_ronde:0});
+    });
+  });
+
+  if(eqRows.length){
+    try{
+      var r2=await fetch(window.SUPA_URL+'/rest/v1/equipements',{
+        method:'POST',
+        headers:{'apikey':window.SUPA_KEY,'Authorization':'Bearer '+window.SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify(eqRows)
+      });
+      if(!r2.ok&&statusEl){var e2=await r2.json();statusEl.textContent='Zones créées, erreur équipements: '+(e2.message||r2.status);return;}
+    }catch(err){if(statusEl)statusEl.textContent='Zones créées, erreur réseau équipements: '+err.message;return;}
+  }
+
+  // Succès
+  _zonesWizardStep=0;
+  _zonesWizardData=[];
+  _zonesWizardEqSel={};
+  if(_session)renderRespTech(_session,'config');
+}
+
+async function _zonesDeleteOne(zoneId){
+  await supaDelete('zones','id=eq.'+zoneId);
+  if(_session)renderRespTech(_session,'config');
+}
+
+async function _zonesDeleteAll(){
+  var sid=_zonesWizardSid||(_session&&_session.groupe_id);
+  if(!sid)return;
+  if(!confirm('Supprimer toutes les zones de ce site ?'))return;
+  await supaDelete('zones','site_id=eq.'+sid);
+  if(_session)renderRespTech(_session,'config');
+}
+
+// ── Parser Excel (SheetJS) ──
+function _zonesHandleFile(file,sid){
+  if(!file)return;
+  var statusEl=document.getElementById('zones-parse-status');
+  if(statusEl)statusEl.textContent='Chargement…';
+  _zonesWizardSid=sid;
+
+  function doparse(XLSX){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      try{
+        var wb=XLSX.read(e.target.result,{type:'array'});
+        var allZones=[];
+
+        wb.SheetNames.forEach(function(sheetName){
+          var ws=wb.Sheets[sheetName];
+          var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+          var isChambre=/chambre/i.test(sheetName);
+          var isCommun=/commun/i.test(sheetName)||!isChambre;
+          var type=isChambre?'chambre':'espace_commun';
+
+          // Trouver la ligne d'en-tête (celle qui contient ETAGE ou DESIGNATION ou CHAMBRE)
+          var headerRow=-1;
+          var etageCol=-1,nameCol=-1;
+          for(var ri=0;ri<Math.min(rows.length,15);ri++){
+            var row=rows[ri];
+            for(var ci=0;ci<row.length;ci++){
+              var cell=(row[ci]+'').trim().toUpperCase();
+              if(cell==='ETAGE'||cell==='ÉTAGE'||(cell.indexOf('ETAGE')>=0&&cell.length<10)){etageCol=ci;headerRow=ri;}
+              if(cell==='DESIGNATION'||cell==='DÉSIGNATION'||cell==='N° DE CHAMBRE'||cell==='CHAMBRE'){nameCol=ci;headerRow=ri;}
+            }
+            if(headerRow===ri)break;
+          }
+          if(headerRow<0||nameCol<0)return; // onglet non reconnu
+
+          // Lire les données en dessous
+          var lastEtage=null;
+          var seen={};
+          for(var di=headerRow+1;di<rows.length;di++){
+            var drow=rows[di];
+            var etageVal=(etageCol>=0?(drow[etageCol]+'').trim():'')||null;
+            var nameVal=(drow[nameCol]+'').trim();
+            if(etageVal)lastEtage=etageVal;
+            if(!nameVal||nameVal.length<2)continue;
+
+            // Détecter doublon
+            var key=(lastEtage||'')+'|'+nameVal.toLowerCase();
+            var isDup=!!seen[key];
+            seen[key]=true;
+
+            // Détecter typo simple (tout majuscules avec erreur connue)
+            var hasTypo=/ELCETRO|GUERRITE|ADMINIT|LOCL\b/i.test(nameVal);
+
+            // Deviner catégorie
+            var cat='Autre';
+            if(isChambre)cat='Hébergement';
+            else if(/restaurant|bar|cuisine|snack|banquet|room.?serv/i.test(nameVal))cat='Restauration';
+            else if(/technique|electr|pompe|buanderie|groupe|tableau|chaufferie|onduleur/i.test(nameVal))cat='Technique';
+            else if(/piscine|fitness|sport|spa|sauna|massage|loisir|jacuzzi/i.test(nameVal))cat='Loisirs';
+            else if(/casino|jeu|machine/i.test(nameVal))cat='Casino';
+            else if(/reception|accueil|lobby|hall|concierg/i.test(nameVal))cat='Accueil';
+            else if(/boutique|commerce|galerie|pressing/i.test(nameVal))cat='Commerce';
+            else if(/bureau|direction|admin|rh\b|meeting|salle de conf/i.test(nameVal))cat='Bureaux';
+            else if(/couloir|ascenseur|escalier|parking|corridor/i.test(nameVal))cat='Circulation';
+
+            allZones.push({
+              nom:nameVal,
+              etage:lastEtage,
+              categorie:cat,
+              type:type,
+              erreur:isDup?'doublon':(lastEtage===null&&di>headerRow+2?'etage_manquant':(hasTypo?'typo':null))
+            });
+          }
+        });
+
+        if(!allZones.length){if(statusEl)statusEl.textContent='Aucune zone trouvée. Vérifiez le format du fichier.';return;}
+        _zonesWizardData=allZones;
+        _zonesWizardStep=1;
+        _zonesWizardEqSel={};
+        if(_session)renderRespTech(_session,'config');
+      }catch(err){if(statusEl)statusEl.textContent='Erreur lecture fichier: '+err.message;}
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // Charger SheetJS si nécessaire
+  if(window.XLSX){doparse(window.XLSX);}
+  else{
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=function(){doparse(window.XLSX);};
+    s.onerror=function(){if(statusEl)statusEl.textContent='Impossible de charger SheetJS. Vérifiez votre connexion.';};
+    document.head.appendChild(s);
+  }
+}
+
 async function _rtConfig(sid){
   _configCurrentSid=sid;
   var types=await supaGet('types_equipements','select=id,nom&order=nom');
@@ -3417,7 +3868,8 @@ async function _rtConfig(sid){
     {key:'seuils',label:'🎯 Seuils d\'alerte'},
     {key:'contacts',label:'👥 Contacts & Alertes'},
     {key:'releves',label:'📋 Relevés horaires'},
-    {key:'energie',label:'⚡ Énergie'}
+    {key:'energie',label:'⚡ Énergie'},
+    {key:'zones',label:'📍 Zones & Lieux'}
   ];
   var tabHtml=tabs.map(function(t){
     return '<button class="config-tab'+(_configCurrentTab===t.key?' active':'')+'" onclick="_switchConfigTab(\''+t.key+'\')">'+t.label+'</button>';
@@ -3452,6 +3904,12 @@ async function _rtConfig(sid){
     if(dc2e){dc2e.style.padding='24px';dc2e.style.maxWidth='none';}
     var energieCfgHtml=await _buildEnergieConfigTab(sid);
     return '<div class="config-tabs">'+tabHtml+'</div>'+energieCfgHtml;
+  }
+  if(_configCurrentTab==='zones'){
+    var dc2z=document.getElementById('dash-content-main');
+    if(dc2z){dc2z.style.padding='24px';dc2z.style.maxWidth='960px';}
+    var zonesCfgHtml=await _buildZonesConfigTab(sid);
+    return '<div class="config-tabs">'+tabHtml+'</div>'+zonesCfgHtml;
   }
 
   // Default selection
