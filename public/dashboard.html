@@ -711,7 +711,21 @@ async function _rtAccueil(session,sid,cid){
     var repByQ={};
     latestReps.forEach(function(r){if(!repByQ[r.question_id]||r.created_at>repByQ[r.question_id].created_at)repByQ[r.question_id]=r;});
     specialQs.forEach(function(q){q._lastVal=repByQ[q.id]?repByQ[q.id].valeur:null;q._lastAt=repByQ[q.id]?repByQ[q.id].created_at:null;});
-    cuveSection=_buildCuveSection(cuveEquips,specialQs.filter(function(q){return cuveEquips.some(function(e){return e.id===q.equipement_id;})}),pleinsHist);
+    // Gasoil depuis relevés énergie (source de vérité pour le niveau)
+    var gasoilNiveau=null;
+    var[gasoilFluides,lastReleve]=await Promise.all([
+      supaGet('energie_config','site_id=eq.'+sid+'&type_valeur=eq.instantane&capacite=not.is.null&actif=eq.true&select=id,nom,capacite&limit=1'),
+      supaGet('releves_energie','site_id=eq.'+sid+'&select=date_releve,valeurs,saisi_par&order=date_releve.desc&limit=1')
+    ]);
+    if(gasoilFluides&&gasoilFluides.length&&lastReleve&&lastReleve.length){
+      var gf=gasoilFluides[0];
+      var lr=lastReleve[0];
+      var pctVal=lr.valeurs&&lr.valeurs[gf.id]!=null?parseFloat(lr.valeurs[gf.id]):null;
+      if(pctVal!=null){
+        gasoilNiveau={pct:pctVal,litres:Math.round(pctVal/100*parseFloat(gf.capacite)),cap:parseFloat(gf.capacite),date:lr.date_releve,saisi_par:lr.saisi_par};
+      }
+    }
+    cuveSection=_buildCuveSection(cuveEquips,specialQs.filter(function(q){return cuveEquips.some(function(e){return e.id===q.equipement_id;})}),pleinsHist,gasoilNiveau);
     vidangesSection=_buildVidangesSection(geEquips,specialQs.filter(function(q){return geEquips.some(function(e){return e.id===q.equipement_id;})}),vidangesHist);
   }
 
@@ -881,34 +895,43 @@ async function _rtAccueil(session,sid,cid){
 }
 
 /* ── Cuve carburant section ── */
-function _buildCuveSection(cuveEquips,cuveQs,pleinsHist){
+function _buildCuveSection(cuveEquips,cuveQs,pleinsHist,gasoilNiveau){
   pleinsHist=pleinsHist||[];
   if(!cuveEquips.length)return '';
   var html='<div class="section-title">⛽ Carburant</div>';
   cuveEquips.forEach(function(e){
-    var niveauQ=cuveQs.find(function(q){
-      return q.equipement_id===e.id&&(q.texte.toLowerCase().indexOf('niveau')>=0||q.texte.toLowerCase().indexOf('cuve')>=0);
-    });
-    var niveau=niveauQ&&niveauQ._lastVal!=null?parseFloat(niveauQ._lastVal):null;
     var cap=parseFloat(e.capacite_litres)||8000;
-    // Si le dernier plein est plus récent que la dernière ronde, utiliser niveau_apres
-    var pleinsEquip=pleinsHist.filter(function(p){return p.equipement_id===e.id;});
-    var latestPlein=pleinsEquip[0]||null;
-    var sourceLabel=null;
-    if(latestPlein&&latestPlein.niveau_apres!=null){
-      var pleinDate=latestPlein.date||'';
-      var rondeDate=niveauQ&&niveauQ._lastAt?niveauQ._lastAt.slice(0,10):'0';
-      if(pleinDate>=rondeDate){
-        niveau=parseFloat(latestPlein.niveau_apres);
-        sourceLabel='Après plein du '+new Date(latestPlein.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+    var niveau=null,pct=null,sourceLabel=null;
+    // Priorité : relevé énergie (source précise)
+    if(gasoilNiveau){
+      pct=gasoilNiveau.pct;
+      niveau=gasoilNiveau.litres;
+      cap=gasoilNiveau.cap||cap;
+      sourceLabel='Relevé énergie · '+new Date(gasoilNiveau.date+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+(gasoilNiveau.saisi_par?' · '+gasoilNiveau.saisi_par:'');
+    } else {
+      // Fallback : question ronde
+      var niveauQ=cuveQs.find(function(q){
+        return q.equipement_id===e.id&&(q.texte.toLowerCase().indexOf('niveau')>=0||q.texte.toLowerCase().indexOf('cuve')>=0);
+      });
+      niveau=niveauQ&&niveauQ._lastVal!=null?parseFloat(niveauQ._lastVal):null;
+      // Si le dernier plein est plus récent que la dernière ronde, utiliser niveau_apres
+      var pleinsEquip=pleinsHist.filter(function(p){return p.equipement_id===e.id;});
+      var latestPlein=pleinsEquip[0]||null;
+      if(latestPlein&&latestPlein.niveau_apres!=null){
+        var pleinDate=latestPlein.date||'';
+        var rondeDate=niveauQ&&niveauQ._lastAt?niveauQ._lastAt.slice(0,10):'0';
+        if(pleinDate>=rondeDate){
+          niveau=parseFloat(latestPlein.niveau_apres);
+          sourceLabel='Après plein du '+new Date(latestPlein.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+        }
       }
+      pct=niveau!=null?Math.min(100,Math.round(niveau/cap*100)):null;
     }
-    var pct=niveau!=null?Math.min(100,Math.round(niveau/cap*100)):null;
     var consoH=parseFloat(e.conso_theorique_lh)||65;
     var autoJours=niveau!=null?Math.round(niveau/(consoH*8)*10)/10:null;
-    var seuilMin=niveauQ&&niveauQ.seuil_min!=null?parseFloat(niveauQ.seuil_min):null;
+    var seuilMin=e.capacite_litres!=null?Math.round(parseFloat(e.capacite_litres)*0.2):null;
     var col=pct!=null?(pct<=20?'var(--rouge)':pct<=40?'var(--orange)':'var(--vert)'):'var(--text3)';
-    var lastAt=sourceLabel||(niveauQ&&niveauQ._lastAt?'Relevé '+_timeAgo(niveauQ._lastAt):'Aucun relevé');
+    var lastAt=sourceLabel||'Aucun relevé';
     var autoBg=autoJours!=null?(autoJours<2?'var(--rouge-pale)':autoJours<5?'var(--orange-pale)':'var(--vert-pale)'):'transparent';
     var autoCol=autoJours!=null?(autoJours<2?'var(--rouge)':autoJours<5?'var(--orange)':'var(--vert)'):'var(--text3)';
     var operateur=_session&&_session.contact&&_session.contact.nom?_session.contact.nom:'';
