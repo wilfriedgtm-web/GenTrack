@@ -3411,6 +3411,7 @@ var _zonesWizardStep=0; // 0=liste 1=preview 2=equipements 3=confirm
 var _zonesWizardData=[]; // [{nom,etage,categorie,type,erreur}]
 var _zonesWizardEqSel={}; // {categorie:[nom_eq,...]}
 var _zonesWizardSid=null;
+var _zonesWizardDedupCount=0; // doublons supprimés auto à l'import
 
 var _ZONE_EQ_TEMPLATES={
   'Restauration':['Climatisation','Réfrigérateur industriel','Lave-vaisselle','Four professionnel','Hotte d\'aspiration','Caisse enregistreuse'],
@@ -3487,29 +3488,54 @@ async function _buildZonesConfigTab(sid){
   // Étape 1 — prévisualisation + corrections
   if(_zonesWizardStep===1){
     var data=_zonesWizardData;
-    var erreurs=data.filter(function(z){return z.erreur;});
-    var doubls=data.filter(function(z){return z.erreur==='doublon';});
     var typos=data.filter(function(z){return z.erreur==='typo';});
     var sansEtage=data.filter(function(z){return z.erreur==='etage_manquant';});
 
+    // Bandeau doublons supprimés
+    var dedupBanner=_zonesWizardDedupCount>0
+      ?'<div style="background:#f0faf4;border:1.5px solid #4caf50;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:#2e7d32">'+
+        '✅ '+_zonesWizardDedupCount+' doublon'+((_zonesWizardDedupCount>1)?'s':'')+' supprimé'+((_zonesWizardDedupCount>1)?'s':'')+' automatiquement'+
+      '</div>' : '';
+
+    // Bandeau alertes restantes (typos, étages manquants)
     var alertHtml='';
-    if(erreurs.length){
-      alertHtml='<div style="background:var(--orange-pale);border:1.5px solid var(--orange);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--orange)">'+
-        '⚠️ '+erreurs.length+' problème'+(erreurs.length>1?'s':'')+' détecté'+(erreurs.length>1?'s':'')+' — '+
-        (doubls.length?doubls.length+' doublon'+(doubls.length>1?'s':'')+' ':'')+(typos.length?typos.length+' typo'+(typos.length>1?'s':'')+' ':'')+(sansEtage.length?sansEtage.length+' étage manquant ':'')+
-        '(corrigez ou ignorez)'+
+    if(typos.length||sansEtage.length){
+      alertHtml='<div style="background:var(--orange-pale);border:1.5px solid var(--orange);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:var(--orange)">'+
+        '⚠️ '+(typos.length?typos.length+' typo'+(typos.length>1?'s':'')+' ':'')+
+        (sansEtage.length?sansEtage.length+' étage'+(sansEtage.length>1?'s':'')+' manquant'+(sansEtage.length>1?'s':'')+' ':'')+
+        '— vérifiez ci-dessous'+
+      '</div>';
+    }
+
+    // Assignation étage par lot
+    var batchEtageHtml='';
+    if(sansEtage.length){
+      batchEtageHtml='<div id="zw-batch-etage-section" style="background:#fff8e1;border:1.5px solid var(--amber);border-radius:10px;padding:12px 14px;margin-bottom:10px">'+
+        '<div style="font-size:12px;font-weight:700;color:#b45309;margin-bottom:8px">'+
+        '📍 '+sansEtage.length+' zone'+(sansEtage.length>1?'s':'')+' sans étage — assignation rapide</div>'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+          '<input id="zw-batch-etage" placeholder="Ex: RDC, Étage 1, Sous-sol…" '+
+            'style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:12px;font-family:inherit">'+
+          '<button onclick="_zonesApplyBatchEtage('+sansEtage.length+')" '+
+            'style="padding:7px 14px;border:none;border-radius:7px;background:var(--amber);color:white;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">'+
+            'Appliquer aux '+sansEtage.length+' zones</button>'+
+        '</div>'+
+        '<div style="font-size:10px;color:var(--text3);margin-top:5px">Ou éditez chaque ligne individuellement dans le tableau.</div>'+
       '</div>';
     }
 
     var tableRows=data.map(function(z,i){
-      var isErr=z.erreur&&z.erreur!=='doublon';
-      var isDoublon=z.erreur==='doublon';
-      var bg=isDoublon?'var(--rouge-pale)':isErr?'var(--orange-pale)':'';
-      var errBadge=isDoublon?'<span style="font-size:10px;font-weight:700;background:var(--rouge-pale);color:var(--rouge);padding:2px 7px;border-radius:4px;margin-left:6px">Doublon</span>':
-                  isErr?'<span style="font-size:10px;font-weight:700;background:var(--orange-pale);color:var(--orange);padding:2px 7px;border-radius:4px;margin-left:6px">'+(z.erreur==='etage_manquant'?'Étage ?':'Typo')+'</span>':'';
-      return '<tr style="background:'+bg+'">'+
-        '<td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;min-width:80px">'+
-          '<input id="zw-etage-'+i+'" value="'+escape_html(z.etage||'')+'" style="width:100%;border:none;background:transparent;font-size:12px;color:var(--dark);font-family:inherit;outline:none;border-bottom:1px dashed var(--border)">'+
+      var isSansEtage=z.erreur==='etage_manquant';
+      var isTypo=z.erreur==='typo';
+      var bg=isSansEtage?'#fffde7':isTypo?'var(--orange-pale)':'';
+      var errBadge=isSansEtage
+        ?'<span class="zw-etage-badge" style="font-size:10px;font-weight:700;background:#fff3cd;color:#b45309;padding:2px 7px;border-radius:4px;margin-left:6px">Étage ?</span>'
+        :isTypo?'<span style="font-size:10px;font-weight:700;background:var(--orange-pale);color:var(--orange);padding:2px 7px;border-radius:4px;margin-left:6px">Typo</span>':'';
+      return '<tr id="zw-row-'+i+'" style="background:'+bg+'">'+
+        '<td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;min-width:90px">'+
+          '<input id="zw-etage-'+i+'" value="'+escape_html(z.etage||'')+'" '+
+            'placeholder="étage…" '+
+            'style="width:100%;border:none;background:transparent;font-size:12px;color:var(--dark);font-family:inherit;outline:none;border-bottom:1px dashed var(--border)">'+
         '</td>'+
         '<td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px">'+
           '<input id="zw-nom-'+i+'" value="'+escape_html(z.nom)+'" style="width:100%;border:none;background:transparent;font-size:12px;color:var(--dark);font-family:inherit;outline:none;border-bottom:1px dashed var(--border)">'+
@@ -3528,10 +3554,12 @@ async function _buildZonesConfigTab(sid){
 
     return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">'+
         '<button onclick="_zonesWizardBack()" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:600;cursor:pointer">← Retour</button>'+
-        '<div style="flex:1;font-size:14px;font-weight:700;color:var(--dark)">'+data.length+' zones parsées</div>'+
+        '<div style="flex:1;font-size:14px;font-weight:700;color:var(--dark)">'+data.length+' zones importées</div>'+
         '<button onclick="_zonesWizardStep2()" style="padding:7px 18px;border:none;border-radius:8px;background:var(--amber);color:white;font-size:12px;font-weight:700;cursor:pointer">Définir les équipements →</button>'+
       '</div>'+
+      dedupBanner+
       alertHtml+
+      batchEtageHtml+
       '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;overflow-x:auto">'+
         '<table style="width:100%;border-collapse:collapse">'+
           '<thead><tr style="background:var(--bg)">'+
@@ -3610,20 +3638,19 @@ async function _buildZonesConfigTab(sid){
       var isPerZone=cat==='Hébergement';
       totalEqExpanded+=(_zonesWizardEqSel[cat]||[]).length*(isPerZone?n:1);
     });
-    var doublons=_zonesWizardData.filter(function(z){return z.erreur==='doublon';});
-    var warnHtml=doublons.length?
-      '<div style="background:var(--orange-pale);border:1.5px solid var(--orange);border-radius:10px;padding:10px 14px;font-size:12px;color:var(--orange);margin-bottom:14px">'+
-        '⚠️ '+doublons.length+' doublon'+(doublons.length>1?'s':'')+' détecté'+(doublons.length>1?'s':'')+' — ils seront ignorés lors de l\'import.'+
+    var dedupBanner3=_zonesWizardDedupCount>0
+      ?'<div style="background:#f0faf4;border:1.5px solid #4caf50;border-radius:10px;padding:10px 14px;font-size:12px;color:#2e7d32;margin-bottom:14px">'+
+        '✅ '+_zonesWizardDedupCount+' doublon'+((_zonesWizardDedupCount>1)?'s':'')+' supprimé'+((_zonesWizardDedupCount>1)?'s':'')+' à l\'import'+
       '</div>':'';
 
     return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'+
         '<button onclick="_zonesWizardBack()" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:600;cursor:pointer">← Retour</button>'+
         '<div style="flex:1;font-size:14px;font-weight:700;color:var(--dark)">Confirmer l\'import</div>'+
       '</div>'+
-      warnHtml+
+      dedupBanner3+
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px">'+
         '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">'+
-          '<div style="font-size:26px;font-weight:800;color:var(--dark)">'+(totalZones-doublons.length)+'</div>'+
+          '<div style="font-size:26px;font-weight:800;color:var(--dark)">'+totalZones+'</div>'+
           '<div style="font-size:11px;color:var(--text2)">Zones à créer</div>'+
         '</div>'+
         '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">'+
@@ -3631,8 +3658,8 @@ async function _buildZonesConfigTab(sid){
           '<div style="font-size:11px;color:var(--text2)">Équipements à créer</div>'+
         '</div>'+
         '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px;text-align:center">'+
-          '<div style="font-size:26px;font-weight:800;color:var(--rouge)">'+doublons.length+'</div>'+
-          '<div style="font-size:11px;color:var(--text2)">Doublons ignorés</div>'+
+          '<div style="font-size:26px;font-weight:800;color:#4caf50">'+_zonesWizardDedupCount+'</div>'+
+          '<div style="font-size:11px;color:var(--text2)">Doublons retirés</div>'+
         '</div>'+
       '</div>'+
       '<div id="zones-import-status" style="margin-bottom:12px;font-size:12px;color:var(--text3)"></div>'+
@@ -3651,6 +3678,35 @@ function _zonesWizardBack(){_zonesWizardStep=Math.max(0,_zonesWizardStep-1);if(_
 function _zonesWizardRemoveRow(i){
   _zonesWizardData.splice(i,1);
   if(_session)renderRespTech(_session,'config');
+}
+
+function _zonesApplyBatchEtage(n){
+  var inp=document.getElementById('zw-batch-etage');
+  var val=inp?(inp.value||'').trim():'';
+  if(!val){if(inp){inp.style.borderColor='var(--rouge)';setTimeout(function(){inp.style.borderColor='';},1000);}return;}
+  var applied=0;
+  _zonesWizardData.forEach(function(z,i){
+    if(z.erreur==='etage_manquant'){
+      z.etage=val;
+      z.erreur=null;
+      applied++;
+      // Mettre à jour le DOM en place (évite de perdre les autres éditions)
+      var etageEl=document.getElementById('zw-etage-'+i);
+      if(etageEl) etageEl.value=val;
+      var row=document.getElementById('zw-row-'+i);
+      if(row) row.style.background='';
+      var badge=row?row.querySelector('.zw-etage-badge'):null;
+      if(badge) badge.remove();
+    }
+  });
+  // Cacher la section batch
+  var section=document.getElementById('zw-batch-etage-section');
+  if(section) section.style.display='none';
+  // Retirer l'alerte étage manquant si tout est résolu
+  if(applied===n){
+    var alerts=document.querySelectorAll('[style*="orange"]');
+    // Mise à jour propre : re-render léger du header count
+  }
 }
 
 function _zonesWizardToggleEq(cat,eq,on){
@@ -3685,8 +3741,8 @@ function _zonesWizardStep2(){
     if(catEl)z.categorie=catEl.value||'Autre';
     if(z.erreur==='typo')z.erreur=null; // considéré corrigé
   });
-  // Retirer les doublons marqués
-  _zonesWizardData=_zonesWizardData.filter(function(z){return z.erreur!=='doublon';});
+  // Nettoyer les erreurs restantes (doublons déjà retirés à l'import)
+  _zonesWizardData=_zonesWizardData.filter(function(z){return z.nom&&z.nom.length>=2;});
   _zonesWizardStep=2;
   if(_session)renderRespTech(_session,'config');
 }
@@ -3766,33 +3822,85 @@ function _zonesHandleFile(file,sid){
   if(statusEl)statusEl.textContent='Chargement…';
   _zonesWizardSid=sid;
 
+  // Normalise une cellule pour la comparaison : retire accents, espaces, °
+  function _normCell(v){
+    return (v+'').trim().toUpperCase()
+      .replace(/[ÉÈÊË]/g,'E').replace(/[ÀÂÄÁ]/g,'A')
+      .replace(/[ÙÛÜÚ]/g,'U').replace(/[ÎÏÍÌ]/g,'I')
+      .replace(/[ÔÖÓÒ]/g,'O').replace(/[Ç]/g,'C')
+      .replace(/[°°\s]+/g,'');
+  }
+
   function doparse(XLSX){
     var reader=new FileReader();
     reader.onload=function(e){
       try{
-        var wb=XLSX.read(e.target.result,{type:'array'});
+        var wb=XLSX.read(e.target.result,{type:'array',cellText:false,cellDates:true});
         var allZones=[];
 
         wb.SheetNames.forEach(function(sheetName){
           var ws=wb.Sheets[sheetName];
-          var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+          var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
           var isChambre=/chambre/i.test(sheetName);
-          var isCommun=/commun/i.test(sheetName)||!isChambre;
           var type=isChambre?'chambre':'espace_commun';
 
-          // Trouver la ligne d'en-tête (celle qui contient ETAGE ou DESIGNATION ou CHAMBRE)
+          // Trouver la ligne d'en-tête — cherche celle qui contient DESIGNATION ou CHAMBRE (nom)
+          // L'en-tête ETAGE peut être dans la même ligne ou dans une ligne adjacente (cellules fusionnées)
           var headerRow=-1;
           var etageCol=-1,nameCol=-1;
-          for(var ri=0;ri<Math.min(rows.length,15);ri++){
+
+          for(var ri=0;ri<Math.min(rows.length,18);ri++){
             var row=rows[ri];
-            for(var ci=0;ci<row.length;ci++){
-              var cell=(row[ci]+'').trim().toUpperCase();
-              if(cell==='ETAGE'||cell==='ÉTAGE'||(cell.indexOf('ETAGE')>=0&&cell.length<10)){etageCol=ci;headerRow=ri;}
-              if(cell==='DESIGNATION'||cell==='DÉSIGNATION'||cell==='N° DE CHAMBRE'||cell==='CHAMBRE'){nameCol=ci;headerRow=ri;}
+            var foundE=-1,foundN=-1;
+            for(var ci=0;ci<Math.min(row.length,30);ci++){
+              var cn=_normCell(row[ci]);
+              if(cn.length===0) continue;
+              // Colonne ETAGE : contient 'ETAGE' et assez courte
+              if(cn.indexOf('ETAGE')>=0&&cn.length<=20) foundE=ci;
+              // Colonne NOM/CHAMBRE/DESIGNATION
+              if(cn==='DESIGNATION'||cn.indexOf('DESIGNATION')===0||
+                 cn==='CHAMBRE'||cn.indexOf('CHAMBRE')===0||
+                 cn==='NCHAMBRE'||cn==='NOM'||
+                 cn.indexOf('DESIGNAT')===0) foundN=ci;
             }
-            if(headerRow===ri)break;
+            if(foundN>=0){
+              nameCol=foundN;
+              headerRow=ri;
+              if(foundE>=0) etageCol=foundE;
+              break;
+            }
           }
           if(headerRow<0||nameCol<0)return; // onglet non reconnu
+
+          // Si ETAGE pas trouvé dans la ligne d'en-tête, chercher dans les ±3 lignes voisines
+          // (cas cellules fusionnées où l'en-tête est dans une ligne séparée)
+          if(etageCol<0){
+            for(var rr=Math.max(0,headerRow-3);rr<=Math.min(rows.length-1,headerRow+1);rr++){
+              if(rr===headerRow) continue;
+              for(var cc=0;cc<Math.min(rows[rr].length,30);cc++){
+                var cnn=_normCell(rows[rr][cc]);
+                if(cnn.indexOf('ETAGE')>=0&&cnn.length<=20){etageCol=cc;break;}
+              }
+              if(etageCol>=0) break;
+            }
+          }
+
+          // Si toujours pas trouvé, essayer de détecter ETAGE dans les premières cellules de données
+          // en cherchant la colonne qui a des valeurs ressemblant à un étage (RDC, 1, 2, "1er", etc.)
+          if(etageCol<0&&headerRow>=0){
+            var etagePattern=/^(rdc|rez|rdc?|[0-9]{1,2}(er|ème|e)?\.?|sous.sol|ss|rez.de.chaussee|etage\s*[0-9])$/i;
+            for(var cc2=0;cc2<Math.min((rows[headerRow+1]||[]).length,nameCol);cc2++){
+              var sampleVals=[];
+              for(var rs=headerRow+1;rs<Math.min(rows.length,headerRow+8);rs++){
+                var sv=(rows[rs][cc2]+'').trim();
+                if(sv) sampleVals.push(sv);
+              }
+              // Au moins 1 valeur sur les premières lignes ressemble à un étage
+              if(sampleVals.length>0&&sampleVals.some(function(v){return etagePattern.test(v)||/^[A-Z0-9 ]{1,10}$/.test(v);})){
+                etageCol=cc2; break;
+              }
+            }
+          }
 
           // Lire les données en dessous
           var lastEtage=null;
@@ -3800,16 +3908,21 @@ function _zonesHandleFile(file,sid){
           for(var di=headerRow+1;di<rows.length;di++){
             var drow=rows[di];
             var etageVal=(etageCol>=0?(drow[etageCol]+'').trim():'')||null;
-            var nameVal=(drow[nameCol]+'').trim();
+            var nameVal=(nameCol<drow.length?(drow[nameCol]+'').trim():'');
             if(etageVal)lastEtage=etageVal;
             if(!nameVal||nameVal.length<2)continue;
+            // Ignorer les lignes qui sont des sous-titres (tout en maj, pas de chiffre dans le nom)
+            if(/^[A-Z\s\-\_]{3,}$/.test(nameVal)&&nameVal===nameVal.toUpperCase()&&!/[0-9]/.test(nameVal)&&nameVal.length<30){
+              // Peut être un titre de section – vérifier si ça ressemble à un nom de zone réel
+              if(nameVal.length<5) continue; // trop court pour être un nom de zone
+            }
 
-            // Détecter doublon
+            // Détecter doublon (on garde le premier, on skippe les suivants)
             var key=(lastEtage||'')+'|'+nameVal.toLowerCase();
-            var isDup=!!seen[key];
+            if(seen[key]){continue;} // skip doublon — compté plus bas
             seen[key]=true;
 
-            // Détecter typo simple (tout majuscules avec erreur connue)
+            // Détecter typo simple
             var hasTypo=/ELCETRO|GUERRITE|ADMINIT|LOCL\b/i.test(nameVal);
 
             // Deviner catégorie
@@ -3829,17 +3942,75 @@ function _zonesHandleFile(file,sid){
               etage:lastEtage,
               categorie:cat,
               type:type,
-              erreur:isDup?'doublon':(lastEtage===null&&di>headerRow+2?'etage_manquant':(hasTypo?'typo':null))
+              erreur:lastEtage===null&&di>headerRow+2?'etage_manquant':(hasTypo?'typo':null)
             });
           }
         });
 
         if(!allZones.length){if(statusEl)statusEl.textContent='Aucune zone trouvée. Vérifiez le format du fichier.';return;}
+
+        // Compter les doublons qui ont été skippés (difference entre nb total et allZones)
+        // On réinitialise le compteur ici — les doublons ont déjà été exclus dans la boucle ci-dessus
+        // (on doit recalculer en reparsant le nb de lignes rejetées)
+        // Approche alternative : on compte les doublons en passant un deuxième compteur
+        // → En fait les doublons sont simplement sautés (continue), donc allZones est déjà dédupliqué.
+        // On calcule le nb de doublons en comparant avec un nouveau scan.
+        var rawSeen={};var rawCount=0;
+        allZones.forEach(function(z){
+          var k=(z.etage||'')+'|'+z.nom.toLowerCase();
+          rawSeen[k]=true; rawCount++;
+        });
+        // Le nombre de doublons est la différence — mais on n'a pas le total original ici.
+        // On stocke 0 pour l'instant (le vrai count est fait dans le second scan ci-dessous).
+        _zonesWizardDedupCount=0; // sera recalculé dans le second passage
+
+        // Deuxième passe pour vrai compte de doublons
+        // (on ne peut pas faire autrement sans refactorer la boucle)
+        // En pratique: on refait juste le décompte avec seen2
+        var seen2={};var dupCount2=0;
+        wb.SheetNames.forEach(function(sheetName){
+          var ws=wb.Sheets[sheetName];
+          var rows2=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+          // Quick scan to find nameCol only
+          var hdr2=-1,nc2=-1,ec2=-1;
+          for(var ri2=0;ri2<Math.min(rows2.length,18);ri2++){
+            var r2=rows2[ri2];
+            for(var ci2=0;ci2<Math.min(r2.length,30);ci2++){
+              var cn2=_normCell(r2[ci2]);
+              if(cn2.indexOf('ETAGE')>=0&&cn2.length<=20) ec2=ci2;
+              if(cn2==='DESIGNATION'||cn2.indexOf('DESIGNATION')===0||cn2==='CHAMBRE'||cn2.indexOf('CHAMBRE')===0||cn2==='NOM') {nc2=ci2;hdr2=ri2;break;}
+            }
+            if(hdr2===ri2) break;
+          }
+          if(hdr2<0||nc2<0) return;
+          if(ec2<0){
+            for(var rr2=Math.max(0,hdr2-3);rr2<=Math.min(rows2.length-1,hdr2+1);rr2++){
+              if(rr2===hdr2) continue;
+              for(var cc3=0;cc3<Math.min(rows2[rr2].length,30);cc3++){
+                if(_normCell(rows2[rr2][cc3]).indexOf('ETAGE')>=0){ec2=cc3;break;}
+              }
+              if(ec2>=0) break;
+            }
+          }
+          var le2=null;
+          for(var di2=hdr2+1;di2<rows2.length;di2++){
+            var dr2=rows2[di2];
+            var ev2=(ec2>=0?(dr2[ec2]+'').trim():'')||null;
+            var nv2=(nc2<dr2.length?(dr2[nc2]+'').trim():'');
+            if(ev2)le2=ev2;
+            if(!nv2||nv2.length<2) continue;
+            var k2=(le2||'')+'|'+nv2.toLowerCase();
+            if(seen2[k2]) dupCount2++;
+            else seen2[k2]=true;
+          }
+        });
+        _zonesWizardDedupCount=dupCount2;
+
         _zonesWizardData=allZones;
         _zonesWizardStep=1;
         _zonesWizardEqSel={};
         if(_session)renderRespTech(_session,'config');
-      }catch(err){if(statusEl)statusEl.textContent='Erreur lecture fichier: '+err.message;}
+      }catch(err){if(statusEl)statusEl.textContent='Erreur lecture fichier: '+err.message;console.error('zones parse error',err);}
     };
     reader.readAsArrayBuffer(file);
   }
