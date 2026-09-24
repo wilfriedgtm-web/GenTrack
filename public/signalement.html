@@ -226,6 +226,7 @@ async function init(){
   document.getElementById('sg-site-name').textContent=sites[0].nom||'';
 
   // Charger zones et équipements en parallèle
+  var equipParam=params.get('equip')||'';
   var results=await Promise.all([
     supa('zones','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,etage,categorie&order=ordre.asc'),
     supa('equipements','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id,types_equipements(nom)&order=ordre_ronde.asc')
@@ -271,6 +272,21 @@ async function init(){
       document.getElementById('sg-zone-select-wrap').style.display='none';
       // Filtrer équipements sur cette zone
       _renderEquipOptions(zoneParam);
+    }
+  }
+
+  // Pré-sélectionner équipement si ?equip= dans URL (QR équipement)
+  if(equipParam){
+    var equipSel=document.getElementById('sg-equip');
+    // Attendre que les options soient peuplées (déjà fait via _renderEquipOptions)
+    var found=_equips.find(function(e){return e.id===equipParam;});
+    if(found){
+      equipSel.value=equipParam;
+      // Badge pré-rempli sous le select
+      var equipBadge=document.createElement('div');
+      equipBadge.style.cssText='margin-top:6px;font-size:11px;color:var(--vert);font-weight:600;display:flex;align-items:center;gap:4px';
+      equipBadge.innerHTML='<span>✓</span><span>Équipement pré-sélectionné depuis le QR</span>';
+      equipSel.parentNode.appendChild(equipBadge);
     }
   }
 

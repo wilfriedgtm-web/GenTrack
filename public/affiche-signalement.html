@@ -129,20 +129,69 @@ body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 </div>
 
 <script>
-// Paramètres depuis URL
-var params=new URLSearchParams(window.location.search);
-var siteId=params.get('site')||'';
-var siteNom=params.get('nom')||'Hôtel';
-var BASE=location.origin+location.pathname.replace('affiche-signalement.html','');
+var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
 
-var sgUrl=BASE+'signalement.html?site='+encodeURIComponent(siteId);
-var qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(sgUrl);
+function supaFetch(table,query){
+  return fetch(SUPA_URL+'/rest/v1/'+table+'?'+query,{
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+  }).then(function(r){return r.json();}).catch(function(){return[];});
+}
 
-document.getElementById('qr-img').src=qrUrl;
-document.getElementById('site-name').textContent=decodeURIComponent(siteNom);
-document.getElementById('qr-url').textContent=sgUrl;
-document.getElementById('toolbar-site').textContent='Affiche — '+decodeURIComponent(siteNom);
-document.title='GenTrack · Affiche — '+decodeURIComponent(siteNom);
+async function init(){
+  var params=new URLSearchParams(window.location.search);
+  var siteId=params.get('site')||'';
+  var equipId=params.get('equip')||'';
+  var BASE=location.origin+location.pathname.replace('affiche-signalement.html','');
+
+  // Fetch noms depuis Supabase
+  var siteNom='Hôtel';
+  var equipNom='';
+  if(siteId){
+    var sites=await supaFetch('sites','id=eq.'+siteId+'&select=nom');
+    if(sites&&sites[0])siteNom=sites[0].nom||siteNom;
+  }
+  if(equipId){
+    var equips=await supaFetch('equipements','id=eq.'+equipId+'&select=nom,types_equipements(nom)');
+    if(equips&&equips[0]){
+      equipNom=equips[0].nom||'';
+    }
+  }
+
+  // Construire l'URL de signalement
+  var sgUrl=BASE+'signalement.html?site='+encodeURIComponent(siteId);
+  if(equipId)sgUrl+='&equip='+encodeURIComponent(equipId);
+
+  // Adapter l'affiche selon le mode
+  if(equipNom){
+    // Mode équipement
+    document.querySelector('.aff-icon').textContent='⚙️';
+    document.querySelector('.aff-title').textContent='Signaler un incident';
+    document.querySelector('.aff-subtitle').innerHTML='Équipement : <strong style="color:white">'+_esc(equipNom)+'</strong><br/>Scannez pour envoyer un signalement à l\'équipe technique';
+    document.querySelector('.aff-qr-label').textContent='Scanner pour signaler sur cet équipement';
+    document.getElementById('site-name').textContent=equipNom;
+    document.getElementById('qr-url').textContent=sgUrl;
+    document.getElementById('toolbar-site').textContent='Affiche équipement — '+equipNom;
+    document.title='GenTrack · Affiche — '+equipNom;
+    // Changer l'étape 2
+    var steps=document.querySelectorAll('.aff-step-text span');
+    if(steps[1])steps[1].textContent='L\'équipement '+equipNom+' est déjà pré-sélectionné. Décrivez le problème observé et ajoutez une photo si possible.';
+  } else {
+    // Mode hôtel général
+    document.getElementById('site-name').textContent=siteNom;
+    document.getElementById('qr-url').textContent=sgUrl;
+    document.getElementById('toolbar-site').textContent='Affiche — '+siteNom;
+    document.title='GenTrack · Affiche — '+siteNom;
+  }
+
+  // Générer le QR via qrserver
+  var qrUrl='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(sgUrl);
+  document.getElementById('qr-img').src=qrUrl;
+}
+
+function _esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+init();
 </script>
 </body>
 </html>
