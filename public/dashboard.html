@@ -318,7 +318,7 @@ function _updateAlertPill(n){
   badges.forEach(function(b){b.style.display=n>0?'block':'none';});
 }
 function roleName(r){var m={dir_ops:'Directeur des opérations',dir_tech:'Directeur technique',resp_tech:'Responsable technique',technicien:'Technicien'};return m[r]||r;}
-function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',releves:'Relevés horaires',signalements:'Signalements',maintenances:'Maintenance',config:'Configuration',rapport:'Rapport conso',commandes:'Commandes'};return m[id]||'Accueil';}
+function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',releves:'Relevés horaires',signalements:'Signalements',maintenances:'Maintenance',config:'Configuration',rapport:'Rapport conso',commandes:'Commandes',energie:'Énergie'};return m[id]||'Accueil';}
 function saveSession(s){_session=s;try{localStorage.setItem('gt_session',JSON.stringify(s));}catch(e){}}
 function loadStored(){try{return JSON.parse(localStorage.getItem('gt_session'));}catch(e){return null;}}
 function clearSession(){_session=null;try{localStorage.removeItem('gt_session');}catch(e){}}
@@ -496,6 +496,7 @@ function buildNavItems(role){
   if(role==='resp_tech'){
     items.push({id:'signalements',icon:'location_on',label:'Signalements'});
     items.push({id:'maintenances',icon:'build',label:'Maintenance'});
+    items.push({id:'energie',icon:'bolt',label:'Énergie'});
     items.push({id:'commandes',icon:'shopping_cart',label:'Commandes'});
     items.push({id:'equipe',icon:'group',label:'Mon équipe'});
     items.push({id:'releves',icon:'schedule',label:'Relevés'});
@@ -553,7 +554,7 @@ function buildMobileNav(role,activeNav,alerteBadge){
       {id:'signalements',icon:'location_on',label:'Signalements'},
       {id:'__plus__',icon:'apps',label:'Plus'}
     ];
-    plusIds=['maintenances','commandes','equipe','releves','historique','config'];
+    plusIds=['maintenances','energie','commandes','equipe','releves','historique','config'];
   }
   var plusItems=allItems.filter(function(it){return plusIds.indexOf(it.id)!==-1;});
   var plusActive=plusItems.some(function(it){return it.id===activeNav;});
@@ -661,6 +662,7 @@ async function _loadRT(session,nav){
     else if(nav==='releves')html=await _rtReleves(session,sid);
     else if(nav==='signalements')html=await _rtSignalements(sid);
     else if(nav==='maintenances')html=await _rtMaintenances(sid);
+    else if(nav==='energie')html=await _rtEnergie(sid);
     else if(nav==='commandes')html=await _rtCommandes(sid,session);
     else if(nav==='equipe')html=await _rtMonEquipe(sid,session);
     else if(nav==='config')html=await _rtConfig(sid);
@@ -3309,7 +3311,8 @@ async function _rtConfig(sid){
     {key:'planning',label:'📅 Planning rondes'},
     {key:'seuils',label:'🎯 Seuils d\'alerte'},
     {key:'contacts',label:'👥 Contacts & Alertes'},
-    {key:'releves',label:'📋 Relevés horaires'}
+    {key:'releves',label:'📋 Relevés horaires'},
+    {key:'energie',label:'⚡ Énergie'}
   ];
   var tabHtml=tabs.map(function(t){
     return '<button class="config-tab'+(_configCurrentTab===t.key?' active':'')+'" onclick="_switchConfigTab(\''+t.key+'\')">'+t.label+'</button>';
@@ -3338,6 +3341,12 @@ async function _rtConfig(sid){
     if(dc2c){dc2c.style.padding='24px';dc2c.style.maxWidth='none';}
     var relevesCfgHtml=await _buildReleveConfigTab(sid);
     return '<div class="config-tabs">'+tabHtml+'</div>'+relevesCfgHtml;
+  }
+  if(_configCurrentTab==='energie'){
+    var dc2e=document.getElementById('dash-content-main');
+    if(dc2e){dc2e.style.padding='24px';dc2e.style.maxWidth='none';}
+    var energieCfgHtml=await _buildEnergieConfigTab(sid);
+    return '<div class="config-tabs">'+tabHtml+'</div>'+energieCfgHtml;
   }
 
   // Default selection
@@ -7612,6 +7621,406 @@ async function _buildRecommandations(sids,siteMap){
       '</div></div>';
   });
   return h+'</div>';
+}
+
+
+/* ═══════════════════════════════════════════════════════
+   ⚡ ÉNERGIE — Vue principale resp_tech
+   ═══════════════════════════════════════════════════════ */
+async function _rtEnergie(sid){
+  var dc=document.getElementById('dash-content-main');
+  if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
+
+  var today=todayStr();
+  var moisDebut=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString().split('T')[0];
+  var since30=dateNJours(30);
+
+  var[fluides,relevesRows,siteRows]=await Promise.all([
+    supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,seuil_alerte_bas,objectif_mensuel,ordre&order=ordre.asc'),
+    supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+since30+'&select=id,date_releve,valeurs,saisi_par&order=date_releve.desc&limit=60'),
+    supaGet('sites','id=eq.'+sid+'&select=nom&limit=1')
+  ]);
+
+  var siteNom=siteRows&&siteRows.length?siteRows[0].nom:'';
+
+  if(!fluides||!fluides.length){
+    return '<div class="placeholder-card" style="margin-top:16px">'+
+      '<div class="placeholder-icon">⚡</div>'+
+      'Aucun fluide configuré pour ce site.<br>'+
+      '<span style="font-size:11px;color:var(--text3)">Ajoutez des fluides dans l\'onglet Configuration → Énergie.</span>'+
+    '</div>';
+  }
+
+  // ── Index relevés par date ──
+  var releveByDate={};
+  (relevesRows||[]).forEach(function(r){releveByDate[r.date_releve]=r;});
+
+  // ── KPI mois courant (conso = valeur du dernier relevé - premier relevé du mois pour index) ──
+  var relevesMois=(relevesRows||[]).filter(function(r){return r.date_releve>=moisDebut;});
+  var releves30=(relevesRows||[]);
+
+  // Pour chaque fluide : dernier relevé connu pour affichage tile
+  var lastReleve=releveByDate[releves30.length?releves30[0].date_releve:null]||null;
+  // Chercher le premier relevé du mois (dernier dans l'array car desc)
+  var firstMoisReleve=relevesMois.length?relevesMois[relevesMois.length-1]:null;
+  var lastMoisReleve=relevesMois.length?relevesMois[0]:null;
+
+  // ── Tiles par fluide ──
+  var tilesHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px">';
+  fluides.forEach(function(f){
+    var lastVal=null;
+    // Chercher la dernière valeur pour ce fluide dans les relevés récents
+    for(var i=0;i<releves30.length;i++){
+      var v=releves30[i].valeurs&&releves30[i].valeurs[f.id];
+      if(v!=null){lastVal=parseFloat(v);break;}
+    }
+    // Conso mois : pour index = dernier - premier du mois; pour instantane = dernier
+    var consoMois=null;
+    if(f.type_valeur==='index'&&firstMoisReleve&&lastMoisReleve){
+      var vFirst=firstMoisReleve.valeurs&&firstMoisReleve.valeurs[f.id];
+      var vLast=lastMoisReleve.valeurs&&lastMoisReleve.valeurs[f.id];
+      if(vFirst!=null&&vLast!=null)consoMois=parseFloat(vLast)-parseFloat(vFirst);
+    } else if(f.type_valeur==='instantane'&&lastVal!=null){
+      consoMois=lastVal;
+    }
+
+    var obj=f.objectif_mensuel?parseFloat(f.objectif_mensuel):null;
+    var pct=obj&&consoMois!=null?Math.round(consoMois/obj*100):null;
+    var alerte=f.seuil_alerte_bas!=null&&lastVal!=null&&lastVal<f.seuil_alerte_bas;
+
+    var couleur=alerte?'var(--rouge)':pct==null?'var(--dark)':
+      (f.type_valeur==='index'?(pct<=100?'var(--vert)':pct<=115?'var(--amber-dark)':'var(--rouge)'):
+       (pct>=80?'var(--vert)':pct>=50?'var(--amber-dark)':'var(--rouge)'));
+    var badge=pct!=null?'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:'+(couleur==='var(--vert)'?'var(--vert-pale)':couleur==='var(--rouge)'?'rgba(220,50,50,.1)':'var(--amber-pale)')+';color:'+couleur+'">'+pct+'%'+(f.type_valeur==='index'?' conso':'')+'</span>':'';
+
+    tilesHtml+='<div style="background:white;border:1.5px solid '+(alerte?'var(--rouge)':'var(--border)')+';border-radius:12px;padding:14px 16px">'+
+      '<div style="font-size:11px;color:var(--text2);margin-bottom:4px">'+escape_html(f.nom)+(f.unite?' <span style="color:var(--text3)">('+escape_html(f.unite)+')</span>':'')+'</div>'+
+      '<div style="font-size:22px;font-weight:800;color:'+couleur+'">'+(lastVal!=null?lastVal.toLocaleString('fr-FR'):'—')+'</div>'+
+      (alerte?'<div style="font-size:10px;color:var(--rouge);font-weight:600;margin-top:2px">⚠️ Sous le seuil ('+f.seuil_alerte_bas+' '+( f.unite||'')+')</div>':'')+
+      (badge?'<div style="margin-top:6px">'+badge+'</div>':'')+
+      (obj&&consoMois!=null&&f.type_valeur==='index'?'<div style="font-size:10px;color:var(--text3);margin-top:3px">'+consoMois.toLocaleString('fr-FR')+' / '+obj.toLocaleString('fr-FR')+' '+( f.unite||'')+'</div>':'')+
+    '</div>';
+  });
+  tilesHtml+='</div>';
+
+  // ── Graphique SVG lignes (30 jours, une courbe par fluide) ──
+  // On génère les 30 derniers jours
+  var days30=[];for(var di=29;di>=0;di--)days30.push(dateNJours(di));
+
+  // Extraire les séries par fluide (valeurs brutes ou delta pour index)
+  var series=fluides.map(function(f){
+    var pts=days30.map(function(d){
+      var r=releveByDate[d];
+      if(!r||r.valeurs==null)return null;
+      var v=r.valeurs[f.id];
+      return v!=null?parseFloat(v):null;
+    });
+    // Pour type index : calculer delta j-1
+    if(f.type_valeur==='index'){
+      var deltas=pts.map(function(v,i){
+        if(v==null)return null;
+        var prev=null;
+        for(var k=i-1;k>=0;k--){if(pts[k]!=null){prev=pts[k];break;}}
+        return prev!=null?v-prev:null;
+      });
+      return{id:f.id,nom:f.nom,pts:deltas,unite:f.unite};
+    }
+    return{id:f.id,nom:f.nom,pts:pts,unite:f.unite};
+  });
+
+  // SVG multi-lignes
+  var chartHtml='';
+  var W=520,H=120,PL=40,PR=20,PT=10,PB=30;
+  var chartW=W-PL-PR,chartH=H-PT-PB;
+  var N=30;
+  var COLORS=['#C49A1C','#2D7A4F','#3498DB','#E74C3C','#8E44AD','#D4761E'];
+
+  // Calcul des max par fluide pour normaliser ensemble
+  var allVals=series.reduce(function(acc,s){return acc.concat(s.pts.filter(function(v){return v!=null;}));},[] );
+  var maxVal=allVals.length?Math.max.apply(null,allVals):1;
+  if(maxVal===0)maxVal=1;
+
+  if(allVals.length){
+    var svgStr='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-height:160px" xmlns="http://www.w3.org/2000/svg">';
+    // Axes
+    svgStr+='<line x1="'+PL+'" y1="'+PT+'" x2="'+PL+'" y2="'+(PT+chartH)+'" stroke="#e0d9d0" stroke-width="1"/>';
+    svgStr+='<line x1="'+PL+'" y1="'+(PT+chartH)+'" x2="'+(PL+chartW)+'" y2="'+(PT+chartH)+'" stroke="#e0d9d0" stroke-width="1"/>';
+    // Labels axe Y
+    svgStr+='<text x="'+( PL-4)+'" y="'+(PT+4)+'" text-anchor="end" font-size="7" fill="#a0957e" font-family="Inter,sans-serif">'+Math.round(maxVal).toLocaleString('fr-FR')+'</text>';
+    svgStr+='<text x="'+(PL-4)+'" y="'+(PT+chartH)+'" text-anchor="end" font-size="7" fill="#a0957e" font-family="Inter,sans-serif">0</text>';
+    // Labels axe X (début, milieu, fin)
+    [0,14,29].forEach(function(idx){
+      var x=PL+idx*(chartW/(N-1));
+      var lbl=days30[idx].substring(5); // MM-DD
+      svgStr+='<text x="'+x+'" y="'+(PT+chartH+12)+'" text-anchor="middle" font-size="7" fill="#a0957e" font-family="Inter,sans-serif">'+lbl+'</text>';
+    });
+
+    series.forEach(function(s,si){
+      var col=COLORS[si%COLORS.length];
+      var ptCoords=s.pts.map(function(v,idx){
+        if(v==null)return null;
+        var x=PL+idx*(chartW/(N-1));
+        var y=PT+chartH-(v/maxVal)*chartH;
+        return[x,y];
+      });
+      // Polyline
+      var pathParts=[];
+      ptCoords.forEach(function(pt,idx){
+        if(!pt)return;
+        pathParts.push((pathParts.length===0?'M':'L')+pt[0].toFixed(1)+','+pt[1].toFixed(1));
+      });
+      if(pathParts.length>1){
+        svgStr+='<path d="'+pathParts.join(' ')+'" fill="none" stroke="'+col+'" stroke-width="1.5" stroke-linejoin="round"/>';
+      }
+      // Dots sur les points réels
+      ptCoords.forEach(function(pt){
+        if(!pt)return;
+        svgStr+='<circle cx="'+pt[0].toFixed(1)+'" cy="'+pt[1].toFixed(1)+'" r="2" fill="'+col+'"/>';
+      });
+    });
+
+    svgStr+='</svg>';
+
+    // Légende
+    var legendHtml='<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px">';
+    series.forEach(function(s,si){
+      legendHtml+='<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2)">'+
+        '<span style="width:16px;height:3px;border-radius:2px;background:'+COLORS[si%COLORS.length]+';display:inline-block"></span>'+
+        escape_html(s.nom)+(s.unite?' ('+escape_html(s.unite)+')':'')+
+      '</div>';
+    });
+    legendHtml+='</div>';
+
+    chartHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px">'+
+      '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:10px">📈 Évolution 30 jours</div>'+
+      svgStr+legendHtml+
+    '</div>';
+  }
+
+  // ── Tableau des 30 derniers relevés ──
+  var tblHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden">'+
+    '<div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--dark)">📋 Historique (30 jours)</div>'+
+    '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'+
+    '<thead><tr style="background:var(--bg2)">'+
+      '<th style="padding:8px 12px;text-align:left;color:var(--text2);font-weight:600;white-space:nowrap">Date</th>'+
+      '<th style="padding:8px 12px;text-align:left;color:var(--text2);font-weight:600;white-space:nowrap">Saisi par</th>'+
+      fluides.map(function(f){
+        return '<th style="padding:8px 12px;text-align:right;color:var(--text2);font-weight:600;white-space:nowrap">'+
+          escape_html(f.nom)+(f.unite?' ('+escape_html(f.unite)+')':'')+
+        '</th>';
+      }).join('')+
+    '</tr></thead><tbody>';
+
+  var sortedReleves=(releves30||[]).slice().sort(function(a,b){return b.date_releve.localeCompare(a.date_releve);});
+  if(!sortedReleves.length){
+    tblHtml+='<tr><td colspan="'+(2+fluides.length)+'" style="padding:24px;text-align:center;color:var(--text3)">Aucun relevé sur les 30 derniers jours</td></tr>';
+  }
+  sortedReleves.forEach(function(r,ri){
+    var isToday=r.date_releve===today;
+    tblHtml+='<tr style="border-top:1px solid var(--border);background:'+(ri%2===0?'white':'var(--bg)') + (isToday?';font-weight:700':'') + '">'+
+      '<td style="padding:8px 12px;white-space:nowrap;color:var(--dark)">'+
+        (isToday?'🟢 Aujourd\'hui':'')+ new Date(r.date_releve+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+
+      '</td>'+
+      '<td style="padding:8px 12px;color:var(--text2);white-space:nowrap">'+(r.saisi_par?escape_html(r.saisi_par):'—')+'</td>'+
+      fluides.map(function(f){
+        var v=r.valeurs&&r.valeurs[f.id];
+        var vNum=v!=null?parseFloat(v):null;
+        var alerte=f.seuil_alerte_bas!=null&&vNum!=null&&vNum<f.seuil_alerte_bas;
+        return '<td style="padding:8px 12px;text-align:right;color:'+(alerte?'var(--rouge)':vNum!=null?'var(--dark)':'var(--text3)')+'">'+
+          (vNum!=null?(alerte?'⚠️ ':'')+vNum.toLocaleString('fr-FR'):'—')+
+        '</td>';
+      }).join('')+
+    '</tr>';
+  });
+
+  tblHtml+='</tbody></table></div></div>';
+
+  // ── Header ──
+  var todayReleve=releveByDate[today];
+  var statutAujourdhui=todayReleve?
+    '<span style="font-size:11px;font-weight:700;color:var(--vert);background:var(--vert-pale);padding:3px 10px;border-radius:20px">✅ Relevé du jour saisi</span>':
+    '<span style="font-size:11px;font-weight:700;color:var(--amber-dark);background:var(--amber-pale);padding:3px 10px;border-radius:20px">⏳ Relevé du jour manquant</span>';
+
+  var headerHtml='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">'+
+    '<div>'+
+      '<div style="font-size:16px;font-weight:800;color:var(--dark)">⚡ Énergie</div>'+
+      '<div style="font-size:11px;color:var(--text3)">'+(siteNom?escape_html(siteNom)+' · ':'')+fluides.length+' fluide'+(fluides.length>1?'s':'')+' suivis</div>'+
+    '</div>'+
+    statutAujourdhui+
+  '</div>';
+
+  return headerHtml+tilesHtml+chartHtml+tblHtml;
+}
+
+/* ═══════════════════════════════════════════════════════
+   ⚡ ÉNERGIE CONFIG — Onglet config fluides
+   ═══════════════════════════════════════════════════════ */
+async function _buildEnergieConfigTab(sid){
+  var fluides=await supaGet('energie_config','site_id=eq.'+sid+'&select=id,nom,unite,type_valeur,seuil_alerte_bas,objectif_mensuel,actif,ordre&order=ordre.asc');
+
+  // Savoir quels fluides ont des données (pour bloquer la suppression)
+  var fluidesAvecDonnees={};
+  if(fluides&&fluides.length){
+    var fIds=fluides.map(function(f){return f.id;});
+    var relevesCheck=await supaGet('releves_energie','site_id=eq.'+sid+'&select=valeurs&limit=100');
+    (relevesCheck||[]).forEach(function(r){
+      if(r.valeurs){Object.keys(r.valeurs).forEach(function(fid){fluidesAvecDonnees[fid]=true;});}
+    });
+  }
+
+  var h='<div style="max-width:700px">';
+
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'+
+    '<div style="font-size:12px;color:var(--text2)">Configurez les fluides à suivre dans le relevé énergie quotidien (WhatsApp bot).</div>'+
+    '<button onclick="_energieAjouterFluide(\''+sid+'\')" style="flex-shrink:0;margin-left:16px;background:var(--amber);color:white;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">+ Ajouter fluide</button>'+
+  '</div>';
+
+  if(!fluides||!fluides.length){
+    h+='<div class="placeholder-card">'+
+      '<div class="placeholder-icon">⚡</div>'+
+      'Aucun fluide configuré.<br>'+
+      '<span style="font-size:11px;color:var(--text3)">Ajoutez des fluides pour démarrer le suivi énergie.</span>'+
+    '</div>';
+    return h+'</div>';
+  }
+
+  // En-têtes colonnes
+  h+='<div style="display:grid;grid-template-columns:30px 1fr 80px 80px 100px 100px 50px 70px;gap:6px;padding:0 4px 6px;font-size:10px;font-weight:700;color:var(--text3);border-bottom:1.5px solid var(--border);margin-bottom:6px">'+
+    '<div></div>'+
+    '<div>Nom</div>'+
+    '<div>Unité</div>'+
+    '<div>Type</div>'+
+    '<div style="text-align:right">Seuil bas</div>'+
+    '<div style="text-align:right">Obj. mensuel</div>'+
+    '<div style="text-align:center">Actif</div>'+
+    '<div></div>'+
+  '</div>';
+
+  fluides.forEach(function(f){
+    var hasDonnees=!!fluidesAvecDonnees[f.id];
+    var fJs=f.id.replace(/'/g,"\\'");
+    h+=
+      '<div id="ecfg-row-'+f.id+'" style="display:grid;grid-template-columns:30px 1fr 80px 80px 100px 100px 50px 70px;gap:6px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--border);background:'+(f.actif?'white':'var(--bg2)')+'" class="ecfg-row" data-id="'+f.id+'">'+
+
+        // Ordre drag handle (visuel)
+        '<div style="font-size:14px;color:var(--text3);text-align:center;cursor:default" title="Ordre: '+f.ordre+'">'+f.ordre+'</div>'+
+
+        // Nom
+        '<input id="ecfg-nom-'+f.id+'" type="text" value="'+escape_html(f.nom)+'" '+
+          'style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;width:100%;box-sizing:border-box" '+
+          'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
+
+        // Unité
+        '<input id="ecfg-unite-'+f.id+'" type="text" value="'+escape_html(f.unite||'')+'" placeholder="kWh, m³…" '+
+          'style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:11px;width:100%;box-sizing:border-box" '+
+          'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
+
+        // Type valeur
+        '<select id="ecfg-type-'+f.id+'" '+
+          'style="border:1px solid var(--border);border-radius:6px;padding:5px 6px;font-size:11px;width:100%;box-sizing:border-box" '+
+          'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')">'+
+          '<option value="index"'+(f.type_valeur==='index'?' selected':'')+'>Index</option>'+
+          '<option value="instantane"'+(f.type_valeur==='instantane'?' selected':'')+'>Instantané</option>'+
+        '</select>'+
+
+        // Seuil bas
+        '<input id="ecfg-seuil-'+f.id+'" type="number" value="'+(f.seuil_alerte_bas!=null?f.seuil_alerte_bas:'')+'" placeholder="—" '+
+          'style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" '+
+          'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
+
+        // Objectif mensuel
+        '<input id="ecfg-obj-'+f.id+'" type="number" value="'+(f.objectif_mensuel!=null?f.objectif_mensuel:'')+'" placeholder="—" '+
+          'style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" '+
+          'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
+
+        // Toggle actif
+        '<div style="text-align:center">'+
+          '<label style="position:relative;display:inline-block;width:32px;height:18px">'+
+            '<input type="checkbox" '+(f.actif?'checked':'')+' onchange="_energieToggleActif(\''+sid+'\',\''+fJs+'\',this.checked)" style="opacity:0;width:0;height:0;position:absolute"/>'+
+            '<span style="position:absolute;inset:0;background:'+(f.actif?'var(--amber)':'#ccc')+';border-radius:18px;transition:.2s;cursor:pointer"></span>'+
+            '<span style="position:absolute;left:'+(f.actif?'15px':'2px')+';top:2px;width:14px;height:14px;background:white;border-radius:50%;transition:.2s"></span>'+
+          '</label>'+
+        '</div>'+
+
+        // Bouton suppression
+        '<div style="text-align:right">'+
+          (hasDonnees?
+            '<span style="font-size:9px;color:var(--text3)" title="Données existantes — suppression désactivée">🔒</span>':
+            '<button onclick="_energieDemanderSuppression(\''+sid+'\',\''+fJs+'\',\''+escape_html(f.nom)+'\')" '+
+              'style="background:none;border:none;cursor:pointer;color:var(--rouge);font-size:14px;padding:2px 6px" title="Supprimer">🗑</button>')+
+        '</div>'+
+      '</div>';
+  });
+
+  h+='<div style="font-size:11px;color:var(--text3);margin-top:12px">'+
+    '💡 <strong>Index</strong> : valeur croissante (compteur). <strong>Instantané</strong> : valeur brute (%, pression…). '+
+    'Les modifications de nom et d\'unité sont rétrocompatibles. Le 🔒 indique un fluide ayant déjà des relevés.'+
+  '</div>';
+
+  return h+'</div>';
+}
+
+async function _energieSauvegarder(sid,fid){
+  var nom=document.getElementById('ecfg-nom-'+fid);
+  var unite=document.getElementById('ecfg-unite-'+fid);
+  var type=document.getElementById('ecfg-type-'+fid);
+  var seuil=document.getElementById('ecfg-seuil-'+fid);
+  var obj=document.getElementById('ecfg-obj-'+fid);
+  if(!nom)return;
+
+  var payload={
+    nom:nom.value.trim()||'Fluide',
+    unite:unite?unite.value.trim()||null:null,
+    type_valeur:type?type.value:'index',
+    seuil_alerte_bas:seuil&&seuil.value!==''?parseFloat(seuil.value):null,
+    objectif_mensuel:obj&&obj.value!==''?parseFloat(obj.value):null,
+    updated_at:new Date().toISOString()
+  };
+
+  await supaPatch('energie_config',fid,payload);
+  // Feedback visuel bref
+  var row=document.getElementById('ecfg-row-'+fid);
+  if(row){var orig=row.style.background;row.style.background='var(--vert-pale)';setTimeout(function(){row.style.background=orig;},800);}
+}
+
+async function _energieToggleActif(sid,fid,actif){
+  await supaPatch('energie_config',fid,{actif:actif,updated_at:new Date().toISOString()});
+  if(_session)renderRespTech(_session,'config');
+}
+
+async function _energieAjouterFluide(sid){
+  var nom=window.prompt('Nom du nouveau fluide (ex: Électricité K1, Eau potable…)');
+  if(!nom||!nom.trim())return;
+  var unite=window.prompt('Unité (ex: kWh, m³, %, ou laisser vide)','');
+  var typeRaw=window.prompt('Type de valeur :\n1 = Index (compteur croissant)\n2 = Instantané (valeur brute)','1');
+  var typeVal=typeRaw==='2'?'instantane':'index';
+
+  // Trouver le prochain ordre
+  var existing=await supaGet('energie_config','site_id=eq.'+sid+'&select=ordre&order=ordre.desc&limit=1');
+  var nextOrdre=(existing&&existing.length?existing[0].ordre:0)+1;
+
+  var payload={
+    site_id:sid,
+    nom:nom.trim(),
+    unite:unite&&unite.trim()?unite.trim():null,
+    type_valeur:typeVal,
+    actif:true,
+    ordre:nextOrdre
+  };
+  var ok=await supaPost('energie_config',payload);
+  if(ok){
+    if(_session)renderRespTech(_session,'config');
+  } else {
+    alert('Erreur lors de l\'ajout du fluide.');
+  }
+}
+
+function _energieDemanderSuppression(sid,fid,nom){
+  var msg='Supprimer le fluide "'+nom+'" ?\n\nCette action est irréversible si aucune donnée n\'est liée.';
+  if(!window.confirm(msg))return;
+  // On n'exécute pas le DELETE ici — on affiche le SQL pour l'admin
+  var sql='DELETE FROM energie_config WHERE id = \''+fid+'\';';
+  alert('Pour supprimer ce fluide, exécutez ce SQL dans Supabase :\n\n'+sql);
 }
 
 init();
