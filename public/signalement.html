@@ -39,6 +39,20 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .sg-textarea{width:100%;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;font-size:15px;color:var(--text);background:var(--bg);outline:none;resize:none;min-height:100px;font-family:inherit;transition:border-color .15s}
 .sg-textarea:focus{border-color:var(--amber);background:var(--white)}
 
+/* Zone tiles + chips */
+.zone-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.zone-tile{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 6px;text-align:center;cursor:pointer;background:var(--white);transition:all .15s;-webkit-tap-highlight-color:transparent}
+.zone-tile.sel{border-color:var(--amber);background:var(--amber-pale)}
+.zone-tile:active{transform:scale(.96)}
+.zone-tile-icon{font-size:22px;margin-bottom:3px}
+.zone-tile-label{font-size:11px;font-weight:700;color:var(--text2);line-height:1.2}
+.zone-tile.sel .zone-tile-label{color:var(--amber-dark)}
+.zone-chips-wrap{margin-top:10px;display:none}
+.zone-chips-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px}
+.zone-chips{display:flex;flex-wrap:wrap;gap:6px}
+.zone-chip{border:1.5px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--text2);background:var(--white);cursor:pointer;transition:all .15s}
+.zone-chip.sel{border-color:var(--amber);background:var(--amber-pale);color:var(--dark)}
+
 /* Type pills */
 .type-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .type-pill{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;font-weight:600;color:var(--text2);background:var(--white);cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;transition:all .15s}
@@ -122,13 +136,15 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
         <span id="sg-zone-name-locked" style="flex:1"></span>
         <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--amber-dark);background:white;border-radius:5px;padding:2px 6px">QR</span>
       </div>
-      <!-- Mode sélection libre -->
+      <!-- Mode sélection libre : tuiles catégories + chips sous-zones -->
       <div id="sg-zone-select-wrap">
-        <select id="sg-zone" class="sg-select" onchange="_onZoneChange(this.value)">
-          <option value="">— Sélectionner une zone —</option>
-        </select>
+        <div class="zone-tiles" id="sg-zone-tiles"></div>
+        <div class="zone-chips-wrap" id="sg-zone-chips-wrap">
+          <div class="zone-chips-label" id="sg-zone-chips-label">Sélectionnez la salle</div>
+          <div class="zone-chips" id="sg-zone-chips"></div>
+        </div>
       </div>
-      <input id="sg-lieu" class="sg-input" type="text" placeholder="Précision (optionnel) : ex. coin fenêtre, porte gauche…" style="margin-top:8px;font-size:13px;color:var(--text2)"/>
+      <input id="sg-lieu" class="sg-input" type="text" placeholder="Précision (optionnel) : ex. coin fenêtre, porte gauche…" style="margin-top:10px;font-size:13px;color:var(--text2)"/>
     </div>
 
     <!-- Équipement -->
@@ -188,10 +204,26 @@ var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 var _groupeId=null;
 var _equips=[];
 var _zones=[];
-var _selectedZoneId=null;
-var _lockedZoneId=null; // zone pré-remplie depuis URL ?zone=
+var _selectedZoneId=null;    // zone/sous-zone sélectionnée (chip)
+var _selectedCatZoneIds=[];  // tous les zone_id de la catégorie sélectionnée
+var _lockedZoneId=null;      // zone pré-remplie depuis URL ?zone=
 var _selectedType=null;
 var _photoFile=null;
+
+var _catIcons={
+  'chambre':'🛏️','chambres':'🛏️','room':'🛏️','rooms':'🛏️',
+  'cuisine':'🍳','kitchen':'🍳','restauration':'🍳',
+  'piscine':'🏊','pool':'🏊','bassin':'🏊',
+  'salle':'📋','réunion':'📋','conference':'📋','meeting':'📋',
+  'local technique':'⚙️','technique':'⚙️','chaufferie':'🔥','électrique':'⚡',
+  'réception':'🏨','accueil':'🏨','lobby':'🏨','hall':'🏨',
+  'bar':'🍸','restaurant':'🍽️','salle à manger':'🍽️',
+  'spa':'💆','gym':'🏋️','fitness':'🏋️','sport':'🏋️',
+  'parking':'🅿️','garage':'🅿️',
+  'jardin':'🌿','extérieur':'🌿','terrasse':'☀️','patio':'☀️',
+  'couloir':'🚪','ascenseur':'🛗','escalier':'🪜',
+  'bureau':'💼','office':'💼'
+};
 
 function supa(table,query){
   return fetch(SUPA_URL+'/rest/v1/'+table+'?'+query,{
@@ -234,29 +266,10 @@ async function init(){
   _zones=results[0]||[];
   _equips=results[1]||[];
 
-  // Peupler dropdown zones
-  var zSel=document.getElementById('sg-zone');
-  // Grouper par étage si présent
-  var etages={};
-  _zones.forEach(function(z){var e=z.etage||'';if(!etages[e])etages[e]=[];etages[e].push(z);});
-  Object.keys(etages).sort().forEach(function(e){
-    var grp=document.createElement('optgroup');
-    grp.label=e||'Sans étage';
-    etages[e].forEach(function(z){
-      var opt=document.createElement('option');
-      opt.value=z.id;
-      opt.textContent=z.nom;
-      grp.appendChild(opt);
-    });
-    zSel.appendChild(grp);
-  });
-  if(_zones.length===0){
-    var opt=document.createElement('option');
-    opt.value='';opt.textContent='— Aucune zone configurée —';opt.disabled=true;
-    zSel.appendChild(opt);
-  }
+  // Construire les tuiles catégories
+  _buildZoneTiles();
 
-  // Peupler dropdown équipements (tous)
+  // Peupler dropdown équipements (tous, pas de filtre au départ)
   _renderEquipOptions(null);
 
   // Gestion param ?zone= (QR zone)
@@ -271,7 +284,7 @@ async function init(){
       document.getElementById('sg-zone-name-locked').textContent=foundZone.nom+(foundZone.etage?' ('+foundZone.etage+')':'');
       document.getElementById('sg-zone-select-wrap').style.display='none';
       // Filtrer équipements sur cette zone
-      _renderEquipOptions(zoneParam);
+      _renderEquipOptions([zoneParam]);
     }
   }
 
@@ -294,16 +307,80 @@ async function init(){
   document.getElementById('sg-main').style.display='block';
 }
 
-function _renderEquipOptions(zoneId){
+function _buildZoneTiles(){
+  // Grouper zones par categorie
+  var cats={};
+  _zones.forEach(function(z){
+    var c=(z.categorie||z.nom||'Autre').toLowerCase().trim();
+    var cLabel=z.categorie||z.nom||'Autre';
+    if(!cats[c])cats[c]={label:cLabel,zones:[]};
+    cats[c].zones.push(z);
+  });
+  var container=document.getElementById('sg-zone-tiles');
+  container.innerHTML='';
+  Object.keys(cats).forEach(function(c){
+    var info=cats[c];
+    var icon=_getCatIcon(c);
+    var tile=document.createElement('div');
+    tile.className='zone-tile';
+    tile.innerHTML='<div class="zone-tile-icon">'+icon+'</div><div class="zone-tile-label">'+_esc(info.label)+'</div>';
+    tile.addEventListener('click',function(){_selectCat(tile,c,info);});
+    container.appendChild(tile);
+  });
+}
+
+function _getCatIcon(c){
+  var keys=Object.keys(_catIcons);
+  for(var i=0;i<keys.length;i++){if(c.indexOf(keys[i])!==-1||keys[i].indexOf(c)!==-1)return _catIcons[keys[i]];}
+  return '📍';
+}
+
+function _selectCat(tileEl,catKey,info){
+  // Highlight tile
+  document.querySelectorAll('.zone-tile').forEach(function(t){t.classList.remove('sel');});
+  tileEl.classList.add('sel');
+  // Stocker les zone_id de cette catégorie pour filtrer les équips
+  _selectedCatZoneIds=info.zones.map(function(z){return z.id;});
+  _selectedZoneId=null; // on réinitialise le sous-filtre
+  // Afficher chips sous-zones
+  var wrap=document.getElementById('sg-zone-chips-wrap');
+  var chipsEl=document.getElementById('sg-zone-chips');
+  var chipLabel=document.getElementById('sg-zone-chips-label');
+  chipsEl.innerHTML='';
+  if(info.zones.length===1){
+    // Une seule zone → auto-select
+    _selectedZoneId=info.zones[0].id;
+    wrap.style.display='none';
+  } else {
+    chipLabel.textContent=info.label+' — sélectionnez la salle';
+    info.zones.forEach(function(z){
+      var chip=document.createElement('span');
+      chip.className='zone-chip';
+      chip.textContent=z.nom+(z.etage?' ('+z.etage+')':'');
+      chip.addEventListener('click',function(){
+        document.querySelectorAll('.zone-chip').forEach(function(c){c.classList.remove('sel');});
+        chip.classList.add('sel');
+        _selectedZoneId=z.id;
+        // Filtrer équips sur cette zone précise
+        _renderEquipOptions([z.id]);
+      });
+      chipsEl.appendChild(chip);
+    });
+    wrap.style.display='block';
+  }
+  // Filtrer équips sur toute la catégorie
+  _renderEquipOptions(_selectedCatZoneIds);
+}
+
+function _renderEquipOptions(zoneIds){
   var sel=document.getElementById('sg-equip');
   var prevVal=sel.value;
-  // Vider sauf option vide
   while(sel.options.length>1)sel.remove(1);
   var list=_equips;
-  if(zoneId){
-    var filtered=_equips.filter(function(e){return e.zone_id===zoneId;});
+  if(zoneIds&&zoneIds.length>0){
+    var filtered=_equips.filter(function(e){return zoneIds.indexOf(e.zone_id)!==-1;});
     if(filtered.length>0)list=filtered;
-    // Si aucun équip dans cette zone → on garde tout (pas de filtre inutile)
+    // Si aucun équip dans ces zones → on garde tout
   }
   list.forEach(function(e){
     var opt=document.createElement('option');
@@ -311,13 +388,14 @@ function _renderEquipOptions(zoneId){
     opt.textContent=(e.types_equipements&&e.types_equipements.nom?e.types_equipements.nom+' — ':'')+e.nom;
     sel.appendChild(opt);
   });
-  // Rétablir valeur si toujours dans la liste
   if(prevVal&&list.find(function(e){return e.id===prevVal;}))sel.value=prevVal;
 }
 
+function _esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
 function _onZoneChange(zoneId){
   _selectedZoneId=zoneId||null;
-  _renderEquipOptions(_selectedZoneId);
+  _renderEquipOptions(_selectedZoneId?[_selectedZoneId]:null);
 }
 
 function _showInvalid(){
@@ -456,10 +534,14 @@ function _reset(){
   // Réinitialiser zone seulement si pas de zone verrouillée par URL
   if(!_lockedZoneId){
     _selectedZoneId=null;
-    document.getElementById('sg-zone').value='';
+    _selectedCatZoneIds=[];
+    // Deselect tiles + chips + hide chips wrap
+    document.querySelectorAll('.zone-tile').forEach(function(t){t.classList.remove('sel');});
+    document.querySelectorAll('.zone-chip').forEach(function(c){c.classList.remove('sel');});
+    document.getElementById('sg-zone-chips-wrap').style.display='none';
     _renderEquipOptions(null);
   }else{
-    _renderEquipOptions(_lockedZoneId);
+    _renderEquipOptions([_lockedZoneId]);
     document.getElementById('sg-equip').value='';
   }
 }
