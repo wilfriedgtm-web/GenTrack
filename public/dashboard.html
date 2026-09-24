@@ -7025,7 +7025,13 @@ async function _openRapportHebdo(period){
       Object.values(cuveHistory).forEach(function(h){h.points.sort(function(a,b){return a.t<b.t?-1:1;});});
     }
 
-    var html=_buildRapportPro(siteNom,periodeStr,period,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows);
+    // Énergie
+    var[energieFluides,relevesEnergiePeriode]=await Promise.all([
+      supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,objectif_mensuel,capacite&order=ordre.asc'),
+      supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+cutoff+'&select=date_releve,valeurs,saisi_par&order=date_releve.asc&limit=100')
+    ]);
+
+    var html=_buildRapportPro(siteNom,periodeStr,period,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[]);
     var w=window.open('','_blank');
     if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
     w.document.write(html);w.document.close();
@@ -7033,7 +7039,7 @@ async function _openRapportHebdo(period){
   finally{if(btn){btn.disabled=false;btn.textContent='📄 Rapport ▾';}}
 }
 
-function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows){
+function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides,relevesEnergie){
   var respNom=(session.contact&&session.contact.nom)||'Responsable technique';
   var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -7163,6 +7169,112 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     '</svg>';
   }
 
+  // ── Énergie : calculs ──
+  energieFluides=energieFluides||[];relevesEnergie=relevesEnergie||[];
+  var energieData=[];
+  if(energieFluides.length&&relevesEnergie.length){
+    energieFluides.forEach(function(f){
+      var pts=relevesEnergie.map(function(r){
+        var v=r.valeurs&&r.valeurs[f.id]!=null?parseFloat(r.valeurs[f.id]):null;
+        return{date:r.date_releve,val:v};
+      }).filter(function(p){return p.val!=null&&!isNaN(p.val);});
+      var isInstant=f.type_valeur==='instantane';
+      var cap=f.capacite!=null?parseFloat(f.capacite):null;
+      var tarif=f.tarif!=null?parseFloat(f.tarif):null;
+      var obj=f.objectif_mensuel!=null?parseFloat(f.objectif_mensuel):null;
+      var lastVal=pts.length?pts[pts.length-1].val:null;
+      var conso=null,cout=null;
+      if(isInstant&&cap!=null&&pts.length>=2){
+        var drops=0;for(var pi=1;pi<pts.length;pi++){var dd=pts[pi].val-pts[pi-1].val;if(dd<0)drops+=Math.abs(dd);}
+        conso=Math.round(drops/100*cap);
+      }else if(!isInstant&&pts.length>=2){
+        conso=Math.round(pts[pts.length-1].val-pts[0].val);
+      }
+      if(conso!=null&&tarif!=null)cout=Math.round(conso*tarif);
+      var restants=isInstant&&cap!=null&&lastVal!=null?Math.round(lastVal/100*cap):null;
+      var budget=obj!=null&&tarif!=null?Math.round(obj*tarif):null;
+      var vs=cout!=null&&budget!=null?cout-budget:null;
+      energieData.push({f:f,pts:pts,isInstant:isInstant,cap:cap,tarif:tarif,obj:obj,lastVal:lastVal,conso:conso,cout:cout,restants:restants,budget:budget,vs:vs});
+    });
+  }
+
+  function fmtCout(v){
+    if(v==null||isNaN(v))return'—';
+    var abs=Math.abs(v),s=v<0?'-':'';
+    if(abs>=1000000)return s+(abs/1000000).toFixed(1).replace('.',',')+' M FCFA';
+    if(abs>=1000)return s+Math.round(abs/1000).toLocaleString('fr-FR')+' k FCFA';
+    return s+Math.round(abs).toLocaleString('fr-FR')+' FCFA';
+  }
+  function fmtConso(d){
+    if(d.conso==null)return'—';
+    return d.isInstant?d.conso.toLocaleString('fr-FR')+' L':d.conso.toLocaleString('fr-FR')+(d.f.unite?' '+d.f.unite:'');
+  }
+
+  function svgEnergieMultiChart(indexData){
+    if(!indexData.length||!indexData.some(function(d){return d.pts.length>=2;}))return'';
+    var COLORS=['#2D7A4F','#1E6FA0','#C49A1C','#C0392B','#7B4EA6'];
+    var W=640,H=100,PL=10,PR=10,PT=12,PB=22;
+    var allDates=[];
+    indexData.forEach(function(d){d.pts.forEach(function(p){if(allDates.indexOf(p.date)<0)allDates.push(p.date);});});
+    allDates.sort();
+    if(allDates.length<2)return'';
+    var xMin=new Date(allDates[0]+'T12:00:00').getTime();
+    var xMax=new Date(allDates[allDates.length-1]+'T12:00:00').getTime();
+    var xR=xMax-xMin||1;
+    function pxx(date){return PL+(new Date(date+'T12:00:00').getTime()-xMin)/xR*(W-PL-PR);}
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-height:110px;margin:8px 0 4px" xmlns="http://www.w3.org/2000/svg">';
+    var step=Math.max(1,Math.ceil(allDates.length/6));
+    for(var di=0;di<allDates.length;di+=step){
+      var xp=pxx(allDates[di]);
+      svg+='<text x="'+xp.toFixed(1)+'" y="'+(H-5)+'" font-size="8" fill="#A8957E" font-family="Inter,sans-serif" text-anchor="middle">'+new Date(allDates[di]+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</text>';
+    }
+    var lx=PL;
+    indexData.forEach(function(d,ci){
+      if(d.pts.length<2)return;
+      var col=COLORS[ci%COLORS.length];
+      var minV=Math.min.apply(null,d.pts.map(function(p){return p.val;}));
+      var maxV=Math.max.apply(null,d.pts.map(function(p){return p.val;}));
+      var range=maxV-minV||1;
+      var pts2=d.pts.map(function(p){return pxx(p.date).toFixed(1)+','+(PT+(1-(p.val-minV)/range)*(H-PT-PB)).toFixed(1);});
+      svg+='<polyline points="'+pts2.join(' ')+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+      svg+='<rect x="'+lx+'" y="'+(PT-2)+'" width="10" height="3" fill="'+col+'" rx="1"/>'+
+           '<text x="'+(lx+13)+'" y="'+PT+'" font-size="8.5" fill="#6B5E4A" font-family="Inter,sans-serif">'+escape_html(d.f.nom)+'</text>';
+      lx+=escape_html(d.f.nom).length*5+28;
+    });
+    return svg+'</svg>';
+  }
+
+  function svgGasoilChart(d){
+    if(!d||!d.pts||d.pts.length<2)return'';
+    var W=640,H=90,PL=10,PR=10,PT=8,PB=22;
+    var xMin=new Date(d.pts[0].date+'T12:00:00').getTime();
+    var xMax=new Date(d.pts[d.pts.length-1].date+'T12:00:00').getTime();
+    var xR=xMax-xMin||1;
+    function pxg(date){return PL+(new Date(date+'T12:00:00').getTime()-xMin)/xR*(W-PL-PR);}
+    function pyg(v){return PT+(1-v/100)*(H-PT-PB);}
+    var y20=pyg(20);
+    var pathD=d.pts.map(function(p,i){return(i?'L':'M')+pxg(p.date).toFixed(1)+','+pyg(p.val).toFixed(1);}).join(' ');
+    var areaD=pathD+' L'+pxg(d.pts[d.pts.length-1].date).toFixed(1)+','+(H-PB)+' L'+PL+','+(H-PB)+' Z';
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-height:110px;margin:8px 0 4px" xmlns="http://www.w3.org/2000/svg">';
+    svg+='<rect x="'+PL+'" y="'+y20.toFixed(1)+'" width="'+(W-PL-PR)+'" height="'+(H-PB-y20).toFixed(1)+'" fill="#FDECEA" opacity="0.4"/>';
+    svg+='<line x1="'+PL+'" y1="'+y20.toFixed(1)+'" x2="'+(W-PR)+'" y2="'+y20.toFixed(1)+'" stroke="#C0392B" stroke-width="0.8" stroke-dasharray="4,3" opacity="0.7"/>';
+    svg+='<text x="'+(PL+2)+'" y="'+(y20-2).toFixed(1)+'" font-size="8" fill="#C0392B" font-family="Inter,sans-serif" opacity="0.8">seuil critique 20%</text>';
+    svg+='<defs><linearGradient id="gg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#D4761E" stop-opacity="0.2"/><stop offset="100%" stop-color="#D4761E" stop-opacity="0.02"/></linearGradient></defs>';
+    svg+='<path d="'+areaD+'" fill="url(#gg)"/>';
+    svg+='<path d="'+pathD+'" fill="none" stroke="#D4761E" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    for(var i=1;i<d.pts.length;i++){
+      var delta=d.pts[i].val-d.pts[i-1].val;
+      if(delta>5){var xp=pxg(d.pts[i].date),yp=pyg(d.pts[i].val);svg+='<circle cx="'+xp.toFixed(1)+'" cy="'+yp.toFixed(1)+'" r="4" fill="#2D7A4F" stroke="white" stroke-width="1"/>'+
+      '<text x="'+(xp+6).toFixed(1)+'" y="'+(yp+3).toFixed(1)+'" font-size="8" fill="#2D7A4F" font-family="Inter,sans-serif">+'+Math.round(delta)+'%</text>';}
+    }
+    var step2=Math.max(1,Math.ceil(d.pts.length/5));
+    for(var j=0;j<d.pts.length;j+=step2){
+      var xp2=pxg(d.pts[j].date);
+      svg+='<text x="'+xp2.toFixed(1)+'" y="'+(H-5)+'" font-size="8" fill="#A8957E" font-family="Inter,sans-serif" text-anchor="middle">'+new Date(d.pts[j].date+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</text>';
+    }
+    return svg+'</svg>';
+  }
+
   // ── Données export JSON embeddées ──
   var exportScript='<scr'+'ipt>'+
     'var _exportRondes='+JSON.stringify(rondeExportRows||[])+';'+
@@ -7284,6 +7396,93 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
         svgCuveChart(ch.points,ch.cap)+
       '</div>';
     });
+  }
+
+  // ── Énergie & Fluides HTML ──
+  if(energieData.length){
+    var nbDep=energieData.filter(function(d){return d.vs!=null&&d.vs>0;}).length;
+    h+='<h2>Énergie &amp; Fluides'+(nbDep?' <span style="font-size:11px;font-weight:600;color:#C0392B;background:#FDECEA;padding:2px 8px;border-radius:10px;vertical-align:middle">'+nbDep+' dépassement'+(nbDep>1?'s':'')+'</span>':'')+'</h2>';
+
+    var hasAnyTarif=energieData.some(function(d){return d.tarif!=null;});
+    var hasAnyObj=energieData.some(function(d){return d.obj!=null;});
+    h+='<table><thead><tr>'+
+      '<th>Fluide</th>'+
+      '<th style="text-align:right">Conso ce mois</th>'+
+      (hasAnyObj?'<th style="text-align:right">Objectif</th>':'')+
+      (hasAnyTarif?'<th style="text-align:right">Coût réel</th>':'')+
+      (hasAnyObj&&hasAnyTarif?'<th style="text-align:right">vs budget</th>':'')+
+      '<th style="text-align:center">Statut</th>'+
+    '</tr></thead><tbody>';
+    energieData.forEach(function(d){
+      var statut='—',statutCls='badge';
+      if(d.vs!=null){statut=d.vs>0?'Dépassement':'OK';statutCls=d.vs>0?'badge badge-ko':'badge badge-ok';}
+      else if(d.cout!=null){statut='Suivi';statutCls='badge badge-warn';}
+      h+='<tr>'+
+        '<td><strong>'+escape_html(d.f.nom)+'</strong>'+(d.isInstant&&d.restants!=null?'<br><span style="font-size:10px;color:var(--text3)">'+d.restants.toLocaleString('fr-FR')+' L restants</span>':'')+'</td>'+
+        '<td style="text-align:right;font-weight:600">'+fmtConso(d)+'</td>'+
+        (hasAnyObj?'<td style="text-align:right;color:var(--text2)">'+(d.obj!=null?d.obj.toLocaleString('fr-FR')+(d.isInstant?' L':d.f.unite?' '+d.f.unite:''):'—')+'</td>':'')+
+        (hasAnyTarif?'<td style="text-align:right;font-weight:600;color:'+(d.vs!=null&&d.vs>0?'var(--rouge)':'var(--vert)')+'">'+fmtCout(d.cout)+'</td>':'')+
+        (hasAnyObj&&hasAnyTarif?'<td style="text-align:right;font-weight:700;color:'+(d.vs!=null?(d.vs>0?'var(--rouge)':'var(--vert)'):'var(--text3)')+'">'+(d.vs!=null?(d.vs>0?'+':'')+fmtCout(d.vs):'—')+'</td>':'')+
+        '<td style="text-align:center"><span class="'+statutCls+'">'+escape_html(statut)+'</span></td>'+
+      '</tr>';
+    });
+    h+='</tbody></table>';
+
+    // Graphe multi-lignes pour les fluides index (compteurs)
+    var indexData2=energieData.filter(function(d){return !d.isInstant&&d.pts.length>=2;});
+    if(indexData2.length){
+      h+='<div style="margin:16px 0 8px">'+
+        '<div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:2px">Évolution des relevés — compteurs (normalisé par fluide)</div>'+
+        '<div style="font-size:10px;color:var(--text3);margin-bottom:4px">Les courbes montrent la tendance de chaque fluide sur sa propre échelle</div>'+
+        svgEnergieMultiChart(indexData2)+
+      '</div>';
+    }
+
+    // Jauge + graphe pour chaque fluide instantané (gasoil, niveau)
+    var instantData2=energieData.filter(function(d){return d.isInstant&&d.pts.length>=1;});
+    instantData2.forEach(function(d){
+      var pct=d.lastVal!=null?Math.round(d.lastVal):null;
+      var col=pct!=null?(pct<=20?'var(--rouge)':pct<=40?'var(--orange)':'var(--vert)'):'var(--text3)';
+      var seuilAlerte=d.cap!=null?Math.round(d.cap*0.2):null;
+      h+='<div style="margin:16px 0;padding:14px 18px;background:#FAFAF8;border:1px solid var(--border);border-radius:8px;page-break-inside:avoid">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">'+
+          '<div>'+
+            '<div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(d.f.nom)+'</div>'+
+            (d.cap!=null?'<div style="font-size:11px;color:var(--text3)">Citerne '+d.cap.toLocaleString('fr-FR')+' L</div>':'')+
+          '</div>'+
+          '<div style="text-align:right">'+
+            '<div style="font-family:\'Cormorant Garamond\',serif;font-size:28px;font-weight:600;color:'+col+'">'+(pct!=null?pct+'%':'—')+'</div>'+
+            (d.restants!=null?'<div style="font-size:11px;color:var(--text3)">'+d.restants.toLocaleString('fr-FR')+' L restants</div>':'')+
+          '</div>'+
+        '</div>'+
+        (pct!=null?'<div style="background:var(--border);border-radius:4px;height:8px;margin-bottom:8px;overflow:hidden"><div style="height:100%;width:'+Math.min(100,pct)+'%;background:'+col+';border-radius:4px"></div></div>':'')+
+        (seuilAlerte!=null?'<div style="font-size:10px;color:var(--text3)">Seuil d\'alerte : '+seuilAlerte.toLocaleString('fr-FR')+' L (20%)</div>':'')+
+        (d.conso!=null?'<div style="font-size:11px;color:var(--text2);margin-top:4px">Consommation estimée ce mois : <strong>'+d.conso.toLocaleString('fr-FR')+' L</strong>'+(d.cout!=null?' · '+fmtCout(d.cout):'')+'</div>':'')+
+        (d.pts.length>=2?svgGasoilChart(d):'')+
+      '</div>';
+    });
+
+    // Coûts comparatifs si plusieurs fluides avec tarif + objectif
+    var withBudget2=energieData.filter(function(d){return d.budget!=null&&d.cout!=null;});
+    if(withBudget2.length>=2){
+      h+='<div style="margin:16px 0 8px">'+
+        '<div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px">Coût réel vs budget</div>'+
+        '<div style="display:flex;gap:12px;flex-wrap:wrap">';
+      withBudget2.forEach(function(d){
+        var pctB=Math.round(d.cout/d.budget*100);
+        var col2=pctB>100?'var(--rouge)':pctB>85?'var(--orange)':'var(--vert)';
+        h+='<div style="flex:1;min-width:140px;background:#F9F6F0;border:1px solid var(--border);border-radius:8px;padding:12px">'+
+          '<div style="font-size:10px;font-weight:600;color:var(--text2);margin-bottom:4px">'+escape_html(d.f.nom)+'</div>'+
+          '<div style="font-size:14px;font-weight:600;color:'+col2+'">'+fmtCout(d.cout)+'</div>'+
+          '<div style="font-size:10px;color:var(--text3)">budget '+fmtCout(d.budget)+'</div>'+
+          '<div style="margin-top:6px;background:var(--border);border-radius:3px;height:5px;overflow:hidden">'+
+            '<div style="height:100%;width:'+Math.min(100,pctB)+'%;background:'+col2+'"></div>'+
+          '</div>'+
+          '<div style="font-size:10px;font-weight:700;color:'+col2+';margin-top:3px">'+pctB+'% du budget</div>'+
+        '</div>';
+      });
+      h+='</div></div>';
+    }
   }
 
   // Rondes
