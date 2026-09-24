@@ -458,6 +458,7 @@ function renderDashboard(s){
 // Navigate to a specific signalement card and highlight it
 function _goToSignalement(sgId){
   _sgFilter='tous';
+  _sgZoneFilter=null;
   _dtSgFilter='tous';
   navTo('signalements');
   var attempts=0;
@@ -1813,49 +1814,120 @@ var _sgFilter='tous'; // tous | ouvert | en_cours | resolu
 var _SG_TYPES={panne:'⚡ Panne',anomalie:'👁 Anomalie',bruit:'🔊 Bruit',odeur:'💨 Odeur',fuite:'💧 Fuite',seuil:'📈 Seuil dépassé',autre:'📝 Autre'};
 var _SG_STATUTS={ouvert:{label:'Ouvert',color:'var(--rouge)',bg:'var(--rouge-pale)'},en_cours:{label:'En cours',color:'var(--orange)',bg:'var(--orange-pale)'},resolu:{label:'Résolu',color:'var(--vert)',bg:'var(--vert-pale)'}};
 
+var _sgZoneFilter=null; // null=toutes zones, sinon zone.id
+
 async function _rtSignalements(sid){
   var dc=document.getElementById('dash-content-main');
-  if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
+  if(dc){dc.style.padding='0';dc.style.maxWidth='100%';}
 
-  // Fetch all for KPIs + analytics, filter client-side
-  var allRows=await supaGet('signalements',
-    'groupe_id=eq.'+sid+'&order=created_at.desc&limit=200'+
-    '&select=id,groupe_id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,pris_en_charge_par,pris_en_charge_at,ref_code,created_at,source,photo_url,equipement_id,equipements(nom),maintenances(photo_url,prestataire)'
-  );
+  // Fetch zones + signalements en parallèle
+  var [zones,allRows]=await Promise.all([
+    supaGet('zones','site_id=eq.'+sid+'&actif=eq.true&order=categorie.asc,ordre.asc,nom.asc&select=id,nom,etage,categorie,type'),
+    supaGet('signalements',
+      'groupe_id=eq.'+sid+'&order=created_at.desc&limit=200'+
+      '&select=id,groupe_id,site_id,type,description,statut,signale_par,lieu,zone_id,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,pris_en_charge_par,pris_en_charge_at,ref_code,created_at,source,photo_url,equipement_id,equipements(nom),maintenances(photo_url,prestataire)'
+    )
+  ]);
+  zones=zones||[]; allRows=allRows||[];
 
   window._sgRows={};
   allRows.forEach(function(r){window._sgRows[r.id]=r;});
 
-  // KPIs mois courant
-  var moisDebut=new Date(new Date().getFullYear(),new Date().getMonth(),1);
-  var rowsMois=allRows.filter(function(r){return new Date(r.created_at)>=moisDebut;});
-  var resolus=rowsMois.filter(function(r){return r.statut==='resolu';}).length;
-  // Coût = pannes résolues ce mois (peu importe quand signalées)
-  var resoludsMois=allRows.filter(function(r){return r.resolved_at&&new Date(r.resolved_at)>=moisDebut;});
-  var totalCout=resoludsMois.reduce(function(s,r){return s+(parseFloat(r.cout_intervention)||0);},0);
+  // ── Sidebar zones ──
+  // Compter les signalements ouverts par zone
+  var zoneOpen={};
+  allRows.forEach(function(r){
+    if(r.zone_id&&r.statut!=='resolu') zoneOpen[r.zone_id]=(zoneOpen[r.zone_id]||0)+1;
+  });
 
-  var kpiHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'+
+  var sidebarInner='';
+  if(!zones.length){
+    sidebarInner='<div style="padding:16px 12px;font-size:12px;color:var(--text3);line-height:1.6">'+
+      'Aucune zone configurée.<br><br>'+
+      '<a href="#" onclick="navTo(\'config\');return false;" style="color:var(--amber-dark);font-weight:700;text-decoration:none">Importer les zones →</a>'+
+    '</div>';
+  } else {
+    // Grouper par catégorie
+    var cats={};
+    zones.forEach(function(z){var c=z.categorie||'Autre';if(!cats[c])cats[c]=[];cats[c].push(z);});
+    sidebarInner=Object.keys(cats).sort().map(function(cat){
+      var items=cats[cat].map(function(z){
+        var open=zoneOpen[z.id]||0;
+        var dot=open>0?'var(--rouge)':'var(--vert)';
+        var isActive=_sgZoneFilter===z.id;
+        return '<div onclick="_setSgZone(\''+z.id+'\')" style="display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;border-bottom:1px solid var(--bg);background:'+(isActive?'var(--amber-pale)':'white')+';border-left:3px solid '+(isActive?'var(--amber)':'transparent')+';">'+
+          '<div style="width:7px;height:7px;border-radius:50%;background:'+dot+';flex-shrink:0;margin-left:2px"></div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:12px;font-weight:'+(isActive?'700':'500')+';color:'+(isActive?'var(--amber-dark)':'var(--dark)')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(z.nom)+'</div>'+
+            (z.etage?'<div style="font-size:10px;color:var(--text3)">'+escape_html(z.etage)+'</div>':'')+
+          '</div>'+
+          (open>0?'<span style="font-size:10px;font-weight:700;background:var(--rouge-pale);color:var(--rouge);padding:2px 6px;border-radius:10px">'+open+'</span>':'')+
+        '</div>';
+      }).join('');
+      return '<div>'+
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);padding:10px 14px 4px;background:var(--bg)">'+escape_html(cat)+'</div>'+
+        items+
+      '</div>';
+    }).join('');
+  }
+
+  var allOpen=allRows.filter(function(r){return r.statut!=='resolu';}).length;
+  var sidebarHtml=
+    '<div style="width:220px;flex-shrink:0;border-right:1.5px solid var(--border);background:white;overflow-y:auto;max-height:calc(100vh - 140px)">'+
+      '<div onclick="_setSgZone(null)" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;border-bottom:1.5px solid var(--border);background:'+(_sgZoneFilter===null?'var(--amber-pale)':'white')+';border-left:3px solid '+(_sgZoneFilter===null?'var(--amber)':'transparent')+';">'+
+        '<span style="font-size:13px;font-weight:700;color:'+(_sgZoneFilter===null?'var(--amber-dark)':'var(--dark)')+'">Toutes les zones</span>'+
+        (allOpen>0?'<span style="font-size:10px;font-weight:700;background:var(--rouge-pale);color:var(--rouge);padding:2px 7px;border-radius:10px">'+allOpen+'</span>':'')+
+      '</div>'+
+      sidebarInner+
+    '</div>';
+
+  // ── Filtrer les signalements ──
+  var rowsForZone=_sgZoneFilter?allRows.filter(function(r){return r.zone_id===_sgZoneFilter;}):allRows;
+  var moisDebut=new Date(new Date().getFullYear(),new Date().getMonth(),1);
+  var rowsMois=rowsForZone.filter(function(r){return new Date(r.created_at)>=moisDebut;});
+  var resolus=rowsMois.filter(function(r){return r.statut==='resolu';}).length;
+  var resoludsMois=rowsForZone.filter(function(r){return r.resolved_at&&new Date(r.resolved_at)>=moisDebut;});
+  var totalCout=resoludsMois.reduce(function(s,r){return s+(parseFloat(r.cout_intervention)||0);},0);
+  var ouverts=rowsForZone.filter(function(r){return r.statut==='ouvert';}).length;
+  var enCours=rowsForZone.filter(function(r){return r.statut==='en_cours';}).length;
+
+  // Nom de la zone active
+  var zoneActive=_sgZoneFilter?zones.find(function(z){return z.id===_sgZoneFilter;}):null;
+  var zoneTitle=zoneActive?escape_html(zoneActive.nom):'Tous les signalements';
+
+  // KPIs
+  var kpiHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">'+
     '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
-      '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Pannes ce mois</div>'+
-      '<div style="font-size:20px;font-weight:800;color:var(--dark)">'+rowsMois.length+'</div>'+
-      '<div style="font-size:11px;color:var(--text3)">dont '+resolus+' résolues</div>'+
+      '<div style="font-size:10px;color:var(--text2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em">Ce mois</div>'+
+      '<div style="font-size:22px;font-weight:800;color:var(--dark)">'+rowsMois.length+'</div>'+
+      '<div style="font-size:11px;color:var(--text3)">'+resolus+' résolus</div>'+
     '</div>'+
     '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
-      '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Coût interventions</div>'+
-      '<div style="font-size:20px;font-weight:800;color:var(--dark)">'+totalCout.toLocaleString('fr-FR')+'</div>'+
-      '<div style="font-size:11px;color:var(--text3)">FCFA résolu ce mois</div>'+
+      '<div style="font-size:10px;color:var(--text2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em">Ouverts</div>'+
+      '<div style="font-size:22px;font-weight:800;color:'+(ouverts>0?'var(--rouge)':'var(--dark)')+'">'+ouverts+'</div>'+
+      '<div style="font-size:11px;color:var(--text3)">en attente</div>'+
+    '</div>'+
+    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
+      '<div style="font-size:10px;color:var(--text2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em">En cours</div>'+
+      '<div style="font-size:22px;font-weight:800;color:'+(enCours>0?'var(--orange)':'var(--dark)')+'">'+enCours+'</div>'+
+      '<div style="font-size:11px;color:var(--text3)">pris en charge</div>'+
+    '</div>'+
+    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
+      '<div style="font-size:10px;color:var(--text2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em">Coût mois</div>'+
+      '<div style="font-size:22px;font-weight:800;color:var(--dark)">'+Math.round(totalCout/1000)+'k</div>'+
+      '<div style="font-size:11px;color:var(--text3)">FCFA interventions</div>'+
     '</div>'+
   '</div>';
 
-  // Équipements récurrents (top 4)
+  // Équipements récurrents (top 3)
   var eqCount={};
-  allRows.forEach(function(r){
-    var n=r.equipements&&r.equipements.nom?r.equipements.nom:'Sans équipement';
-    eqCount[n]=(eqCount[n]||0)+1;
+  rowsForZone.forEach(function(r){
+    var n=r.equipements&&r.equipements.nom?r.equipements.nom:null;
+    if(n) eqCount[n]=(eqCount[n]||0)+1;
   });
-  var eqSorted=Object.entries(eqCount).sort(function(a,b){return b[1]-a[1];}).slice(0,4);
+  var eqSorted=Object.entries(eqCount).sort(function(a,b){return b[1]-a[1];}).slice(0,3);
   var eqMax=eqSorted.length?eqSorted[0][1]:1;
-  var eqColors=['var(--rouge)','var(--orange)','var(--vert)','var(--bleu)'];
+  var eqColors=['var(--rouge)','var(--orange)','var(--vert)'];
   var eqHtml='';
   if(eqSorted.length>1){
     eqHtml='<div style="margin-bottom:14px">'+
@@ -1864,9 +1936,9 @@ async function _rtSignalements(sid){
         eqSorted.map(function(e,i){
           var pct=Math.round(e[1]/eqMax*100);
           var c=eqColors[i]||'var(--text3)';
-          return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;'+(i<eqSorted.length-1?'border-bottom:1px solid var(--border)':'')+'">'+
+          return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;'+(i<eqSorted.length-1?'border-bottom:1px solid var(--border)':'')+'">'+
             '<div style="font-size:12px;color:var(--dark);width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(e[0])+'</div>'+
-            '<div style="flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:'+c+';border-radius:3px"></div></div>'+
+            '<div style="flex:1;height:5px;background:var(--bg);border-radius:3px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:'+c+';border-radius:3px"></div></div>'+
             '<div style="font-size:12px;font-weight:700;color:'+c+';width:28px;text-align:right">'+e[1]+'×</div>'+
           '</div>';
         }).join('')+
@@ -1874,10 +1946,9 @@ async function _rtSignalements(sid){
     '</div>';
   }
 
-  // Filtre + counts
-  var counts={tous:allRows.length,ouvert:0,en_cours:0,resolu:0};
-  allRows.forEach(function(r){if(counts[r.statut]!==undefined)counts[r.statut]++;});
-  var filtered=_sgFilter==='tous'?allRows:allRows.filter(function(r){return r.statut===_sgFilter;});
+  // Filtres statut
+  var counts={tous:rowsForZone.length,ouvert:ouverts,en_cours:enCours,resolu:rowsForZone.filter(function(r){return r.statut==='resolu';}).length};
+  var filtered=_sgFilter==='tous'?rowsForZone:rowsForZone.filter(function(r){return r.statut===_sgFilter;});
 
   var filterHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+
     ['tous','ouvert','en_cours','resolu'].map(function(f){
@@ -1887,10 +1958,10 @@ async function _rtSignalements(sid){
     }).join('')+
   '</div>';
 
-  // Cards
+  // Cards signalements
   var cardsHtml='';
   if(!filtered.length){
-    cardsHtml='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px;opacity:.4">📍</div><div style="font-size:14px">Aucun signalement.</div></div>';
+    cardsHtml='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:36px;margin-bottom:12px;opacity:.4">📍</div><div style="font-size:14px">Aucun signalement'+(zoneActive?' pour '+escape_html(zoneActive.nom):'')+'.</div></div>';
   } else {
     cardsHtml=filtered.map(function(r){
       var resolu=r.statut==='resolu';
@@ -1904,8 +1975,11 @@ async function _rtSignalements(sid){
       var mnt=r.maintenances&&r.maintenances[0]?r.maintenances[0]:null;
       var photoApres=mnt&&mnt.photo_url?mnt.photo_url:null;
       var tech=r.resolved_by||(mnt&&mnt.prestataire)||null;
+      // Nom de zone (si pas filtré par zone, on affiche la zone du signalement)
+      var zNom=null;
+      if(!_sgZoneFilter&&r.zone_id){var zObj=zones.find(function(z){return z.id===r.zone_id;});zNom=zObj?zObj.nom:null;}
+      var lieuLabel=zNom||r.lieu||null;
 
-      // Photos conditionnelles
       var photoHtml='';
       if(resolu&&r.photo_url&&photoApres){
         photoHtml='<div style="display:flex;gap:8px;margin:10px 0">'+
@@ -1918,7 +1992,6 @@ async function _rtSignalements(sid){
         photoHtml='<div style="margin:8px 0"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px">Après intervention</div><a href="'+photoApres+'" target="_blank"><img src="'+photoApres+'" style="max-width:100%;max-height:160px;object-fit:cover;border-radius:8px;border:1px solid var(--vert-border)" onerror="this.style.display=\'none\'"></a></div>';
       }
 
-      // Bloc résolution
       var resolutionHtml=resolu?
         '<div style="margin-top:10px;background:var(--vert-pale);border-radius:8px;padding:10px 12px">'+
           '<div style="font-size:11px;font-weight:700;color:var(--vert);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">🔧 Intervention'+(tech?' · '+escape_html(tech):'')+'</div>'+
@@ -1928,9 +2001,6 @@ async function _rtSignalements(sid){
 
       var sgEnCours=r.statut==='en_cours';
       var sgPreneur=r.assigne_a||r.pris_en_charge_par||'';
-      var sgRef=r.ref_code||'';
-      var sgSid=r.groupe_id||(sid)||'';
-      var sgRefJs=sgRef.replace(/'/g,"\\'");
       var actionsHtml=!resolu?
         '<div style="display:flex;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">'+
           (sgEnCours?
@@ -1955,7 +2025,7 @@ async function _rtSignalements(sid){
         photoHtml+
         '<div style="font-size:11px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap">'+
           (r.signale_par?'<span>👤 '+escape_html(r.signale_par)+'</span>':'')+
-          (r.lieu?'<span>📍 '+escape_html(r.lieu)+'</span>':'')+
+          (lieuLabel?'<span>📍 '+escape_html(lieuLabel)+'</span>':'')+
           '<span>🕐 '+date+'</span>'+
         '</div>'+
         (r.ref_code?'<div style="margin-top:4px"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:5px;background:#f0f0f0;color:var(--text2);letter-spacing:.5px">'+escape_html(r.ref_code)+'</span></div>':'')+
@@ -1965,15 +2035,27 @@ async function _rtSignalements(sid){
     }).join('');
   }
 
-  return '<div>'+kpiHtml+eqHtml+filterHtml+cardsHtml+
-    '<div style="text-align:center;margin-top:12px">'+
-      '<button onclick="_sgCreerManuel(\''+sid+'\')" style="padding:9px 18px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:700;color:var(--dark);cursor:pointer">＋ Nouveau signalement</button>'+
+  var mainHtml='<div style="flex:1;padding:20px 24px;overflow-y:auto;max-height:calc(100vh - 140px)">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+      '<h2 style="font-size:15px;font-weight:700;color:var(--dark);margin:0">'+zoneTitle+'</h2>'+
+      '<button onclick="_sgCreerManuel(\''+sid+'\')" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:700;color:var(--dark);cursor:pointer">＋ Signalement</button>'+
     '</div>'+
+    kpiHtml+eqHtml+filterHtml+cardsHtml+
   '</div>';
+
+  return '<div style="display:flex;min-height:500px">'+sidebarHtml+mainHtml+'</div>';
 }
 
 function _setSgFilter(f){
   _sgFilter=f;
+  if(!_session)return;
+  if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'signalements');
+  else renderRespTech(_session,'signalements');
+}
+
+function _setSgZone(zoneId){
+  _sgZoneFilter=zoneId;
+  _sgFilter='tous';
   if(!_session)return;
   if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'signalements');
   else renderRespTech(_session,'signalements');
