@@ -670,6 +670,7 @@ async function _loadRT(session,nav){
     else if(nav==='equipe')html=await _rtMonEquipe(sid,session);
     else if(nav==='config')html=await _rtConfig(sid);
     el.innerHTML=html;
+    if(nav==='signalements'){_sgSelected=null;_sgRenderKanban(sid);}
   }catch(e){
     el.innerHTML='<div class="alert-banner" style="margin-top:12px"><div class="ab-icon">⚠️</div><div class="ab-body"><div class="ab-title">Erreur de chargement</div><div class="ab-sub">'+(e.message||'Vérifiez votre connexion')+'</div></div></div>';
   }
@@ -1811,18 +1812,46 @@ async function _openRondeDetail(rondeId,dateStr,freq){
 /* ══════════════════════════════════════
    SIGNALEMENTS
 ══════════════════════════════════════ */
-var _sgFilter='tous'; // tous | ouvert | en_cours | resolu
+var _sgFilter='tous';
+var _sgZoneFilter=null;
+var _sgSearch='';
+var _sgSelected=null;
 
-var _SG_TYPES={panne:'⚡ Panne',anomalie:'👁 Anomalie',bruit:'🔊 Bruit',odeur:'💨 Odeur',fuite:'💧 Fuite',seuil:'📈 Seuil dépassé',autre:'📝 Autre'};
-var _SG_STATUTS={ouvert:{label:'Ouvert',color:'var(--rouge)',bg:'var(--rouge-pale)'},en_cours:{label:'En cours',color:'var(--orange)',bg:'var(--orange-pale)'},resolu:{label:'Résolu',color:'var(--vert)',bg:'var(--vert-pale)'}};
+var _SG_TYPES={panne:'Panne',anomalie:'Anomalie',bruit:'Bruit',odeur:'Odeur',fuite:'Fuite',seuil:'Seuil dépassé',autre:'Autre'};
+var _SG_ICONS={panne:'⚡',anomalie:'👁',bruit:'🔊',odeur:'💨',fuite:'💧',seuil:'📈',autre:'📝'};
+var _SG_STATUTS={ouvert:{label:'Ouvert',color:'var(--rouge)',bg:'var(--rouge-pale)',border:'var(--rouge-border)'},en_cours:{label:'En cours',color:'var(--orange)',bg:'var(--orange-pale)',border:'var(--orange-border)'},resolu:{label:'Résolu',color:'var(--vert)',bg:'var(--vert-pale)',border:'var(--vert-border)'}};
 
-var _sgZoneFilter=null; // null=toutes zones, sinon zone.id
+function _sgTimeAgo(dt){
+  if(!dt)return '';
+  var d=new Date(dt),now=new Date(),diff=Math.floor((now-d)/60000);
+  if(diff<2)return 'à l\'instant';
+  if(diff<60)return 'il y a '+diff+' min';
+  var h=Math.floor(diff/60);
+  if(h<24)return 'il y a '+h+'h';
+  var days=Math.floor(h/24);
+  if(days===1)return 'hier';
+  if(days<8)return 'il y a '+days+' j';
+  return new Date(dt).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+}
+function _sgKpi(label,valColor,val,sub){
+  return '<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:11px 14px">'+
+    '<div style="font-size:10px;color:var(--text3);margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em">'+label+'</div>'+
+    '<div style="font-size:22px;font-weight:800;color:'+valColor+'">'+val+'</div>'+
+    '<div style="font-size:11px;color:var(--text3)">'+sub+'</div>'+
+  '</div>';
+}
+function _sgMetaField(label,val){
+  return '<div style="background:var(--bg);border-radius:6px;padding:8px 10px">'+
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:2px">'+label+'</div>'+
+    '<div style="font-size:12px;font-weight:500;color:var(--dark)">'+escape_html(val)+'</div>'+
+  '</div>';
+}
 
 async function _rtSignalements(sid){
   var dc=document.getElementById('dash-content-main');
-  if(dc){dc.style.padding='0';dc.style.maxWidth='100%';}
+  if(dc){dc.style.padding='16px 20px';dc.style.maxWidth='100%';}
+  window._sgSid=sid;
 
-  // Fetch zones + signalements en parallèle
   var [zones,allRows]=await Promise.all([
     supaGet('zones','site_id=eq.'+sid+'&actif=eq.true&order=categorie.asc,ordre.asc,nom.asc&select=id,nom,etage,categorie,type'),
     supaGet('signalements',
@@ -1831,236 +1860,300 @@ async function _rtSignalements(sid){
     )
   ]);
   zones=zones||[]; allRows=allRows||[];
-
+  window._sgZones=zones;
+  window._sgAllRows=allRows;
   window._sgRows={};
   allRows.forEach(function(r){window._sgRows[r.id]=r;});
 
-  // ── Sidebar zones ──
-  // Compter les signalements ouverts par zone
-  var zoneOpen={};
-  allRows.forEach(function(r){
-    if(r.zone_id&&r.statut!=='resolu') zoneOpen[r.zone_id]=(zoneOpen[r.zone_id]||0)+1;
-  });
-
-  var sidebarInner='';
-  if(!zones.length){
-    sidebarInner='<div style="padding:16px 12px;font-size:12px;color:var(--text3);line-height:1.6">'+
-      'Aucune zone configurée.<br><br>'+
-      '<a href="#" onclick="navTo(\'config\');return false;" style="color:var(--amber-dark);font-weight:700;text-decoration:none">Importer les zones →</a>'+
-    '</div>';
-  } else {
-    // Grouper par catégorie
-    var cats={};
-    zones.forEach(function(z){var c=z.categorie||'Autre';if(!cats[c])cats[c]=[];cats[c].push(z);});
-    sidebarInner=Object.keys(cats).sort().map(function(cat){
-      var items=cats[cat].map(function(z){
-        var open=zoneOpen[z.id]||0;
-        var dot=open>0?'var(--rouge)':'var(--vert)';
-        var isActive=_sgZoneFilter===z.id;
-        return '<div onclick="_setSgZone(\''+z.id+'\')" style="display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;border-bottom:1px solid var(--bg);background:'+(isActive?'var(--amber-pale)':'white')+';border-left:3px solid '+(isActive?'var(--amber)':'transparent')+';">'+
-          '<div style="width:7px;height:7px;border-radius:50%;background:'+dot+';flex-shrink:0;margin-left:2px"></div>'+
-          '<div style="flex:1;min-width:0">'+
-            '<div style="font-size:12px;font-weight:'+(isActive?'700':'500')+';color:'+(isActive?'var(--amber-dark)':'var(--dark)')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(z.nom)+'</div>'+
-            (z.etage?'<div style="font-size:10px;color:var(--text3)">'+escape_html(z.etage)+'</div>':'')+
-          '</div>'+
-          (open>0?'<span style="font-size:10px;font-weight:700;background:var(--rouge-pale);color:var(--rouge);padding:2px 6px;border-radius:10px">'+open+'</span>':'')+
-        '</div>';
-      }).join('');
-      return '<div>'+
-        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);padding:10px 14px 4px;background:var(--bg)">'+escape_html(cat)+'</div>'+
-        items+
-      '</div>';
-    }).join('');
-  }
-
-  var allOpen=allRows.filter(function(r){return r.statut!=='resolu';}).length;
-  var sidebarHtml=
-    '<div style="width:220px;flex-shrink:0;border-right:1.5px solid var(--border);background:white;overflow-y:auto;max-height:calc(100vh - 140px)">'+
-      '<div onclick="_setSgZone(null)" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;border-bottom:1.5px solid var(--border);background:'+(_sgZoneFilter===null?'var(--amber-pale)':'white')+';border-left:3px solid '+(_sgZoneFilter===null?'var(--amber)':'transparent')+';">'+
-        '<span style="font-size:13px;font-weight:700;color:'+(_sgZoneFilter===null?'var(--amber-dark)':'var(--dark)')+'">Toutes les zones</span>'+
-        (allOpen>0?'<span style="font-size:10px;font-weight:700;background:var(--rouge-pale);color:var(--rouge);padding:2px 7px;border-radius:10px">'+allOpen+'</span>':'')+
-      '</div>'+
-      sidebarInner+
-    '</div>';
-
-  // ── Filtrer les signalements ──
-  var rowsForZone=_sgZoneFilter?allRows.filter(function(r){return r.zone_id===_sgZoneFilter;}):allRows;
-  var moisDebut=new Date(new Date().getFullYear(),new Date().getMonth(),1);
-  var rowsMois=rowsForZone.filter(function(r){return new Date(r.created_at)>=moisDebut;});
-  var resolus=rowsMois.filter(function(r){return r.statut==='resolu';}).length;
-  var resoludsMois=rowsForZone.filter(function(r){return r.resolved_at&&new Date(r.resolved_at)>=moisDebut;});
-  var totalCout=resoludsMois.reduce(function(s,r){return s+(parseFloat(r.cout_intervention)||0);},0);
-  var ouverts=rowsForZone.filter(function(r){return r.statut==='ouvert';}).length;
-  var enCours=rowsForZone.filter(function(r){return r.statut==='en_cours';}).length;
-
-  // Nom de la zone active
-  var zoneActive=_sgZoneFilter?zones.find(function(z){return z.id===_sgZoneFilter;}):null;
-  var zoneTitle=zoneActive?escape_html(zoneActive.nom):'Tous les signalements';
-
   // KPIs
-  var kpiHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">'+
-    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
-      '<div style="font-size:10px;color:var(--text2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em">Ce mois</div>'+
-      '<div style="font-size:22px;font-weight:800;color:var(--dark)">'+rowsMois.length+'</div>'+
-      '<div style="font-size:11px;color:var(--text3)">'+resolus+' résolus</div>'+
-    '</div>'+
-    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
-      '<div style="font-size:10px;color:var(--text2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em">Ouverts</div>'+
-      '<div style="font-size:22px;font-weight:800;color:'+(ouverts>0?'var(--rouge)':'var(--dark)')+'">'+ouverts+'</div>'+
-      '<div style="font-size:11px;color:var(--text3)">en attente</div>'+
-    '</div>'+
-    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
-      '<div style="font-size:10px;color:var(--text2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em">En cours</div>'+
-      '<div style="font-size:22px;font-weight:800;color:'+(enCours>0?'var(--orange)':'var(--dark)')+'">'+enCours+'</div>'+
-      '<div style="font-size:11px;color:var(--text3)">pris en charge</div>'+
-    '</div>'+
-    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
-      '<div style="font-size:10px;color:var(--text2);margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em">Coût mois</div>'+
-      '<div style="font-size:22px;font-weight:800;color:var(--dark)">'+Math.round(totalCout/1000)+'k</div>'+
-      '<div style="font-size:11px;color:var(--text3)">FCFA interventions</div>'+
-    '</div>'+
+  var moisDebut=new Date(new Date().getFullYear(),new Date().getMonth(),1);
+  var rowsMois=allRows.filter(function(r){return new Date(r.created_at)>=moisDebut;});
+  var resolus30=allRows.filter(function(r){return r.resolved_at&&new Date(r.resolved_at)>=moisDebut;});
+  var totalCout=resolus30.reduce(function(s,r){return s+(parseFloat(r.cout_intervention)||0);},0);
+  var ouverts=allRows.filter(function(r){return r.statut==='ouvert';}).length;
+  var enCours=allRows.filter(function(r){return r.statut==='en_cours';}).length;
+  var kpiHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">'+
+    _sgKpi('Ce mois','var(--dark)',rowsMois.length+'',resolus30.length+' résolus')+
+    _sgKpi('Ouverts',ouverts>0?'var(--rouge)':'var(--dark)',ouverts+'','en attente')+
+    _sgKpi('En cours',enCours>0?'var(--orange)':'var(--dark)',enCours+'','pris en charge')+
+    _sgKpi('Coût mois','var(--dark)',Math.round(totalCout/1000)+'k','FCFA interventions')+
   '</div>';
 
-  // Équipements récurrents (top 3)
+  // Points chauds
+  var zCount={};
+  allRows.forEach(function(r){if(r.zone_id)zCount[r.zone_id]=(zCount[r.zone_id]||0)+1;});
+  var zTop=Object.entries(zCount).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
   var eqCount={};
-  rowsForZone.forEach(function(r){
-    var n=r.equipements&&r.equipements.nom?r.equipements.nom:null;
-    if(n) eqCount[n]=(eqCount[n]||0)+1;
-  });
-  var eqSorted=Object.entries(eqCount).sort(function(a,b){return b[1]-a[1];}).slice(0,3);
-  var eqMax=eqSorted.length?eqSorted[0][1]:1;
-  var eqColors=['var(--rouge)','var(--orange)','var(--vert)'];
-  var eqHtml='';
-  if(eqSorted.length>1){
-    eqHtml='<div style="margin-bottom:14px">'+
-      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">Équipements récurrents</div>'+
-      '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:10px 14px">'+
-        eqSorted.map(function(e,i){
-          var pct=Math.round(e[1]/eqMax*100);
-          var c=eqColors[i]||'var(--text3)';
-          return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;'+(i<eqSorted.length-1?'border-bottom:1px solid var(--border)':'')+'">'+
-            '<div style="font-size:12px;color:var(--dark);width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(e[0])+'</div>'+
-            '<div style="flex:1;height:5px;background:var(--bg);border-radius:3px;overflow:hidden"><div style="width:'+pct+'%;height:100%;background:'+c+';border-radius:3px"></div></div>'+
-            '<div style="font-size:12px;font-weight:700;color:'+c+';width:28px;text-align:right">'+e[1]+'×</div>'+
-          '</div>';
-        }).join('')+
+  allRows.forEach(function(r){var n=r.equipements&&r.equipements.nom?r.equipements.nom:null;if(n)eqCount[n]=(eqCount[n]||0)+1;});
+  var eqTop=Object.entries(eqCount).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+  var hotHtml='';
+  if(zTop.length||eqTop.length){
+    hotHtml='<details style="margin-bottom:14px;background:white;border:1.5px solid var(--border);border-radius:10px;overflow:hidden" open>'+
+      '<summary style="list-style:none;display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;background:var(--bg);border-bottom:1px solid var(--border)">'+
+        '<span style="font-size:13px;font-weight:700;color:var(--dark);flex:1">🔥 Points chauds</span>'+
+      '</summary>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0">'+
+        '<div style="padding:12px 14px;border-right:1px solid var(--border)">'+
+          '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px">📍 Zones</div>'+
+          zTop.map(function(e,i){
+            var z=zones.find(function(z){return z.id===e[0];});
+            var nom=z?z.nom:e[0];
+            var isA=_sgZoneFilter===e[0];
+            return '<div onclick="_setSgZone(\''+e[0]+'\')" style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;cursor:pointer;background:'+(isA?'var(--amber-pale)':'transparent')+';border:1px solid '+(isA?'var(--amber)':'transparent')+';margin-bottom:3px">'+
+              '<span style="font-size:11px;font-weight:700;color:var(--text3);width:14px;text-align:center">'+(i+1)+'</span>'+
+              '<span style="font-size:12px;color:var(--dark);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(nom)+'</span>'+
+              '<span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;background:var(--rouge-pale);color:var(--rouge)">'+e[1]+'</span>'+
+            '</div>';
+          }).join('')+
+        '</div>'+
+        '<div style="padding:12px 14px">'+
+          '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px">🔧 Équipements</div>'+
+          eqTop.map(function(e,i){
+            return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px">'+
+              '<span style="font-size:11px;font-weight:700;color:var(--text3);width:14px;text-align:center">'+(i+1)+'</span>'+
+              '<span style="font-size:12px;color:var(--dark);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(e[0])+'</span>'+
+              '<span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;background:#e3f0ff;color:#1565c0">'+e[1]+'</span>'+
+            '</div>';
+          }).join('')+
+        '</div>'+
       '</div>'+
-    '</div>';
+    '</details>';
   }
 
-  // Filtres statut
-  var counts={tous:rowsForZone.length,ouvert:ouverts,en_cours:enCours,resolu:rowsForZone.filter(function(r){return r.statut==='resolu';}).length};
-  var filtered=_sgFilter==='tous'?rowsForZone:rowsForZone.filter(function(r){return r.statut===_sgFilter;});
+  // Zone select options
+  var zoneOpts='<option value="">Toutes les zones</option>'+
+    zones.map(function(z){return '<option value="'+z.id+'"'+(z.id===_sgZoneFilter?' selected':'')+'>'+escape_html(z.nom)+'</option>';}).join('');
 
-  var filterHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+
-    ['tous','ouvert','en_cours','resolu'].map(function(f){
-      var labels={tous:'Tous',ouvert:'Ouverts',en_cours:'En cours',resolu:'Résolus'};
-      var active=_sgFilter===f;
-      return '<button onclick="_setSgFilter(\''+f+'\')" style="font-size:11px;font-weight:'+(active?'700':'500')+';padding:5px 12px;border-radius:20px;border:1.5px solid '+(active?'var(--amber)':'var(--border)')+';background:'+(active?'var(--amber-pale)':'white')+';color:'+(active?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+labels[f]+(counts[f]?' ('+counts[f]+')':'')+'</button>';
+  return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">'+
+      '<div style="display:flex;align-items:center;gap:6px;background:white;border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;flex:1;min-width:160px">'+
+        '<span style="font-size:13px;color:var(--text3)">🔍</span>'+
+        '<input id="sg-search" type="text" placeholder="Rechercher…" oninput="_sgSetSearch(this.value)" style="border:none;background:none;font-size:12px;color:var(--dark);outline:none;width:100%;font-family:inherit" value="'+escape_html(_sgSearch)+'">'+
+      '</div>'+
+      '<select id="sg-zone-sel" onchange="_setSgZone(this.value||null)" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;background:white;color:var(--dark);cursor:pointer;font-family:inherit">'+zoneOpts+'</select>'+
+      '<button onclick="_sgCreerManuel(\''+sid+'\')" style="padding:7px 14px;border:1.5px solid var(--amber);border-radius:8px;background:var(--amber-pale);font-size:12px;font-weight:700;color:var(--amber-dark);cursor:pointer;white-space:nowrap">＋ Signalement</button>'+
+    '</div>'+
+    kpiHtml+
+    hotHtml+
+    '<div id="sg-kanban"></div>'+
+    '<div id="sg-detail" style="margin-top:10px"></div>';
+}
+
+function _sgSetSearch(v){
+  _sgSearch=(v||'').toLowerCase().trim();
+  _sgRenderKanban(window._sgSid);
+}
+
+function _sgSelectCard(id){
+  _sgSelected=(_sgSelected===id)?null:id;
+  _sgRenderKanban(window._sgSid);
+  if(_sgSelected){
+    var d=document.getElementById('sg-detail');
+    if(d)setTimeout(function(){d.scrollIntoView({behavior:'smooth',block:'nearest'});},60);
+  }
+}
+
+async function _sgPrendreEnCharge(id){
+  var nom=_session&&(_session.nom||_session.email)||'Resp Tech';
+  await supaPatch('signalements',id,{statut:'en_cours',pris_en_charge_par:nom,pris_en_charge_at:new Date().toISOString()});
+  if(window._sgRows&&window._sgRows[id]){
+    window._sgRows[id].statut='en_cours';
+    window._sgRows[id].pris_en_charge_par=nom;
+  }
+  if(window._sgAllRows){
+    var idx=window._sgAllRows.findIndex(function(r){return r.id===id;});
+    if(idx>=0){window._sgAllRows[idx].statut='en_cours';window._sgAllRows[idx].pris_en_charge_par=nom;}
+  }
+  _sgSelected=id;
+  _sgRenderKanban(window._sgSid);
+}
+
+function _sgRenderKanban(sid){
+  var kEl=document.getElementById('sg-kanban');
+  if(!kEl)return;
+  var allRows=window._sgAllRows||[];
+  var zones=window._sgZones||[];
+
+  // Filters
+  var rows=_sgZoneFilter?allRows.filter(function(r){return r.zone_id===_sgZoneFilter;}):allRows;
+  if(_sgSearch){
+    rows=rows.filter(function(r){
+      return (r.description||'').toLowerCase().indexOf(_sgSearch)>=0||
+        (r.equipements&&r.equipements.nom?r.equipements.nom.toLowerCase():'' ).indexOf(_sgSearch)>=0||
+        (r.lieu||'').toLowerCase().indexOf(_sgSearch)>=0;
+    });
+  }
+
+  var byStatut={ouvert:[],en_cours:[],resolu:[]};
+  rows.forEach(function(r){if(byStatut[r.statut])byStatut[r.statut].push(r);});
+
+  var cols=[
+    {key:'ouvert',label:'Ouvert',dot:'var(--rouge)',cntBg:'var(--rouge-pale)',cntColor:'var(--rouge)'},
+    {key:'en_cours',label:'En cours',dot:'var(--orange)',cntBg:'var(--orange-pale)',cntColor:'var(--orange)'},
+    {key:'resolu',label:'Résolu',dot:'var(--vert)',cntBg:'var(--vert-pale)',cntColor:'var(--vert)'}
+  ];
+
+  kEl.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">'+
+    cols.map(function(col){
+      var items=byStatut[col.key]||[];
+      return '<div style="background:white;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column">'+
+        '<div style="display:flex;align-items:center;gap:7px;padding:10px 12px;border-bottom:1.5px solid var(--border);background:var(--bg)">'+
+          '<div style="width:8px;height:8px;border-radius:50%;background:'+col.dot+';flex-shrink:0"></div>'+
+          '<div style="font-size:12px;font-weight:700;color:var(--dark);flex:1">'+col.label+'</div>'+
+          '<div style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;background:'+col.cntBg+';color:'+col.cntColor+'">'+items.length+'</div>'+
+        '</div>'+
+        '<div style="padding:8px;overflow-y:auto;max-height:520px;display:flex;flex-direction:column;gap:6px">'+
+          (items.length===0?'<div style="text-align:center;padding:32px 0;font-size:12px;color:var(--text3)">—</div>':items.map(function(r){return _sgBuildCard(r,zones,col.key);}).join(''))+
+        '</div>'+
+      '</div>';
     }).join('')+
   '</div>';
 
-  // Cards signalements
-  var cardsHtml='';
-  if(!filtered.length){
-    cardsHtml='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:36px;margin-bottom:12px;opacity:.4">📍</div><div style="font-size:14px">Aucun signalement'+(zoneActive?' pour '+escape_html(zoneActive.nom):'')+'.</div></div>';
-  } else {
-    cardsHtml=filtered.map(function(r){
-      var resolu=r.statut==='resolu';
-      var accent=resolu?'var(--vert)':r.statut==='en_cours'?'var(--orange)':'var(--rouge)';
-      var badgeBg=resolu?'var(--vert-pale)':r.statut==='en_cours'?'var(--orange-pale)':'var(--rouge-pale)';
-      var badgeColor=resolu?'var(--vert)':r.statut==='en_cours'?'var(--orange)':'var(--rouge)';
-      var badgeLabel=resolu?'✅ Résolu':r.statut==='en_cours'?'🟠 En cours':'🔴 Ouvert';
-      var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
-      var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
-      var date=r.created_at?new Date(r.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-      var mnt=r.maintenances&&r.maintenances[0]?r.maintenances[0]:null;
-      var photoApres=mnt&&mnt.photo_url?mnt.photo_url:null;
-      var tech=r.resolved_by||(mnt&&mnt.prestataire)||null;
-      // Nom de zone (si pas filtré par zone, on affiche la zone du signalement)
-      var zNom=null;
-      if(!_sgZoneFilter&&r.zone_id){var zObj=zones.find(function(z){return z.id===r.zone_id;});zNom=zObj?zObj.nom:null;}
-      var lieuLabel=zNom||r.lieu||null;
+  // Detail panel
+  var dEl=document.getElementById('sg-detail');
+  if(dEl){
+    if(_sgSelected&&window._sgRows&&window._sgRows[_sgSelected]){
+      dEl.innerHTML=_sgBuildDetail(window._sgRows[_sgSelected],zones,sid||window._sgSid);
+    } else {
+      dEl.innerHTML='';
+    }
+  }
+}
 
-      var photoHtml='';
-      if(resolu&&r.photo_url&&photoApres){
-        photoHtml='<div style="display:flex;gap:8px;margin:10px 0">'+
-          '<div style="flex:1"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px">Avant</div><a href="'+r.photo_url+'" target="_blank"><img src="'+r.photo_url+'" style="width:100%;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" onerror="this.style.display=\'none\'"></a></div>'+
-          '<div style="flex:1"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px">Après</div><a href="'+photoApres+'" target="_blank"><img src="'+photoApres+'" style="width:100%;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--vert-border)" onerror="this.style.display=\'none\'"></a></div>'+
-        '</div>';
-      } else if(r.photo_url){
-        photoHtml='<div style="margin:8px 0"><a href="'+r.photo_url+'" target="_blank"><img src="'+r.photo_url+'" style="max-width:100%;max-height:160px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" onerror="this.style.display=\'none\'"></a></div>';
-      } else if(resolu&&photoApres){
-        photoHtml='<div style="margin:8px 0"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px">Après intervention</div><a href="'+photoApres+'" target="_blank"><img src="'+photoApres+'" style="max-width:100%;max-height:160px;object-fit:cover;border-radius:8px;border:1px solid var(--vert-border)" onerror="this.style.display=\'none\'"></a></div>';
-      }
+function _sgBuildCard(r,zones,colKey){
+  var accent=colKey==='ouvert'?'var(--rouge)':colKey==='en_cours'?'var(--orange)':'var(--vert)';
+  var icon=_SG_ICONS[r.type]||'📝';
+  var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
+  var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
+  var z=r.zone_id?zones.find(function(z){return z.id===r.zone_id;}):null;
+  var lieuLabel=z?z.nom:(r.lieu||'');
+  var isSel=(_sgSelected===r.id);
+  var photoThumb='';
+  if(r.photo_url){
+    photoThumb='<a href="'+r.photo_url+'" target="_blank" onclick="event.stopPropagation()">'+
+      '<img src="'+r.photo_url+'" style="width:100%;height:56px;object-fit:cover;border-radius:6px;margin:5px 0;border:1px solid var(--border)" onerror="this.style.display=\'none\'">'+
+    '</a>';
+  }
+  var quickActions='';
+  if(colKey==='ouvert'){
+    quickActions='<div style="display:flex;gap:5px;margin-top:7px;padding-top:7px;border-top:1px solid var(--border)">'+
+      '<button onclick="event.stopPropagation();_sgAffecter(\''+r.id+'\')" style="flex:1;padding:5px 0;font-size:11px;font-weight:600;border:1.5px solid var(--amber-border);border-radius:6px;background:var(--amber-pale);color:var(--amber-dark);cursor:pointer;font-family:inherit">👷 Affecter</button>'+
+      '<button onclick="event.stopPropagation();_sgPrendreEnCharge(\''+r.id+'\')" style="flex:1;padding:5px 0;font-size:11px;font-weight:600;border:1.5px solid #90caf9;border-radius:6px;background:#e3f0ff;color:#1565c0;cursor:pointer;font-family:inherit">▶ Prendre</button>'+
+    '</div>';
+  } else if(colKey==='en_cours'){
+    var preneur=r.assigne_a||r.pris_en_charge_par||'';
+    quickActions='<div style="display:flex;align-items:center;gap:5px;margin-top:7px;padding-top:7px;border-top:1px solid var(--border)">'+
+      (preneur?'<span style="font-size:11px;color:var(--orange);flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">⚡ '+escape_html(preneur)+'</span>':'')+
+      '<button onclick="event.stopPropagation();_sgResoudre(\''+r.id+'\')" style="padding:5px 8px;font-size:11px;font-weight:600;border:1.5px solid var(--vert-border);border-radius:6px;background:var(--vert-pale);color:var(--vert);cursor:pointer;white-space:nowrap;font-family:inherit">✅ Résoudre</button>'+
+      '<button onclick="event.stopPropagation();_sgAffecter(\''+r.id+'\')" style="padding:5px 8px;font-size:11px;border:1.5px solid var(--border);border-radius:6px;background:white;color:var(--text2);cursor:pointer;font-family:inherit">↩</button>'+
+    '</div>';
+  }
+  return '<div id="sg-card-'+r.id+'" onclick="_sgSelectCard(\''+r.id+'\')" style="border:1.5px solid '+(isSel?'var(--amber)':'var(--border)')+';border-left:4px solid '+accent+';border-radius:8px;padding:10px 11px;cursor:pointer;background:'+(isSel?'var(--amber-pale)':'white')+';transition:border-color .12s">'+
+    '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">'+
+      '<span style="font-size:11px">'+icon+'</span>'+
+      '<span style="font-size:11px;font-weight:700;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(typeLabel)+(eqNom?' · '+escape_html(eqNom):'')+'</span>'+
+    '</div>'+
+    '<div style="font-size:12px;color:var(--dark);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+escape_html(r.description)+'</div>'+
+    photoThumb+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;align-items:center">'+
+      (lieuLabel?'<span style="font-size:10px;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 6px">'+escape_html(lieuLabel)+'</span>':'')+
+      '<span style="font-size:10px;color:var(--text3);margin-left:auto">'+_sgTimeAgo(r.created_at)+'</span>'+
+    '</div>'+
+    quickActions+
+  '</div>';
+}
 
-      var resolutionHtml=resolu?
-        '<div style="margin-top:10px;background:var(--vert-pale);border-radius:8px;padding:10px 12px">'+
-          '<div style="font-size:11px;font-weight:700;color:var(--vert);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">🔧 Intervention'+(tech?' · '+escape_html(tech):'')+'</div>'+
-          (r.note_resolution?'<div style="font-size:12px;color:var(--vert);line-height:1.5;margin-bottom:4px">'+escape_html(r.note_resolution)+'</div>':'')+
-          (r.cout_intervention?'<div style="font-size:12px;font-weight:700;color:var(--vert)">'+Number(r.cout_intervention).toLocaleString('fr-FR')+' FCFA</div>':'')+
-        '</div>':'';
+function _sgBuildDetail(r,zones,sid){
+  var icon=_SG_ICONS[r.type]||'📝';
+  var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
+  var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
+  var z=r.zone_id?zones.find(function(z){return z.id===r.zone_id;}):null;
+  var lieuLabel=z?z.nom:(r.lieu||'');
+  var statut=_SG_STATUTS[r.statut]||{label:r.statut,color:'var(--text3)',bg:'var(--bg)'};
+  var mnt=r.maintenances&&r.maintenances[0]?r.maintenances[0]:null;
+  var photoApres=mnt&&mnt.photo_url?mnt.photo_url:null;
+  var tech=r.resolved_by||(mnt&&mnt.prestataire)||null;
+  var dateStr=r.created_at?new Date(r.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+  var resolvedStr=r.resolved_at?new Date(r.resolved_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
 
-      var sgEnCours=r.statut==='en_cours';
-      var sgPreneur=r.assigne_a||r.pris_en_charge_par||'';
-      var actionsHtml=!resolu?
-        '<div style="display:flex;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">'+
-          (sgEnCours?
-            '<div style="display:flex;align-items:center;gap:6px;flex:1;background:var(--vert-pale);border:1px solid var(--vert-border);border-radius:8px;padding:6px 10px">'+
-              '<span style="font-size:18px">⚡</span>'+
-              '<div style="flex:1;min-width:0">'+
-                '<div style="font-size:10px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.04em">En cours</div>'+
-                '<div style="font-size:12px;color:var(--vert);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(sgPreneur||'')+'</div>'+
-              '</div>'+
-              '<button onclick="_sgAffecter(\''+r.id+'\')" style="font-size:11px;padding:4px 10px;border:1px solid var(--vert-border);border-radius:8px;background:white;color:var(--vert);cursor:pointer;white-space:nowrap;font-weight:600">↩ Changer</button>'+
-            '</div>':
-            '<button onclick="_sgAffecter(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--amber-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--amber-dark);background:var(--amber-pale);cursor:pointer">👷 Affecter</button>')+
-          '<button onclick="_sgResoudre(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Résoudre</button>'+
-        '</div>':'';
-
-      return '<div id="sg-card-'+r.id+'" style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+accent+'">'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'+
-          '<span style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(typeLabel)+(eqNom?' · '+escape_html(eqNom):'')+'</span>'+
-          '<span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:'+badgeBg+';color:'+badgeColor+'">'+badgeLabel+'</span>'+
-        '</div>'+
-        '<div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:6px">'+escape_html(r.description)+'</div>'+
-        photoHtml+
-        '<div style="font-size:11px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap">'+
-          (r.signale_par?'<span>👤 '+escape_html(r.signale_par)+'</span>':'')+
-          (lieuLabel?'<span>📍 '+escape_html(lieuLabel)+'</span>':'')+
-          '<span>🕐 '+date+'</span>'+
-        '</div>'+
-        (r.ref_code?'<div style="margin-top:4px"><span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:5px;background:#f0f0f0;color:var(--text2);letter-spacing:.5px">'+escape_html(r.ref_code)+'</span></div>':'')+
-        resolutionHtml+
-        actionsHtml+
-      '</div>';
-    }).join('');
+  var photosHtml='';
+  if(r.photo_url&&photoApres){
+    photosHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'+
+      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px">Avant</div><a href="'+r.photo_url+'" target="_blank"><img src="'+r.photo_url+'" style="width:100%;height:100px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border)" onerror="this.style.display=\'none\'"></a></div>'+
+      '<div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--vert);margin-bottom:4px">Après</div><a href="'+photoApres+'" target="_blank"><img src="'+photoApres+'" style="width:100%;height:100px;object-fit:cover;border-radius:8px;border:1.5px solid var(--vert-border)" onerror="this.style.display=\'none\'"></a></div>'+
+    '</div>';
+  } else if(r.photo_url){
+    photosHtml='<div style="margin-bottom:12px">'+
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px">Photo signalement</div>'+
+      '<a href="'+r.photo_url+'" target="_blank"><img src="'+r.photo_url+'" style="max-width:100%;max-height:180px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border)" onerror="this.style.display=\'none\'"></a>'+
+    '</div>';
+  } else if(photoApres){
+    photosHtml='<div style="margin-bottom:12px">'+
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--vert);margin-bottom:4px">Après intervention</div>'+
+      '<a href="'+photoApres+'" target="_blank"><img src="'+photoApres+'" style="max-width:100%;max-height:180px;object-fit:cover;border-radius:8px;border:1.5px solid var(--vert-border)" onerror="this.style.display=\'none\'"></a>'+
+    '</div>';
+  } else if(r.statut!=='resolu'){
+    photosHtml='<div style="margin-bottom:12px;border:2px dashed var(--border);border-radius:8px;padding:14px;text-align:center;font-size:11px;color:var(--text3)">📷 Photos visibles après résolution</div>';
   }
 
-  var mainHtml='<div style="flex:1;padding:20px 24px;overflow-y:auto;max-height:calc(100vh - 140px)">'+
-    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
-      '<h2 style="font-size:15px;font-weight:700;color:var(--dark);margin:0">'+zoneTitle+'</h2>'+
-      '<button onclick="_sgCreerManuel(\''+sid+'\')" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:700;color:var(--dark);cursor:pointer">＋ Signalement</button>'+
-    '</div>'+
-    kpiHtml+eqHtml+filterHtml+cardsHtml+
+  var resolutionHtml=r.statut==='resolu'?
+    '<div style="background:var(--vert-pale);border:1px solid var(--vert-border);border-radius:8px;padding:10px 12px;margin-bottom:12px">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--vert);margin-bottom:4px">🔧 Intervention'+(tech?' · '+escape_html(tech):'')+'</div>'+
+      (r.note_resolution?'<div style="font-size:12px;color:var(--vert);margin-bottom:4px;line-height:1.5">'+escape_html(r.note_resolution)+'</div>':'')+
+      (r.cout_intervention?'<div style="font-size:12px;font-weight:700;color:var(--vert)">'+Number(r.cout_intervention).toLocaleString('fr-FR')+' FCFA</div>':'')+
+    '</div>':'';
+
+  var actionsHtml='';
+  if(r.statut==='ouvert'){
+    actionsHtml='<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button onclick="_sgAffecter(\''+r.id+'\')" style="flex:1;padding:9px;border:1.5px solid var(--amber-border);border-radius:8px;font-size:12px;font-weight:700;color:var(--amber-dark);background:var(--amber-pale);cursor:pointer;font-family:inherit">👷 Affecter</button>'+
+      '<button onclick="_sgPrendreEnCharge(\''+r.id+'\')" style="flex:1;padding:9px;border:1.5px solid #90caf9;border-radius:8px;font-size:12px;font-weight:700;color:#1565c0;background:#e3f0ff;cursor:pointer;font-family:inherit">▶ Prendre en charge</button>'+
+      '<button onclick="_sgResoudre(\''+r.id+'\')" style="flex:1;padding:9px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:700;color:var(--vert);background:var(--vert-pale);cursor:pointer;font-family:inherit">✅ Résoudre</button>'+
+    '</div>';
+  } else if(r.statut==='en_cours'){
+    actionsHtml='<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button onclick="_sgAffecter(\''+r.id+'\')" style="flex:1;padding:9px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-weight:600;color:var(--text2);background:white;cursor:pointer;font-family:inherit">↩ Changer</button>'+
+      '<button onclick="_sgResoudre(\''+r.id+'\')" style="flex:2;padding:9px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:700;color:var(--vert);background:var(--vert-pale);cursor:pointer;font-family:inherit">✅ Marquer résolu</button>'+
+    '</div>';
+  }
+
+  var metaFields='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">'+
+    _sgMetaField('Signalé par',r.signale_par||'—')+
+    _sgMetaField('Date',dateStr||'—')+
+    _sgMetaField('Zone',lieuLabel||'—')+
+    (r.ref_code?_sgMetaField('Référence',r.ref_code):'<div></div>')+
+    (r.assigne_a||r.pris_en_charge_par?_sgMetaField('Assigné à',r.assigne_a||r.pris_en_charge_par):'')+
+    (resolvedStr?_sgMetaField('Résolu le',resolvedStr):'')+
   '</div>';
 
-  return '<div style="display:flex;min-height:500px">'+sidebarHtml+mainHtml+'</div>';
+  return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px;border-top:4px solid '+statut.color+'">'+
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px">'+
+      '<div style="flex:1">'+
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'+
+          '<span style="font-size:20px">'+icon+'</span>'+
+          '<span style="font-size:14px;font-weight:700;color:var(--dark)">'+escape_html(typeLabel)+(eqNom?' · '+escape_html(eqNom):'')+'</span>'+
+          '<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:'+statut.bg+';color:'+statut.color+'">'+statut.label+'</span>'+
+        '</div>'+
+        '<div style="font-size:13px;color:var(--dark);line-height:1.6">'+escape_html(r.description)+'</div>'+
+      '</div>'+
+      '<button onclick="_sgSelectCard(\''+r.id+'\')" style="flex-shrink:0;padding:5px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;color:var(--text3);background:white;cursor:pointer;margin-left:12px;font-family:inherit">✕</button>'+
+    '</div>'+
+    metaFields+
+    photosHtml+
+    resolutionHtml+
+    actionsHtml+
+  '</div>';
 }
 
 function _setSgFilter(f){
   _sgFilter=f;
-  if(!_session)return;
-  if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'signalements');
-  else renderRespTech(_session,'signalements');
+  _sgRenderKanban(window._sgSid);
 }
 
 function _setSgZone(zoneId){
-  _sgZoneFilter=zoneId;
-  _sgFilter='tous';
-  if(!_session)return;
-  if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'signalements');
-  else renderRespTech(_session,'signalements');
+  _sgZoneFilter=zoneId||null;
+  var sel=document.getElementById('sg-zone-sel');
+  if(sel)sel.value=zoneId||'';
+  _sgRenderKanban(window._sgSid);
 }
 
 
