@@ -4317,7 +4317,7 @@ function _zonesHandleFile(file,sid){
 async function _rtConfig(sid){
   _configCurrentSid=sid;
   var types=await supaGet('types_equipements','select=id,nom&order=nom');
-  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,actif_ronde,actif_releve,ordre_ronde,type_id,puissance_kva,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,prix_litre,type_compteur_heures,types_equipements(nom)&order=ordre_ronde.asc');
+  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,actif_ronde,actif_releve,ordre_ronde,type_id,zone_id,puissance_kva,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,prix_litre,type_compteur_heures,types_equipements(nom)&order=ordre_ronde.asc');
   // Populate cache for safe onclick lookup (évite l'échappement multi-niveau)
   _configEquipCache={};
   equips.forEach(function(e){_configEquipCache[e.id]=e;});
@@ -4383,7 +4383,7 @@ async function _rtConfig(sid){
 
   // Séparer équipements en suivi actif vs secondaires
   var prioritaires=equips.filter(function(e){return e.actif_ronde||e.actif_releve;});
-  var secondaires=equips.filter(function(e){return !e.actif_ronde&&!e.actif_releve;});
+  var secondaires=equips.filter(function(e){return !e.actif_ronde&&!e.actif_releve&&!e.zone_id;});
 
   // Helper: rend un groupe d'équipements groupé par type
   function _cfgBuildEquipGroup(list){
@@ -4419,7 +4419,7 @@ async function _rtConfig(sid){
   } else if(prioritaires.length===0){
     // Aucun avec suivi → message indicatif + liste complète
     listHtml+='<div style="padding:8px 12px;font-size:10px;color:var(--text3);border-bottom:1px solid var(--border)">Activez Ronde ou Relevé sur un équipement pour le faire apparaître ici</div>'+
-      _cfgBuildEquipGroup(equips);
+      (secondaires.length?_cfgBuildEquipGroup(secondaires):'');
   } else {
     // Seulement les équipements avec suivi actif (ronde ou relevé)
     listHtml+=_cfgBuildEquipGroup(prioritaires);
