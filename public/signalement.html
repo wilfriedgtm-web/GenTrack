@@ -376,11 +376,15 @@ function _renderEquipOptions(zoneIds){
   var sel=document.getElementById('sg-equip');
   var prevVal=sel.value;
   while(sel.options.length>1)sel.remove(1);
-  var list=_equips;
+  var list;
   if(zoneIds&&zoneIds.length>0){
+    // Filtrer les équipements de cette zone précise
     var filtered=_equips.filter(function(e){return zoneIds.indexOf(e.zone_id)!==-1;});
-    if(filtered.length>0)list=filtered;
-    // Si aucun équip dans ces zones → on garde tout
+    // Si aucun équipement lié à cette zone → liste vide (pas de fallback sur tout le site)
+    list=filtered;
+  } else {
+    // Pas de zone sélectionnée → on affiche les équipements sans zone (équipements généraux du site)
+    list=_equips.filter(function(e){return !e.zone_id;});
   }
   list.forEach(function(e){
     var opt=document.createElement('option');
