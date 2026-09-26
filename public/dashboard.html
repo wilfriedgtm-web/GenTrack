@@ -724,9 +724,9 @@ async function _rtAccueil(session,sid,cid){
     if(gasoilFluides&&gasoilFluides.length&&lastReleve&&lastReleve.length){
       var gf=gasoilFluides[0];
       var lr=lastReleve[0];
-      var pctVal=lr.valeurs&&lr.valeurs[gf.id]!=null?parseFloat(lr.valeurs[gf.id]):null;
-      if(pctVal!=null){
-        gasoilNiveau={pct:pctVal,litres:Math.round(pctVal/100*parseFloat(gf.capacite)),cap:parseFloat(gf.capacite),date:lr.date_releve,saisi_par:lr.saisi_par};
+      var rawVal=lr.valeurs&&lr.valeurs[gf.id]!=null?parseFloat(lr.valeurs[gf.id]):null;
+      if(rawVal!=null){
+        var cap=parseFloat(gf.capacite);var isLitres=rawVal>100;var litres=isLitres?Math.round(rawVal):Math.round(rawVal/100*cap);var pct=isLitres?Math.min(100,Math.round(rawVal/cap*100)):Math.min(100,rawVal);gasoilNiveau={pct:pct,litres:litres,cap:cap,date:lr.date_releve,saisi_par:lr.saisi_par};
       }
     }
     cuveSection=_buildCuveSection(cuveEquips,specialQs.filter(function(q){return cuveEquips.some(function(e){return e.id===q.equipement_id;})}),pleinsHist,gasoilNiveau);
