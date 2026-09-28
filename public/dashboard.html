@@ -220,6 +220,21 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .cfg-form-group{margin-bottom:14px}
 .cfg-form-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text2);display:block;margin-bottom:6px}
 .cfg-form-input,.cfg-form-select{width:100%;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;outline:none;transition:border-color .15s;background:white;font-family:inherit}
+/* Boutons génériques de modales */
+.cfg-btn{padding:9px 18px;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit}
+.cfg-btn-cancel{background:white;border:1.5px solid var(--border);color:var(--text2)}
+.cfg-btn-green{background:var(--vert);color:white;font-weight:700;border:none}
+.cfg-btn-amber{background:var(--amber);color:white;font-weight:700;border:none}
+/* Cards zones */
+.zones-card{background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.zones-card-hd{padding:10px 12px;display:flex;align-items:flex-start;gap:9px;border-bottom:1px solid var(--border)}
+.zones-card-bd{padding:8px 12px;flex:1}
+.zones-eq-row{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--dark);padding:2px 0;border-bottom:1px solid var(--border)}
+.zones-icon-btn{width:22px;height:22px;border:1px solid var(--border);border-radius:5px;background:white;color:var(--text3);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0}
+.zones-eq-del{width:16px;height:16px;border:none;background:none;color:var(--text3);cursor:pointer;font-size:10px;padding:0;flex-shrink:0;border-radius:3px}
+.zones-eq-del:hover{background:var(--rouge-pale);color:var(--rouge)}
+.zones-add-eq{margin-top:6px;width:100%;box-sizing:border-box;padding:5px;border:1.5px dashed var(--border);border-radius:7px;background:transparent;color:var(--text3);font-size:11px;cursor:pointer;font-family:inherit}
+.zones-add-eq:hover{border-color:var(--vert);color:var(--vert)}
 .cfg-form-input:focus,.cfg-form-select:focus{border-color:var(--amber)}
 .cfg-btn-primary{background:var(--amber);color:white;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s}
 .cfg-btn-primary:hover{opacity:.88}
@@ -3755,76 +3770,48 @@ async function _buildZonesConfigTab(sid){
       var cat=z.categorie||'Autre';
       var icon=_ZONE_CAT_ICONS[cat]||'📍';
       var color=_ZONE_CAT_COLORS[cat]||'var(--amber)';
-      var zNomJs=z.nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      var catJs=cat.replace(/'/g,"\\'");
-      var etageJs=(z.etage||'').replace(/'/g,"\\'");
 
-      // Équipements de salle (inventaire signalements)
-      var eqSalleHtml='';
-      if(!eqsSalle.length){
-        eqSalleHtml='<div style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:11px;color:var(--text3);font-style:italic">'+
-          '<span>⚠️</span><span>Aucun équipement — pensez à en ajouter</span></div>';
-      } else {
-        eqSalleHtml=eqsSalle.map(function(e){
-          var eNomJs=e.nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-          return '<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--dark);padding:2px 0;border-bottom:1px solid var(--border)">'+
-            '<span style="width:4px;height:4px;border-radius:50%;background:'+color+';flex-shrink:0"></span>'+
-            '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escape_html(e.nom)+'">'+escape_html(e.nom)+'</span>'+
-            '<button onclick="_zonesDeleteEqZone(\''+e.id+'\',\''+sid+'\')" title="Supprimer" '+
-              'style="width:16px;height:16px;border:none;background:none;color:var(--text3);cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;border-radius:3px" '+
-              'onmouseover="this.style.background=\'var(--rouge-pale)\';this.style.color=\'var(--rouge)\'" '+
-              'onmouseout="this.style.background=\'none\';this.style.color=\'var(--text3)\'">✕</button>'+
-          '</div>';
-        }).join('');
-      }
+      // Équipements de salle
+      var eqSalleHtml=eqsSalle.length
+        ? eqsSalle.map(function(e){
+            return '<div class="zones-eq-row">'+
+              '<span style="width:4px;height:4px;border-radius:50%;background:'+color+';flex-shrink:0"></span>'+
+              '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(e.nom)+'</span>'+
+              '<button class="zones-eq-del" onclick="_zonesDeleteEqZone(\''+e.id+'\',\''+sid+'\')" title="Supprimer">✕</button>'+
+            '</div>';
+          }).join('')
+        : '<div style="padding:4px 0;font-size:11px;color:var(--text3);font-style:italic">⚠️ Aucun équipement</div>';
 
-      // Équipements techniques (ronde/relevé) — section compacte en bas
+      // Équipements techniques (ronde/relevé) — compacts en bas
       var eqTechHtml='';
       if(eqsTech.length){
-        var eqTechNames=eqsTech.slice(0,3).map(function(e){return escape_html(e.nom);}).join(', ');
-        if(eqsTech.length>3)eqTechNames+=' +'+( eqsTech.length-3);
-        eqTechHtml='<div style="margin-top:6px;padding-top:5px;border-top:1px dashed var(--border)">'+
-          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:2px">⚙️ Ronde · Relevé</div>'+
-          '<div style="font-size:10px;color:var(--text3)">'+eqTechNames+'</div>'+
-        '</div>';
+        var names=eqsTech.slice(0,3).map(function(e){return escape_html(e.nom);}).join(', ')+(eqsTech.length>3?' +'+( eqsTech.length-3):'');
+        eqTechHtml='<div style="margin-top:6px;padding-top:5px;border-top:1px dashed var(--border);font-size:10px;color:var(--text3)">'+
+          '<span style="font-weight:700;font-size:9px;text-transform:uppercase;letter-spacing:.05em">⚙️ Ronde · Relevé&nbsp;</span>'+names+'</div>';
       }
 
-      return '<div data-zone-cat="'+escape_html(cat)+'" '+
-        'style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .15s">'+
-        // En-tête card
-        '<div style="padding:10px 12px;display:flex;align-items:flex-start;gap:9px;border-bottom:1px solid var(--border)">'+
+      return '<div class="zones-card" data-zone-cat="'+escape_html(cat)+'">'+
+        '<div class="zones-card-hd">'+
           '<div style="width:32px;height:32px;border-radius:8px;background:'+color+'22;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">'+icon+'</div>'+
           '<div style="flex:1;min-width:0">'+
-            '<div style="font-size:12px;font-weight:700;color:var(--dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escape_html(z.nom)+'">'+escape_html(z.nom)+'</div>'+
-            '<div style="font-size:10px;color:var(--text3);margin-top:1px;display:flex;align-items:center;gap:5px">'+
-              (z.etage?'<span>'+escape_html(z.etage)+'</span>':'')+
-              (z.etage&&cat?'<span>·</span>':'')+
-              '<span>'+escape_html(cat)+'</span>'+
+            '<div style="font-size:12px;font-weight:700;color:var(--dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(z.nom)+'</div>'+
+            '<div style="font-size:10px;color:var(--text3);margin-top:1px">'+
+              (z.etage?escape_html(z.etage)+' · ':'')+escape_html(cat)+
             '</div>'+
           '</div>'+
           '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">'+
             (sgCount?'<button onclick="_goToSgZone(\''+z.id+'\')" title="Voir signalements" '+
-              'style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;background:var(--rouge-pale);color:var(--rouge);border:1px solid var(--rouge-border);cursor:pointer;white-space:nowrap">'+sgCount+'</button>':'') +
-            '<button onclick="_zonesEditZoneModal(\''+z.id+'\',\''+zNomJs+'\',\''+catJs+'\',\''+etageJs+'\')" title="Modifier" '+
-              'style="width:22px;height:22px;border:1px solid var(--border);border-radius:5px;background:white;color:var(--text3);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0">✏️</button>'+
-            '<button onclick="_zonesDeleteOne(\''+z.id+'\')" title="Supprimer cette zone" '+
-              'style="width:22px;height:22px;border:1px solid var(--border);border-radius:5px;background:white;color:var(--text3);cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center;padding:0">✕</button>'+
+              'style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:10px;background:var(--rouge-pale);color:var(--rouge);border:1px solid var(--rouge-border);cursor:pointer">'+sgCount+'</button>':'')+
+            '<button class="zones-icon-btn" onclick="_zonesEditZoneById(\''+z.id+'\')" title="Modifier">✏️</button>'+
+            '<button class="zones-icon-btn" onclick="_zonesDeleteOne(\''+z.id+'\')" title="Supprimer">✕</button>'+
           '</div>'+
         '</div>'+
-        // Corps card — équipements de salle
-        '<div style="padding:8px 12px;flex:1">'+
-          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">'+
-            '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">'+
-              (eqsSalle.length?eqsSalle.length+' équipement'+(eqsSalle.length>1?'s':''):'Équipements')+
-            '</div>'+
+        '<div class="zones-card-bd">'+
+          '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px">'+
+            (eqsSalle.length?eqsSalle.length+' équipement'+(eqsSalle.length>1?'s':''):'Équipements')+
           '</div>'+
           eqSalleHtml+
-          '<button onclick="_zonesAddEqZoneModal(\''+z.id+'\',\''+zNomJs+'\',\''+sid+'\')" '+
-            'style="margin-top:6px;width:100%;padding:5px;border:1.5px dashed var(--border);border-radius:7px;background:transparent;color:var(--text3);font-size:11px;cursor:pointer;font-family:inherit;text-align:center" '+
-            'onmouseover="this.style.borderColor=\''+color+'\';this.style.color=\''+color+'\'" '+
-            'onmouseout="this.style.borderColor=\'var(--border)\';this.style.color=\'var(--text3)\'">'+
-            '+ Ajouter un équipement'+
-          '</button>'+
+          '<button class="zones-add-eq" onclick="_zonesAddEqZoneModal(\''+z.id+'\',\''+sid+'\')">+ Ajouter un équipement</button>'+
           eqTechHtml+
         '</div>'+
       '</div>';
@@ -4203,95 +4190,99 @@ async function _zonesDeleteAll(){
   if(_session)renderRespTech(_session,'config');
 }
 
-/* ── Zones : navigation vers signalements ── */
-function _goToSgZone(zoneId){
-  _sgZoneFilter=zoneId||null;
-  navTo('signalements');
+/* ── Zones helpers ── */
+function _zonesRefresh(){_zonesWizardStep=0;if(_session)renderRespTech(_session,'config');}
+function _goToSgZone(zoneId){_sgZoneFilter=zoneId||null;navTo('signalements');}
+
+function _zonesCatOpts(selected){
+  return _ZONE_CATS.map(function(c){
+    return '<option value="'+c+'"'+(c===selected?' selected':'')+'>'+(_ZONE_CAT_ICONS[c]||'')+' '+c+'</option>';
+  }).join('');
 }
 
-/* ── Zones : ajouter une zone manuellement ── */
+function _zonesModalFooter(saveId,saveLabel,saveOnclick,color){
+  color=color||'cfg-btn-green';
+  return '<div class="cfg-modal-footer">'+
+    '<button class="cfg-btn cfg-btn-cancel" onclick="_closeCfgModal()">Annuler</button>'+
+    '<button id="'+saveId+'" class="cfg-btn '+color+'" onclick="'+saveOnclick+'">'+saveLabel+'</button>'+
+  '</div>';
+}
+
+/* ── Ajouter une zone ── */
 function _zonesAddZoneModal(sid){
-  var catsOpts=_ZONE_CATS.map(function(c){return '<option value="'+c+'">'+(_ZONE_CAT_ICONS[c]||'')+'  '+c+'</option>';}).join('');
   _showCfgModal(
     '<div class="cfg-modal-title">📍 Nouvelle zone</div>'+
     '<div class="cfg-form-group"><label class="cfg-form-label">Nom / Numéro</label>'+
-      '<input id="znew-nom" class="cfg-input" placeholder="ex: 012, Lobby, Salle Acacia" autocomplete="off" style="font-size:14px">'+
+      '<input id="znew-nom" class="cfg-form-input" placeholder="ex: 012, Lobby, Salle Acacia" autocomplete="off">'+
     '</div>'+
     '<div class="cfg-form-group"><label class="cfg-form-label">Catégorie</label>'+
-      '<select id="znew-cat" class="cfg-input">'+catsOpts+'</select>'+
+      '<select id="znew-cat" class="cfg-form-select">'+_zonesCatOpts('')+'</select>'+
     '</div>'+
     '<div class="cfg-form-group"><label class="cfg-form-label">Étage (optionnel)</label>'+
-      '<input id="znew-etage" class="cfg-input" placeholder="ex: Étage 1, RDC, Sous-sol">'+
+      '<input id="znew-etage" class="cfg-form-input" placeholder="ex: Étage 1, RDC">'+
     '</div>'+
-    '<div class="cfg-modal-footer">'+
-      '<button type="button" onclick="_closeCfgModal()" style="padding:9px 18px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:13px;cursor:pointer;font-family:inherit">Annuler</button>'+
-      '<button type="button" id="znew-save-btn" onclick="_zonesSaveNew(\''+sid+'\')" style="padding:9px 18px;border:none;border-radius:8px;background:var(--vert);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Créer</button>'+
-    '</div>'
+    _zonesModalFooter('znew-save','Créer',"_zonesSaveNew('"+sid+"')")
   );
   setTimeout(function(){var el=document.getElementById('znew-nom');if(el)el.focus();},80);
 }
 
 async function _zonesSaveNew(sid){
   var nom=(document.getElementById('znew-nom').value||'').trim();
-  var cat=document.getElementById('znew-cat').value||'Autre';
-  var etage=(document.getElementById('znew-etage').value||'').trim();
   if(!nom)return;
-  var btn=document.getElementById('znew-save-btn');
+  var btn=document.getElementById('znew-save');
   if(btn){btn.disabled=true;btn.textContent='Création…';}
-  await supaPost('zones',{site_id:sid,groupe_id:sid,nom:nom,categorie:cat,etage:etage||null,actif:true,type:'salle'});
+  await supaPost('zones',{site_id:sid,groupe_id:sid,nom:nom,actif:true,type:'salle',
+    categorie:document.getElementById('znew-cat').value||'Autre',
+    etage:(document.getElementById('znew-etage').value||'').trim()||null});
   _closeCfgModal();
-  _zonesWizardStep=0;
-  if(_session)renderRespTech(_session,'config');
+  _zonesRefresh();
 }
 
-/* ── Zones : modifier une zone ── */
-function _zonesEditZoneModal(zoneId,nom,cat,etage){
-  var catsOpts=_ZONE_CATS.map(function(c){return '<option value="'+c+'"'+(c===cat?' selected':'')+'>'+(_ZONE_CAT_ICONS[c]||'')+'  '+c+'</option>';}).join('');
+/* ── Modifier une zone (depuis le cache) ── */
+function _zonesEditZoneById(zoneId){
+  var z=(window._zonesCacheZones||[]).find(function(x){return x.id===zoneId;});
+  if(!z)return;
+  var cat=z.categorie||'Autre';
   _showCfgModal(
     '<div class="cfg-modal-title">✏️ Modifier la zone</div>'+
     '<div class="cfg-form-group"><label class="cfg-form-label">Nom / Numéro</label>'+
-      '<input id="zedit-nom" class="cfg-input" value="'+escape_html(nom)+'" autocomplete="off" style="font-size:14px">'+
+      '<input id="zedit-nom" class="cfg-form-input" value="'+escape_html(z.nom)+'" autocomplete="off">'+
     '</div>'+
     '<div class="cfg-form-group"><label class="cfg-form-label">Catégorie</label>'+
-      '<select id="zedit-cat" class="cfg-input">'+catsOpts+'</select>'+
+      '<select id="zedit-cat" class="cfg-form-select">'+_zonesCatOpts(cat)+'</select>'+
     '</div>'+
     '<div class="cfg-form-group"><label class="cfg-form-label">Étage (optionnel)</label>'+
-      '<input id="zedit-etage" class="cfg-input" value="'+escape_html(etage)+'" placeholder="ex: Étage 1, RDC">'+
+      '<input id="zedit-etage" class="cfg-form-input" value="'+escape_html(z.etage||'')+'" placeholder="ex: Étage 1, RDC">'+
     '</div>'+
-    '<div class="cfg-modal-footer">'+
-      '<button type="button" onclick="_closeCfgModal()" style="padding:9px 18px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:13px;cursor:pointer;font-family:inherit">Annuler</button>'+
-      '<button type="button" id="zedit-save-btn" onclick="_zonesSaveEdit(\''+zoneId+'\')" style="padding:9px 18px;border:none;border-radius:8px;background:var(--amber);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Enregistrer</button>'+
-    '</div>'
+    _zonesModalFooter('zedit-save','Enregistrer',"_zonesSaveEdit('"+zoneId+"')",'cfg-btn-amber')
   );
   setTimeout(function(){var el=document.getElementById('zedit-nom');if(el){el.focus();el.select();}},80);
 }
 
 async function _zonesSaveEdit(zoneId){
   var nom=(document.getElementById('zedit-nom').value||'').trim();
-  var cat=document.getElementById('zedit-cat').value||'Autre';
-  var etage=(document.getElementById('zedit-etage').value||'').trim();
   if(!nom)return;
-  var btn=document.getElementById('zedit-save-btn');
+  var btn=document.getElementById('zedit-save');
   if(btn){btn.disabled=true;btn.textContent='Enregistrement…';}
-  await supaPatch('zones',zoneId,{nom:nom,categorie:cat,etage:etage||null});
+  await supaPatch('zones',zoneId,{nom:nom,
+    categorie:document.getElementById('zedit-cat').value||'Autre',
+    etage:(document.getElementById('zedit-etage').value||'').trim()||null});
   _closeCfgModal();
-  _zonesWizardStep=0;
-  if(_session)renderRespTech(_session,'config');
+  _zonesRefresh();
 }
 
-/* ── Zones : ajouter un équipement de salle ── */
-function _zonesAddEqZoneModal(zoneId,zoneNom,sid){
+/* ── Ajouter un équipement de salle ── */
+function _zonesAddEqZoneModal(zoneId,sid){
+  var z=(window._zonesCacheZones||[]).find(function(x){return x.id===zoneId;});
+  var zoneNom=z?z.nom:'';
   _showCfgModal(
     '<div class="cfg-modal-title">🔧 Ajouter un équipement</div>'+
     '<div style="font-size:12px;color:var(--text2);margin-bottom:14px">Zone : <strong>'+escape_html(zoneNom)+'</strong></div>'+
-    '<div class="cfg-form-group"><label class="cfg-form-label">Nom de l\'équipement</label>'+
-      '<input id="zeq-nom" class="cfg-input" placeholder="ex: Coffre fort, Télévision, Climatisation…" autocomplete="off" style="font-size:14px">'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Nom</label>'+
+      '<input id="zeq-nom" class="cfg-form-input" placeholder="ex: Coffre fort, Télévision, Climatisation…" autocomplete="off">'+
     '</div>'+
-    '<div id="zeq-hint" style="font-size:11px;color:var(--text3);margin-top:-8px;margin-bottom:10px">Cet équipement sera disponible dans le formulaire de signalement.</div>'+
-    '<div class="cfg-modal-footer">'+
-      '<button type="button" onclick="_closeCfgModal()" style="padding:9px 18px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:13px;cursor:pointer;font-family:inherit">Annuler</button>'+
-      '<button type="button" id="zeq-save-btn" onclick="_zonesSaveEqZone(\''+zoneId+'\',\''+sid+'\')" style="padding:9px 18px;border:none;border-radius:8px;background:var(--vert);color:white;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">Ajouter</button>'+
-    '</div>'
+    '<div style="font-size:11px;color:var(--text3);margin-top:-8px;margin-bottom:10px">Visible dans le formulaire de signalement.</div>'+
+    _zonesModalFooter('zeq-save','Ajouter',"_zonesSaveEqZone('"+zoneId+"','"+sid+"')")
   );
   setTimeout(function(){var el=document.getElementById('zeq-nom');if(el)el.focus();},80);
 }
@@ -4299,19 +4290,17 @@ function _zonesAddEqZoneModal(zoneId,zoneNom,sid){
 async function _zonesSaveEqZone(zoneId,sid){
   var nom=(document.getElementById('zeq-nom').value||'').trim();
   if(!nom)return;
-  var btn=document.getElementById('zeq-save-btn');
+  var btn=document.getElementById('zeq-save');
   if(btn){btn.disabled=true;btn.textContent='Ajout…';}
   await supaPost('equipements_zone',{site_id:sid,groupe_id:sid,zone_id:zoneId,nom:nom,actif:true});
   _closeCfgModal();
-  _zonesWizardStep=0;
-  if(_session)renderRespTech(_session,'config');
+  _zonesRefresh();
 }
 
 async function _zonesDeleteEqZone(eqId,sid){
   if(!confirm('Supprimer cet équipement ?'))return;
   await supaPatch('equipements_zone',eqId,{actif:false});
-  _zonesWizardStep=0;
-  if(_session)renderRespTech(_session,'config');
+  _zonesRefresh();
 }
 
 // ── Parser Excel (SheetJS) ──
