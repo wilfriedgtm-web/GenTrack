@@ -2395,7 +2395,8 @@ async function _sgAffecterConfirm(){
 
 function _sgAffecterMsg(r,instr,rapportUrl){
   var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
-  var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
+  var eqNom=(r.equipements&&r.equipements.nom)?r.equipements.nom
+           :(r.equipements_zone&&r.equipements_zone.nom)?r.equipements_zone.nom:'';
   return '🔧 *Intervention requise — GenTrack*\n\n'+
     '📍 *'+typeLabel+(eqNom?' · '+eqNom:'')+'*\n'+
     (r.lieu?'📍 Lieu : '+r.lieu+'\n':'')+
@@ -2422,7 +2423,8 @@ function _sgAffecter(id){
     if(!sid)return;
     var ROLE_LABELS={technicien:'Technicien',resp_tech:'Resp. technique',dir_tech:'Dir. technique'};
     var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
-    var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
+    var eqNom=(r.equipements&&r.equipements.nom)?r.equipements.nom
+             :(r.equipements_zone&&r.equipements_zone.nom)?r.equipements_zone.nom:'';
 
     supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&role=in.(technicien,resp_tech)&select=id,nom,whatsapp,role&order=role.asc,nom.asc').then(function(contacts){
       if(!contacts||!contacts.length){

@@ -554,11 +554,15 @@ async function _submit(){
   errEl.style.display='none';
 
   // Construire le champ lieu depuis zone + précision
+  var _catPfxSg={'Hébergement':'Chambre','Restauration':'Salle','Bureaux':'Bureau','Loisirs':'Espace','Spa':'Spa','Casino':'Casino','Accueil':'Accueil','Commerce':'Commerce','Technique':'Local','Circulation':'Couloir'};
   var zoneNom=null;
   var zoneId=_selectedZoneId||_lockedZoneId||null;
   if(zoneId){
     var z=_zones.find(function(z){return z.id===zoneId;});
-    if(z)zoneNom=z.nom;
+    if(z){
+      var pfx=z.categorie&&_catPfxSg[z.categorie]?_catPfxSg[z.categorie]+' ':'';
+      zoneNom=pfx+z.nom+(z.etage?' · '+z.etage:'');
+    }
   }
   var lieuFinal=[zoneNom,precision].filter(Boolean).join(' — ')||null;
 
