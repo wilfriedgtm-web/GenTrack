@@ -202,7 +202,8 @@ var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
 var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
 
 var _groupeId=null;
-var _equips=[];
+var _equips=[];       // équipements techniques (table equipements)
+var _equipZones=[];   // équipements d'inventaire de zone (table equipements_zone)
 var _zones=[];
 var _selectedZoneId=null;    // zone/sous-zone sélectionnée (chip)
 var _selectedCatZoneIds=[];  // tous les zone_id de la catégorie sélectionnée
@@ -257,14 +258,16 @@ async function init(){
 
   document.getElementById('sg-site-name').textContent=sites[0].nom||'';
 
-  // Charger zones et équipements en parallèle
+  // Charger zones, équipements techniques et équipements de zone en parallèle
   var equipParam=params.get('equip')||'';
   var results=await Promise.all([
     supa('zones','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,etage,categorie&order=ordre.asc'),
-    supa('equipements','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id,types_equipements(nom)&order=ordre_ronde.asc')
+    supa('equipements','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id,types_equipements(nom)&order=ordre_ronde.asc'),
+    supa('equipements_zone','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id&order=nom.asc')
   ]);
   _zones=results[0]||[];
   _equips=results[1]||[];
+  _equipZones=results[2]||[];
 
   // Construire les tuiles catégories
   _buildZoneTiles();
@@ -375,24 +378,43 @@ function _selectCat(tileEl,catKey,info){
 function _renderEquipOptions(zoneIds){
   var sel=document.getElementById('sg-equip');
   var prevVal=sel.value;
+  // Vider sauf le premier placeholder
   while(sel.options.length>1)sel.remove(1);
-  var list;
-  if(zoneIds&&zoneIds.length>0){
-    // Filtrer les équipements de cette zone précise
-    var filtered=_equips.filter(function(e){return zoneIds.indexOf(e.zone_id)!==-1;});
-    // Si aucun équipement lié à cette zone → liste vide (pas de fallback sur tout le site)
-    list=filtered;
-  } else {
-    // Pas de zone sélectionnée → on affiche les équipements sans zone (équipements généraux du site)
-    list=_equips.filter(function(e){return !e.zone_id;});
+
+  // ── Groupe 1 : Équipements techniques (table equipements, sans zone_id) ──
+  var techList=_equips.filter(function(e){return !e.zone_id;});
+  if(techList.length){
+    var grp1=document.createElement('optgroup');
+    grp1.label='⚙️ Équipements techniques';
+    techList.forEach(function(e){
+      var opt=document.createElement('option');
+      opt.value='eq:'+e.id;
+      opt.textContent=(e.types_equipements&&e.types_equipements.nom?e.types_equipements.nom+' — ':'')+e.nom;
+      grp1.appendChild(opt);
+    });
+    sel.appendChild(grp1);
   }
-  list.forEach(function(e){
-    var opt=document.createElement('option');
-    opt.value=e.id;
-    opt.textContent=(e.types_equipements&&e.types_equipements.nom?e.types_equipements.nom+' — ':'')+e.nom;
-    sel.appendChild(opt);
-  });
-  if(prevVal&&list.find(function(e){return e.id===prevVal;}))sel.value=prevVal;
+
+  // ── Groupe 2 : Équipements de salle (table equipements_zone) ──
+  var zoneList;
+  if(zoneIds&&zoneIds.length>0){
+    zoneList=_equipZones.filter(function(e){return zoneIds.indexOf(e.zone_id)!==-1;});
+  } else {
+    zoneList=_equipZones;
+  }
+  if(zoneList.length){
+    var grp2=document.createElement('optgroup');
+    grp2.label='🛏️ Équipements de salle';
+    zoneList.forEach(function(e){
+      var opt=document.createElement('option');
+      opt.value='ez:'+e.id;
+      opt.textContent=e.nom;
+      grp2.appendChild(opt);
+    });
+    sel.appendChild(grp2);
+  }
+
+  if(prevVal&&sel.querySelector('option[value="'+prevVal+'"]'))sel.value=prevVal;
 }
 
 function _esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -428,7 +450,9 @@ function _onPhotoChange(input){
 async function _submit(){
   var prenom=(document.getElementById('sg-prenom').value||'').trim();
   var precision=(document.getElementById('sg-lieu').value||'').trim();
-  var equipId=document.getElementById('sg-equip').value;
+  var equipRaw=document.getElementById('sg-equip').value||'';
+  var equipId=equipRaw.startsWith('eq:')?equipRaw.slice(3):(equipRaw&&!equipRaw.startsWith('ez:')?equipRaw:null);
+  var equipZoneId=equipRaw.startsWith('ez:')?equipRaw.slice(3):null;
   var desc=(document.getElementById('sg-desc').value||'').trim();
   var errEl=document.getElementById('sg-error');
 
@@ -477,6 +501,7 @@ async function _submit(){
       site_id:_groupeId,
       zone_id:zoneId||null,
       equipement_id:equipId||null,
+      equipement_zone_id:equipZoneId||null,
       signale_par:prenom||null,
       lieu:lieuFinal,
       type:_selectedType,
@@ -504,6 +529,7 @@ async function _submit(){
     // Notifier resp_tech (fire & forget)
     var equipNom=null;
     if(equipId){var eq=_equips.find(function(x){return x.id===equipId;});if(eq)equipNom=eq.nom;}
+    if(!equipNom&&equipZoneId){var eqz=_equipZones.find(function(x){return x.id===equipZoneId;});if(eqz)equipNom=eqz.nom;}
     fetch(SUPA_URL+'/functions/v1/notify-signalement',{
       method:'POST',
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},

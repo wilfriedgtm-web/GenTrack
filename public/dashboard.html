@@ -3529,7 +3529,7 @@ async function _mntCreerSubmit(sid){
 var _zonesWizardStep=0; // 0=liste 1=preview 2=equipements 3=confirm
 var _zonesWizardData=[]; // [{nom,etage,categorie,type,erreur}]
 var _zonesWizardEqSel={}; // {categorie:[nom_eq,...]}
-var _zonesWizardEqTracking={}; // {'Cat::EqNom': 'ronde'|'releve'|'none'}
+// _zonesWizardEqTracking supprimé — equipements_zone est pour signalements uniquement (pas de ronde/relevé)
 var _zonesWizardSid=null;
 var _zonesWizardDedupCount=0; // doublons supprimés auto à l'import
 
@@ -3918,19 +3918,10 @@ async function _buildZonesConfigTab(sid){
         var chk=isChecked?'checked':'';
         var catKey=cat.replace(/'/g,"\\'");
         var eqKey=eq.replace(/'/g,"\\'");
-        var trackKey=(cat+'::'+eq).replace(/[^a-z0-9]/gi,'_');
-        var tracked=_zonesWizardEqTracking[cat+'::'+eq]||'ronde';
         var perTag=isPerZone?'<span style="font-size:10px;font-weight:700;background:var(--bleu-pale);color:var(--bleu);padding:1px 7px;border-radius:3px">×'+countZones+'</span>':'';
-        var tBtns=isChecked
-          ?'<span style="display:flex;gap:3px;margin-left:4px;flex-shrink:0">'+
-            '<button id="zwt-'+trackKey+'-ronde" onclick="event.preventDefault();_zonesWizardSetTracking(\''+catKey+'\',\''+eqKey+'\',\'ronde\')" style="font-size:10px;padding:2px 7px;border-radius:4px;border:1.5px solid '+(tracked==='ronde'?'var(--vert)':'var(--border)')+';background:'+(tracked==='ronde'?'var(--vert-pale)':'white')+';color:'+(tracked==='ronde'?'var(--vert)':'var(--text3)')+';cursor:pointer;font-weight:600">Ronde</button>'+
-            '<button id="zwt-'+trackKey+'-releve" onclick="event.preventDefault();_zonesWizardSetTracking(\''+catKey+'\',\''+eqKey+'\',\'releve\')" style="font-size:10px;padding:2px 7px;border-radius:4px;border:1.5px solid '+(tracked==='releve'?'var(--bleu)':'var(--border)')+';background:'+(tracked==='releve'?'var(--bleu-pale)':'white')+';color:'+(tracked==='releve'?'var(--bleu)':'var(--text3)')+';cursor:pointer;font-weight:600">Relevé</button>'+
-            '<button id="zwt-'+trackKey+'-none" onclick="event.preventDefault();_zonesWizardSetTracking(\''+catKey+'\',\''+eqKey+'\',\'none\')" style="font-size:10px;padding:2px 7px;border-radius:4px;border:1.5px solid '+(tracked==='none'?'#888':'var(--border)')+';background:'+(tracked==='none'?'#f0f0f0':'white')+';color:'+(tracked==='none'?'var(--dark)':'var(--text3)')+';cursor:pointer">Ignorer</button>'+
-          '</span>':'';
-        return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;color:var(--dark);cursor:pointer;border-bottom:1px solid var(--border);flex-wrap:wrap">'+
+        return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px;color:var(--dark);cursor:pointer;border-bottom:1px solid var(--border)">'+
           '<input type="checkbox" '+chk+' onchange="_zonesWizardToggleEq(\''+catKey+'\',\''+eqKey+'\',this.checked)" style="accent-color:var(--amber);width:14px;height:14px;flex-shrink:0">'+
           '<span style="flex:1;display:flex;align-items:center;gap:6px">'+escape_html(eq)+perTag+'</span>'+
-          tBtns+
         '</label>';
       }).join('');
       var inputId='zw-eq-add-'+cat.replace(/[^a-z0-9]/gi,'_');
@@ -3939,7 +3930,7 @@ async function _buildZonesConfigTab(sid){
           '<div style="width:30px;height:30px;border-radius:7px;background:var(--amber-pale);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">📍</div>'+
           '<div>'+
             '<div style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(cat)+'</div>'+
-            '<div style="font-size:11px;color:var(--text3)">'+countZones+' zone'+(countZones>1?'s':'')+(isPerZone?' · équipements par zone':'')+'</div>'+
+            '<div style="font-size:11px;color:var(--text3)">'+countZones+' zone'+(countZones>1?'s':'')+(isPerZone?' · équipements par zone':'')+' · 📍 signalements uniquement</div>'+
           '</div>'+
         '</div>'+
         checkboxes+
@@ -4057,32 +4048,12 @@ function _zonesWizardToggleEq(cat,eq,on){
   var idx=arr.indexOf(eq);
   if(on&&idx<0){
     arr.push(eq);
-    // Défaut: ronde sauf si déjà défini
-    if(!_zonesWizardEqTracking[cat+'::'+eq])_zonesWizardEqTracking[cat+'::'+eq]='ronde';
   } else if(!on&&idx>=0){
     arr.splice(idx,1);
   }
   if(_session)renderRespTech(_session,'config');
 }
 
-function _zonesWizardSetTracking(cat,eq,state){
-  _zonesWizardEqTracking[cat+'::'+eq]=state;
-  // Mise à jour des boutons en place (pas de re-render complet)
-  var key=(cat+'::'+eq).replace(/[^a-z0-9]/gi,'_');
-  var styles={
-    ronde:{border:'var(--vert)',bg:'var(--vert-pale)',color:'var(--vert)'},
-    releve:{border:'var(--bleu)',bg:'var(--bleu-pale)',color:'var(--bleu)'},
-    none:{border:'#888',bg:'#f0f0f0',color:'var(--dark)'}
-  };
-  ['ronde','releve','none'].forEach(function(s){
-    var btn=document.getElementById('zwt-'+key+'-'+s);
-    if(!btn)return;
-    var active=(s===state);
-    btn.style.borderColor=active?styles[s].border:'var(--border)';
-    btn.style.background=active?styles[s].bg:'white';
-    btn.style.color=active?styles[s].color:'var(--text3)';
-  });
-}
 
 function _zonesWizardAddCustomEq(cat,inputId){
   var inp=document.getElementById(inputId);
@@ -4142,20 +4113,12 @@ async function _zonesWizardImport(){
     created=await r.json();
   }catch(err){if(statusEl)statusEl.textContent='Erreur réseau: '+err.message;return;}
 
-  // Créer les équipements liés (en respectant le choix Ronde/Relevé/Ignorer)
+  // Créer les équipements liés dans equipements_zone (signalements uniquement)
   var eqRows=[];
   created.forEach(function(z){
     var eqs=_zonesWizardEqSel[z.categorie]||[];
     eqs.forEach(function(eqNom){
-      var tracking=_zonesWizardEqTracking[z.categorie+'::'+eqNom]||'ronde';
-      // 'none' = signalement uniquement : on crée quand même l'équipement (visible dans les signalements)
-      // mais avec actif_ronde et actif_releve à false → n'apparaît pas dans les rondes/relevés
-      eqRows.push({
-        site_id:sid,zone_id:z.id,nom:eqNom+' — '+z.nom,actif:true,
-        actif_ronde:tracking==='ronde',
-        actif_releve:tracking==='releve',
-        photo_requise:false,ordre_ronde:0
-      });
+      eqRows.push({site_id:sid,zone_id:z.id,nom:eqNom+' — '+z.nom,actif:true});
     });
   });
 
@@ -4174,7 +4137,6 @@ async function _zonesWizardImport(){
   _zonesWizardStep=0;
   _zonesWizardData=[];
   _zonesWizardEqSel={};
-  _zonesWizardEqTracking={};
   if(_session)renderRespTech(_session,'config');
 }
 
