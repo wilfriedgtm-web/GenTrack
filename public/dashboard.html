@@ -6159,7 +6159,7 @@ async function _dtAccueil(session,sids,cid){
     supaGet('signalements','groupe_id=in.('+sidStr+')&type=eq.panne&created_at=gte.'+since7+'&select=id,groupe_id,type,description,created_at,statut,equipements(nom)&order=created_at.desc&limit=30'),
     supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,devise&order=ordre.asc'),
     supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+moisDebut+'&select=site_id,date_releve,valeurs&order=date_releve.asc&limit=300'),
-    supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+since30+'T00:00:00&select=id,groupe_id,equipement_id,equipement_zone_id,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=600')
+    supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+since30+'T00:00:00&select=id,groupe_id,equipement_id,equipement_zone_id,lieu,description,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=600')
   ]);
 
   var rIds=rondes.map(function(r){return r.id;});
@@ -6239,7 +6239,11 @@ async function _dtAccueil(session,sids,cid){
     else if(s.equipements_zone&&s.equipements_zone.nom){
       key='ez_'+s.equipement_zone_id;
       nom=s.equipements_zone.nom+(s.equipements_zone.zones&&s.equipements_zone.zones.nom?' · '+s.equipements_zone.zones.nom:'');
-    }else{key='_unknown';nom='Équipement non défini';}
+    }else{
+      var _desc=s.lieu||(s.description?s.description.substring(0,40):null);
+      key=_desc?'desc_'+_desc:'_unknown';
+      nom=_desc?_desc:'Sans équipement lié';
+    }
     if(!topSigsBySite[s.groupe_id][key])topSigsBySite[s.groupe_id][key]={nom:nom,count:0,isZone:!!s.equipement_zone_id};
     topSigsBySite[s.groupe_id][key].count++;
   });
@@ -8586,17 +8590,19 @@ async function _openRapportDT(period){
     var periodeStr=dateDebut.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})+' – '+dateFin.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
     var sidStr=sids.join(',');
 
-    var[sites,pleins,maintenances,signalements,rondes]=await Promise.all([
+    var[sites,pleins,maintenances,signalements,rondes,energieFluidesDT,relevesEnergieDT]=await Promise.all([
       supaGet('sites','id=in.('+sidStr+')&select=id,nom'),
       supaGet('pleins','site_id=in.('+sidStr+')&date=gte.'+cutoff+'&select=id,site_id,litres_ajoutes,cout,date&order=date.asc'),
       supaGet('maintenances','groupe_id=in.('+sidStr+')&date_intervention=gte.'+cutoff+'&select=id,groupe_id,type,titre,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=200'),
-      supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+cutoff+'T00:00:00&select=id,groupe_id,type,description,statut,signale_par,cout_intervention,created_at,resolved_at,equipement_id,equipements(nom)&order=created_at.desc&limit=200'),
-      supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+cutoff+'&select=id,site_id,date_ronde,frequence&order=date_ronde.asc&limit=500')
+      supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+cutoff+'T00:00:00&select=id,groupe_id,type,description,statut,signale_par,cout_intervention,created_at,resolved_at,equipement_id,equipement_zone_id,lieu,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=200'),
+      supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+cutoff+'&select=id,site_id,date_ronde,frequence&order=date_ronde.asc&limit=500'),
+      supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel&order=ordre.asc'),
+      supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+cutoff+'&select=site_id,date_releve,valeurs&order=date_releve.asc&limit=500')
     ]);
     var rIds=rondes.map(function(r){return r.id;});
     var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,equipement_id,statut'):[];
 
-    var html=_buildRapportDirTech(period,periodeStr,_session,sites,pleins,maintenances,signalements,rondes,rondesEq);
+    var html=_buildRapportDirTech(period,periodeStr,_session,sites,pleins,maintenances,signalements,rondes,rondesEq,energieFluidesDT||[],relevesEnergieDT||[]);
     var w=window.open('','_blank');
     if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
     w.document.write(html);w.document.close();
@@ -8604,7 +8610,9 @@ async function _openRapportDT(period){
   finally{if(btn){btn.disabled=false;btn.textContent='📊 Rapport ▾';}}
 }
 
-function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenances,signalements,rondes,rondesEq){
+function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenances,signalements,rondes,rondesEq,energieFluidesDT,relevesEnergieDT){
+  var HCOLS=['#C49A1C','#2D7A4F','#3498DB','#D4761E','#8E44AD','#E74C3C'];
+  var HCOLS_PALE=['#FDF3E3','#E8F5EE','#EBF5FB','#FDF0E6','#F5EEF8','#FDEDEC'];
   var dirNom=(session.contact&&session.contact.nom)||'Directeur technique';
   var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
@@ -8628,33 +8636,49 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   function fmtDur(h){if(h===null||h===undefined)return'—';if(h<1)return Math.round(h*60)+'min';if(h<48)return h.toFixed(1)+'h';return(h/24).toFixed(1)+'j';}
   function kpiCol(val,s1,s2,inv){if(val===null||val===undefined)return'#888';if(inv)return val<=s1?'#2D7A4F':val<=s2?'#C49A1C':'#C0392B';return val>=s2?'#2D7A4F':val>=s1?'#C49A1C':'#C0392B';}
 
+  // ── Énergie : conso sur la période par site/fluide ──
+  var _efBySite={};
+  (energieFluidesDT||[]).forEach(function(f){if(!_efBySite[f.site_id])_efBySite[f.site_id]=[];_efBySite[f.site_id].push(f);});
+  var _relBySite={};
+  (relevesEnergieDT||[]).forEach(function(r){if(!_relBySite[r.site_id])_relBySite[r.site_id]=[];_relBySite[r.site_id].push(r);});
+  var energieBySite={};
+  sites.forEach(function(site){
+    var fls=_efBySite[site.id]||[];if(!fls.length)return;
+    var rels=(_relBySite[site.id]||[]).slice().sort(function(a,b){return a.date_releve.localeCompare(b.date_releve);});
+    var first=rels.length?rels[0]:null,last=rels.length?rels[rels.length-1]:null;
+    var items=fls.map(function(f){
+      var conso=null;
+      if(f.type_valeur==='index'){
+        var vf=first&&first.valeurs&&first.valeurs[f.id];
+        var vl=last&&last.valeurs&&last.valeurs[f.id];
+        conso=(vf!=null&&vl!=null)?Math.max(0,parseFloat(vl)-parseFloat(vf)):null;
+      }else{var vl2=last&&last.valeurs&&last.valeurs[f.id];conso=vl2!=null?parseFloat(vl2):null;}
+      var objPeriode=f.objectif_mensuel!=null?Math.round(parseFloat(f.objectif_mensuel)*period/30):null;
+      var pct=conso!=null&&objPeriode?Math.round(conso/objPeriode*100):null;
+      return{nom:f.nom,unite:f.unite||'',conso:conso!=null?Math.round(conso):null,obj:objPeriode,pct:pct};
+    });
+    energieBySite[site.id]=items;
+  });
+
+  // ── Top signalements (groupés eq/zone/lieu/description) ──
+  var topSigsAll={};
+  signalements.forEach(function(s){
+    var eqLabel,siteId=s.groupe_id;
+    if(s.equipements&&s.equipements.nom){eqLabel=s.equipements.nom;}
+    else if(s.equipements_zone&&s.equipements_zone.nom){eqLabel=s.equipements_zone.nom+(s.equipements_zone.zones&&s.equipements_zone.zones.nom?' · '+s.equipements_zone.zones.nom:'');}
+    else{eqLabel=s.lieu||(s.description?s.description.substring(0,40):'Sans équipement lié');}
+    var key=siteId+'__'+eqLabel;
+    if(!topSigsAll[key])topSigsAll[key]={eqLabel:eqLabel,siteId:siteId,siteNom:siteMap[siteId]||siteId,count:0};
+    topSigsAll[key].count++;
+  });
+  var topSigsList=Object.values(topSigsAll).sort(function(a,b){return b.count-a.count;}).slice(0,8);
+
   // ── Narratives ──
   var narGlobal='Bilan sur la période du '+periodeStr+'. ';
   if(confPct!==null)narGlobal+='Taux de conformité rondes (multi-sites) : '+confPct+'%. ';
-  narGlobal+=totLitres>0?'Consommation carburant : '+Math.round(totLitres).toLocaleString('fr-FR')+' L'+( totCarb>0?' ('+totCarb.toLocaleString('fr-FR')+' FCFA)':'')+'. ':'';
+  narGlobal+=totLitres>0?'Consommation carburant : '+Math.round(totLitres).toLocaleString('fr-FR')+' L'+(totCarb>0?' ('+totCarb.toLocaleString('fr-FR')+' FCFA)':'')+'. ':'';
   narGlobal+=totPannes>0?totPannes+' panne'+(totPannes>1?'s':'')+' active'+(totPannes>1?'s':'')+' en cours. ':'Aucune panne active. ';
-  narGlobal+=totMnt>0?totMnt+' intervention'+(totMnt>1?'s':'')+' de maintenance'+( totMntCout>0?' pour '+totMntCout.toLocaleString('fr-FR')+' FCFA':'')+'.':'';
-
-  // ── SVG bar chart ──
-  function svgBarChart(data,labels,maxVal,colors,unit){
-    if(!data.length)return '';
-    var W=500,H=90,BW=Math.min(60,Math.floor((W-40)/data.length)-8),gap=(W-40-BW*data.length)/(data.length+1);
-    var html='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-height:110px" xmlns="http://www.w3.org/2000/svg">';
-    data.forEach(function(v,i){
-      var x=40+gap*(i+1)+BW*i;
-      var barH=maxVal>0?Math.round((v/maxVal)*(H-30)):0;
-      var y=H-20-barH;
-      html+='<rect x="'+x+'" y="'+y+'" width="'+BW+'" height="'+barH+'" rx="3" fill="'+(colors[i]||'#C49A1C')+'"/>';
-      html+='<text x="'+(x+BW/2)+'" y="'+(H-6)+'" text-anchor="middle" font-size="8" fill="#A8957E" font-family="Inter,sans-serif">'+escape_html(labels[i].substring(0,8))+'</text>';
-      if(v>0)html+='<text x="'+(x+BW/2)+'" y="'+(y-3)+'" text-anchor="middle" font-size="7.5" fill="#666" font-family="Inter,sans-serif">'+( unit==='L'?Math.round(v).toLocaleString('fr-FR'):v)+'</text>';
-    });
-    html+='</svg>';
-    return html;
-  }
-
-  var siteIds=sites.map(function(s){return s.id;});
-  var siteNoms=sites.map(function(s){return s.nom;});
-  var barColors=['#C49A1C','#2D7A4F','#D4761E','#3498DB','#8E44AD','#E74C3C'];
+  narGlobal+=totMnt>0?totMnt+' intervention'+(totMnt>1?'s':'')+' de maintenance'+(totMntCout>0?' pour '+totMntCout.toLocaleString('fr-FR')+' FCFA':'')+'.':'';
 
   // ── HTML ──
   var h='';
@@ -8665,35 +8689,44 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
     '<button class="btn-close" onclick="window.close()">Fermer</button>'+
   '</div>';
 
-  // En-tête
-  h+='<div class="report-header">'+
-    '<div><div class="report-logo">GenTrack</div><div class="report-sub">Rapport de direction technique</div></div>'+
-    '<div class="report-meta">'+
-      '<div class="report-site">Portefeuille — '+sites.length+' hôtel'+(sites.length>1?'s':'')+'</div>'+
-      '<div>Période : '+escape_html(periodeStr)+'</div>'+
-      '<div>Directeur technique : '+escape_html(dirNom)+'</div>'+
-      '<div>Généré le '+genDate+'</div>'+
+  // ── COUVERTURE (fond sombre) ──
+  h+='<div style="background:#1A1411;border-radius:10px;padding:32px 36px;margin-bottom:32px;page-break-after:avoid">'+
+    '<div class="report-logo" style="color:#E8C87A;margin-bottom:3px">GenTrack</div>'+
+    '<div class="report-sub" style="margin-bottom:20px">Rapport de direction technique</div>'+
+    '<div style="font-size:15px;font-weight:600;color:white;margin-bottom:5px">Bilan multi-sites · '+period+' derniers jours</div>'+
+    '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:2px">Période : '+escape_html(periodeStr)+'</div>'+
+    '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:2px">Directeur technique : '+escape_html(dirNom)+'</div>'+
+    '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:20px">Généré le '+genDate+'</div>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:7px">'+
+      sites.map(function(s,i){var col=HCOLS[i%HCOLS.length];return'<div style="display:inline-flex;align-items:center;gap:6px;background:'+col+'22;border:1px solid '+col+'55;border-radius:6px;padding:4px 11px;font-size:11px;color:'+col+';font-weight:500"><div style="width:7px;height:7px;border-radius:50%;background:'+col+'"></div>'+escape_html(s.nom)+'</div>';}).join('')+
     '</div>'+
   '</div>';
 
-  // KPIs globaux
+  // ── KPIs globaux ──
   h+='<div class="kpi-row">'+
     '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+kpiCol(confPct,70,90,false)+'">'+(confPct!==null?confPct+'%':'—')+'</div><div class="kpi-sub">Tous sites · '+period+' jours</div></div>'+
     '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+' FCFA':'Coût non saisi')+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+kpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-sub">'+totMnt+' intervention'+(totMnt>1?'s':'')+' maintenance</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+kpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-sub">MTTR moy. : '+fmtDur(avgMttr)+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Coût total</div><div class="kpi-value">'+(totCarb+totMntCout>0?(totCarb+totMntCout).toLocaleString('fr-FR'):'—')+'</div><div class="kpi-sub">FCFA (carburant + maintenance)</div></div>'+
   '</div>';
 
-  // ── Tableau de bord par site ──
-  h+='<h2>Tableau de bord par hôtel</h2>'+
+  // ── Légende couleurs (réutilisée partout) ──
+  h+='<div style="display:flex;flex-wrap:wrap;gap:12px;margin:-8px 0 20px">'+
+    sites.map(function(s,i){var col=HCOLS[i%HCOLS.length];return'<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:9px;height:9px;border-radius:50%;background:'+col+'"></div>'+escape_html(s.nom)+'</div>';}).join('')+
+  '</div>';
+
+  // ── Tableau comparatif ──
+  var hasEnergie=Object.keys(energieBySite).length>0;
+  h+='<h2>Comparatif par hôtel</h2>'+
     '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px"><thead><tr>'+
-      '<th style="text-align:left;padding:8px 12px;background:#F0EBE3;color:var(--text2);font-weight:600">Hôtel</th>'+
-      '<th style="padding:8px 12px;background:#F0EBE3;color:var(--text2);font-weight:600;text-align:center">Rondes</th>'+
-      '<th style="padding:8px 12px;background:#F0EBE3;color:var(--text2);font-weight:600;text-align:center">Pannes actives</th>'+
-      '<th style="padding:8px 12px;background:#F0EBE3;color:var(--text2);font-weight:600;text-align:center">MTTR moy.</th>'+
-      '<th style="padding:8px 12px;background:#F0EBE3;color:var(--text2);font-weight:600;text-align:center">Carburant</th>'+
-      '<th style="padding:8px 12px;background:#F0EBE3;color:var(--text2);font-weight:600;text-align:center">Coût total</th>'+
-      '<th style="padding:8px 12px;background:#F0EBE3;color:var(--text2);font-weight:600;text-align:center">Statut</th>'+
+      '<th>Hôtel</th>'+
+      '<th style="text-align:center">Rondes</th>'+
+      '<th style="text-align:center">Pannes</th>'+
+      '<th style="text-align:center">MTTR</th>'+
+      '<th style="text-align:center">Carburant</th>'+
+      '<th style="text-align:center">Coût total</th>'+
+      (hasEnergie?'<th style="text-align:center">Énergie</th>':'')+
+      '<th style="text-align:center">Statut</th>'+
     '</tr></thead><tbody>'+
     sites.map(function(site,i){
       var d=siteData[site.id];
@@ -8701,72 +8734,86 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
       var total=d.coutCarb+d.mntCout+d.panneCout;
       var critique=sConf!==null&&sConf<70||d.pannes>=3;
       var excellent=(sConf===null||sConf>=90)&&d.pannes===0;
-      var score=critique?'🔴 Critique':excellent?'🟢 Bon':'🟡 À surveiller';
+      var scoreLabel=critique?'Critique':excellent?'Bon':'À surveiller';
       var scoreCol=critique?'#C0392B':excellent?'#2D7A4F':'#C49A1C';
-      var mttrCol=d.mttr===null?'var(--text3)':d.mttr<=2?'#2D7A4F':d.mttr<=8?'#C49A1C':'#C0392B';
-      return '<tr style="background:'+(i%2?'#FAFAF8':'white')+';border-bottom:1px solid #F0EBE3">'+
-        '<td style="padding:9px 12px;font-weight:700;color:var(--dark)">'+escape_html(site.nom)+'</td>'+
-        '<td style="padding:9px 12px;text-align:center;font-weight:700;color:'+kpiCol(sConf,70,90,false)+'">'+(sConf!==null?sConf+'%':'—')+'</td>'+
-        '<td style="padding:9px 12px;text-align:center;font-weight:700;color:'+kpiCol(d.pannes,1,3,true)+'">'+d.pannes+'</td>'+
-        '<td style="padding:9px 12px;text-align:center;font-weight:700;color:'+mttrCol+'">'+fmtDur(d.mttr)+'</td>'+
-        '<td style="padding:9px 12px;text-align:center;color:var(--text2)">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</td>'+
-        '<td style="padding:9px 12px;text-align:center;color:var(--text2)">'+(total>0?total.toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
-        '<td style="padding:9px 12px;text-align:center;font-weight:700;color:'+scoreCol+'">'+score+'</td>'+
+      var scoreBg=critique?'#FDECEA':excellent?'#E8F5EE':'#FEF3E2';
+      var mttrCol=d.mttr===null?'#888':d.mttr<=2?'#2D7A4F':d.mttr<=8?'#C49A1C':'#C0392B';
+      var col=HCOLS[i%HCOLS.length];
+      var rBarW=sConf!=null?Math.min(100,sConf):0;
+      var rBarCol=kpiCol(sConf,70,90,false);
+      var efItems=energieBySite[site.id]||[];
+      var efWithPct=efItems.filter(function(f){return f.pct!=null;});
+      var efAvgPct=efWithPct.length?Math.round(efWithPct.reduce(function(a,f){return a+f.pct;},0)/efWithPct.length):null;
+      var efCol=efAvgPct==null?'#888':efAvgPct>100?'#C0392B':efAvgPct>85?'#C49A1C':'#2D7A4F';
+      var efLabel=efAvgPct==null?'—':efAvgPct+'%';
+      return '<tr style="background:'+(i%2?'#FAFAF8':'white')+';border-bottom:1px solid #EDE5D8">'+
+        '<td style="padding:9px 11px"><div style="display:flex;align-items:center;gap:7px"><div style="width:9px;height:9px;border-radius:50%;background:'+col+';flex-shrink:0"></div><span style="font-weight:600;color:var(--dark)">'+escape_html(site.nom)+'</span></div></td>'+
+        '<td style="padding:9px 11px"><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;height:5px;background:#EDE5D8;border-radius:3px;overflow:hidden;min-width:40px"><div style="width:'+rBarW+'%;height:100%;border-radius:3px;background:'+rBarCol+'"></div></div><span style="font-size:11px;font-weight:600;color:'+rBarCol+';min-width:28px;text-align:right">'+(sConf!==null?sConf+'%':'—')+'</span></div></td>'+
+        '<td style="text-align:center;padding:9px 11px;font-weight:700;color:'+kpiCol(d.pannes,1,3,true)+'">'+d.pannes+'</td>'+
+        '<td style="text-align:center;padding:9px 11px;font-weight:600;color:'+mttrCol+'">'+fmtDur(d.mttr)+'</td>'+
+        '<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</td>'+
+        '<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+(total>0?total.toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+        (hasEnergie?'<td style="text-align:center;padding:9px 11px;font-weight:600;color:'+efCol+'">'+efLabel+'</td>':'')+
+        '<td style="text-align:center;padding:9px 11px"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:'+scoreBg+';color:'+scoreCol+'">'+scoreLabel+'</span></td>'+
       '</tr>';
     }).join('')+
     '</tbody></table>';
 
-  // ── Référentiel normes ──
-  h+='<div style="margin:0 0 24px;background:#FAFAF8;border:1px solid #E8DFD0;border-radius:10px;padding:16px 20px;page-break-inside:avoid">'+
-    '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">📋 Référentiel de performance</div>'+
-    '<table style="width:100%;border-collapse:collapse;font-size:11px">'+
-      '<thead><tr>'+
-        '<th style="text-align:left;padding:6px 10px;background:#F0EBE3;color:var(--text2);font-weight:600">Indicateur</th>'+
-        '<th style="padding:6px 10px;background:#E8F5EE;color:#2D7A4F;font-weight:700;text-align:center">✓ Bon</th>'+
-        '<th style="padding:6px 10px;background:#FEF3E2;color:#C49A1C;font-weight:700;text-align:center">⚠ À surveiller</th>'+
-        '<th style="padding:6px 10px;background:#FDECEA;color:#C0392B;font-weight:700;text-align:center">✗ Critique</th>'+
-        '<th style="padding:6px 10px;background:#F0EBE3;color:var(--text2);font-weight:600;text-align:center">Valeur portfolio</th>'+
-      '</tr></thead><tbody>'+
-      [
-        {label:'Conformité rondes (global)',bon:'≥ 90%',surv:'70 – 89%',crit:'< 70%',val:confPct!==null?confPct+'%':'—',col:kpiCol(confPct,70,90,false)},
-        {label:'Pannes actives (total)',bon:'0',surv:'1 – 3',crit:'≥ 4',val:String(totPannes),col:kpiCol(totPannes,1,4,true)},
-        {label:'Sites en état critique',bon:'0',surv:'1',crit:'≥ 2',val:String(sites.filter(function(s){var d=siteData[s.id];var sConf=d.rondesTot>0?Math.round(d.rondesVal/d.rondesTot*100):null;return(sConf!==null&&sConf<70)||d.pannes>=3;}).length),col:kpiCol(sites.filter(function(s){var d=siteData[s.id];var sConf=d.rondesTot>0?Math.round(d.rondesVal/d.rondesTot*100):null;return(sConf!==null&&sConf<70)||d.pannes>=3;}).length,1,2,true)},
-        {label:'MTTR moyen groupe (temps résolution)',bon:'≤ 2h',surv:'2h – 8h',crit:'> 8h',val:fmtDur(avgMttr),col:avgMttr===null?'#888':avgMttr<=2?'#2D7A4F':avgMttr<=8?'#C49A1C':'#C0392B'},
-      ].map(function(r,i){return'<tr style="background:'+(i%2?'#FAFAF8':'white')+'">'+
-        '<td style="padding:7px 10px;font-weight:500;color:var(--dark)">'+escape_html(r.label)+'</td>'+
-        '<td style="padding:7px 10px;text-align:center;color:#2D7A4F">'+r.bon+'</td>'+
-        '<td style="padding:7px 10px;text-align:center;color:#C49A1C">'+r.surv+'</td>'+
-        '<td style="padding:7px 10px;text-align:center;color:#C0392B">'+r.crit+'</td>'+
-        '<td style="padding:7px 10px;text-align:center;font-weight:800;color:'+r.col+'">'+r.val+'</td>'+
-      '</tr>';}).join('')+
-    '</tbody></table>'+
-  '</div>';
+  // ── Section Énergie ──
+  var efSitesList=sites.filter(function(s){return energieBySite[s.id]&&energieBySite[s.id].length;});
+  if(efSitesList.length){
+    h+='<h2>Énergie — consommation vs objectif</h2>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px">';
+    efSitesList.forEach(function(site){
+      var si=sites.indexOf(site);
+      var col=HCOLS[si%HCOLS.length];
+      var items=energieBySite[site.id];
+      h+='<div style="flex:1;min-width:150px;background:#F9F6F0;border:1px solid var(--border);border-radius:8px;padding:14px 16px;page-break-inside:avoid">'+
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">'+
+          '<div style="width:8px;height:8px;border-radius:50%;background:'+col+'"></div>'+
+          '<div style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px">'+escape_html(site.nom)+'</div>'+
+        '</div>'+
+        items.map(function(f){
+          var col2=f.pct!=null?(f.pct>100?'#C0392B':f.pct>85?'#C49A1C':'#2D7A4F'):'#888';
+          return '<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)">'+
+            '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">'+
+              '<span style="color:var(--text2)">'+escape_html(f.nom)+'</span>'+
+              '<span style="font-weight:600;color:'+col2+'">'+(f.conso!=null?f.conso.toLocaleString('fr-FR')+' '+f.unite:'—')+'</span>'+
+            '</div>'+
+            (f.pct!=null?'<div style="height:4px;background:#EDE5D8;border-radius:2px;overflow:hidden"><div style="width:'+Math.min(100,f.pct)+'%;height:100%;border-radius:2px;background:'+col2+'"></div></div><div style="font-size:10px;color:'+col2+';text-align:right;margin-top:2px">'+f.pct+'% de l\'objectif</div>':'')+
+          '</div>';
+        }).join('')+
+      '</div>';
+    });
+    h+='</div>';
+  }
 
-  // Synthèse narrative
+  // ── Top signalements ──
+  if(topSigsList.length){
+    h+='<h2>Top signalements · '+period+' jours</h2>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px"><thead><tr>'+
+        '<th>Équipement / Zone / Lieu</th>'+
+        '<th>Hôtel</th>'+
+        '<th style="text-align:center">Occurrences</th>'+
+      '</tr></thead><tbody>'+
+      topSigsList.map(function(t,i){
+        var siteIdx=sites.findIndex(function(s){return s.id===t.siteId;});
+        var col=siteIdx>=0?HCOLS[siteIdx%HCOLS.length]:'#888';
+        return '<tr style="background:'+(i%2?'#FAFAF8':'white')+';border-bottom:1px solid #EDE5D8">'+
+          '<td style="padding:8px 11px;font-weight:500;color:var(--dark)">'+escape_html(t.eqLabel)+'</td>'+
+          '<td style="padding:8px 11px"><div style="display:flex;align-items:center;gap:6px"><div style="width:8px;height:8px;border-radius:50%;background:'+col+'"></div><span style="color:var(--text2)">'+escape_html(t.siteNom)+'</span></div></td>'+
+          '<td style="text-align:center;padding:8px 11px;font-weight:700;font-size:13px;color:'+col+'">'+t.count+'×</td>'+
+        '</tr>';
+      }).join('')+
+      '</tbody></table>';
+  }
+
+  // ── Synthèse narrative ──
   h+='<h2>Synthèse de direction</h2>'+
     '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
     '<p class="narrative" contenteditable="true">'+escape_html(narGlobal)+'</p>';
 
-  // Graphiques comparatifs
-  if(sites.length>1){
-    h+='<h2>Comparatif multi-sites</h2>';
-    var litresVals=siteIds.map(function(id){return siteData[id].litres;});
-    var maxLitres=Math.max.apply(null,litresVals)||1;
-    h+='<div style="margin-bottom:18px">'+
-      '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Consommation carburant (L)</div>'+
-      svgBarChart(litresVals,siteNoms,maxLitres,barColors,'L')+
-    '</div>';
-    var coutVals=siteIds.map(function(id){return siteData[id].coutCarb+siteData[id].mntCout+siteData[id].panneCout;});
-    var maxCout=Math.max.apply(null,coutVals)||1;
-    if(maxCout>0){
-      h+='<div style="margin-bottom:18px">'+
-        '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Coût total (FCFA)</div>'+
-        svgBarChart(coutVals,siteNoms,maxCout,barColors,'FCFA')+
-      '</div>';
-    }
-  }
-
-  // Section par site
+  // ── Détail par hôtel ──
   h+='<h2>Détail par hôtel</h2>';
   sites.forEach(function(site,si){
     var d=siteData[site.id];
@@ -8774,59 +8821,67 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
     var total=d.coutCarb+d.mntCout+d.panneCout;
     var siteSignalements=signalements.filter(function(s){return s.groupe_id===site.id;});
     var siteMaintenances=maintenances.filter(function(m){return m.groupe_id===site.id;});
+    var col=HCOLS[si%HCOLS.length];
+    var pale=HCOLS_PALE[si%HCOLS_PALE.length];
+    var critique=sConf!==null&&sConf<70||d.pannes>=3;
+    var excellent=(sConf===null||sConf>=90)&&d.pannes===0;
+    var scoreLabel=critique?'Critique':excellent?'Bon':'À surveiller';
+    var scoreCol=critique?'#C0392B':excellent?'#2D7A4F':'#C49A1C';
+    var scoreBg=critique?'#FDECEA':excellent?'#E8F5EE':'#FEF3E2';
 
-    h+='<div style="border:1.5px solid #E8DFD0;border-radius:12px;padding:18px 22px;margin-bottom:24px;page-break-inside:avoid">'+
-      '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px">'+
-        '<span style="font-size:15px;font-weight:700;color:#1A1411">🏨 '+escape_html(site.nom)+'</span>'+
-        (total>0?'<span style="font-size:12px;font-weight:600;color:var(--text2)">'+total.toLocaleString('fr-FR')+' FCFA total</span>':'')+
+    h+='<div style="display:grid;grid-template-columns:4px 1fr;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:24px;page-break-inside:avoid">'+
+      '<div style="background:'+col+'"></div>'+
+      '<div style="padding:18px 22px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
+          '<div style="display:flex;align-items:center;gap:8px">'+
+            '<div style="width:10px;height:10px;border-radius:50%;background:'+col+'"></div>'+
+            '<span style="font-family:\'Cormorant Garamond\',serif;font-size:16px;font-weight:600;color:var(--dark)">'+escape_html(site.nom)+'</span>'+
+          '</div>'+
+          '<span style="display:inline-block;padding:3px 10px;border-radius:5px;font-size:10px;font-weight:600;background:'+scoreBg+';color:'+scoreCol+'">'+scoreLabel+'</span>'+
+        '</div>'+
+        '<div class="kpi-row" style="margin-bottom:14px">'+
+          '<div class="kpi"><div class="kpi-label">Rondes</div><div class="kpi-value" style="font-size:20px;color:'+kpiCol(sConf,70,90,false)+'">'+(sConf!==null?sConf+'%':'—')+'</div><div class="kpi-sub">'+d.rondes+' rondes</div></div>'+
+          '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="font-size:20px;color:'+kpiCol(d.pannes,1,3,true)+'">'+d.pannes+'</div><div class="kpi-sub">'+d.pannesTot+' total période</div></div>'+
+          '<div class="kpi"><div class="kpi-label">MTTR moyen</div><div class="kpi-value" style="font-size:20px;color:'+(d.mttr===null?'#888':d.mttr<=2?'#2D7A4F':d.mttr<=8?'#C49A1C':'#C0392B')+'">'+fmtDur(d.mttr)+'</div><div class="kpi-sub">temps résolution</div></div>'+
+          '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value" style="font-size:20px">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
+          (total>0?'<div class="kpi" style="border-color:'+col+'55;background:'+pale+'"><div class="kpi-label">Coût total</div><div class="kpi-value" style="font-size:20px;color:'+col+'">'+total.toLocaleString('fr-FR')+'</div><div class="kpi-sub">FCFA</div></div>':'')+
+        '</div>'+
+        '<div class="edit-hint">Observations (modifiable)</div>'+
+        '<div class="obs-zone" contenteditable="true" data-placeholder="Observations pour '+escape_html(site.nom)+' : constats, recommandations, actions..."></div>'+
+        (siteSignalements.length>0?
+          '<div style="margin-top:14px"><div style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Signalements</div>'+
+          '<table><thead><tr><th>Équipement / Zone / Lieu</th><th>Description</th><th>Date</th><th>Statut</th><th>Coût</th></tr></thead><tbody>'+
+          siteSignalements.slice(0,15).map(function(s){
+            var ts=new Date(s.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+            var resolu=s.statut==='resolu';
+            var eqNom=s.equipements&&s.equipements.nom?s.equipements.nom
+              :s.equipements_zone&&s.equipements_zone.nom?(s.equipements_zone.nom+(s.equipements_zone.zones&&s.equipements_zone.zones.nom?' · '+s.equipements_zone.zones.nom:''))
+              :s.lieu||'—';
+            return '<tr>'+
+              '<td style="font-weight:500">'+escape_html(eqNom)+'</td>'+
+              '<td style="max-width:220px;color:var(--text2)">'+escape_html((s.description||'').substring(0,70))+'</td>'+
+              '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
+              '<td>'+(resolu?'<span class="badge badge-ok">Résolu</span>':'<span class="badge badge-ko">En cours</span>')+'</td>'+
+              '<td style="font-size:11px">'+(s.cout_intervention?Number(s.cout_intervention).toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+            '</tr>';
+          }).join('')+
+          '</tbody></table></div>':'')+
+        (siteMaintenances.length>0?
+          '<div style="margin-top:14px"><div style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Interventions maintenance</div>'+
+          '<table><thead><tr><th>Intervention</th><th>Type</th><th>Intervenant</th><th>Date</th><th>Coût</th></tr></thead><tbody>'+
+          siteMaintenances.slice(0,15).map(function(m){
+            var ts=m.date_intervention?new Date(m.date_intervention).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
+            var eqNom=m.equipements&&m.equipements.nom?' · '+m.equipements.nom:'';
+            return '<tr>'+
+              '<td><strong>'+escape_html(m.titre||'Intervention')+'</strong>'+escape_html(eqNom)+'</td>'+
+              '<td style="font-size:11px;color:var(--text2)">'+escape_html(m.type||'—')+'</td>'+
+              '<td style="font-size:11px">'+escape_html(m.prestataire||'—')+'</td>'+
+              '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
+              '<td style="font-size:11px">'+(m.cout?(Number(m.cout)||0).toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+            '</tr>';
+          }).join('')+
+          '</tbody></table></div>':'')+
       '</div>'+
-      '<div class="kpi-row" style="margin-bottom:12px">'+
-        '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value" style="font-size:18px">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
-        '<div class="kpi"><div class="kpi-label">Rondes</div><div class="kpi-value" style="font-size:18px;color:'+kpiCol(sConf,70,90,false)+'">'+(sConf!==null?sConf+'%':'—')+'</div><div class="kpi-sub">'+d.rondes+' rondes</div></div>'+
-        '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="font-size:18px;color:'+kpiCol(d.pannes,1,3,true)+'">'+d.pannes+'</div><div class="kpi-sub">'+d.pannesTot+' total sur période</div></div>'+
-        '<div class="kpi"><div class="kpi-label">MTTR moyen</div><div class="kpi-value" style="font-size:18px;color:'+(d.mttr===null?'#888':d.mttr<=2?'#2D7A4F':d.mttr<=8?'#C49A1C':'#C0392B')+'">'+fmtDur(d.mttr)+'</div><div class="kpi-sub">temps de résolution</div></div>'+
-        '<div class="kpi"><div class="kpi-label">Maintenance</div><div class="kpi-value" style="font-size:18px">'+d.mntCount+'</div><div class="kpi-sub">'+(d.mntCout>0?d.mntCout.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
-      '</div>'+
-
-      // Observations par site (editables)
-      '<div class="edit-hint" style="font-size:10px;color:var(--text3);margin-bottom:4px">Observations (modifiable)</div>'+
-      '<div class="obs-zone" contenteditable="true" data-placeholder="Observations pour '+escape_html(site.nom)+' : constats, recommandations, actions..."></div>'+
-
-      // Signalements de ce site
-      (siteSignalements.length>0?
-        '<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Signalements</div>'+
-        '<table><thead><tr><th>Type</th><th>Description</th><th>Date</th><th>Statut</th><th>Coût</th></tr></thead><tbody>'+
-        siteSignalements.slice(0,15).map(function(s){
-          var ts=new Date(s.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
-          var typeLabels={panne:'⚡ Panne',anomalie:'👁 Anomalie',autre:'📝 Autre'};
-          var resolu=s.statut==='resolu';
-          var eqNom=s.equipements&&s.equipements.nom?' · '+s.equipements.nom:'';
-          return '<tr>'+
-            '<td>'+escape_html(typeLabels[s.type]||s.type)+'</td>'+
-            '<td style="max-width:240px">'+escape_html((s.description||'').substring(0,70))+escape_html(eqNom)+'</td>'+
-            '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
-            '<td>'+(resolu?'<span class="badge badge-ok">Résolu</span>':'<span class="badge badge-ko">En cours</span>')+'</td>'+
-            '<td style="font-size:11px">'+(s.cout_intervention?Number(s.cout_intervention).toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
-          '</tr>';
-        }).join('')+
-        '</tbody></table></div>':'')+''+
-
-      // Maintenances de ce site
-      (siteMaintenances.length>0?
-        '<div style="margin-top:14px"><div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Interventions maintenance</div>'+
-        '<table><thead><tr><th>Intervention</th><th>Type</th><th>Intervenant</th><th>Date</th><th>Coût</th></tr></thead><tbody>'+
-        siteMaintenances.slice(0,15).map(function(m){
-          var ts=m.date_intervention?new Date(m.date_intervention).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
-          var eqNom=m.equipements&&m.equipements.nom?' · '+m.equipements.nom:'';
-          return '<tr>'+
-            '<td><strong>'+escape_html(m.titre||'Intervention')+'</strong>'+escape_html(eqNom)+'</td>'+
-            '<td style="font-size:11px;color:var(--text2)">'+escape_html(m.type||'—')+'</td>'+
-            '<td style="font-size:11px">'+escape_html(m.prestataire||'—')+'</td>'+
-            '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
-            '<td style="font-size:11px">'+(m.cout?(Number(m.cout)||0).toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
-          '</tr>';
-        }).join('')+
-        '</tbody></table></div>':'')+
     '</div>';
   });
 
