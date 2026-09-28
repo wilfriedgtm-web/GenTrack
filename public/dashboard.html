@@ -7017,68 +7017,178 @@ async function _dtSignalements(sids){
 
 /* ── DIR TECH : maintenances cross-site ── */
 var _dtMntFilter='tous';
+var _dtMntPeriod=30;
+var _dtMntSiteFilter='tous';
+function _mntKpi(label,val,sub,valCol){
+  return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
+    '<div style="font-size:10px;color:var(--text3);margin-bottom:4px">'+label+'</div>'+
+    '<div style="font-size:20px;font-weight:800;color:'+(valCol||'var(--dark)')+'">'+val+'</div>'+
+    '<div style="font-size:10px;color:var(--text3);margin-top:2px">'+sub+'</div>'+
+  '</div>';
+}
 async function _dtMaintenances(sids){
   var dc=document.getElementById('dash-content-main');
   if(dc){dc.style.padding='24px';dc.style.maxWidth='none';}
   if(!sids.length)return '<div class="placeholder-card"><div class="placeholder-icon">🔧</div>Aucun site configuré</div>';
+  var HCOLS=['#C49A1C','#2D7A4F','#3498DB','#D4761E','#8E44AD','#E74C3C'];
+  var HCOLS_PALE=['#FDF3E3','#E8F5EE','#EBF5FB','#FDF0E6','#F5EEF8','#FDEDEC'];
+  var MNT=_MNT_TYPES||{};
   var sidStr=sids.join(',');
   var sites=await supaGet('sites','id=in.('+sidStr+')&select=id,nom');
-  var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
-  var query='groupe_id=in.('+sidStr+')&order=created_at.desc&limit=300&select=id,groupe_id,type,titre,description,date_intervention,statut,cout,quantite,unite,prestataire,created_by,created_at,photo_url,equipements(nom)';
-  if(_dtMntFilter!=='tous')query+='&type=eq.'+_dtMntFilter;
-  var rows=await supaGet('maintenances',query);
+  var siteMap={};
+  sites.forEach(function(s,i){siteMap[s.id]={nom:s.nom,col:HCOLS[i%HCOLS.length],pale:HCOLS_PALE[i%HCOLS_PALE.length]};});
+  var cutoff=new Date();cutoff.setDate(cutoff.getDate()-_dtMntPeriod);
+  var cutoffStr=cutoff.toISOString().slice(0,10);
+  var todayStr=new Date().toISOString().slice(0,10);
+  var baseSelect='id,groupe_id,type,titre,statut,date_intervention,cout,prestataire,quantite,unite,equipements(nom)';
+  var qPast='groupe_id=in.('+sidStr+')&statut=neq.planifie&date_intervention=gte.'+cutoffStr+'&order=date_intervention.desc&limit=300&select='+baseSelect;
+  var qUpcoming='groupe_id=in.('+sidStr+')&statut=eq.planifie&date_intervention=gte.'+todayStr+'&order=date_intervention.asc&limit=100&select='+baseSelect;
+  var results=await Promise.all([supaGet('maintenances',qPast),supaGet('maintenances',qUpcoming)]);
+  var rows=results[0];var upcoming=results[1];
+  /* filtered views */
+  var displayRows=rows.filter(function(r){
+    if(_dtMntFilter!=='tous'&&r.type!==_dtMntFilter)return false;
+    if(_dtMntSiteFilter!=='tous'&&String(r.groupe_id)!==String(_dtMntSiteFilter))return false;
+    return true;
+  });
+  var displayUpcoming=upcoming.filter(function(r){
+    if(_dtMntSiteFilter!=='tous'&&String(r.groupe_id)!==String(_dtMntSiteFilter))return false;
+    return true;
+  });
+  /* KPIs */
+  var nbRealises=rows.filter(function(r){return r.statut==='realise';}).length;
   var totalCout=rows.filter(function(r){return r.statut==='realise';}).reduce(function(s,r){return s+(Number(r.cout)||0);},0);
-  var byType={};rows.forEach(function(r){if(r.type)byType[r.type]=(byType[r.type]||0)+1;});
-  var filterHtml=['tous','panne','vidange','ravitaillement','preventive'].map(function(f){
-    var labels={tous:'Tous',panne:'Pannes',vidange:'Vidanges',ravitaillement:'Ravitaillements',preventive:'Préventive'};
-    var n=f==='tous'?rows.length:(byType[f]||0);
-    var active=_dtMntFilter===f;
-    return '<button onclick="_dtSetMntFilter(\''+f+'\')" style="padding:6px 14px;border-radius:20px;border:1.5px solid '+(active?'var(--amber)':'var(--border)')+';background:'+(active?'var(--amber-pale)':'white')+';font-size:12px;font-weight:'+(active?'700':'500')+';color:'+(active?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+labels[f]+(n?' ('+n+')':'')+'</button>';
+  var sitesActifs=new Set(rows.map(function(r){return r.groupe_id;}));
+  /* per-site stats */
+  var siteStats={};
+  sites.forEach(function(s,i){siteStats[s.id]={nb:0,cout:0,planif:0,col:HCOLS[i%HCOLS.length],pale:HCOLS_PALE[i%HCOLS_PALE.length],nom:s.nom};});
+  rows.forEach(function(r){if(siteStats[r.groupe_id]){siteStats[r.groupe_id].nb++;if(r.statut==='realise')siteStats[r.groupe_id].cout+=(Number(r.cout)||0);}});
+  upcoming.forEach(function(r){if(siteStats[r.groupe_id])siteStats[r.groupe_id].planif++;});
+  var maxNb=1;Object.values(siteStats).forEach(function(s){if(s.nb>maxNb)maxNb=s.nb;});
+  /* KPI bar */
+  var kpiHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">'+
+    _mntKpi('Interventions réalisées',nbRealises,_dtMntPeriod+' derniers jours','')+
+    _mntKpi('Coût total',totalCout.toLocaleString('fr-FR')+' FCFA','opérations réalisées','')+
+    _mntKpi('Planifiées à venir',upcoming.length,'à partir d\'aujourd\'hui',upcoming.length>0?'var(--orange)':'')+
+    _mntKpi('Sites actifs',sitesActifs.size+' / '+sites.length,'avec activité sur la période','')+
+  '</div>';
+  /* period pills */
+  var periodHtml=[7,30,90].map(function(d){
+    var a=_dtMntPeriod===d;
+    return '<button onclick="_dtMntPeriod='+d+';_dtSetMntFilter(_dtMntFilter)" style="padding:5px 12px;border-radius:20px;border:1.5px solid '+(a?'var(--amber)':'var(--border)')+';background:'+(a?'var(--amber-pale)':'white')+';font-size:11px;font-weight:'+(a?'700':'500')+';color:'+(a?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+d+' jours</button>';
   }).join('');
+  /* type pills */
+  var byType={};rows.forEach(function(r){if(r.type)byType[r.type]=(byType[r.type]||0)+1;});
+  var typeLabels={tous:'Tous les types',panne:'Pannes',vidange:'Vidanges',ravitaillement:'Ravitaillement',preventive:'Préventive'};
+  var typeHtml=['tous','panne','vidange','ravitaillement','preventive'].map(function(f){
+    var a=_dtMntFilter===f;
+    var n=f==='tous'?rows.length:(byType[f]||0);
+    return '<button onclick="_dtSetMntFilter(\''+f+'\')" style="padding:5px 12px;border-radius:20px;border:1.5px solid '+(a?'var(--amber)':'var(--border)')+';background:'+(a?'var(--amber-pale)':'white')+';font-size:11px;font-weight:'+(a?'700':'500')+';color:'+(a?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+typeLabels[f]+(n&&f!=='tous'?' ('+n+')':'')+'</button>';
+  }).join('');
+  /* site dropdown */
+  var siteOptHtml='<option value="tous">Tous les hôtels</option>'+sites.map(function(s){return '<option value="'+s.id+'"'+(String(_dtMntSiteFilter)===String(s.id)?' selected':'')+'>'+escape_html(s.nom)+'</option>';}).join('');
+  var siteSelectHtml='<select onchange="_dtMntSiteFilter=this.value;_dtSetMntFilter(_dtMntFilter)" style="padding:5px 12px;border-radius:20px;border:1.5px solid var(--border);background:white;font-size:11px;color:var(--text2);cursor:pointer;outline:none">'+siteOptHtml+'</select>';
+  var filtersHtml='<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px">'+
+    periodHtml+
+    '<div style="width:1px;height:18px;background:var(--border);margin:0 2px;flex-shrink:0"></div>'+
+    typeHtml+
+    '<div style="width:1px;height:18px;background:var(--border);margin:0 2px;flex-shrink:0"></div>'+
+    siteSelectHtml+
+  '</div>';
+  /* recap table */
+  var siteRows=sites.map(function(s){
+    var st=siteStats[s.id]||{nb:0,cout:0,planif:0,col:'#aaa'};
+    var pct=rows.length?Math.round(st.nb/rows.length*100):0;
+    var barPct=Math.round(st.nb/maxNb*100);
+    return '<tr>'+
+      '<td style="padding:8px 10px;border-bottom:0.5px solid var(--border)">'+
+        '<div style="display:flex;align-items:center;gap:7px">'+
+          '<span style="width:9px;height:9px;border-radius:50%;background:'+st.col+';display:inline-block;flex-shrink:0"></span>'+
+          '<span style="font-weight:600;font-size:12px">'+escape_html(s.nom)+'</span>'+
+        '</div></td>'+
+      '<td style="padding:8px 10px;border-bottom:0.5px solid var(--border)">'+
+        '<div style="display:flex;align-items:center;gap:7px">'+
+          '<div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;min-width:50px"><div style="height:100%;border-radius:3px;background:'+st.col+';width:'+barPct+'%"></div></div>'+
+          '<span style="font-size:11px;font-weight:600;min-width:16px;color:var(--dark)">'+st.nb+'</span>'+
+        '</div></td>'+
+      '<td style="padding:8px 10px;border-bottom:0.5px solid var(--border);font-size:12px;font-weight:600;color:var(--dark)">'+(st.cout?st.cout.toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+      '<td style="padding:8px 10px;border-bottom:0.5px solid var(--border);font-size:11px;color:var(--text3)">'+(pct?pct+'%':'—')+'</td>'+
+      '<td style="padding:8px 10px;border-bottom:0.5px solid var(--border)">'+(st.planif>0?'<span style="background:var(--orange-pale);color:var(--orange);font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px">'+st.planif+' planifiée'+(st.planif>1?'s':'')+'</span>':'<span style="font-size:11px;color:var(--text3)">—</span>')+'</td>'+
+    '</tr>';
+  }).join('');
+  var recapHtml='<div style="margin-bottom:16px">'+
+    '<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">Récap par hôtel</div>'+
+    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden">'+
+      '<table style="width:100%;border-collapse:collapse">'+
+        '<thead><tr>'+
+          '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Hôtel</th>'+
+          '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Interventions</th>'+
+          '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Coût réalisé</th>'+
+          '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Part</th>'+
+          '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Planifiées</th>'+
+        '</tr></thead>'+
+        '<tbody>'+siteRows+'</tbody>'+
+      '</table>'+
+    '</div>'+
+  '</div>';
+  /* upcoming banner */
+  var bannerHtml='';
+  if(displayUpcoming.length){
+    var snippet=displayUpcoming.slice(0,3).map(function(r){
+      var t=MNT[r.type]||{label:r.type,icon:'🔧'};
+      var sInfo=siteMap[r.groupe_id]||{nom:''};
+      var dStr=r.date_intervention?new Date(r.date_intervention).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'';
+      return '<span style="margin-right:12px">'+t.icon+' '+escape_html(r.titre||t.label)+' · <span style="opacity:.8">'+escape_html(sInfo.nom)+'</span>'+(dStr?' <span style="opacity:.6">'+dStr+'</span>':'')+'</span>';
+    }).join('');
+    var extra=displayUpcoming.length>3?'<span style="opacity:.6"> +'+( displayUpcoming.length-3)+'</span>':'';
+    bannerHtml='<div style="background:var(--orange-pale);border:1.5px solid var(--orange);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:flex-start;gap:10px">'+
+      '<div style="font-size:18px;flex-shrink:0;margin-top:1px">📅</div>'+
+      '<div><div style="font-size:12px;font-weight:700;color:var(--orange-dark)">'+displayUpcoming.length+' intervention'+(displayUpcoming.length>1?'s':'')+' planifiée'+(displayUpcoming.length>1?'s':'')+' à venir</div>'+
+        '<div style="font-size:11px;color:var(--orange-dark);margin-top:3px;line-height:1.6">'+snippet+extra+'</div>'+
+      '</div>'+
+    '</div>';
+  }
+  /* cards list */
+  var listTitle='<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px">Interventions — chronologique</div>';
   var cards='';
-  if(!rows.length){
-    cards='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px;opacity:.4">🔧</div><div style="font-size:14px">Aucune opération enregistrée'+(_dtMntFilter!=='tous'?' dans cette catégorie':'')+'.</div></div>';
+  if(!displayRows.length){
+    cards='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px;opacity:.4">🔧</div><div style="font-size:14px">Aucune opération enregistrée pour cette période.</div></div>';
   }else{
-    var MNT=_MNT_TYPES||{};
-    cards=rows.map(function(r){
+    cards=displayRows.map(function(r){
       var t=MNT[r.type]||{label:r.type||'Maintenance',icon:'🔧',color:'var(--text2)',bg:'var(--bg)'};
+      var sInfo=siteMap[r.groupe_id]||{nom:'',col:'#aaa',pale:'#fafafa'};
       var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:null;
-      var sNom=siteMap[r.groupe_id]||'';
       var date=r.date_intervention||r.created_at;
       var dateStr=date?new Date(date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'';
-      return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+t.color+'">'+
-        '<div style="display:flex;align-items:flex-start;gap:12px">'+
-          '<div style="width:36px;height:36px;border-radius:10px;background:'+t.bg+';display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">'+t.icon+'</div>'+
-          '<div style="flex:1;min-width:0">'+
-            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">'+
-              '<span style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(r.titre||t.label)+'</span>'+
-              '<span style="font-size:11px;color:var(--text3)">· '+escape_html(sNom)+'</span>'+
+      var statutBadge='';
+      if(r.statut==='realise')statutBadge='<span style="background:var(--vert-pale);color:var(--vert);font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px">Réalisée</span>';
+      else if(r.statut==='en_cours')statutBadge='<span style="background:var(--bleu-pale);color:var(--bleu);font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px">En cours</span>';
+      else statutBadge='<span style="background:var(--orange-pale);color:var(--orange);font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px">'+escape_html(r.statut||'—')+'</span>';
+      return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;margin-bottom:8px;display:grid;grid-template-columns:4px 1fr;overflow:hidden">'+
+        '<div style="background:'+sInfo.col+'"></div>'+
+        '<div style="padding:12px 14px">'+
+          '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">'+
+            '<div>'+
+              '<div style="font-size:13px;font-weight:700;color:var(--dark)">'+t.icon+' '+escape_html(r.titre||t.label)+'</div>'+
+              '<div style="display:flex;align-items:center;gap:5px;margin-top:3px">'+
+                '<span style="width:7px;height:7px;border-radius:50%;background:'+sInfo.col+';display:inline-block;flex-shrink:0"></span>'+
+                '<span style="font-size:11px;color:var(--text3)">'+escape_html(sInfo.nom)+'</span>'+
+                (eqNom?'<span style="font-size:11px;color:var(--text3)">· '+escape_html(eqNom)+'</span>':'')+
+              '</div>'+
             '</div>'+
-            (eqNom?'<div style="font-size:12px;color:var(--text2);margin-bottom:4px">'+escape_html(eqNom)+'</div>':'')+
-            '<div style="font-size:11px;color:var(--text3);display:flex;flex-wrap:wrap;gap:10px">'+
-              (dateStr?'<span>📅 '+dateStr+'</span>':'')+
-              (r.prestataire?'<span>👷 '+escape_html(r.prestataire)+'</span>':'')+
-              (r.quantite?'<span>📦 '+r.quantite+(r.unite?' '+r.unite:'')+'</span>':'')+
-              (r.cout?'<span>💰 '+Number(r.cout).toLocaleString('fr-FR')+' FCFA</span>':'')+
-            '</div>'+
+            '<div style="flex-shrink:0">'+statutBadge+'</div>'+
+          '</div>'+
+          '<div style="font-size:11px;color:var(--text3);display:flex;flex-wrap:wrap;gap:10px">'+
+            (dateStr?'<span>📅 '+dateStr+'</span>':'')+
+            (r.prestataire?'<span>👷 '+escape_html(r.prestataire)+'</span>':'')+
+            (r.quantite?'<span>📦 '+r.quantite+(r.unite?' '+r.unite:'')+'</span>':'')+
+            (r.cout?'<span>💰 '+Number(r.cout).toLocaleString('fr-FR')+' FCFA</span>':'')+
           '</div>'+
         '</div>'+
-        (r.photo_url?
-          '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
-            '<img src="'+r.photo_url+'" style="max-width:100%;border-radius:8px;border:1.5px solid var(--border);display:block" onerror="this.parentElement.style.display=\'none\'"/>'+
-            '<a href="'+r.photo_url+'" download target="_blank" style="display:inline-block;margin-top:6px;padding:5px 10px;background:var(--bg);border:1.5px solid var(--border);border-radius:8px;font-size:11px;font-weight:600;color:var(--text2);text-decoration:none">⬇️ Télécharger</a>'+
-          '</div>':'')+
       '</div>';
     }).join('');
   }
-  return '<div>'+
-    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 18px">'+
-      '<div style="font-size:22px">💰</div>'+
-      '<div><div style="font-size:18px;font-weight:800;color:var(--dark)">'+totalCout.toLocaleString('fr-FR')+' FCFA</div><div style="font-size:11px;color:var(--text3)">Coût total des opérations réalisées</div></div>'+
-    '</div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'+filterHtml+'</div>'+
-    cards+
-  '</div>';
+  return kpiHtml+filtersHtml+recapHtml+bannerHtml+listTitle+cards;
 }
 function _dtSetMntFilter(f){_dtMntFilter=f;if(_session)renderDirTech(_session,'maintenances');}
 
