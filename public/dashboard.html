@@ -7251,17 +7251,168 @@ async function _dtEnergie(sids,session){
     '</div>';
   });
 
+  // Store fluides + objs globally so the modal can access them without re-fetching
+  window._dtEnFluides=fluides||[];
+  window._dtEnObjs=objs||[];
+  window._dtEnSites=sites||[];
+
   return '<div>'+
     '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">'+
       '<div style="font-size:18px;font-weight:800;color:var(--dark)">⚡ Énergie — '+moisLabel+(offset===0?' <span style="font-size:11px;color:var(--text3);font-weight:500">('+daysElapsed+' j écoulés)</span>':'')+'</div>'+
-      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+periodOpts+'</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">'+
+        periodOpts+
+        '<button onclick="_dtEnObjModal()" style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--amber);background:var(--amber-pale);font-size:12px;font-weight:700;color:var(--amber-dark);cursor:pointer;margin-left:6px">🎯 Définir les objectifs</button>'+
+      '</div>'+
     '</div>'+
+    '<div id="dt-en-modal-wrap"></div>'+
     kpisHtml+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">'+
       '<div><div class="section-title" style="margin-bottom:10px">Par hôtel</div>'+siteCardsHtml+'</div>'+
       '<div><div class="section-title" style="margin-bottom:10px">Comparatif inter-sites</div>'+(comparHtml||'<div style="color:var(--text3);font-size:12px">Aucune donnée disponible</div>')+'</div>'+
     '</div>'+
   '</div>';
+}
+
+function _dtEnObjModal(siteIdSel){
+  var sites=window._dtEnSites||[];
+  var fluides=window._dtEnFluides||[];
+  var objs=window._dtEnObjs||[];
+  var today=todayStr();
+  var now=new Date();
+  var moisDebut=new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0];
+
+  if(!siteIdSel)siteIdSel=sites.length?sites[0].id:'';
+
+  // Active objective per fluide for this site
+  function _activeObj(fid){
+    var best=null;
+    objs.forEach(function(o){
+      if(o.fluide_id!==fid)return;
+      // Only for this site — objs are global, filter by fluide which is site-specific
+      if(!o.date_debut||o.date_debut>today)return;
+      if(o.date_fin&&o.date_fin<moisDebut)return;
+      if(!best||o.date_debut>best.date_debut)best=o;
+    });
+    return best;
+  }
+
+  var siteOpts=sites.map(function(s){
+    return '<option value="'+s.id+'"'+(s.id===siteIdSel?' selected':'')+'>'+escape_html(s.nom)+'</option>';
+  }).join('');
+
+  var siteFluides=fluides.filter(function(f){return f.site_id===siteIdSel;});
+
+  var rows=siteFluides.map(function(f){
+    var cur=_activeObj(f.id);
+    var curVal=cur?cur.valeur:'';
+    var fUnite=f.unite?(' '+escape_html(f.unite)):'';
+    return '<tr style="border-bottom:1px solid #F5F0EA" id="dt-en-row-'+f.id+'">'+
+      '<td style="padding:8px 6px;font-size:12px;font-weight:600;color:var(--dark)">'+escape_html(f.nom)+'<span style="color:var(--text3);font-weight:400">'+fUnite+'</span></td>'+
+      '<td style="padding:8px 6px">'+(cur?'<span style="font-size:11px;color:var(--text3)">Actuel : <b>'+Number(cur.valeur).toLocaleString('fr-FR')+'</b>'+fUnite+(cur.date_debut?' (depuis '+cur.date_debut+')':'')+'</span>':'<span style="font-size:11px;color:var(--text3)">Aucun objectif</span>')+'</td>'+
+      '<td style="padding:8px 6px"><input type="number" id="dt-en-val-'+f.id+'" value="'+curVal+'" min="0" placeholder="Valeur" style="width:90px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px" /></td>'+
+      '<td style="padding:8px 6px"><input type="date" id="dt-en-deb-'+f.id+'" value="'+moisDebut+'" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px" /></td>'+
+      '<td style="padding:8px 6px"><input type="date" id="dt-en-fin-'+f.id+'" placeholder="Sans limite" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px" /></td>'+
+      '<td style="padding:8px 6px"><input type="text" id="dt-en-note-'+f.id+'" placeholder="Note (opt.)" style="width:110px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px" /></td>'+
+    '</tr>';
+  }).join('');
+
+  if(!rows)rows='<tr><td colspan="6" style="padding:16px;color:var(--text3);font-size:12px;text-align:center">Aucun fluide configuré pour ce site</td></tr>';
+
+  var modal='<div id="dt-en-modal" style="background:white;border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:20px;box-shadow:0 4px 24px rgba(0,0,0,.08)">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'+
+      '<div style="font-size:15px;font-weight:800;color:var(--dark)">🎯 Définir les objectifs énergétiques</div>'+
+      '<button onclick="document.getElementById(\'dt-en-modal-wrap\').innerHTML=\'\'" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3)">✕</button>'+
+    '</div>'+
+    '<div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">'+
+      '<label style="font-size:12px;font-weight:600;color:var(--text2)">Site :</label>'+
+      '<select onchange="_dtEnObjModal(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-weight:600">'+siteOpts+'</select>'+
+    '</div>'+
+    '<div style="overflow-x:auto">'+
+    '<table style="width:100%;border-collapse:collapse">'+
+      '<thead><tr style="border-bottom:2px solid var(--border)">'+
+        '<th style="padding:6px 6px;font-size:10px;font-weight:700;color:var(--text3);text-align:left;text-transform:uppercase;letter-spacing:.5px">Fluide</th>'+
+        '<th style="padding:6px 6px;font-size:10px;font-weight:700;color:var(--text3);text-align:left;text-transform:uppercase;letter-spacing:.5px">Objectif actuel</th>'+
+        '<th style="padding:6px 6px;font-size:10px;font-weight:700;color:var(--text3);text-align:left;text-transform:uppercase;letter-spacing:.5px">Nouvelle valeur / mois</th>'+
+        '<th style="padding:6px 6px;font-size:10px;font-weight:700;color:var(--text3);text-align:left;text-transform:uppercase;letter-spacing:.5px">Date début</th>'+
+        '<th style="padding:6px 6px;font-size:10px;font-weight:700;color:var(--text3);text-align:left;text-transform:uppercase;letter-spacing:.5px">Date fin</th>'+
+        '<th style="padding:6px 6px;font-size:10px;font-weight:700;color:var(--text3);text-align:left;text-transform:uppercase;letter-spacing:.5px">Note</th>'+
+      '</tr></thead>'+
+      '<tbody>'+rows+'</tbody>'+
+    '</table>'+
+    '</div>'+
+    '<div style="margin-top:16px;display:flex;gap:10px;align-items:center">'+
+      '<button onclick="_dtEnObjSave(\''+siteIdSel+'\')" style="padding:8px 20px;background:var(--amber);color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Enregistrer</button>'+
+      '<button onclick="document.getElementById(\'dt-en-modal-wrap\').innerHTML=\'\'" style="padding:8px 16px;background:white;color:var(--text2);border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">Annuler</button>'+
+      '<span id="dt-en-save-msg" style="font-size:12px;color:var(--text3)"></span>'+
+    '</div>'+
+  '</div>';
+
+  var wrap=document.getElementById('dt-en-modal-wrap');
+  if(wrap)wrap.innerHTML=modal;
+}
+
+async function _dtEnObjSave(siteId){
+  var fluides=(window._dtEnFluides||[]).filter(function(f){return f.site_id===siteId;});
+  var objs=window._dtEnObjs||[];
+  var today=todayStr();
+  var moisDebut=new Date().toISOString().split('T')[0].substring(0,7)+'-01';
+  var msgEl=document.getElementById('dt-en-save-msg');
+  if(msgEl)msgEl.textContent='Enregistrement…';
+
+  var errors=[];var saved=0;
+
+  for(var i=0;i<fluides.length;i++){
+    var f=fluides[i];
+    var valInput=document.getElementById('dt-en-val-'+f.id);
+    var debInput=document.getElementById('dt-en-deb-'+f.id);
+    var finInput=document.getElementById('dt-en-fin-'+f.id);
+    var noteInput=document.getElementById('dt-en-note-'+f.id);
+    if(!valInput||!valInput.value)continue; // skip if empty — no change
+    var valeur=parseFloat(valInput.value);
+    if(isNaN(valeur)||valeur<0){errors.push(f.nom+' : valeur invalide');continue;}
+    var dateDebut=debInput&&debInput.value?debInput.value:moisDebut;
+    var dateFin=finInput&&finInput.value?finInput.value:null;
+    var note=noteInput&&noteInput.value?noteInput.value.trim():null;
+
+    // Find active objective to close (date_debut <= today, date_fin null or >= dateDebut)
+    var prevObj=null;
+    objs.forEach(function(o){
+      if(o.fluide_id!==f.id)return;
+      if(!o.id)return; // skip synthetic fallbacks
+      if(!o.date_debut||o.date_debut>today)return;
+      if(o.date_fin&&o.date_fin<dateDebut)return;
+      if(!prevObj||o.date_debut>prevObj.date_debut)prevObj=o;
+    });
+
+    // PATCH previous objective: set date_fin = dateDebut - 1 day
+    if(prevObj&&prevObj.id){
+      var dPrev=new Date(dateDebut);
+      dPrev.setDate(dPrev.getDate()-1);
+      var closingDate=dPrev.toISOString().split('T')[0];
+      var ok=await supaPatch('objectifs_energie',prevObj.id,{date_fin:closingDate});
+      if(!ok)errors.push(f.nom+' : impossible de fermer l\'objectif précédent');
+    }
+
+    // INSERT new objective
+    var newObj={site_id:siteId,fluide_id:f.id,valeur:valeur,date_debut:dateDebut};
+    if(dateFin)newObj.date_fin=dateFin;
+    if(note)newObj.note=note;
+    var res=await supaPost('objectifs_energie',newObj);
+    if(res){saved++;} else {errors.push(f.nom+' : échec de l\'enregistrement');}
+  }
+
+  if(errors.length){
+    if(msgEl)msgEl.style.color='var(--rouge)';
+    if(msgEl)msgEl.textContent='⚠ '+errors.join(' · ');
+  } else if(saved===0){
+    if(msgEl)msgEl.style.color='var(--text3)';
+    if(msgEl)msgEl.textContent='Aucune modification (laissez une valeur vide pour ne pas changer)';
+  } else {
+    if(msgEl)msgEl.style.color='var(--vert)';
+    if(msgEl)msgEl.textContent='✓ '+saved+' objectif'+(saved>1?'s':'')+ ' enregistré'+(saved>1?'s':'');
+    // Refresh the view after 1.2s
+    setTimeout(function(){renderDirTech(_session,'energie');},1200);
+  }
 }
 
 /* ── DIR TECH : Fiabilité ── */
