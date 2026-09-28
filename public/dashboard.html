@@ -8237,30 +8237,21 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   else narResume+=(signalements.length)+' signalement'+(signalements.length>1?'s':'')+' enregistré'+(signalements.length>1?'s':'')+' dont '+nbSgOuverts+' en cours et '+nbSgResolus+' résolu'+(nbSgResolus>1?'s':'')+'. ';
   if(coutTotal>0)narResume+='Coût total des interventions : '+coutTotal.toLocaleString('fr-FR')+' FCFA.';
 
-  // Équipements
+  // Équipements — narrative GE uniquement (niveaux cuves dans section Énergie)
   var narEquip='';
-  var consoTotale=ges.reduce(function(s,g){return s+(parseFloat(g.conso_theorique_lh)||0);},0);
-  cuves.forEach(function(c){
-    var lr=lastRepsByEq[c.id];
-    if(!lr||!lr.vals)return;
-    var niveauEntry=lr.vals.find(function(v){return v.texte.toLowerCase().includes('niveau');});
-    if(!niveauEntry)return;
-    var niveau=parseFloat(niveauEntry.valeur);
-    var cap=parseFloat(c.capacite_litres);
-    if(isNaN(niveau)||isNaN(cap))return;
-    var pct=Math.round(niveau/cap*100);
-    var consoH=parseFloat(c.conso_theorique_lh)||65;
-    var autoJ=consoH>0?Math.round(niveau/(consoH*8)*10)/10:null;
-    var etat=pct<=20?'critique (⚠️ commande urgente requise)':pct<=40?'à surveiller':' satisfaisant';
-    narEquip+=(c.nom||'La cuve')+' est à '+pct+'% de capacité ('+niveau+'L / '+cap+'L). État '+etat+'.'+( autoJ?' Autonomie estimée : ~'+autoJ+' jour'+(autoJ>1?'s':'')+'.' :'')+' ';
-  });
   ges.forEach(function(g){
     var lr=lastRepsByEq[g.id];
     if(!lr||!lr.vals)return;
     var cptEntry=lr.vals.find(function(v){return v.texte.toLowerCase().includes('compteur');});
     if(cptEntry)narEquip+=(g.nom||'Le groupe')+' affiche '+cptEntry.valeur+' heures au compteur. ';
   });
-  if(!narEquip)narEquip='Aucune donnée de relevé disponible sur la période pour évaluer l\'état des équipements.';
+  if(cuves.length&&!narEquip)narEquip='';
+  if(!narEquip){
+    if(cuves.length)narEquip='Les niveaux des cuves sont détaillés dans la section Énergie & Fluides ci-dessous.';
+    else narEquip='Aucune donnée de relevé disponible sur la période pour évaluer l\'état des équipements.';
+  }else if(cuves.length){
+    narEquip+='Les niveaux des cuves sont détaillés dans la section Énergie & Fluides ci-dessous.';
+  }
 
   // Rondes
   var narRondes='';
