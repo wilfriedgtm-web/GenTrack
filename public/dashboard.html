@@ -3460,7 +3460,7 @@ async function _rtMaintenances(sid){
   // Exclure source=signalement : les pannes brutes vivent dans l'onglet Signalements
   // Garder seulement vidanges, pleins, et fiches maintenances (incl. pannes résolues)
   var allRows=await supaGet('vue_journal_maintenance',
-    'site_id=eq.'+sid+'&source=neq.signalement&order=date_ref.desc&limit=200'+
+    'site_id=eq.'+sid+'&source=not.in.(signalement,plein)&order=date_ref.desc&limit=200'+
     '&select=id,type,titre,description,date_ref,equipement_nom,cout,statut,intervenant,notes,created_at,source,photo_url'
   );
 
