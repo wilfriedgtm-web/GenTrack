@@ -150,9 +150,14 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
     <!-- Équipement -->
     <div class="sg-section">
       <div class="sg-label">Équipement concerné (optionnel)</div>
-      <select id="sg-equip" class="sg-select">
-        <option value="">— Sélectionner —</option>
-      </select>
+      <div style="position:relative" id="sg-equip-wrap">
+        <input id="sg-equip-input" class="sg-input" type="text" placeholder="Rechercher un équipement…" autocomplete="off"
+               oninput="_equipComboFilter()" onfocus="_equipComboOpen()" onblur="_equipComboBlur()"
+               style="padding-right:36px">
+        <button onclick="_equipComboClear()" id="sg-equip-clear" style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;color:var(--text3);cursor:pointer;padding:0;line-height:1">✕</button>
+        <input type="hidden" id="sg-equip" value="">
+        <div id="sg-equip-list" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:100;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);max-height:220px;overflow-y:auto"></div>
+      </div>
     </div>
 
     <!-- Type de problème -->
@@ -204,6 +209,7 @@ var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 var _groupeId=null;
 var _equips=[];       // équipements techniques (table equipements)
 var _equipZones=[];   // équipements d'inventaire de zone (table equipements_zone)
+var _equipComboItems=[];  // liste aplatie pour le combobox [{val,label,group}]
 var _zones=[];
 var _selectedZoneId=null;    // zone/sous-zone sélectionnée (chip)
 var _selectedCatZoneIds=[];  // tous les zone_id de la catégorie sélectionnée
@@ -293,16 +299,15 @@ async function init(){
 
   // Pré-sélectionner équipement si ?equip= dans URL (QR équipement)
   if(equipParam){
-    var equipSel=document.getElementById('sg-equip');
-    // Attendre que les options soient peuplées (déjà fait via _renderEquipOptions)
     var found=_equips.find(function(e){return e.id===equipParam;});
     if(found){
-      equipSel.value=equipParam;
-      // Badge pré-rempli sous le select
+      var foundLabel=(found.types_equipements&&found.types_equipements.nom?found.types_equipements.nom+' — ':'')+found.nom;
+      _equipComboSelect('eq:'+equipParam,foundLabel);
+      // Badge pré-rempli sous le combobox
       var equipBadge=document.createElement('div');
       equipBadge.style.cssText='margin-top:6px;font-size:11px;color:var(--vert);font-weight:600;display:flex;align-items:center;gap:4px';
       equipBadge.innerHTML='<span>✓</span><span>Équipement pré-sélectionné depuis le QR</span>';
-      equipSel.parentNode.appendChild(equipBadge);
+      document.getElementById('sg-equip-wrap').appendChild(equipBadge);
     }
   }
 
@@ -376,24 +381,15 @@ function _selectCat(tileEl,catKey,info){
 }
 
 function _renderEquipOptions(zoneIds){
-  var sel=document.getElementById('sg-equip');
-  var prevVal=sel.value;
-  // Vider sauf le premier placeholder
-  while(sel.options.length>1)sel.remove(1);
+  var prevVal=document.getElementById('sg-equip').value;
+  _equipComboItems=[];
 
-  // ── Groupe 1 : Équipements techniques (table equipements, sans zone_id) ──
+  // ── Groupe 1 : Équipements de ronde (table equipements) ──
   var techList=_equips.filter(function(e){return !e.zone_id;});
-  if(techList.length){
-    var grp1=document.createElement('optgroup');
-    grp1.label='⚙️ Équipements techniques';
-    techList.forEach(function(e){
-      var opt=document.createElement('option');
-      opt.value='eq:'+e.id;
-      opt.textContent=(e.types_equipements&&e.types_equipements.nom?e.types_equipements.nom+' — ':'')+e.nom;
-      grp1.appendChild(opt);
-    });
-    sel.appendChild(grp1);
-  }
+  techList.forEach(function(e){
+    var label=(e.types_equipements&&e.types_equipements.nom?e.types_equipements.nom+' — ':'')+e.nom;
+    _equipComboItems.push({val:'eq:'+e.id,label:label,group:'ronde'});
+  });
 
   // ── Groupe 2 : Équipements de salle (table equipements_zone) ──
   var zoneList;
@@ -402,19 +398,78 @@ function _renderEquipOptions(zoneIds){
   } else {
     zoneList=_equipZones;
   }
-  if(zoneList.length){
-    var grp2=document.createElement('optgroup');
-    grp2.label='🛏️ Équipements de salle';
-    zoneList.forEach(function(e){
-      var opt=document.createElement('option');
-      opt.value='ez:'+e.id;
-      opt.textContent=e.nom;
-      grp2.appendChild(opt);
-    });
-    sel.appendChild(grp2);
+  zoneList.forEach(function(e){
+    _equipComboItems.push({val:'ez:'+e.id,label:e.nom,group:'salle'});
+  });
+
+  // Si la sélection précédente n'est plus disponible, effacer
+  if(prevVal&&!_equipComboItems.find(function(i){return i.val===prevVal;})){
+    document.getElementById('sg-equip').value='';
+    document.getElementById('sg-equip-input').value='';
+    document.getElementById('sg-equip-clear').style.display='none';
+  }
+}
+
+function _equipComboFilter(){
+  var q=(document.getElementById('sg-equip-input').value||'').toLowerCase().trim();
+  document.getElementById('sg-equip').value='';
+  document.getElementById('sg-equip-clear').style.display='none';
+  _equipComboRender(q);
+  document.getElementById('sg-equip-list').style.display='block';
+}
+
+function _equipComboOpen(){
+  var q=(document.getElementById('sg-equip-input').value||'').toLowerCase().trim();
+  _equipComboRender(q);
+  document.getElementById('sg-equip-list').style.display='block';
+}
+
+function _equipComboBlur(){
+  setTimeout(function(){
+    var list=document.getElementById('sg-equip-list');
+    if(list)list.style.display='none';
+  },200);
+}
+
+function _equipComboSelect(val,label){
+  document.getElementById('sg-equip').value=val;
+  document.getElementById('sg-equip-input').value=label;
+  document.getElementById('sg-equip-clear').style.display='block';
+  document.getElementById('sg-equip-list').style.display='none';
+}
+
+function _equipComboClear(){
+  document.getElementById('sg-equip').value='';
+  document.getElementById('sg-equip-input').value='';
+  document.getElementById('sg-equip-clear').style.display='none';
+  document.getElementById('sg-equip-list').style.display='none';
+}
+
+function _equipComboRender(q){
+  var list=document.getElementById('sg-equip-list');
+  var items=q
+    ?_equipComboItems.filter(function(i){return i.label.toLowerCase().indexOf(q)!==-1;})
+    :_equipComboItems;
+
+  if(!items.length){
+    list.innerHTML='<div style="padding:14px;text-align:center;color:var(--text3);font-size:13px">Aucun résultat</div>';
+    return;
   }
 
-  if(prevVal&&sel.querySelector('option[value="'+prevVal+'"]'))sel.value=prevVal;
+  var html='';
+  var lastGroup='';
+  items.forEach(function(item){
+    if(item.group!==lastGroup){
+      var glabel=item.group==='ronde'?'⚙️ Équipements de ronde':'🛏️ Équipements de salle';
+      html+='<div style="padding:6px 12px 4px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;background:#f8f8f8;border-bottom:1px solid var(--border)">'+glabel+'</div>';
+      lastGroup=item.group;
+    }
+    var esc=item.label.replace(/'/g,"\\'");
+    var safe=item.label.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    var highlighted=q?safe.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<strong style="color:var(--amber)">$1</strong>'):safe;
+    html+='<div onmousedown="_equipComboSelect(\''+item.val+'\',\''+esc+'\')" style="padding:10px 14px;font-size:14px;color:var(--dark);cursor:pointer;border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'white\'">'+highlighted+'</div>';
+  });
+  list.innerHTML=html;
 }
 
 function _esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -573,6 +628,8 @@ function _reset(){
   }else{
     _renderEquipOptions([_lockedZoneId]);
     document.getElementById('sg-equip').value='';
+    document.getElementById('sg-equip-input').value='';
+    document.getElementById('sg-equip-clear').style.display='none';
   }
 }
 
