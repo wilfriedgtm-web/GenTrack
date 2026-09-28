@@ -402,27 +402,20 @@ function _renderEquipOptions(zoneIds){
   var prevVal=document.getElementById('sg-equip').value;
   _equipComboItems=[];
 
-  // ── Groupe 1 : Équipements de ronde (table equipements) ──
-  var techList=_equips.filter(function(e){return !e.zone_id;});
-  techList.forEach(function(e){
-    var label=(e.types_equipements&&e.types_equipements.nom?e.types_equipements.nom+' — ':'')+e.nom;
-    _equipComboItems.push({val:'eq:'+e.id,label:label,group:'ronde'});
-  });
-
-  // ── Groupe 2 : Équipements de salle (table equipements_zone) — masqué en mode ronde ──
-  if(!_rondeOnly){
-    var zoneList;
-    if(zoneIds&&zoneIds.length>0){
-      zoneList=_equipZones.filter(function(e){return zoneIds.indexOf(e.zone_id)!==-1;});
-    } else {
-      zoneList=_equipZones;
-    }
-    zoneList.forEach(function(e){
-      _equipComboItems.push({val:'ez:'+e.id,label:e.nom,group:'salle'});
+  if(_rondeOnly){
+    // Mode ronde : uniquement les équipements techniques
+    _equips.forEach(function(e){
+      var label=(e.types_equipements&&e.types_equipements.nom?e.types_equipements.nom+' — ':'')+e.nom;
+      _equipComboItems.push({val:'eq:'+e.id,label:label});
     });
+  } else {
+    // Mode normal : uniquement les équipements de salle, filtrés par zone si besoin
+    var list=zoneIds&&zoneIds.length>0
+      ?_equipZones.filter(function(e){return zoneIds.indexOf(e.zone_id)!==-1;})
+      :_equipZones;
+    list.forEach(function(e){_equipComboItems.push({val:'ez:'+e.id,label:e.nom});});
   }
 
-  // Si la sélection précédente n'est plus disponible, effacer
   if(prevVal&&!_equipComboItems.find(function(i){return i.val===prevVal;})){
     document.getElementById('sg-equip').value='';
     document.getElementById('sg-equip-input').value='';
@@ -499,13 +492,7 @@ function _equipComboRender(q){
   }
 
   var html='';
-  var lastGroup='';
   items.forEach(function(item){
-    if(item.group!==lastGroup){
-      var glabel=item.group==='ronde'?'⚙️ Équipements de ronde':'🛏️ Équipements de salle';
-      html+='<div style="padding:6px 12px 4px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;background:#f8f8f8;border-bottom:1px solid var(--border)">'+glabel+'</div>';
-      lastGroup=item.group;
-    }
     var esc=item.label.replace(/'/g,"\\'");
     var safe=item.label.replace(/&/g,'&amp;').replace(/</g,'&lt;');
     var highlighted=q?safe.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<strong style="color:var(--amber)">$1</strong>'):safe;
