@@ -865,6 +865,11 @@ async function _rtAccueil(session,sid,cid){
       var eqReco=recoData&&recoData[e.id]?recoData[e.id]:{recos:[],lastSaisie:null};
       var topReco=eqReco.recos[0]||null;
       var ls=eqReco.lastSaisie;
+      // Pour les cuves, afficher le niveau énergie si pas de saisie ronde
+      var isCuve=e.capacite_litres!=null&&parseFloat(e.capacite_litres)>0;
+      if(!ls&&isCuve&&gasoilNiveau){
+        ls={v:gasoilNiveau.pct+'% · '+Math.round(gasoilNiveau.litres).toLocaleString('fr-FR')+' L',t:gasoilNiveau.date+'T12:00:00',unite:''};
+      }
       var today=new Date().toISOString().split('T')[0];
       var lsOld=ls?new Date(ls.t).toISOString().split('T')[0]<today:false;
       statut+='<div class="eq-card" style="flex-direction:column;align-items:stretch;gap:6px">'+
@@ -9231,12 +9236,13 @@ async function _openRapportHebdo(period){
     }
 
     // Énergie
-    var[energieFluides,relevesEnergiePeriode]=await Promise.all([
+    var[energieFluides,relevesEnergiePeriode,pleinsPeriode]=await Promise.all([
       supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,objectif_mensuel,capacite,devise&order=ordre.asc'),
-      supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+cutoff+'&select=date_releve,valeurs,saisi_par&order=date_releve.asc&limit=100')
+      supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+cutoff+'&select=date_releve,valeurs,saisi_par&order=date_releve.asc&limit=100'),
+      supaGet('pleins','site_id=eq.'+sid+'&date=gte.'+cutoff+'&select=date,litres_ajoutes&order=date.asc&limit=50')
     ]);
 
-    var html=_buildRapportPro(siteNom,periodeStr,period,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[]);
+    var html=_buildRapportPro(siteNom,periodeStr,period,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[]);
     var w=window.open('','_blank');
     if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
     w.document.write(html);w.document.close();
@@ -9244,7 +9250,7 @@ async function _openRapportHebdo(period){
   finally{if(btn){btn.disabled=false;btn.textContent='📄 Rapport ▾';}}
 }
 
-function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides,relevesEnergie){
+function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides,relevesEnergie,pleinsSite){
   var respNom=(session.contact&&session.contact.nom)||'Responsable technique';
   var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -9368,6 +9374,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   // ── Énergie : calculs ──
   energieFluides=energieFluides||[];relevesEnergie=relevesEnergie||[];
   var energieData=[];
+  pleinsSite=pleinsSite||[];
   if(energieFluides.length&&relevesEnergie.length){
     energieFluides.forEach(function(f){
       var pts=relevesEnergie.map(function(r){
@@ -9400,7 +9407,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
       var lastValPctR=isInstant&&cap!=null&&lastVal!=null?(_rLastIsL?Math.min(100,Math.round(lastVal/cap*100)):Math.min(100,Math.round(lastVal))):null;
       var budget=obj!=null&&tarif!=null?Math.round(obj*tarif):null;
       var vs=cout!=null&&budget!=null?cout-budget:null;
-      energieData.push({f:f,pts:pts,isInstant:isInstant,cap:cap,tarif:tarif,obj:obj,lastVal:lastVal,lastValPct:lastValPctR,conso:conso,cout:cout,restants:restants,budget:budget,vs:vs});
+      energieData.push({f:f,pts:pts,isInstant:isInstant,cap:cap,tarif:tarif,obj:obj,lastVal:lastVal,lastValPct:lastValPctR,conso:conso,cout:cout,restants:restants,budget:budget,vs:vs,pleins:isInstant?pleinsSite:[]});
     });
   }
 
@@ -9489,13 +9496,30 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     svg+='<defs><linearGradient id="gg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#D4761E" stop-opacity="0.2"/><stop offset="100%" stop-color="#D4761E" stop-opacity="0.02"/></linearGradient></defs>';
     svg+='<path d="'+areaD+'" fill="url(#gg)"/>';
     svg+='<path d="'+pathD+'" fill="none" stroke="#D4761E" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
-    // Points de ravitaillement (hausse significative)
-    for(var i=1;i<ptsL.length;i++){
-      if(ptsL[i].v>ptsL[i-1].v+50){
-        var xp=pxg(ptsL[i].date),yp=pyg(ptsL[i].v);
-        var delta=Math.round(ptsL[i].v-ptsL[i-1].v);
+    // Points de ravitaillement — utilise les dates réelles de la table pleins
+    var pleinsData=d.pleins||[];
+    if(pleinsData.length){
+      pleinsData.forEach(function(p){
+        if(!p.date||!p.litres_ajoutes)return;
+        var xp=pxg(p.date);
+        if(xp<PL||xp>W-PR)return;
+        // Y positionné sur le relevé le plus proche après le plein
+        var nearPt=null;
+        for(var k=0;k<ptsL.length;k++){if(ptsL[k].date>=p.date){nearPt=ptsL[k];break;}}
+        if(!nearPt)nearPt=ptsL[ptsL.length-1];
+        var yp=pyg(nearPt.v);
         svg+='<circle cx="'+xp.toFixed(1)+'" cy="'+yp.toFixed(1)+'" r="4" fill="#2D7A4F" stroke="white" stroke-width="1"/>'+
-          '<text x="'+(xp+6).toFixed(1)+'" y="'+(yp+3).toFixed(1)+'" font-size="8" fill="#2D7A4F" font-family="Inter,sans-serif">+'+delta.toLocaleString('fr-FR')+' L</text>';
+          '<text x="'+(xp+6).toFixed(1)+'" y="'+(yp+3).toFixed(1)+'" font-size="8" fill="#2D7A4F" font-family="Inter,sans-serif">+'+Math.round(p.litres_ajoutes).toLocaleString('fr-FR')+' L</text>';
+      });
+    }else{
+      // Fallback : détection par hausse significative entre deux relevés
+      for(var i=1;i<ptsL.length;i++){
+        if(ptsL[i].v>ptsL[i-1].v+50){
+          var xp=pxg(ptsL[i].date),yp=pyg(ptsL[i].v);
+          var delta=Math.round(ptsL[i].v-ptsL[i-1].v);
+          svg+='<circle cx="'+xp.toFixed(1)+'" cy="'+yp.toFixed(1)+'" r="4" fill="#2D7A4F" stroke="white" stroke-width="1"/>'+
+            '<text x="'+(xp+6).toFixed(1)+'" y="'+(yp+3).toFixed(1)+'" font-size="8" fill="#2D7A4F" font-family="Inter,sans-serif">+'+delta.toLocaleString('fr-FR')+' L</text>';
+        }
       }
     }
     var step2=Math.max(1,Math.ceil(ptsL.length/5));
