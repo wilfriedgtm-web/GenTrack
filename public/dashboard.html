@@ -3665,6 +3665,33 @@ async function _mntAnnuler(id){
   _mntRefresh();
 }
 
+function _mntEquipFilter(){
+  var q=(document.getElementById('mnt-m-equip-search').value||'').toLowerCase().trim();
+  var sel=document.getElementById('mnt-m-equip');
+  var all=window._mntEquipAll||[];
+  var prevVal=sel.value;
+  var html='<option value="">— Aucun / Général —</option>';
+  var techItems=all.filter(function(e){return e.g==='eq'&&(!q||e.n.toLowerCase().indexOf(q)!==-1);});
+  var zoneItems=all.filter(function(e){return e.g==='ez'&&(!q||e.n.toLowerCase().indexOf(q)!==-1);});
+  if(techItems.length){
+    html+='<optgroup label="Équipements techniques">';
+    html+=techItems.map(function(e){return '<option value="eq_'+e.id+'">'+escape_html(e.n)+'</option>';}).join('');
+    html+='</optgroup>';
+  }
+  if(zoneItems.length){
+    html+='<optgroup label="Équipements de zone / chambre">';
+    html+=zoneItems.map(function(e){return '<option value="ez_'+e.id+'">'+escape_html(e.n)+'</option>';}).join('');
+    html+='</optgroup>';
+  }
+  if(!techItems.length&&!zoneItems.length&&q){
+    html+='<option disabled value="">Aucun résultat</option>';
+  }
+  sel.innerHTML=html;
+  // restore previous selection if still present
+  if(prevVal){
+    for(var i=0;i<sel.options.length;i++){if(sel.options[i].value===prevVal){sel.value=prevVal;break;}}
+  }
+}
 function _mntCreer(sid){
   Promise.all([
     supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc'),
@@ -3672,6 +3699,10 @@ function _mntCreer(sid){
   ]).then(function(res){
     var equips=res[0]||[];
     var equipsZone=res[1]||[];
+    // store for filter function
+    window._mntEquipAll=
+      equips.map(function(e){return {g:'eq',id:e.id,n:e.nom};}).concat(
+      equipsZone.map(function(e){return {g:'ez',id:e.id,n:e.nom};}));
     var eqOpts='<option value="">— Aucun / Général —</option>';
     if(equips.length){
       eqOpts+='<optgroup label="Équipements techniques">';
@@ -3690,7 +3721,11 @@ function _mntCreer(sid){
         '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">TYPE</label>'+
         '<select id="mnt-m-type" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px">'+typeOpts+'</select></div>'+
         '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">ÉQUIPEMENT</label>'+
-        '<select id="mnt-m-equip" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px">'+eqOpts+'</select></div>'+
+        '<div style="position:relative;margin-bottom:6px">'+
+          '<span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none">🔍</span>'+
+          '<input id="mnt-m-equip-search" type="text" placeholder="Rechercher…" oninput="_mntEquipFilter()" style="width:100%;padding:8px 12px 8px 30px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;box-sizing:border-box"/>'+
+        '</div>'+
+        '<select id="mnt-m-equip" size="4" style="width:100%;padding:4px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;height:auto">'+eqOpts+'</select></div>'+
         '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">TITRE</label>'+
         '<input id="mnt-m-titre" type="text" placeholder="Ex : Remplacement filtre GE…" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
         '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">DATE</label>'+
