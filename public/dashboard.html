@@ -7057,18 +7057,18 @@ async function _dtMaintenances(sids){
   });
   /* KPIs */
   var nbRealises=rows.filter(function(r){return r.statut==='realise';}).length;
-  var totalCout=rows.filter(function(r){return r.statut==='realise';}).reduce(function(s,r){return s+(Number(r.cout)||0);},0);
+  var totalCout=rows.filter(function(r){return r.statut==='realise'&&r.type!=='ravitaillement';}).reduce(function(s,r){return s+(Number(r.cout)||0);},0);
   var sitesActifs=new Set(rows.map(function(r){return r.groupe_id;}));
   /* per-site stats */
   var siteStats={};
   sites.forEach(function(s,i){siteStats[s.id]={nb:0,cout:0,planif:0,col:HCOLS[i%HCOLS.length],pale:HCOLS_PALE[i%HCOLS_PALE.length],nom:s.nom};});
-  rows.forEach(function(r){if(siteStats[r.groupe_id]){siteStats[r.groupe_id].nb++;if(r.statut==='realise')siteStats[r.groupe_id].cout+=(Number(r.cout)||0);}});
+  rows.forEach(function(r){if(siteStats[r.groupe_id]){siteStats[r.groupe_id].nb++;if(r.statut==='realise'&&r.type!=='ravitaillement')siteStats[r.groupe_id].cout+=(Number(r.cout)||0);}});
   upcoming.forEach(function(r){if(siteStats[r.groupe_id])siteStats[r.groupe_id].planif++;});
   var maxNb=1;Object.values(siteStats).forEach(function(s){if(s.nb>maxNb)maxNb=s.nb;});
   /* KPI bar */
   var kpiHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">'+
     _mntKpi('Interventions réalisées',nbRealises,_dtMntPeriod+' derniers jours','')+
-    _mntKpi('Coût total',totalCout.toLocaleString('fr-FR')+' FCFA','opérations réalisées','')+
+    _mntKpi('Coût interventions',totalCout.toLocaleString('fr-FR')+' FCFA','hors ravitaillement carburant','')+
     _mntKpi('Planifiées à venir',upcoming.length,'à partir d\'aujourd\'hui',upcoming.length>0?'var(--orange)':'')+
     _mntKpi('Sites actifs',sitesActifs.size+' / '+sites.length,'avec activité sur la période','')+
   '</div>';
