@@ -938,7 +938,8 @@ function _buildCuveSection(cuveEquips,cuveQs,pleinsHist,gasoilNiveau){
       var niveauQ=cuveQs.find(function(q){
         return q.equipement_id===e.id&&(q.texte.toLowerCase().indexOf('niveau')>=0||q.texte.toLowerCase().indexOf('cuve')>=0);
       });
-      niveau=niveauQ&&niveauQ._lastVal!=null?parseFloat(niveauQ._lastVal):null;
+      var _rawNiv=niveauQ&&niveauQ._lastVal!=null?parseFloat(niveauQ._lastVal):null;
+      niveau=_rawNiv!=null?(_rawNiv>100?Math.round(_rawNiv):Math.round(_rawNiv/100*cap)):null;
       // Si le dernier plein est plus récent que la dernière ronde, utiliser niveau_apres
       var pleinsEquip=pleinsHist.filter(function(p){return p.equipement_id===e.id;});
       var latestPlein=pleinsEquip[0]||null;
@@ -2575,11 +2576,12 @@ async function _rtCommandes(sid,session){
       var lastByQ={};
       cuveReps.forEach(function(r){if(!lastByQ[r.question_id]||r.created_at>lastByQ[r.question_id].created_at)lastByQ[r.question_id]=r;});
       niveauQs.forEach(function(q){
-        var niv=lastByQ[q.id]?parseFloat(lastByQ[q.id].valeur):null;
         var eq=cuveEquips.find(function(e){return e.id===q.equipement_id;});
-        if(eq&&niv!=null){
+        if(eq){
           var cap=eq.capacite_litres||10000;
-          cuveMap[eq.id]={niv:Math.round(niv),cap:cap,manque:Math.round(cap-niv),nom:eq.nom};
+          var _rawNivC=lastByQ[q.id]?parseFloat(lastByQ[q.id].valeur):null;
+          var niv=_rawNivC!=null?(_rawNivC>100?Math.round(_rawNivC):Math.round(_rawNivC/100*cap)):null;
+          if(niv!=null)cuveMap[eq.id]={niv:niv,cap:cap,manque:Math.round(cap-niv),nom:eq.nom};
         }
       });
     }
@@ -2616,50 +2618,34 @@ async function _rtCommandes(sid,session){
     h+='</div>';
   }
 
-  // ── Section équipements de zone ──
+  // ── Wizard cascade Équipement de zone ──
   if(zones.length&&eqsZone.length){
-    h+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">Équipements de zone</div>';
-    var ZONE_CAT_ICONS={'chambre':'🛏️','commun':'🏢','technique':'⚙️','restaurant':'🍽️','piscine':'🏊','spa':'💆','parking':'🅿️'};
-    var catOrder=['chambre','commun','technique','restaurant','piscine','spa','parking'];
-    var zonesByCat={};
-    zones.forEach(function(z){var cat=z.categorie||'commun';if(!zonesByCat[cat])zonesByCat[cat]=[];zonesByCat[cat].push(z);});
-    var catsPresentes=catOrder.filter(function(c){return zonesByCat[c]&&zonesByCat[c].length;});
-    Object.keys(zonesByCat).forEach(function(c){if(catsPresentes.indexOf(c)<0)catsPresentes.push(c);});
-
-    catsPresentes.forEach(function(cat){
-      var catZones=zonesByCat[cat];
-      var catIcon=ZONE_CAT_ICONS[cat]||'📍';
-      var catLabel=cat.charAt(0).toUpperCase()+cat.slice(1)+'s';
-      var zonesAvecEq=catZones.filter(function(z){return eqsByZone[z.id]&&eqsByZone[z.id].length;});
-      if(!zonesAvecEq.length)return;
-
-      h+='<div style="margin-bottom:20px">'+
-        '<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">'+catIcon+' '+escape_html(catLabel)+'</div>'+
-        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">';
-
-      zonesAvecEq.forEach(function(zone){
-        var zoneEqs=eqsByZone[zone.id]||[];
-        h+='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px">'+
-          '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:8px">'+
-            escape_html(zone.nom)+(zone.etage?'<span style="font-size:10px;color:var(--text3);font-weight:400;margin-left:4px">· '+escape_html(zone.etage)+'</span>':'')+
-          '</div>';
-        zoneEqs.forEach(function(eq){
-          var sigs=sigByEqZone[eq.id]||[];
-          var ouvertes=sigs.filter(function(s){return s.statut!=='resolu';}).length;
-          var eqJs=escape_html(eq.nom).replace(/'/g,"\\'");
-          var zoneNomJs=escape_html(zone.nom).replace(/'/g,"\\'");
-          h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">'+
-            '<div>'+
-              '<div style="font-size:12px;color:var(--text)">'+escape_html(eq.nom)+'</div>'+
-              (ouvertes>0?'<div style="font-size:10px;color:var(--orange);margin-top:1px">'+ouvertes+' signalement'+(ouvertes>1?'s':'')+' ouvert'+(ouvertes>1?'s':'')+'</div>':'<div style="font-size:10px;color:var(--vert)">✓ OK</div>')+
-            '</div>'+
-            '<button onclick="_ouvrirNouvelleDemandeZone(\''+sid+'\',\''+eq.id+'\',\''+eqJs+'\',\''+zoneNomJs+'\')" style="padding:5px 10px;background:var(--dark);color:white;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">Demande</button>'+
-          '</div>';
-        });
-        h+='</div>';
-      });
-      h+='</div></div>';
-    });
+    window._zwizCurrentSid=sid;
+    window._zwizZones=zones;
+    window._zwizEqsByZone=eqsByZone;
+    window._zwizSigByEqZone=sigByEqZone;
+    var _ZWIZ_CAT_ICONS={'chambre':'🛏️','commun':'🏢','technique':'⚙️','restaurant':'🍽️','piscine':'🏊','spa':'💆','parking':'🅿️'};
+    var _catOrd=['chambre','commun','technique','restaurant','piscine','spa','parking'];
+    var _zbc={};zones.forEach(function(z){var c=z.categorie||'commun';if(!_zbc[c])_zbc[c]=[];_zbc[c].push(z);});
+    var _cats=_catOrd.filter(function(c){return _zbc[c]&&_zbc[c].some(function(z){return eqsByZone[z.id]&&eqsByZone[z.id].length;});});
+    Object.keys(_zbc).forEach(function(c){if(_cats.indexOf(c)<0&&_zbc[c].some(function(z){return eqsByZone[z.id]&&eqsByZone[z.id].length;}))_cats.push(c);});
+    var catTiles=_cats.map(function(cat){
+      var icon=_ZWIZ_CAT_ICONS[cat]||'📍';
+      var label=cat.charAt(0).toUpperCase()+cat.slice(1);
+      return '<button id="zwiz-cat-'+cat+'" onclick="_zwizSelectCat(\''+cat+'\')" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:20px;background:white;cursor:pointer;font-size:11px;font-weight:600;color:var(--text2)">'+icon+' '+escape_html(label)+'</button>';
+    }).join('');
+    h+='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:24px">'+
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:10px">Commande · Équipement de zone</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:6px">'+catTiles+'</div>'+
+      '<div id="zwiz-step2" style="display:none;margin-top:12px">'+
+        '<input id="zwiz-zone-search" type="text" placeholder="🔍 Rechercher une zone…" oninput="_zwizFilterZones()" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;outline:none;box-sizing:border-box">'+
+        '<div id="zwiz-zone-list" style="max-height:180px;overflow-y:auto;margin-top:6px;border:1px solid var(--border);border-radius:8px"></div>'+
+      '</div>'+
+      '<div id="zwiz-step3" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'+
+        '<div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px" id="zwiz-zone-label"></div>'+
+        '<div id="zwiz-eq-chips" style="display:flex;flex-wrap:wrap;gap:6px"></div>'+
+      '</div>'+
+    '</div>';
   }
 
   // ── Historique commandes (classiques + zone) ──
@@ -2793,6 +2779,69 @@ function _ouvrirNouvelleDemandeZone(sid,eqZoneId,eqZoneNom,zoneNom){
     var rapportEl=document.getElementById('dm-rapport-body');
     if(rapportEl)rapportEl.innerHTML=_buildRapportBody();
   });
+}
+
+/* ── wizard cascade zone ── */
+var _zwizCatActuelle=null;
+function _zwizSelectCat(cat){
+  _zwizCatActuelle=cat;
+  ['chambre','commun','technique','restaurant','piscine','spa','parking'].forEach(function(c){
+    var el=document.getElementById('zwiz-cat-'+c);if(!el)return;
+    var sel=c===cat;
+    el.style.background=sel?'var(--amber-pale)':'white';
+    el.style.borderColor=sel?'var(--amber)':'var(--border)';
+    el.style.color=sel?'var(--amber-dark)':'var(--text2)';
+  });
+  var s2=document.getElementById('zwiz-step2'),s3=document.getElementById('zwiz-step3');
+  if(s2)s2.style.display='';if(s3)s3.style.display='none';
+  var inp=document.getElementById('zwiz-zone-search');if(inp)inp.value='';
+  _zwizRenderZoneList('');
+}
+function _zwizFilterZones(){
+  var q=((document.getElementById('zwiz-zone-search')||{}).value||'').toLowerCase();
+  _zwizRenderZoneList(q);
+}
+function _zwizRenderZoneList(q){
+  var cat=_zwizCatActuelle;
+  var zones=(window._zwizZones||[]).filter(function(z){
+    if((z.categorie||'commun')!==cat)return false;
+    var eqs=(window._zwizEqsByZone||{})[z.id]||[];
+    if(!eqs.length)return false;
+    if(!q)return true;
+    return z.nom.toLowerCase().indexOf(q)>=0||(z.etage||'').toLowerCase().indexOf(q)>=0;
+  });
+  var html='';
+  zones.forEach(function(z){
+    var eqs=(window._zwizEqsByZone||{})[z.id]||[];
+    var openSigs=eqs.reduce(function(acc,eq){return acc+((window._zwizSigByEqZone||{})[eq.id]||[]).filter(function(s){return s.statut!=='resolu';}).length;},0);
+    var zIdEsc=z.id.replace(/'/g,"\\'");
+    var zNomEsc=escape_html(z.nom).replace(/'/g,"\\'");
+    html+='<div onclick="_zwizSelectZone(\''+zIdEsc+'\',\''+zNomEsc+'\')" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;cursor:pointer;border-radius:8px" onmouseover="this.style.background=\'var(--creme)\'" onmouseout="this.style.background=\'transparent\'">'+
+      '<div><div style="font-size:12px;font-weight:600;color:var(--text)">'+escape_html(z.nom)+'</div>'+(z.etage?'<div style="font-size:10px;color:var(--text3)">'+escape_html(z.etage)+'</div>':'')+'</div>'+
+      (openSigs>0?'<span style="font-size:10px;font-weight:600;color:var(--orange);background:var(--orange-pale);padding:2px 8px;border-radius:10px">'+openSigs+' sign.</span>':'')+
+    '</div>';
+  });
+  if(!html)html='<div style="text-align:center;padding:12px;color:var(--text3);font-size:12px">Aucune zone trouvée</div>';
+  var el=document.getElementById('zwiz-zone-list');if(el)el.innerHTML=html;
+}
+function _zwizSelectZone(zoneId,zoneNom){
+  var eqs=(window._zwizEqsByZone||{})[zoneId]||[];
+  var lbl=document.getElementById('zwiz-zone-label');if(lbl)lbl.textContent='📍 '+zoneNom;
+  var chipsEl=document.getElementById('zwiz-eq-chips');if(!chipsEl)return;
+  var sid=window._zwizCurrentSid;
+  var html='';
+  eqs.forEach(function(eq){
+    var sigs=((window._zwizSigByEqZone||{})[eq.id]||[]).filter(function(s){return s.statut!=='resolu';});
+    var eqJs=escape_html(eq.nom).replace(/'/g,"\\'");
+    var zNomJs=escape_html(zoneNom).replace(/'/g,"\\'");
+    var alert=sigs.length>0;
+    html+='<button onclick="_ouvrirNouvelleDemandeZone(\''+sid+'\',\''+eq.id+'\',\''+eqJs+'\',\''+zNomJs+'\')" style="padding:7px 14px;border:1.5px solid '+(alert?'var(--orange)':'var(--border)')+';border-radius:20px;background:'+(alert?'var(--orange-pale)':'white')+';cursor:pointer;font-size:11px;font-weight:600;color:'+(alert?'var(--orange)':'var(--text2)')+'">'+
+      escape_html(eq.nom)+(alert?' ⚠ '+sigs.length:'')+
+    '</button>';
+  });
+  if(!html)html='<div style="font-size:12px;color:var(--text3)">Aucun équipement configuré</div>';
+  chipsEl.innerHTML=html;
+  var s3=document.getElementById('zwiz-step3');if(s3)s3.style.display='';
 }
 
 /* ── contenu onglet rapport ── */
@@ -6109,7 +6158,8 @@ async function _dtAccueil(session,sids,cid){
     cuveEquipsDT.forEach(function(e){
       var nQ=cuveQsDT.find(function(q){return q.equipement_id===e.id&&(q.texte.toLowerCase().indexOf('niveau')>=0||q.texte.toLowerCase().indexOf('cuve')>=0);});
       var cap=e.capacite_litres||10000;var conso=e.conso_theorique_lh||65;
-      var niv=nQ&&nQ._lastVal!=null?parseFloat(nQ._lastVal):null;
+      var _rawNivDT=nQ&&nQ._lastVal!=null?parseFloat(nQ._lastVal):null;
+      var niv=_rawNivDT!=null?(_rawNivDT>100?Math.round(_rawNivDT):Math.round(_rawNivDT/100*cap)):null;
       var lp=cuvePleinsDT.find(function(p){return p.equipement_id===e.id;});
       if(lp&&lp.niveau_apres!=null&&nQ&&nQ._lastAt&&lp.date>nQ._lastAt.slice(0,10))niv=parseFloat(lp.niveau_apres);
       var pctCv=niv!=null?Math.min(100,Math.round(niv/cap*100)):null;
