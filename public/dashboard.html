@@ -3693,59 +3693,52 @@ function _mntEquipFilter(){
   }
 }
 function _mntCreer(sid){
-  Promise.all([
-    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc'),
-    supaGet('equipements_zone','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=nom.asc')
-  ]).then(function(res){
-    var equips=res[0]||[];
-    var equipsZone=res[1]||[];
-    // store for filter function
-    window._mntEquipAll=
-      equips.map(function(e){return {g:'eq',id:e.id,n:e.nom};}).concat(
-      equipsZone.map(function(e){return {g:'ez',id:e.id,n:e.nom};}));
-    var eqOpts='<option value="">— Aucun / Général —</option>';
-    if(equips.length){
-      eqOpts+='<optgroup label="Équipements techniques">';
-      eqOpts+=equips.map(function(e){return '<option value="eq_'+e.id+'">'+escape_html(e.nom)+'</option>';}).join('');
-      eqOpts+='</optgroup>';
-    }
-    if(equipsZone.length){
-      eqOpts+='<optgroup label="Équipements de zone / chambre">';
-      eqOpts+=equipsZone.map(function(e){return '<option value="ez_'+e.id+'">'+escape_html(e.nom)+'</option>';}).join('');
-      eqOpts+='</optgroup>';
-    }
-    var typeOpts=Object.keys(_MNT_TYPES).map(function(k){return '<option value="'+k+'">'+_MNT_TYPES[k].icon+' '+_MNT_TYPES[k].label+'</option>';}).join('');
-    _showCfgModal(
-      '<h3 style="font-size:16px;font-weight:700;margin-bottom:16px">🔧 Nouvelle opération</h3>'+
-      '<div style="display:flex;flex-direction:column;gap:12px">'+
-        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">TYPE</label>'+
-        '<select id="mnt-m-type" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px">'+typeOpts+'</select></div>'+
-        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">ÉQUIPEMENT</label>'+
+  var typeOpts=Object.keys(_MNT_TYPES).map(function(k){
+    return '<option value="'+k+'">'+_MNT_TYPES[k].icon+' '+_MNT_TYPES[k].label+'</option>';
+  }).join('');
+  var today=new Date().toISOString().split('T')[0];
+  var inp=function(id,type,ph,extra){
+    return '<input id="'+id+'" type="'+type+'" placeholder="'+ph+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"'+(extra||'')+'/>';
+  };
+  var lbl=function(t){return '<label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">'+t+'</label>';};
+  var fld=function(l,c){return '<div>'+lbl(l)+c+'</div>';};
+  var s='<style>input[type=date]::-webkit-calendar-picker-indicator{opacity:.5}</style>';
+  _showCfgModal(
+    s+
+    '<h3 style="font-size:16px;font-weight:700;margin-bottom:16px">🔧 Nouvelle opération</h3>'+
+    '<div style="display:flex;flex-direction:column;gap:12px">'+
+      fld('TYPE','<select id="mnt-m-type" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px">'+typeOpts+'</select>')+
+      '<div>'+lbl('ÉQUIPEMENT')+
         '<div style="position:relative;margin-bottom:6px">'+
           '<span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none">🔍</span>'+
           '<input id="mnt-m-equip-search" type="text" placeholder="Rechercher…" oninput="_mntEquipFilter()" style="width:100%;padding:8px 12px 8px 30px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;box-sizing:border-box"/>'+
         '</div>'+
-        '<select id="mnt-m-equip" size="4" style="width:100%;padding:4px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;height:auto">'+eqOpts+'</select></div>'+
-        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">TITRE</label>'+
-        '<input id="mnt-m-titre" type="text" placeholder="Ex : Remplacement filtre GE…" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
-        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">DATE</label>'+
-        '<input id="mnt-m-date" type="date" value="'+new Date().toISOString().split('T')[0]+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
-        '<div style="display:flex;gap:10px">'+
-          '<div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">COÛT (FCFA)</label>'+
-          '<input id="mnt-m-cout" type="number" placeholder="0" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
-          '<div style="flex:1"><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">PRESTATAIRE</label>'+
-          '<input id="mnt-m-prest" type="text" placeholder="Nom…" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
-        '</div>'+
-        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">NOTES</label>'+
-        '<textarea id="mnt-m-desc" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;resize:none" placeholder="Détails de l\'opération…"></textarea></div>'+
-        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">STATUT</label>'+
-        '<select id="mnt-m-statut" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"><option value="realise">Réalisé</option><option value="planifie">Planifié</option></select></div>'+
+        '<select id="mnt-m-equip" size="4" style="width:100%;padding:4px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"></select>'+
       '</div>'+
-      '<div style="display:flex;gap:8px;margin-top:16px">'+
-        '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
-        '<button onclick="_mntCreerSubmit(\''+sid+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--amber);color:var(--dark);cursor:pointer">Enregistrer</button>'+
-      '</div>'
-    );
+      fld('TITRE',inp('mnt-m-titre','text','Ex : Remplacement filtre GE…'))+
+      fld('DATE',inp('mnt-m-date','date','',' value="'+today+'"'))+
+      '<div style="display:flex;gap:10px">'+
+        '<div style="flex:1">'+fld('COÛT (FCFA)',inp('mnt-m-cout','number','0'))+'</div>'+
+        '<div style="flex:1">'+fld('PRESTATAIRE',inp('mnt-m-prest','text','Nom…'))+'</div>'+
+      '</div>'+
+      fld('NOTES','<textarea id="mnt-m-desc" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;resize:none;box-sizing:border-box" placeholder="Détails de l\'opération…"></textarea>')+
+      fld('STATUT','<select id="mnt-m-statut" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"><option value="realise">Réalisé</option><option value="planifie">Planifié</option></select>')+
+    '</div>'+
+    '<div style="display:flex;gap:8px;margin-top:16px">'+
+      '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
+      '<button onclick="_mntCreerSubmit(\''+sid+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--amber);color:var(--dark);cursor:pointer">Enregistrer</button>'+
+    '</div>'
+  );
+  // load equipment list then populate select via filter
+  Promise.all([
+    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc'),
+    supaGet('equipements_zone','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=nom.asc')
+  ]).then(function(res){
+    var eq=res[0]||[],ez=res[1]||[];
+    window._mntEquipAll=
+      eq.map(function(e){return {g:'eq',id:e.id,n:e.nom};}).concat(
+      ez.map(function(e){return {g:'ez',id:e.id,n:e.nom};}));
+    _mntEquipFilter();
   });
 }
 
@@ -3767,7 +3760,7 @@ async function _mntCreerSubmit(sid){
   await supaPost('maintenances',{
     groupe_id:sid,equipement_id:equipId,equipement_zone_id:equipZoneId,type:type,titre:titre,
     description:desc,
-    date_intervention:statut==='realise'?date:date,
+    date_intervention:date,
     date_planifiee:statut==='planifie'?date:null,
     date_realisee:statut==='realise'?date:null,
     statut:statut,cout:cout,prestataire:prest,created_by:nom
