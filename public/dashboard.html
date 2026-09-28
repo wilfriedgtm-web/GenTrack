@@ -726,7 +726,12 @@ async function _rtAccueil(session,sid,cid){
       var lr=lastReleve[0];
       var rawVal=lr.valeurs&&lr.valeurs[gf.id]!=null?parseFloat(lr.valeurs[gf.id]):null;
       if(rawVal!=null){
-        var cap=parseFloat(gf.capacite);var isLitres=rawVal>100;var litres=isLitres?Math.round(rawVal):Math.round(rawVal/100*cap);var pct=isLitres?Math.min(100,Math.round(rawVal/cap*100)):Math.min(100,rawVal);gasoilNiveau={pct:pct,litres:litres,cap:cap,date:lr.date_releve,saisi_par:lr.saisi_par};
+        var cap=parseFloat(gf.capacite);
+        // Si la valeur > 100 c'est des litres, sinon c'est un pourcentage (ancien format)
+        var isLitres=rawVal>100;
+        var litres=isLitres?Math.round(rawVal):Math.round(rawVal/100*cap);
+        var pct=isLitres?Math.min(100,Math.round(rawVal/cap*100)):Math.min(100,rawVal);
+        gasoilNiveau={pct:pct,litres:litres,cap:cap,date:lr.date_releve,saisi_par:lr.saisi_par};
       }
     }
     cuveSection=_buildCuveSection(cuveEquips,specialQs.filter(function(q){return cuveEquips.some(function(e){return e.id===q.equipement_id;})}),pleinsHist,gasoilNiveau);
@@ -2249,9 +2254,16 @@ async function _sgCreerMaintenance(sgId){
 
 function _sgCreerManuel(sid){
   var equips_cache=[];
-  supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc').then(function(equips){
+  Promise.all([
+    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc'),
+    supaGet('equipements_zone','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=nom.asc')
+  ]).then(function(results){
+    var equips=results[0];
+    var equipZones=results[1];
     equips_cache=equips;
-    var eqOpts='<option value="">— Aucun / Général —</option>'+equips.map(function(e){return '<option value="'+e.id+'">'+escape_html(e.nom)+'</option>';}).join('');
+    var eqOpts='<option value="">— Aucun / Général —</option>'+
+      (equips.length?'<optgroup label="Équipements ronde">'+equips.map(function(e){return '<option value="eq::'+e.id+'">'+escape_html(e.nom)+'</option>';}).join('')+'</optgroup>':'')+
+      (equipZones.length?'<optgroup label="Équipements zone">'+equipZones.map(function(e){return '<option value="zone::'+e.id+'">'+escape_html(e.nom)+'</option>';}).join('')+'</optgroup>':'');
     var typeOpts=Object.keys(_SG_TYPES).map(function(k){return '<option value="'+k+'">'+_SG_TYPES[k]+'</option>';}).join('');
     _showCfgModal(
       '<h3 style="font-size:16px;font-weight:700;margin-bottom:16px">📍 Nouveau signalement</h3>'+
@@ -2276,17 +2288,26 @@ function _sgCreerManuel(sid){
 async function _sgCreerManuelSubmit(sid){
   var desc=(document.getElementById('sg-m-desc').value||'').trim();
   var type=document.getElementById('sg-m-type').value;
-  var equipId=document.getElementById('sg-m-equip').value||null;
+  var rawVal=document.getElementById('sg-m-equip').value||'';
+  var equipId=null,equipZoneId=null;
+  if(rawVal.startsWith('eq::'))equipId=rawVal.slice(4);
+  else if(rawVal.startsWith('zone::'))equipZoneId=rawVal.slice(6);
   var par=(document.getElementById('sg-m-par').value||'').trim()||null;
   if(!desc)return;
-  await supaPost('signalements',{groupe_id:sid,equipement_id:equipId,type:type,description:desc,signale_par:par,statut:'ouvert',source:'manuel'});
+  await supaPost('signalements',{groupe_id:sid,equipement_id:equipId,equipement_zone_id:equipZoneId,type:type,description:desc,signale_par:par,statut:'ouvert',source:'manuel'});
   _closeCfgModal();
   if(_session)renderRespTech(_session,'signalements');
 }
 
 function _sgCreerDepuisAlerte(sid,alerteId,message,color){
-  supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc').then(function(equips){
-    var eqOpts='<option value="">— Aucun / Général —</option>'+equips.map(function(e){return '<option value="'+e.id+'">'+escape_html(e.nom)+'</option>';}).join('');
+  Promise.all([
+    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc'),
+    supaGet('equipements_zone','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=nom.asc')
+  ]).then(function(results){
+    var equips=results[0];var equipZones=results[1];
+    var eqOpts='<option value="">— Aucun / Général —</option>'+
+      (equips.length?'<optgroup label="Équipements ronde">'+equips.map(function(e){return '<option value="eq::'+e.id+'">'+escape_html(e.nom)+'</option>';}).join('')+'</optgroup>':'')+
+      (equipZones.length?'<optgroup label="Équipements zone">'+equipZones.map(function(e){return '<option value="zone::'+e.id+'">'+escape_html(e.nom)+'</option>';}).join('')+'</optgroup>':'');
     var typeOpts=Object.keys(_SG_TYPES).map(function(k){return '<option value="'+k+'">'+_SG_TYPES[k]+'</option>';}).join('');
     _showCfgModal(
       '<h3 style="font-size:16px;font-weight:700;margin-bottom:4px">📍 Créer un signalement</h3>'+
@@ -2312,11 +2333,14 @@ function _sgCreerDepuisAlerte(sid,alerteId,message,color){
 async function _sgCreerDepuisAlerteSubmit(sid,alerteId){
   var desc=(document.getElementById('sg-a-desc').value||'').trim();
   var type=document.getElementById('sg-a-type').value;
-  var equipId=document.getElementById('sg-a-equip').value||null;
+  var rawVal=document.getElementById('sg-a-equip').value||'';
+  var equipId=null,equipZoneId=null;
+  if(rawVal.startsWith('eq::'))equipId=rawVal.slice(4);
+  else if(rawVal.startsWith('zone::'))equipZoneId=rawVal.slice(6);
   var par=(document.getElementById('sg-a-par').value||'').trim()||null;
   if(!desc)return;
   await Promise.all([
-    supaPost('signalements',{groupe_id:sid,equipement_id:equipId,type:type,description:desc,signale_par:par,statut:'ouvert',source:'alerte'}),
+    supaPost('signalements',{groupe_id:sid,equipement_id:equipId,equipement_zone_id:equipZoneId,type:type,description:desc,signale_par:par,statut:'ouvert',source:'alerte'}),
     supaPatch('alertes',alerteId,{resolue:true})
   ]);
   _closeCfgModal();
@@ -4137,7 +4161,7 @@ async function _zonesWizardImport(){
 
   if(eqRows.length){
     try{
-      var r2=await fetch(window.SUPA_URL+'/rest/v1/equipements',{
+      var r2=await fetch(window.SUPA_URL+'/rest/v1/equipements_zone',{
         method:'POST',
         headers:{'apikey':window.SUPA_KEY,'Authorization':'Bearer '+window.SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
         body:JSON.stringify(eqRows)
@@ -4381,7 +4405,7 @@ async function _rtConfig(sid){
     }
   }
 
-  // Séparer équipements en suivi actif vs secondaires
+  // Séparer équipements en suivi actif vs secondaires (exclure les équipements de zone)
   var prioritaires=equips.filter(function(e){return e.actif_ronde||e.actif_releve;});
   var secondaires=equips.filter(function(e){return !e.actif_ronde&&!e.actif_releve&&!e.zone_id;});
 
@@ -4417,7 +4441,7 @@ async function _rtConfig(sid){
   if(prioritaires.length===0&&equips.length===0){
     listHtml+='<div style="padding:24px 16px;text-align:center;color:var(--text3);font-size:12px"><div style="font-size:32px;margin-bottom:8px;opacity:.3">⚙️</div>Aucun équipement configuré</div>';
   } else if(prioritaires.length===0){
-    // Aucun avec suivi → message indicatif + liste complète
+    // Aucun avec suivi → message indicatif + liste des équipements sans zone uniquement
     listHtml+='<div style="padding:8px 12px;font-size:10px;color:var(--text3);border-bottom:1px solid var(--border)">Activez Ronde ou Relevé sur un équipement pour le faire apparaître ici</div>'+
       (secondaires.length?_cfgBuildEquipGroup(secondaires):'');
   } else {
