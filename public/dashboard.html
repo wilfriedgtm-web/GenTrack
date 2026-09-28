@@ -8578,8 +8578,16 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
         bigSub='';
       }else{
         barCol='var(--vert)';
-        bigVal=d.conso!=null?d.conso.toLocaleString('fr-FR')+(d.f.unite?' '+d.f.unite:''):'—';
-        bigSub='consommation sur la période';
+        if(d.conso!=null){
+          bigVal=d.conso.toLocaleString('fr-FR')+(d.f.unite?' '+d.f.unite:'');
+          bigSub='consommation sur la période';
+        }else if(d.lastVal!=null){
+          bigVal=d.lastVal.toLocaleString('fr-FR')+(d.f.unite?' '+d.f.unite:'');
+          bigSub='index au '+new Date(d.pts[d.pts.length-1].date+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+        }else{
+          bigVal='—';
+          bigSub='aucune donnée sur la période';
+        }
       }
 
       // Ligne infos compacte
