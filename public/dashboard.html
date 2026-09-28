@@ -8390,10 +8390,18 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     function pxx(date){return PL+(new Date(date+'T12:00:00').getTime()-xMin)/xR*(W-PL-PR);}
     var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-height:110px;margin:8px 0 4px" xmlns="http://www.w3.org/2000/svg">';
     var step=Math.max(1,Math.ceil(allDates.length/6));
-    for(var di=0;di<allDates.length;di+=step){
+    var dLabeledIdx=[];
+    for(var di=0;di<allDates.length;di+=step){dLabeledIdx.push(di);}
+    var dLastIdx=allDates.length-1;
+    if(dLabeledIdx.indexOf(dLastIdx)<0){
+      var dPrevX=pxx(allDates[dLabeledIdx[dLabeledIdx.length-1]]);
+      var dLastX=pxx(allDates[dLastIdx]);
+      if(dLastX-dPrevX>(W-PL-PR)*0.08)dLabeledIdx.push(dLastIdx);
+    }
+    dLabeledIdx.forEach(function(di){
       var xp=pxx(allDates[di]);
       svg+='<text x="'+xp.toFixed(1)+'" y="'+(H-5)+'" font-size="8" fill="#A8957E" font-family="Inter,sans-serif" text-anchor="middle">'+new Date(allDates[di]+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</text>';
-    }
+    });
     var lx=PL;
     indexData.forEach(function(d,ci){
       if(d.pts.length<2)return;
@@ -8450,10 +8458,21 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
       }
     }
     var step2=Math.max(1,Math.ceil(ptsL.length/5));
-    for(var j=0;j<ptsL.length;j+=step2){
+    var labeledIdx=[];
+    for(var j=0;j<ptsL.length;j+=step2){labeledIdx.push(j);}
+    // Toujours afficher le dernier point
+    var lastIdx=ptsL.length-1;
+    if(labeledIdx.indexOf(lastIdx)<0){
+      // N'ajouter que si pas trop proche du précédent label (>3% de la largeur)
+      var prevLabelIdx=labeledIdx[labeledIdx.length-1];
+      var prevX=pxg(ptsL[prevLabelIdx].date);
+      var lastX=pxg(ptsL[lastIdx].date);
+      if(lastX-prevX>(W-PL-PR)*0.08)labeledIdx.push(lastIdx);
+    }
+    labeledIdx.forEach(function(j){
       var xp2=pxg(ptsL[j].date);
       svg+='<text x="'+xp2.toFixed(1)+'" y="'+(H-5)+'" font-size="8" fill="#A8957E" font-family="Inter,sans-serif" text-anchor="middle">'+new Date(ptsL[j].date+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</text>';
-    }
+    });
     return svg+'</svg>';
   }
 
