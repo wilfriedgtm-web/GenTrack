@@ -3666,8 +3666,23 @@ async function _mntAnnuler(id){
 }
 
 function _mntCreer(sid){
-  supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc').then(function(equips){
-    var eqOpts='<option value="">— Aucun / Général —</option>'+equips.map(function(e){return '<option value="'+e.id+'">'+escape_html(e.nom)+'</option>';}).join('');
+  Promise.all([
+    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc'),
+    supaGet('equipements_zone','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=nom.asc')
+  ]).then(function(res){
+    var equips=res[0]||[];
+    var equipsZone=res[1]||[];
+    var eqOpts='<option value="">— Aucun / Général —</option>';
+    if(equips.length){
+      eqOpts+='<optgroup label="Équipements techniques">';
+      eqOpts+=equips.map(function(e){return '<option value="eq_'+e.id+'">'+escape_html(e.nom)+'</option>';}).join('');
+      eqOpts+='</optgroup>';
+    }
+    if(equipsZone.length){
+      eqOpts+='<optgroup label="Équipements de zone / chambre">';
+      eqOpts+=equipsZone.map(function(e){return '<option value="ez_'+e.id+'">'+escape_html(e.nom)+'</option>';}).join('');
+      eqOpts+='</optgroup>';
+    }
     var typeOpts=Object.keys(_MNT_TYPES).map(function(k){return '<option value="'+k+'">'+_MNT_TYPES[k].icon+' '+_MNT_TYPES[k].label+'</option>';}).join('');
     _showCfgModal(
       '<h3 style="font-size:16px;font-weight:700;margin-bottom:16px">🔧 Nouvelle opération</h3>'+
@@ -3701,7 +3716,10 @@ function _mntCreer(sid){
 
 async function _mntCreerSubmit(sid){
   var type=document.getElementById('mnt-m-type').value;
-  var equipId=document.getElementById('mnt-m-equip').value||null;
+  var equipRaw=document.getElementById('mnt-m-equip').value||'';
+  var equipId=null,equipZoneId=null;
+  if(equipRaw.indexOf('eq_')===0){equipId=equipRaw.slice(3);}
+  else if(equipRaw.indexOf('ez_')===0){equipZoneId=equipRaw.slice(3);}
   var titre=(document.getElementById('mnt-m-titre').value||'').trim();
   var date=document.getElementById('mnt-m-date').value;
   var coutStr=document.getElementById('mnt-m-cout').value;
@@ -3712,7 +3730,7 @@ async function _mntCreerSubmit(sid){
   var nom=_session&&_session.contact&&_session.contact.nom?_session.contact.nom:null;
   if(!titre&&type){titre=(_MNT_TYPES[type]&&_MNT_TYPES[type].label)||type;}
   await supaPost('maintenances',{
-    groupe_id:sid,equipement_id:equipId,type:type,titre:titre,
+    groupe_id:sid,equipement_id:equipId,equipement_zone_id:equipZoneId,type:type,titre:titre,
     description:desc,
     date_intervention:statut==='realise'?date:date,
     date_planifiee:statut==='planifie'?date:null,
