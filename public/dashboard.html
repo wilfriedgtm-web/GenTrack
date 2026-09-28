@@ -8181,7 +8181,7 @@ async function _openRapportHebdo(period){
 
     // Énergie
     var[energieFluides,relevesEnergiePeriode]=await Promise.all([
-      supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,objectif_mensuel,capacite&order=ordre.asc'),
+      supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,objectif_mensuel,capacite,devise&order=ordre.asc'),
       supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+cutoff+'&select=date_releve,valeurs,saisi_par&order=date_releve.asc&limit=100')
     ]);
 
@@ -8352,12 +8352,13 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     });
   }
 
-  function fmtCout(v){
+  function fmtCout(v,devise){
     if(v==null||isNaN(v))return'—';
+    var d=devise||'XOF';
     var abs=Math.abs(v),s=v<0?'-':'';
-    if(abs>=1000000)return s+(abs/1000000).toFixed(1).replace('.',',')+' M FCFA';
-    if(abs>=1000)return s+Math.round(abs/1000).toLocaleString('fr-FR')+' k FCFA';
-    return s+Math.round(abs).toLocaleString('fr-FR')+' FCFA';
+    if(abs>=1000000)return s+(abs/1000000).toFixed(1).replace('.',',')+' M '+d;
+    if(abs>=1000)return s+Math.round(abs/1000).toLocaleString('fr-FR')+' k '+d;
+    return s+Math.round(abs).toLocaleString('fr-FR')+' '+d;
   }
   function fmtConso(d){
     if(d.conso==null)return'—';
@@ -8575,8 +8576,8 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
         '<td><strong>'+escape_html(d.f.nom)+'</strong>'+(d.isInstant&&d.restants!=null?'<br><span style="font-size:10px;color:var(--text3)">'+d.restants.toLocaleString('fr-FR')+' L restants</span>':'')+'</td>'+
         '<td style="text-align:right;font-weight:600">'+fmtConso(d)+'</td>'+
         (hasAnyObj?'<td style="text-align:right;color:var(--text2)">'+(d.obj!=null?d.obj.toLocaleString('fr-FR')+(d.isInstant?' L':d.f.unite?' '+d.f.unite:''):'—')+'</td>':'')+
-        (hasAnyTarif?'<td style="text-align:right;font-weight:600;color:'+(d.vs!=null&&d.vs>0?'var(--rouge)':'var(--vert)')+'">'+fmtCout(d.cout)+'</td>':'')+
-        (hasAnyObj&&hasAnyTarif?'<td style="text-align:right;font-weight:700;color:'+(d.vs!=null?(d.vs>0?'var(--rouge)':'var(--vert)'):'var(--text3)')+'">'+(d.vs!=null?(d.vs>0?'+':'')+fmtCout(d.vs):'—')+'</td>':'')+
+        (hasAnyTarif?'<td style="text-align:right;font-weight:600;color:'+(d.vs!=null&&d.vs>0?'var(--rouge)':'var(--vert)')+'">'+fmtCout(d.cout,d.f.devise)+'</td>':'')+
+        (hasAnyObj&&hasAnyTarif?'<td style="text-align:right;font-weight:700;color:'+(d.vs!=null?(d.vs>0?'var(--rouge)':'var(--vert)'):'var(--text3)')+'">'+(d.vs!=null?(d.vs>0?'+':'')+fmtCout(d.vs,d.f.devise):'—')+'</td>':'')+
         '<td style="text-align:center"><span class="'+statutCls+'">'+escape_html(statut)+'</span></td>'+
       '</tr>';
     });
@@ -8611,7 +8612,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
         '</div>'+
         (pct!=null?'<div style="background:var(--border);border-radius:4px;height:8px;margin-bottom:8px;overflow:hidden"><div style="height:100%;width:'+Math.min(100,pct)+'%;background:'+col+';border-radius:4px"></div></div>':'')+
         (seuilAlerte!=null?'<div style="font-size:10px;color:var(--text3)">Seuil d\'alerte : '+seuilAlerte.toLocaleString('fr-FR')+' L (20%)</div>':'')+
-        (d.conso!=null?'<div style="font-size:11px;color:var(--text2);margin-top:4px">Consommation estimée ce mois : <strong>'+d.conso.toLocaleString('fr-FR')+' L</strong>'+(d.cout!=null?' · '+fmtCout(d.cout):'')+'</div>':'')+
+        (d.conso!=null?'<div style="font-size:11px;color:var(--text2);margin-top:4px">Consommation estimée ce mois : <strong>'+d.conso.toLocaleString('fr-FR')+' L</strong>'+(d.cout!=null?' · '+fmtCout(d.cout,d.f.devise):'')+'</div>':'')+
         (d.pts.length>=2?svgGasoilChart(d):'')+
       '</div>';
     });
@@ -8627,8 +8628,8 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
         var col2=pctB>100?'var(--rouge)':pctB>85?'var(--orange)':'var(--vert)';
         h+='<div style="flex:1;min-width:140px;background:#F9F6F0;border:1px solid var(--border);border-radius:8px;padding:12px">'+
           '<div style="font-size:10px;font-weight:600;color:var(--text2);margin-bottom:4px">'+escape_html(d.f.nom)+'</div>'+
-          '<div style="font-size:14px;font-weight:600;color:'+col2+'">'+fmtCout(d.cout)+'</div>'+
-          '<div style="font-size:10px;color:var(--text3)">budget '+fmtCout(d.budget)+'</div>'+
+          '<div style="font-size:14px;font-weight:600;color:'+col2+'">'+fmtCout(d.cout,d.f.devise)+'</div>'+
+          '<div style="font-size:10px;color:var(--text3)">budget '+fmtCout(d.budget,d.f.devise)+'</div>'+
           '<div style="margin-top:6px;background:var(--border);border-radius:3px;height:5px;overflow:hidden">'+
             '<div style="height:100%;width:'+Math.min(100,pctB)+'%;background:'+col2+'"></div>'+
           '</div>'+
@@ -9022,9 +9023,10 @@ function _calcEnergieStatut(releve,fluides,prevReleve){
       }
     }else{
       var pv=prevReleve&&prevReleve.valeurs&&prevReleve.valeurs[f.id];
-      if(pv!=null&&f.objectif_mensuel){
+      var _fObjV=(window._energieObjActif&&window._energieObjActif[f.id]&&window._energieObjActif[f.id].valeur!=null)?parseFloat(window._energieObjActif[f.id].valeur):null;
+      if(pv!=null&&_fObjV){
         var delta=v-parseFloat(pv);
-        var objJ=f.objectif_mensuel/new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
+        var objJ=_fObjV/new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
         if(delta>objJ*1.2)worst='depassement';
         else if(delta>objJ&&worst==='ok')worst='surveiller';
       }
@@ -9125,17 +9127,79 @@ async function _energieSaveObjectifs(sid){
   var btn=document.getElementById('energie-obj-btn');
   if(btn){btn.disabled=true;btn.textContent='Enregistrement…';}
   var patches=fluides.map(function(f){
-    var inpObj=document.getElementById('eobj-inp-'+f.id);
     var inpTarif=document.getElementById('etarif-inp-'+f.id);
-    if(!inpObj&&!inpTarif)return Promise.resolve();
-    var payload={updated_at:new Date().toISOString()};
-    if(inpObj)payload.objectif_mensuel=inpObj.value!==''?parseFloat(inpObj.value):null;
-    if(inpTarif)payload.tarif=inpTarif.value!==''?parseFloat(inpTarif.value):null;
-    return supaPatch('energie_config',f.id,payload);
+    if(!inpTarif)return Promise.resolve();
+    return supaPatch('energie_config',f.id,{
+      tarif:inpTarif.value!==''?parseFloat(inpTarif.value):null,
+      updated_at:new Date().toISOString()
+    });
   });
   await Promise.all(patches);
-  if(btn){btn.disabled=false;btn.textContent='Enregistrer les objectifs';btn.style.background='var(--vert)';setTimeout(function(){btn.style.background='var(--amber)';},1500);}
-  // Refresh tiles
+  if(btn){btn.disabled=false;btn.textContent='💾 Enregistrer les tarifs';btn.style.background='var(--vert)';setTimeout(function(){btn.style.background='var(--amber)';},1500);}
+  if(_session)navTo('energie');
+}
+
+var _energieObjFluidId=null;
+var _energieObjSid=null;
+
+function _energieModifierObjModal(fid,sid){
+  _energieObjFluidId=fid;
+  _energieObjSid=sid;
+  var f=(_energieFluides||[]).find(function(x){return x.id===fid;});
+  if(!f)return;
+  var activeObj=window._energieObjActif&&window._energieObjActif[fid];
+  var curVal=activeObj&&activeObj.valeur!=null?Number(activeObj.valeur):'';
+  var curSince=activeObj&&activeObj.date_debut?new Date(activeObj.date_debut+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}):'';
+  _showCfgModal(
+    '<div class="cfg-modal-title">🎯 Objectif — '+escape_html(f.nom)+'</div>'+
+    (curVal!==''?'<div style="font-size:12px;color:var(--text2);margin-bottom:14px">Actuel : <strong>'+Number(curVal).toLocaleString('fr-FR')+' '+(f.unite||'u')+'/mois</strong>'+(curSince?' · '+escape_html(curSince):'')+'</div>':'<div style="font-size:12px;color:var(--text3);margin-bottom:14px">Aucun objectif défini.</div>')+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Nouvelle valeur ('+escape_html(f.unite||'u')+'/mois)</label>'+
+      '<input id="enewobj-val" type="number" class="cfg-form-input" value="'+escape_html(String(curVal))+'" placeholder="ex: 2400">'+
+    '</div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Date de début</label>'+
+      '<input id="enewobj-date" type="date" class="cfg-form-input" value="'+todayStr()+'">'+
+    '</div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Note (optionnel)</label>'+
+      '<input id="enewobj-note" class="cfg-form-input" placeholder="ex: Saison sèche, après rénovation…">'+
+    '</div>'+
+    '<div class="cfg-modal-footer">'+
+      '<button class="cfg-btn cfg-btn-cancel" onclick="_closeCfgModal()">Annuler</button>'+
+      '<button id="enewobj-save" class="cfg-btn cfg-btn-amber" onclick="_energieSaveNewObjectif()">Enregistrer</button>'+
+    '</div>'
+  );
+  setTimeout(function(){var el=document.getElementById('enewobj-val');if(el){el.focus();el.select();}},80);
+}
+
+async function _energieSaveNewObjectif(){
+  var valEl=document.getElementById('enewobj-val');
+  var dateEl=document.getElementById('enewobj-date');
+  var noteEl=document.getElementById('enewobj-note');
+  var fid=_energieObjFluidId;
+  var sid=_energieObjSid;
+  if(!valEl||!dateEl||!fid)return;
+  var valeur=parseFloat(valEl.value);
+  var dateDebut=dateEl.value;
+  if(!valeur||!dateDebut){if(!valeur&&valEl)valEl.focus();return;}
+  var btn=document.getElementById('enewobj-save');
+  if(btn){btn.disabled=true;btn.textContent='Enregistrement…';}
+  // Fermer l'objectif actuel (date_fin = date_debut - 1 jour)
+  var activeObj=window._energieObjActif&&window._energieObjActif[fid];
+  if(activeObj&&activeObj.id){
+    var df=new Date(dateDebut+'T12:00:00');
+    df.setDate(df.getDate()-1);
+    var dateFin=df.toISOString().split('T')[0];
+    if(dateFin>=activeObj.date_debut)await supaPatch('objectifs_energie',activeObj.id,{date_fin:dateFin});
+  }
+  // Créer le nouvel objectif
+  await supaPost('objectifs_energie',{
+    site_id:sid,
+    fluide_id:fid,
+    valeur:valeur,
+    date_debut:dateDebut,
+    date_fin:null,
+    note:(noteEl&&noteEl.value.trim())||null
+  });
+  _closeCfgModal();
   if(_session)navTo('energie');
 }
 
@@ -9182,11 +9246,27 @@ async function _rtEnergie(sid){
 
   _energieSidGlobal=sid;
 
-  var[fluides,relevesRows,siteRows]=await Promise.all([
-    supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,seuil_alerte_bas,objectif_mensuel,capacite,ordre&order=ordre.asc'),
+  var[fluides,relevesRows,siteRows,objsRows]=await Promise.all([
+    supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,seuil_alerte_bas,objectif_mensuel,capacite,ordre,devise&order=ordre.asc'),
     supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+moisDebut+'&select=id,date_releve,valeurs,saisi_par,note&order=date_releve.asc&limit=62'),
-    supaGet('sites','id=eq.'+sid+'&select=nom&limit=1')
+    supaGet('sites','id=eq.'+sid+'&select=nom&limit=1'),
+    supaGet('objectifs_energie','site_id=eq.'+sid+'&select=id,fluide_id,valeur,date_debut,date_fin,note&order=date_debut.desc&limit=200')
   ]);
+
+  // Index objectifs actifs par fluide (le plus récent dont date_debut <= aujourd'hui et non expiré avant ce mois)
+  var _objActif={};
+  (objsRows||[]).forEach(function(o){
+    if(!o.date_debut||o.date_debut>today)return;
+    if(o.date_fin&&o.date_fin<moisDebut)return;
+    if(!_objActif[o.fluide_id])_objActif[o.fluide_id]=o;
+  });
+  // Fallback vers objectif_mensuel hérité si pas de versioned
+  (fluides||[]).forEach(function(f){
+    if(!_objActif[f.id]&&f.objectif_mensuel!=null)
+      _objActif[f.id]={id:null,valeur:f.objectif_mensuel,date_debut:null,date_fin:null,note:'Hérité'};
+  });
+  window._energieObjActif=_objActif;
+  window._energieObjsRows=objsRows||[];
 
   var siteNom=siteRows&&siteRows.length?siteRows[0].nom:'';
   _energieFluides=fluides||[];
@@ -9246,7 +9326,8 @@ async function _rtEnergie(sid){
 
   // ── Préparer données graphique (globales pour _renderEnergieChart) ──
   fluides.forEach(function(f,fi){
-    var objJ=f.objectif_mensuel?parseFloat(f.objectif_mensuel)/daysInMonth:null;
+    var _ov=_objActif[f.id]&&_objActif[f.id].valeur!=null?parseFloat(_objActif[f.id].valeur):null;
+    var objJ=_ov?_ov/daysInMonth:null;
     _energieBarData[f.id]={
       days:relevesAsc.map(function(r){return r.date_releve;}),
       vals:deltasByFluide[f.id],
@@ -9277,7 +9358,8 @@ async function _rtEnergie(sid){
       if(v!=null){lastVal=parseFloat(v);break;}
     }
     var consoMois=consoMoisByFluide[f.id];
-    var obj=f.objectif_mensuel?parseFloat(f.objectif_mensuel):null;
+    var obj=_objActif[f.id]&&_objActif[f.id].valeur!=null?parseFloat(_objActif[f.id].valeur):null;
+    var devise=f.devise||'XOF';
     var isInstant=f.type_valeur==='instantane';
     var cap=f.capacite?parseFloat(f.capacite):null;
     // Conso mensuelle pour instantanés : sommer les baisses quotidiennes × capacité
@@ -9349,18 +9431,18 @@ async function _rtEnergie(sid){
           '</div>':'')+
           (budget?'<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:2px">'+
             '<span>Budget</span><span style="font-weight:600;color:var(--text2)">'+
-              (budget>=1000000?Math.round(budget/100000)/10+'M':Math.round(budget/1000)+'k')+' FCFA'+
+              (budget>=1000000?Math.round(budget/100000)/10+'M':Math.round(budget/1000)+'k')+' '+devise+
             '</span>'+
           '</div>':'')+
           (coutReel!=null?'<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:4px">'+
             '<span>Coût réel est.</span><span style="font-weight:600;color:var(--dark)">'+
-              (coutReel>=1000000?Math.round(coutReel/100000)/10+'M':Math.round(coutReel/1000)+'k')+' FCFA'+
+              (coutReel>=1000000?Math.round(coutReel/100000)/10+'M':Math.round(coutReel/1000)+'k')+' '+devise+
             '</span>'+
           '</div>':'')+
           (pct!=null&&coutReel!=null?'<div style="font-size:10px;font-weight:700;color:'+deltaColor+'">'+
             (pct>1?'↑ +':'↓ ')+Math.abs(Math.round((pct-1)*1000)/10)+'% vs objectif'+
             (deltaCout!=null?' · '+(deltaCout>0?'+':'')+
-              (Math.abs(deltaCout)>=1000000?Math.round(Math.abs(deltaCout)/100000)/10+'M':Math.round(Math.abs(deltaCout)/1000)+'k')+' FCFA':'')+
+              (Math.abs(deltaCout)>=1000000?Math.round(Math.abs(deltaCout)/100000)/10+'M':Math.round(Math.abs(deltaCout)/1000)+'k')+' '+devise:'')+
           '</div>':'')+
         '</div>':'')+
       '</div>';
@@ -9380,38 +9462,40 @@ async function _rtEnergie(sid){
   var nextMois=new Date(now.getFullYear(),now.getMonth()+1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
 
   var objPanelHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px;height:fit-content">'+
-    '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:2px">Objectifs &amp; budget</div>'+
-    '<div style="font-size:10px;color:var(--text3);margin-bottom:14px">'+escape_html(moisLabel.charAt(0).toUpperCase()+moisLabel.slice(1))+' · modifiables à tout moment</div>'+
+    '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:2px">Objectifs &amp; tarifs</div>'+
+    '<div style="font-size:10px;color:var(--text3);margin-bottom:14px">'+escape_html(moisLabel.charAt(0).toUpperCase()+moisLabel.slice(1))+'</div>'+
     fluides.map(function(f){
-      var budget=(f.tarif!=null&&f.objectif_mensuel!=null)?Math.round(f.tarif*f.objectif_mensuel):null;
+      var fDevise=f.devise||'XOF';
+      var activeObj=_objActif[f.id];
+      var objVal=activeObj&&activeObj.valeur!=null?parseFloat(activeObj.valeur):null;
+      var budget=f.tarif!=null&&objVal!=null?Math.round(f.tarif*objVal):null;
+      var objLabel=objVal!=null?objVal.toLocaleString('fr-FR')+' '+(f.unite||'u')+'/mois':'Non défini';
+      var objSince=activeObj&&activeObj.date_debut?'depuis '+new Date(activeObj.date_debut+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'';
       return '<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">'+
-        '<div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:6px;display:flex;align-items:center;gap:5px">'+
+        '<div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:8px;display:flex;align-items:center;gap:5px">'+
           '<span>'+_fluidIcon(f)+'</span><span style="text-transform:uppercase;letter-spacing:.4px">'+escape_html(f.nom)+'</span>'+
         '</div>'+
-        // Objectif
-        '<div style="font-size:9px;color:var(--text3);margin-bottom:3px">Objectif mensuel</div>'+
-        '<div style="display:flex;gap:5px;align-items:center;margin-bottom:6px">'+
-          '<input id="eobj-inp-'+f.id+'" type="number" value="'+(f.objectif_mensuel!=null?f.objectif_mensuel:'')+'" placeholder="—" '+
-            'style="flex:1;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;width:0;box-sizing:border-box" />'+
-          '<span style="font-size:10px;color:var(--text3);white-space:nowrap">'+(f.unite?escape_html(f.unite):'u')+'</span>'+
+        // Objectif versionné (lecture seule + bouton modifier)
+        '<div style="font-size:9px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Objectif mensuel</div>'+
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'+
+          '<span style="font-size:12px;font-weight:600;color:var(--dark)">'+objLabel+'</span>'+
+          '<button onclick="_energieModifierObjModal(\''+f.id+'\',\''+sid+'\')" '+
+            'style="font-size:10px;padding:2px 8px;border:1px solid var(--border);border-radius:5px;background:white;cursor:pointer;color:var(--text2);white-space:nowrap">Modifier</button>'+
         '</div>'+
+        (objSince?'<div style="font-size:9px;color:var(--text3);margin-bottom:8px">'+escape_html(objSince)+'</div>':'<div style="margin-bottom:8px"></div>')+
         // Tarif
-        '<div style="font-size:9px;color:var(--text3);margin-bottom:3px">Tarif unitaire</div>'+
+        '<div style="font-size:9px;color:var(--text3);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em">Tarif unitaire</div>'+
         '<div style="display:flex;gap:5px;align-items:center;margin-bottom:6px">'+
           '<input id="etarif-inp-'+f.id+'" type="number" value="'+(f.tarif!=null?f.tarif:'')+'" placeholder="—" '+
             'style="flex:1;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;width:0;box-sizing:border-box" />'+
-          '<span style="font-size:10px;color:var(--text3);white-space:nowrap">FCFA/'+(f.unite?escape_html(f.unite):'u')+'</span>'+
+          '<span style="font-size:10px;color:var(--text3);white-space:nowrap">'+escape_html(fDevise)+'/'+(f.unite?escape_html(f.unite):'u')+'</span>'+
         '</div>'+
-        // Budget calculé
-        (budget!=null?
-          '<div style="font-size:10px;color:var(--amber-dark);font-weight:600">Budget : '+budget.toLocaleString('fr-FR')+' FCFA</div>':
-          (f.tarif!=null||f.objectif_mensuel!=null?'<div style="font-size:10px;color:var(--text3)">Renseignez les deux champs pour voir le budget</div>':'')+
-        '')+
+        (budget!=null?'<div style="font-size:10px;color:var(--amber-dark);font-weight:600">Budget : '+budget.toLocaleString('fr-FR')+' '+escape_html(fDevise)+'</div>':'')+
       '</div>';
     }).join('')+
     '<button id="energie-obj-btn" onclick="_energieSaveObjectifs(\''+sid+'\')" '+
       'style="width:100%;background:var(--amber);color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;margin-top:4px">'+
-      '💾 Enregistrer objectifs &amp; tarifs'+
+      '💾 Enregistrer les tarifs'+
     '</button>'+
   '</div>';
 
@@ -9474,7 +9558,7 @@ async function _rtEnergie(sid){
         var alerte=f.seuil_alerte_bas!=null&&vNum!=null&&vNum<f.seuil_alerte_bas;
         var deltaStr='';
         if(delta!=null&&f.type_valeur==='index'){
-          var objJ=f.objectif_mensuel?parseFloat(f.objectif_mensuel)/daysInMonth:null;
+          var objJ=(_objActif[f.id]&&_objActif[f.id].valeur!=null)?parseFloat(_objActif[f.id].valeur)/daysInMonth:null;
           var over=objJ&&delta>objJ*1.05;
           deltaStr='<div style="font-size:9px;color:'+(over?'#E8841A':'var(--text3)')+'">'+delta.toLocaleString('fr-FR')+(f.unite?' '+f.unite:'')+'/j</div>';
         }
@@ -9532,11 +9616,11 @@ async function _rtEnergie(sid){
    ⚡ ÉNERGIE CONFIG — Onglet config fluides
    ═══════════════════════════════════════════════════════ */
 // Colonnes : ordre | nom | unité | type | tarif | seuil | actif | suppr
-var _ECFG_COLS='30px 1fr 70px 90px 90px 90px 90px 44px';
+var _ECFG_COLS='30px 1fr 70px 90px 65px 85px 80px 80px 44px';
 
 async function _buildEnergieConfigTab(sid){
   var[fluides,relevesCheck]=await Promise.all([
-    supaGet('energie_config','site_id=eq.'+sid+'&select=id,nom,unite,type_valeur,tarif,seuil_alerte_bas,capacite,actif,ordre&order=ordre.asc'),
+    supaGet('energie_config','site_id=eq.'+sid+'&select=id,nom,unite,type_valeur,tarif,seuil_alerte_bas,capacite,actif,ordre,devise&order=ordre.asc'),
     supaGet('releves_energie','site_id=eq.'+sid+'&select=valeurs&limit=100')
   ]);
 
@@ -9556,7 +9640,8 @@ async function _buildEnergieConfigTab(sid){
     '<div>Nom du fluide</div>'+
     '<div>Unité</div>'+
     '<div>Type</div>'+
-    '<div style="text-align:right">Tarif FCFA/u</div>'+
+    '<div>Devise</div>'+
+    '<div style="text-align:right">Tarif /u</div>'+
     '<div style="text-align:right">Seuil bas</div>'+
     '<div style="text-align:right">Capacité</div>'+
     '<div style="text-align:center">Actif</div>'+
@@ -9582,6 +9667,12 @@ async function _buildEnergieConfigTab(sid){
         'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')">'+
         '<option value="index"'+(f.type_valeur==='index'?' selected':'')+'>Index</option>'+
         '<option value="instantane"'+(f.type_valeur==='instantane'?' selected':'')+'>Instantané</option>'+
+      '</select>'+
+      // Devise
+      '<select id="ecfg-devise-'+f.id+'" '+
+        'style="border:1px solid var(--border);border-radius:6px;padding:5px 4px;font-size:11px;width:100%;box-sizing:border-box" '+
+        'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')">'+
+        ['XOF','XAF','MAD','EUR','USD'].map(function(d){return'<option value="'+d+'"'+((f.devise||'XOF')===d?' selected':'')+'>'+d+'</option>';}).join('')+
       '</select>'+
       // Tarif
       '<input id="ecfg-tarif-'+f.id+'" type="number" value="'+(f.tarif!=null?f.tarif:'')+'" placeholder="—" '+
@@ -9616,6 +9707,9 @@ async function _buildEnergieConfigTab(sid){
     '<select id="ecfg-new-type" style="border:1px solid var(--border);border-radius:6px;padding:5px 5px;font-size:11px;width:100%;box-sizing:border-box">'+
       '<option value="index">Index</option><option value="instantane">Instantané</option>'+
     '</select>'+
+    '<select id="ecfg-new-devise" style="border:1px solid var(--border);border-radius:6px;padding:5px 4px;font-size:11px;width:100%;box-sizing:border-box">'+
+      '<option value="XOF">XOF</option><option value="XAF">XAF</option><option value="MAD">MAD</option><option value="EUR">EUR</option><option value="USD">USD</option>'+
+    '</select>'+
     '<input id="ecfg-new-tarif" type="number" placeholder="—" '+
       'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" />'+
     '<input id="ecfg-new-seuil" type="number" placeholder="—" '+
@@ -9633,7 +9727,7 @@ async function _buildEnergieConfigTab(sid){
   h+='<div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between">'+
     '<div style="font-size:10px;color:var(--text3)">'+
       '💡 <strong>Index</strong> : compteur croissant (kWh, m³). <strong>Instantané</strong> : niveau brut (%). '+
-      '<strong>Capacité</strong> : volume total du réservoir (L) pour calcul litres restants &amp; conso. <strong>Tarif</strong> : FCFA/unité.'+
+      '<strong>Capacité</strong> : volume total du réservoir (L) pour calcul litres restants &amp; conso. <strong>Tarif</strong> : montant par unité dans la devise choisie.'+
     '</div>'+
     '<button onclick="_energieAfficherAjout()" id="ecfg-btn-add" '+
       'style="flex-shrink:0;margin-left:16px;background:var(--amber);color:white;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">+ Ajouter</button>'+
@@ -9658,9 +9752,9 @@ function _energieAnnulerAjout(){
   if(row)row.style.display='none';
   var btn=document.getElementById('ecfg-btn-add');
   if(btn)btn.style.display='';
-  ['nom','unite','type','tarif','seuil'].forEach(function(f){
+  ['nom','unite','type','devise','tarif','seuil','cap'].forEach(function(f){
     var el=document.getElementById('ecfg-new-'+f);
-    if(el)el.value=f==='type'?'index':'';
+    if(el)el.value=(f==='type'?'index':f==='devise'?'XOF':'');
   });
 }
 
@@ -9675,11 +9769,13 @@ async function _energieConfirmerAjout(sid){
   var existing=await supaGet('energie_config','site_id=eq.'+sid+'&select=ordre&order=ordre.desc&limit=1');
   var nextOrdre=(existing&&existing.length?existing[0].ordre:0)+1;
 
+  var deviseNew=document.getElementById('ecfg-new-devise');
   var payload={
     site_id:sid,
     nom:nom.value.trim(),
     unite:unite&&unite.value.trim()?unite.value.trim():null,
     type_valeur:type?type.value:'index',
+    devise:deviseNew?deviseNew.value:'XOF',
     tarif:tarif&&tarif.value!==''?parseFloat(tarif.value):null,
     seuil_alerte_bas:seuil&&seuil.value!==''?parseFloat(seuil.value):null,
     capacite:(function(){var c=document.getElementById('ecfg-new-cap');return c&&c.value!==''?parseFloat(c.value):null;})(),
@@ -9698,6 +9794,7 @@ async function _energieSauvegarder(sid,fid){
   var nom=document.getElementById('ecfg-nom-'+fid);
   var unite=document.getElementById('ecfg-unite-'+fid);
   var type=document.getElementById('ecfg-type-'+fid);
+  var deviseEl=document.getElementById('ecfg-devise-'+fid);
   var tarif=document.getElementById('ecfg-tarif-'+fid);
   var seuil=document.getElementById('ecfg-seuil-'+fid);
   var capEl=document.getElementById('ecfg-cap-'+fid);
@@ -9706,6 +9803,7 @@ async function _energieSauvegarder(sid,fid){
     nom:nom.value.trim()||'Fluide',
     unite:unite?unite.value.trim()||null:null,
     type_valeur:type?type.value:'index',
+    devise:deviseEl?deviseEl.value:'XOF',
     tarif:tarif&&tarif.value!==''?parseFloat(tarif.value):null,
     seuil_alerte_bas:seuil&&seuil.value!==''?parseFloat(seuil.value):null,
     capacite:capEl&&capEl.value!==''?parseFloat(capEl.value):null,
