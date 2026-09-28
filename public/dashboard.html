@@ -346,7 +346,8 @@ function dateNJours(n){var d=new Date();d.setDate(d.getDate()-n);return d.toISOS
 async function supaGet(table,qs){
   try{
     var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+qs,{
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Accept':'application/json'}
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Accept':'application/json'},
+      cache:'no-store'
     });
     if(!r.ok){
       var errBody=await r.text().catch(function(){return'';});
