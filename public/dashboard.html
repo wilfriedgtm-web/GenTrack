@@ -6133,6 +6133,7 @@ async function _loadDT(session,nav){
     else if(nav==='equipe')html=await _dtEquipe(sids,session);
     else if(nav==='commandes')html=await _dtCommandesDT(sids,session);
     else if(nav==='rapport')html=await _dtRapport(sids,session);
+    else if(nav==='energie')html=await _dtEnergie(sids,session);
     el.innerHTML=html;
   }catch(e){
     el.innerHTML='<div class="alert-banner" style="margin-top:12px"><div class="ab-icon">⚠️</div><div class="ab-body"><div class="ab-title">Erreur de chargement</div><div class="ab-sub">'+(e.message||'Vérifiez votre connexion')+'</div></div></div>';
@@ -7053,6 +7054,214 @@ async function _dtRapport(sids,session){
   '</div>';
 }
 function _dtSetRapportPeriod(n){_dtRapportPeriod=n;if(_session)renderDirTech(_session,'rapport');}
+
+/* ── DIR TECH : Énergie multi-sites ── */
+var _dtEnergiePeriod=0; // 0 = mois en cours, -1 = mois-1, -2 = mois-2
+function _dtSetEnergiePeriod(n){_dtEnergiePeriod=n;if(_session)renderDirTech(_session,'energie');}
+
+async function _dtEnergie(sids,session){
+  var dc=document.getElementById('dash-content-main');
+  if(dc){dc.style.padding='24px';dc.style.maxWidth='none';}
+  if(!sids.length)return '<div class="placeholder-card"><div class="placeholder-icon">⚡</div>Aucun site configuré</div>';
+  var sidStr=sids.join(',');
+  var now=new Date();
+  var offset=_dtEnergiePeriod||0;
+  var tgt=new Date(now.getFullYear(),now.getMonth()+offset,1);
+  var moisDebut=tgt.toISOString().split('T')[0];
+  var moisFin=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).toISOString().split('T')[0];
+  var daysInMonth=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).getDate();
+  var today=todayStr();
+  var daysElapsed=offset===0?Math.min(now.getDate(),daysInMonth):daysInMonth;
+  var moisLabel=tgt.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  moisLabel=moisLabel.charAt(0).toUpperCase()+moisLabel.slice(1);
+
+  var[sites,fluides,releves,objs]=await Promise.all([
+    supaGet('sites','id=in.('+sidStr+')&select=id,nom&order=nom.asc'),
+    supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,devise,tarif&order=ordre.asc'),
+    supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=site_id,date_releve,valeurs&order=date_releve.asc&limit=600'),
+    supaGet('objectifs_energie','site_id=in.('+sidStr+')&select=fluide_id,valeur,date_debut,date_fin&order=date_debut.desc&limit=400')
+  ]);
+
+  var siteMap={};(sites||[]).forEach(function(s){siteMap[s.id]=s.nom;});
+
+  // Build active objective per fluide
+  function _getObj(fluidId,siteId){
+    var best=null;
+    (objs||[]).forEach(function(o){
+      if(o.fluide_id!==fluidId)return;
+      if(!o.date_debut||o.date_debut>today)return;
+      if(o.date_fin&&o.date_fin<moisDebut)return;
+      if(!best)best=o;
+    });
+    if(best)return parseFloat(best.valeur);
+    var f=(fluides||[]).find(function(x){return x.id===fluidId&&x.site_id===siteId;});
+    return f&&f.objectif_mensuel!=null?parseFloat(f.objectif_mensuel):null;
+  }
+
+  // Group fluides and releves by site
+  var fluidesBySite={};
+  (fluides||[]).forEach(function(f){if(!fluidesBySite[f.site_id])fluidesBySite[f.site_id]=[];fluidesBySite[f.site_id].push(f);});
+  var relevesBySite={};
+  (releves||[]).forEach(function(r){if(!relevesBySite[r.site_id])relevesBySite[r.site_id]=[];relevesBySite[r.site_id].push(r);});
+
+  // Compute conso per site per fluide
+  var consoData={}; // {site_id: [{nom,unite,conso,obj,pct,col,devise}]}
+  sids.forEach(function(sid){
+    var fls=fluidesBySite[sid]||[];if(!fls.length)return;
+    var rels=(relevesBySite[sid]||[]).slice().sort(function(a,b){return a.date_releve.localeCompare(b.date_releve);});
+    var first=rels.length?rels[0]:null,last=rels.length?rels[rels.length-1]:null;
+    var items=[];
+    fls.forEach(function(f){
+      var conso=null;
+      if(f.type_valeur==='index'){
+        var vf=first&&first.valeurs&&first.valeurs[f.id]!=null?parseFloat(first.valeurs[f.id]):null;
+        var vl=last&&last.valeurs&&last.valeurs[f.id]!=null?parseFloat(last.valeurs[f.id]):null;
+        conso=(vf!=null&&vl!=null)?Math.max(0,vl-vf):null;
+      }else{
+        var vl2=last&&last.valeurs&&last.valeurs[f.id]!=null?parseFloat(last.valeurs[f.id]):null;
+        conso=vl2;
+      }
+      var obj=_getObj(f.id,f.site_id);
+      // Pro-rate objective to days elapsed (current month only)
+      var objRef=obj!=null&&offset===0?Math.round(obj*daysElapsed/daysInMonth):obj!=null?Math.round(obj):null;
+      var pct=conso!=null&&objRef?Math.round(conso/objRef*100):null;
+      var col=pct!=null?(pct>100?'var(--rouge)':pct>80?'var(--orange)':'var(--vert)'):'var(--border)';
+      items.push({id:f.id,nom:f.nom,unite:f.unite||'',conso:conso!=null?Math.round(conso):null,obj:obj!=null?Math.round(obj):null,objRef:objRef,pct:pct,col:col,devise:f.devise||'',tarif:parseFloat(f.tarif)||0});
+    });
+    if(items.length)consoData[sid]=items;
+  });
+
+  // Global KPIs: group by fluide nom+unite across all sites
+  var globalFluides={};
+  Object.values(consoData).forEach(function(items){
+    items.forEach(function(f){
+      var key=f.nom+'||'+f.unite;
+      if(!globalFluides[key])globalFluides[key]={nom:f.nom,unite:f.unite,totalConso:0,totalObj:0,sites:0,over:0};
+      if(f.conso!=null){globalFluides[key].totalConso+=f.conso;globalFluides[key].sites++;}
+      if(f.obj!=null)globalFluides[key].totalObj+=f.obj;
+      if(f.pct!=null&&f.pct>100)globalFluides[key].over++;
+    });
+  });
+  var gfArr=Object.values(globalFluides);
+
+  // Period selector
+  var periodOpts=[-3,-2,-1,0].map(function(n){
+    var d=new Date(now.getFullYear(),now.getMonth()+n,1);
+    var lbl=d.toLocaleDateString('fr-FR',{month:'short',year:'2-digit'});
+    lbl=lbl.charAt(0).toUpperCase()+lbl.slice(1);
+    var on=(offset===n);
+    return '<button onclick="_dtSetEnergiePeriod('+n+')" style="padding:6px 14px;border-radius:20px;border:1.5px solid '+(on?'var(--amber)':'var(--border)')+';background:'+(on?'var(--amber-pale)':'white')+';font-size:12px;font-weight:'+(on?'700':'500')+';color:'+(on?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+lbl+(n===0?' <span style="font-size:9px;vertical-align:middle">●</span>':'')+'</button>';
+  }).join('');
+
+  // Global KPI tiles
+  var kpisHtml='<div class="kpi-grid" style="margin-bottom:20px">';
+  if(!gfArr.length){kpisHtml+='<div class="kpi"><div class="kpi-label">Données</div><div class="kpi-value" style="font-size:14px;color:var(--text3)">Aucun relevé</div><div class="kpi-trend">sur '+moisLabel+'</div></div>';}
+  gfArr.forEach(function(g){
+    var pct=g.totalObj>0?Math.round(g.totalConso/g.totalObj*100):null;
+    var col=pct!=null?(pct>100?'var(--rouge)':pct>80?'var(--orange)':'var(--vert)'):'var(--text2)';
+    kpisHtml+='<div class="kpi">'+
+      '<div class="kpi-label">'+escape_html(g.nom)+'</div>'+
+      '<div class="kpi-value" style="color:'+col+'">'+g.totalConso.toLocaleString('fr-FR')+(g.unite?' '+escape_html(g.unite):'')+'</div>'+
+      '<div class="kpi-trend">'+(g.totalObj>0?'Objectif : '+g.totalObj.toLocaleString('fr-FR')+(g.unite?' '+escape_html(g.unite):'')+' — '+(pct!=null?pct+'%':'—'):'Objectif non défini')+'</div>'+
+    '</div>';
+  });
+  kpisHtml+='</div>';
+
+  // Site cards
+  var sitesWithData=sids.filter(function(sid){return consoData[sid]&&consoData[sid].length;});
+  var noDataSites=sids.filter(function(sid){return !consoData[sid]||!consoData[sid].length;});
+
+  var siteCardsHtml='';
+  sitesWithData.forEach(function(sid){
+    var items=consoData[sid];
+    var sNom=siteMap[sid]||sid;
+    // Status badge: worst fluide
+    var worst=items.reduce(function(a,b){return(b.pct||0)>(a.pct||0)?b:a},{pct:-1});
+    var badgeCol=worst.pct>100?'var(--rouge)':worst.pct>80?'var(--orange)':worst.pct>=0?'var(--vert)':'var(--text3)';
+    var badgeBg=worst.pct>100?'#FDECEA':worst.pct>80?'#FDF3E3':worst.pct>=0?'#E8F5EE':'#F5F2EE';
+    var badgeTxt=worst.pct>100?'Dépassement':worst.pct>80?'Proche objectif':worst.pct>=0?'Objectif tenu':'En cours';
+    var rows=items.map(function(f){
+      var barW=f.pct!=null?Math.min(100,f.pct):0;
+      var bar='<div style="flex:1;height:6px;background:#F2EDE7;border-radius:3px;overflow:hidden;min-width:60px">'+
+        '<div style="height:100%;width:'+barW+'%;background:'+f.col+';border-radius:3px;transition:width .3s"></div></div>';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #F5F0EA">'+
+        '<div style="font-size:12px;color:var(--text2);min-width:90px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(f.nom)+'</div>'+
+        bar+
+        '<div style="font-size:12px;font-weight:700;color:'+f.col+';min-width:60px;text-align:right">'+(f.conso!=null?f.conso.toLocaleString('fr-FR')+' '+escape_html(f.unite):'—')+'</div>'+
+        '<div style="font-size:10px;color:var(--text3);min-width:38px;text-align:right">'+(f.pct!=null?f.pct+'%':'—')+'</div>'+
+      '</div>';
+    }).join('');
+    siteCardsHtml+='<div style="background:white;border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:12px">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
+        '<div style="font-size:14px;font-weight:700;color:var(--dark)">🏨 '+escape_html(sNom)+'</div>'+
+        '<span style="font-size:10px;font-weight:700;color:'+badgeCol+';background:'+badgeBg+';padding:3px 9px;border-radius:10px;border:1px solid '+badgeCol+'">'+badgeTxt+'</span>'+
+      '</div>'+
+      '<div style="font-size:10px;font-weight:600;color:var(--text3);display:grid;grid-template-columns:1fr auto auto auto;gap:8px;padding-bottom:4px;text-transform:uppercase;letter-spacing:.5px">'+
+        '<span>Fluide</span><span></span><span style="text-align:right">Conso</span><span style="text-align:right">vs Obj</span>'+
+      '</div>'+
+      rows+
+    '</div>';
+  });
+
+  if(noDataSites.length){
+    siteCardsHtml+='<div style="background:#FAFAF8;border:1px dashed var(--border);border-radius:10px;padding:14px 18px;color:var(--text3);font-size:12px">'+
+      '⚡ Pas de relevé énergie ce mois pour : '+noDataSites.map(function(sid){return escape_html(siteMap[sid]||sid);}).join(', ')+
+    '</div>';
+  }
+
+  // Inter-site comparatif table per fluide type
+  var comparHtml='';
+  // Collect all unique fluide names
+  var allFluideNames=[];
+  var _seen={};
+  (fluides||[]).forEach(function(f){if(!_seen[f.nom]){_seen[f.nom]=true;allFluideNames.push({nom:f.nom,unite:f.unite||''});}});
+  allFluideNames.forEach(function(fl){
+    var rows2='';
+    var siteRows=[];
+    sids.forEach(function(sid){
+      var items=consoData[sid]||[];
+      var match=items.find(function(x){return x.nom===fl.nom;});
+      if(!match)return;
+      siteRows.push({sid:sid,nom:siteMap[sid]||sid,conso:match.conso,obj:match.obj,pct:match.pct,col:match.col,unite:match.unite});
+    });
+    if(!siteRows.length)return;
+    siteRows.sort(function(a,b){return(b.pct||0)-(a.pct||0);});
+    var maxConso=Math.max.apply(null,siteRows.map(function(r){return r.conso||0;}));
+    siteRows.forEach(function(r){
+      var barW=maxConso>0&&r.conso!=null?Math.round(r.conso/maxConso*100):0;
+      rows2+='<tr style="border-bottom:1px solid #F5F0EA">'+
+        '<td style="padding:7px 8px;font-size:12px;color:var(--text2);white-space:nowrap">'+escape_html(r.nom)+'</td>'+
+        '<td style="padding:7px 8px;width:40%"><div style="height:8px;background:#F2EDE7;border-radius:4px;overflow:hidden">'+
+          '<div style="height:100%;width:'+barW+'%;background:'+r.col+';border-radius:4px"></div></div></td>'+
+        '<td style="padding:7px 8px;font-size:12px;font-weight:700;color:var(--dark);text-align:right;white-space:nowrap">'+(r.conso!=null?r.conso.toLocaleString('fr-FR')+' '+escape_html(r.unite):'—')+'</td>'+
+        '<td style="padding:7px 8px;font-size:12px;font-weight:700;color:'+r.col+';text-align:right">'+(r.pct!=null?r.pct+'%':'—')+'</td>'+
+      '</tr>';
+    });
+    comparHtml+='<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px">'+
+      '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:10px">'+escape_html(fl.nom)+(fl.unite?' <span style="font-weight:400;color:var(--text3)">('+escape_html(fl.unite)+')</span>':'')+'</div>'+
+      '<table style="width:100%;border-collapse:collapse">'+
+        '<thead><tr style="border-bottom:2px solid var(--border)">'+
+          '<th style="padding:5px 8px;font-size:10px;font-weight:700;color:var(--text3);text-align:left;text-transform:uppercase;letter-spacing:.5px">Site</th>'+
+          '<th style="padding:5px 8px;width:40%"></th>'+
+          '<th style="padding:5px 8px;font-size:10px;font-weight:700;color:var(--text3);text-align:right;text-transform:uppercase;letter-spacing:.5px">Conso</th>'+
+          '<th style="padding:5px 8px;font-size:10px;font-weight:700;color:var(--text3);text-align:right;text-transform:uppercase;letter-spacing:.5px">% Obj</th>'+
+        '</tr></thead><tbody>'+rows2+'</tbody>'+
+      '</table>'+
+    '</div>';
+  });
+
+  return '<div>'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">'+
+      '<div style="font-size:18px;font-weight:800;color:var(--dark)">⚡ Énergie — '+moisLabel+(offset===0?' <span style="font-size:11px;color:var(--text3);font-weight:500">('+daysElapsed+' j écoulés)</span>':'')+'</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">'+periodOpts+'</div>'+
+    '</div>'+
+    kpisHtml+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">'+
+      '<div><div class="section-title" style="margin-bottom:10px">Par hôtel</div>'+siteCardsHtml+'</div>'+
+      '<div><div class="section-title" style="margin-bottom:10px">Comparatif inter-sites</div>'+(comparHtml||'<div style="color:var(--text3);font-size:12px">Aucune donnée disponible</div>')+'</div>'+
+    '</div>'+
+  '</div>';
+}
 
 /* ── DIR TECH : Fiabilité ── */
 var _fiabPeriod=90;
