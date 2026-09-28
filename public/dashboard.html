@@ -3468,19 +3468,22 @@ async function _rtMaintenances(sid){
   var moisDebut=new Date(new Date().getFullYear(),new Date().getMonth(),1);
   var rowsMois=allRows.filter(function(r){return new Date(r.created_at)>=moisDebut;});
   var rowsPannes=rowsMois.filter(function(r){return r.type==='panne';});
-  var rowsOps=rowsMois.filter(function(r){return r.type!=='panne';});
-  var totalCout=rowsMois.reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
+  var rowsOps=rowsMois.filter(function(r){return r.type!=='panne'&&r.type!=='ravitaillement';});
+  var rowsRavito=rowsMois.filter(function(r){return r.type==='ravitaillement';});
+  var totalCout=rowsMois.filter(function(r){return r.type!=='ravitaillement';}).reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
   var coutOps=rowsOps.reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
   var coutPannes=rowsPannes.reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
+  var coutRavito=rowsRavito.reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
   var nbOps=rowsOps.length;
 
   // Lignes détail coût
   var detailLines=[];
   if(coutOps>0)detailLines.push('<span>⚙️ '+coutOps.toLocaleString('fr-FR')+' opérations</span>');
   if(coutPannes>0)detailLines.push('<span>🔴 '+coutPannes.toLocaleString('fr-FR')+' pannes</span>');
+  if(coutRavito>0)detailLines.push('<span style="color:var(--bleu)">⛽ '+coutRavito.toLocaleString('fr-FR')+' carburant (suivi séparé)</span>');
 
   var kpiHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px">'+
-    '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Coût ce mois</div>'+
+    '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Coût interventions ce mois</div>'+
     '<div style="font-size:22px;font-weight:800;color:var(--dark)">'+totalCout.toLocaleString('fr-FR')+' <span style="font-size:13px;font-weight:600;color:var(--text3)">FCFA</span></div>'+
     (detailLines.length?'<div style="display:flex;gap:12px;margin-top:4px;font-size:11px;color:var(--text3)">'+detailLines.join('')+'</div>':
       '<div style="font-size:11px;color:var(--text3)">Aucune dépense ce mois</div>')+
