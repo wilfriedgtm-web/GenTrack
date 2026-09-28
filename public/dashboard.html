@@ -6926,12 +6926,14 @@ async function _dtRapport(sids,session){
   var period=_dtRapportPeriod||30;
   var cutoff=dateNJours(period);
   var sidStr=sids.join(',');
-  var[sites,pleins,maintenances,signalements,rondes]=await Promise.all([
+  var[sites,pleins,maintenances,signalements,rondes,rapEfls,rapRels]=await Promise.all([
     supaGet('sites','id=in.('+sidStr+')&select=id,nom'),
     supaGet('pleins','site_id=in.('+sidStr+')&date=gte.'+cutoff+'&select=id,site_id,litres_ajoutes,cout,date'),
     supaGet('maintenances','groupe_id=in.('+sidStr+')&date_intervention=gte.'+cutoff+'&statut=eq.realise&select=id,groupe_id,type,cout'),
     supaGet('signalements','groupe_id=in.('+sidStr+')&type=eq.panne&created_at=gte.'+cutoff+'&select=id,groupe_id,statut,cout_intervention'),
-    supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+cutoff+'&select=id,site_id,date_ronde')
+    supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+cutoff+'&select=id,site_id,date_ronde'),
+    supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel&order=ordre.asc'),
+    supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+cutoff+'&select=site_id,date_releve,valeurs&order=date_releve.asc&limit=500')
   ]);
   var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
   var periodOpts=[7,14,30,60,90].map(function(n){
@@ -6946,11 +6948,42 @@ async function _dtRapport(sids,session){
   rondes.forEach(function(r){if(sitesData[r.site_id])sitesData[r.site_id].rondes++;});
   var totLitres=0,totCarb=0,totPannes=0,totCoutPannes=0,totMnt=0;
   Object.values(sitesData).forEach(function(d){totLitres+=d.litres;totCarb+=d.coutCarb;totPannes+=d.pannes;totCoutPannes+=d.coutPannes;totMnt+=d.mntCout;});
+
+  // ── Énergie : conso sur la période par site/fluide ──
+  var _rapEflsBySite={};
+  (rapEfls||[]).forEach(function(f){if(!_rapEflsBySite[f.site_id])_rapEflsBySite[f.site_id]=[];_rapEflsBySite[f.site_id].push(f);});
+  var _rapRelsBySite={};
+  (rapRels||[]).forEach(function(r){if(!_rapRelsBySite[r.site_id])_rapRelsBySite[r.site_id]=[];_rapRelsBySite[r.site_id].push(r);});
+  var energieRapBySite={};
+  sids.forEach(function(sid){
+    var fls=_rapEflsBySite[sid]||[];if(!fls.length)return;
+    var rels=(_rapRelsBySite[sid]||[]);
+    var first=rels.length?rels[0]:null,last=rels.length?rels[rels.length-1]:null;
+    var items=fls.map(function(f){
+      var conso=null;
+      if(f.type_valeur==='index'){
+        var vf=first&&first.valeurs&&first.valeurs[f.id];
+        var vl=last&&last.valeurs&&last.valeurs[f.id];
+        conso=(vf!=null&&vl!=null)?Math.max(0,parseFloat(vl)-parseFloat(vf)):null;
+      }else{
+        var vl2=last&&last.valeurs&&last.valeurs[f.id];
+        conso=vl2!=null?parseFloat(vl2):null;
+      }
+      var objPeriode=f.objectif_mensuel!=null?Math.round(parseFloat(f.objectif_mensuel)*period/30):null;
+      var pct=conso!=null&&objPeriode?Math.round(conso/objPeriode*100):null;
+      return{nom:f.nom,unite:f.unite||'',conso:conso!=null?Math.round(conso):null,obj:objPeriode,pct:pct};
+    });
+    energieRapBySite[sid]=items;
+  });
   function dtKpiCol(val,s1,s2,inv){if(val===null||val===undefined)return'var(--text3)';if(inv)return val<=s1?'var(--vert)':val<=s2?'var(--amber)':'var(--rouge)';return val>=s2?'var(--vert)':val>=s1?'var(--amber)':'var(--rouge)';}
+  // Agrégat énergie global : nombre de fluides en dépassement
+  var _efDepassement=0,_efTotal=0;
+  Object.values(energieRapBySite).forEach(function(items){items.forEach(function(f){_efTotal++;if(f.pct!=null&&f.pct>100)_efDepassement++;});});
   var kpis='<div class="kpi-grid" style="margin-bottom:16px">'+
     '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-trend">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+' FCFA':'Coût non saisi')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+dtKpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-trend">'+(totCoutPannes>0?totCoutPannes.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Coût maintenance</div><div class="kpi-value">'+totMnt.toLocaleString('fr-FR')+'</div><div class="kpi-trend">FCFA réalisées</div></div>'+
+    (_efTotal>0?'<div class="kpi"><div class="kpi-label">Énergie hors objectif</div><div class="kpi-value" style="color:'+(_efDepassement>0?'var(--rouge)':'var(--vert)')+'">'+_efDepassement+' / '+_efTotal+'</div><div class="kpi-trend">fluides dépassant l\'objectif</div></div>':'')+
   '</div>'+
   '<div style="background:#FAFAF8;border:1px solid #E8DFD0;border-radius:10px;padding:12px 16px;margin-bottom:20px">'+
     '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">📋 Référentiel de performance</div>'+
@@ -6981,7 +7014,25 @@ async function _dtRapport(sids,session){
         '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Pannes</div><div style="font-size:18px;font-weight:800;color:'+(d.pannes>0?'var(--rouge)':'var(--vert)')+'">'+d.pannes+'</div><div style="font-size:11px;color:var(--text3)">'+(d.coutPannes>0?d.coutPannes.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
         '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Maintenance</div><div style="font-size:18px;font-weight:800;color:var(--dark)">'+d.mntCout.toLocaleString('fr-FR')+' FCFA</div><div style="font-size:11px;color:var(--text3)">'+d.rondes+' rondes effectuées</div></div>'+
         (total>0?'<div style="background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--amber-dark);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Total coûts</div><div style="font-size:18px;font-weight:800;color:var(--amber-dark)">'+total.toLocaleString('fr-FR')+' FCFA</div></div>':'')+
-      '</div></div>';
+      '</div>'+
+      (function(){
+        var ef=energieRapBySite[sid]||[];if(!ef.length)return '';
+        var rows=ef.map(function(f){
+          var col=f.pct!=null?(f.pct>100?'var(--rouge)':f.pct>85?'var(--orange)':'var(--vert)'):'var(--text3)';
+          var barW=f.pct!=null?Math.min(100,f.pct):0;
+          return '<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">'+
+            '<div style="width:90px;font-size:11px;color:var(--text2);flex-shrink:0">'+escape_html(f.nom)+'</div>'+
+            '<div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:'+barW+'%;height:100%;border-radius:3px;background:'+col+'"></div></div>'+
+            '<div style="font-size:11px;font-weight:600;color:'+col+';min-width:80px;text-align:right">'+(f.conso!=null?f.conso.toLocaleString('fr-FR')+' '+f.unite:'—')+(f.obj!=null?' / '+f.obj.toLocaleString('fr-FR'):'')+'</div>'+
+            (f.pct!=null?'<div style="font-size:10px;font-weight:700;color:'+col+';width:36px;text-align:right">'+f.pct+'%</div>':'')+
+          '</div>';
+        }).join('');
+        return '<div style="margin-top:14px;padding-top:12px;border-top:1.5px solid var(--border)">'+
+          '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">⚡ Énergie sur la période</div>'+
+          rows+
+        '</div>';
+      })()+
+    '</div>';
   }).join('');
   // Bouton génération rapport complet
   var genBtn='<div style="background:linear-gradient(135deg,#1A1411 0%,#2D2520 100%);border-radius:14px;padding:24px 28px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">'+
