@@ -139,8 +139,19 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
       <!-- Mode sélection libre : tuiles catégories + chips sous-zones -->
       <div id="sg-zone-select-wrap">
         <div class="zone-tiles" id="sg-zone-tiles"></div>
+        <!-- Séparateur + bouton ronde -->
+        <div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px">
+          <div style="flex:1;height:1px;background:var(--border)"></div>
+          <span style="font-size:11px;color:var(--text3);white-space:nowrap">ou</span>
+          <div style="flex:1;height:1px;background:var(--border)"></div>
+        </div>
+        <button id="sg-ronde-btn" onclick="_rondeMode()" style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1.5px solid var(--amber-border);background:var(--amber-pale);font-size:13px;font-weight:600;color:var(--amber-dark);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+          🔧 Équipement de ronde directement
+        </button>
         <div class="zone-chips-wrap" id="sg-zone-chips-wrap">
           <div class="zone-chips-label" id="sg-zone-chips-label">Sélectionnez la salle</div>
+          <input id="sg-chip-search" type="text" placeholder="Rechercher… ex : 028" oninput="_chipSearch()"
+                 style="width:100%;box-sizing:border-box;padding:7px 10px;border-radius:8px;border:0.5px solid var(--border);background:var(--bg);font-size:13px;color:var(--dark);margin-bottom:8px;outline:none">
           <div class="zone-chips" id="sg-zone-chips"></div>
         </div>
       </div>
@@ -210,6 +221,7 @@ var _groupeId=null;
 var _equips=[];       // équipements techniques (table equipements)
 var _equipZones=[];   // équipements d'inventaire de zone (table equipements_zone)
 var _equipComboItems=[];  // liste aplatie pour le combobox [{val,label,group}]
+var _rondeOnly=false;     // mode équipement de ronde direct (bypass sélection salle)
 var _zones=[];
 var _selectedZoneId=null;    // zone/sous-zone sélectionnée (chip)
 var _selectedCatZoneIds=[];  // tous les zone_id de la catégorie sélectionnée
@@ -344,6 +356,10 @@ function _getCatIcon(c){
 }
 
 function _selectCat(tileEl,catKey,info){
+  // Désactiver le mode ronde si actif
+  _rondeOnly=false;
+  var rondeBtn=document.getElementById('sg-ronde-btn');
+  if(rondeBtn){rondeBtn.style.borderColor='var(--amber-border)';rondeBtn.style.background='var(--amber-pale)';}
   // Highlight tile
   document.querySelectorAll('.zone-tile').forEach(function(t){t.classList.remove('sel');});
   tileEl.classList.add('sel');
@@ -361,6 +377,8 @@ function _selectCat(tileEl,catKey,info){
     wrap.style.display='none';
   } else {
     chipLabel.textContent=info.label+' — sélectionnez la salle';
+    var chipSearch=document.getElementById('sg-chip-search');
+    if(chipSearch)chipSearch.value='';
     info.zones.forEach(function(z){
       var chip=document.createElement('span');
       chip.className='zone-chip';
@@ -391,16 +409,18 @@ function _renderEquipOptions(zoneIds){
     _equipComboItems.push({val:'eq:'+e.id,label:label,group:'ronde'});
   });
 
-  // ── Groupe 2 : Équipements de salle (table equipements_zone) ──
-  var zoneList;
-  if(zoneIds&&zoneIds.length>0){
-    zoneList=_equipZones.filter(function(e){return zoneIds.indexOf(e.zone_id)!==-1;});
-  } else {
-    zoneList=_equipZones;
+  // ── Groupe 2 : Équipements de salle (table equipements_zone) — masqué en mode ronde ──
+  if(!_rondeOnly){
+    var zoneList;
+    if(zoneIds&&zoneIds.length>0){
+      zoneList=_equipZones.filter(function(e){return zoneIds.indexOf(e.zone_id)!==-1;});
+    } else {
+      zoneList=_equipZones;
+    }
+    zoneList.forEach(function(e){
+      _equipComboItems.push({val:'ez:'+e.id,label:e.nom,group:'salle'});
+    });
   }
-  zoneList.forEach(function(e){
-    _equipComboItems.push({val:'ez:'+e.id,label:e.nom,group:'salle'});
-  });
 
   // Si la sélection précédente n'est plus disponible, effacer
   if(prevVal&&!_equipComboItems.find(function(i){return i.val===prevVal;})){
@@ -408,6 +428,28 @@ function _renderEquipOptions(zoneIds){
     document.getElementById('sg-equip-input').value='';
     document.getElementById('sg-equip-clear').style.display='none';
   }
+}
+
+function _rondeMode(){
+  _rondeOnly=true;
+  _selectedZoneId=null;
+  _selectedCatZoneIds=[];
+  // Déselectionner les tuiles
+  document.querySelectorAll('.zone-tile').forEach(function(t){t.classList.remove('sel');});
+  // Masquer les chips
+  document.getElementById('sg-zone-chips-wrap').style.display='none';
+  // Activer visuellement le bouton
+  var btn=document.getElementById('sg-ronde-btn');
+  if(btn){btn.style.borderColor='var(--amber)';btn.style.background='#FFF0C0';}
+  // Mettre à jour le combobox (ronde uniquement)
+  _renderEquipOptions(null);
+}
+
+function _chipSearch(){
+  var q=(document.getElementById('sg-chip-search').value||'').toLowerCase();
+  document.querySelectorAll('#sg-zone-chips .zone-chip').forEach(function(chip){
+    chip.style.display=(!q||chip.textContent.toLowerCase().indexOf(q)!==-1)?'':'none';
+  });
 }
 
 function _equipComboFilter(){
