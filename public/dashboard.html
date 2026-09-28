@@ -6816,61 +6816,200 @@ async function _dtHistorique(sids){
 
 /* ── DIR TECH : signalements cross-site ── */
 var _dtSgFilter='tous';
+var _dtSgSiteFilter='tous';
+var _dtSgTypeFilter='tous';
+function _dtSetSgFilter(f){_dtSgFilter=f;if(_session)renderDirTech(_session,'signalements');}
+function _dtSetSgSiteFilter(v){_dtSgSiteFilter=v;if(_session)renderDirTech(_session,'signalements');}
+function _dtSetSgTypeFilter(v){_dtSgTypeFilter=v;if(_session)renderDirTech(_session,'signalements');}
+
 async function _dtSignalements(sids){
   var dc=document.getElementById('dash-content-main');
   if(dc){dc.style.padding='24px';dc.style.maxWidth='none';}
   if(!sids.length)return '<div class="placeholder-card"><div class="placeholder-icon">📍</div>Aucun site configuré</div>';
   var sidStr=sids.join(',');
-  var sites=await supaGet('sites','id=in.('+sidStr+')&select=id,nom');
+  var since30=dateNJours(30);
+  var[sites,allRows]=await Promise.all([
+    supaGet('sites','id=in.('+sidStr+')&select=id,nom&order=nom.asc'),
+    supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+since30+'T00:00:00&order=created_at.desc&limit=400&select=id,groupe_id,type,description,statut,signale_par,lieu,assigne_a,pris_en_charge_par,ref_code,created_at,equipement_id,equipement_zone_id,equipements(nom),equipements_zone(nom,zones(nom))')
+  ]);
   var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
-  var query='groupe_id=in.('+sidStr+')&order=created_at.desc&limit=200&select=id,groupe_id,type,description,statut,signale_par,lieu,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,pris_en_charge_par,pris_en_charge_at,ref_code,created_at,photo_url,equipements(nom)';
-  if(_dtSgFilter!=='tous')query+='&statut=eq.'+_dtSgFilter;
-  var rows=await supaGet('signalements',query);
-  var counts={tous:rows.length,ouvert:0,en_cours:0,resolu:0};
-  rows.forEach(function(r){counts[r.statut]=(counts[r.statut]||0)+1;});
-  var filterHtml=['tous','ouvert','en_cours','resolu'].map(function(f){
+
+  // Cache rows for _sgAffecter
+  if(!window._sgRows)window._sgRows={};
+  allRows.forEach(function(r){window._sgRows[r.id]=r;});
+
+  // KPIs globaux
+  var cOuvert=allRows.filter(function(r){return r.statut==='ouvert';}).length;
+  var cEnCours=allRows.filter(function(r){return r.statut==='en_cours';}).length;
+  var cResolu=allRows.filter(function(r){return r.statut==='resolu';}).length;
+  // Zones actives = zones uniques avec signalements non résolus
+  var _zonesActives=new Set();
+  allRows.filter(function(r){return r.statut!=='resolu';}).forEach(function(r){
+    if(r.equipements_zone&&r.equipements_zone.zones&&r.equipements_zone.zones.nom)_zonesActives.add(r.equipements_zone.zones.nom);
+  });
+
+  // Zones chaudes = top 5 par nb signalements non résolus
+  var _zoneCounts={};
+  allRows.filter(function(r){return r.statut!=='resolu';}).forEach(function(r){
+    var zNom=(r.equipements_zone&&r.equipements_zone.zones&&r.equipements_zone.zones.nom)||
+             (r.equipements_zone&&r.equipements_zone.nom)||
+             (r.equipements&&r.equipements.nom)||
+             (r.lieu)||'—';
+    _zoneCounts[zNom]=(_zoneCounts[zNom]||0)+1;
+  });
+  var _hotZones=Object.keys(_zoneCounts).map(function(k){return{nom:k,n:_zoneCounts[k]};}).sort(function(a,b){return b.n-a.n;}).slice(0,5);
+  var _maxHot=_hotZones.length?_hotZones[0].n:1;
+
+  // Apply filters
+  var rows=allRows.filter(function(r){
+    if(_dtSgFilter!=='tous'&&r.statut!==_dtSgFilter)return false;
+    if(_dtSgSiteFilter!=='tous'&&r.groupe_id!==_dtSgSiteFilter)return false;
+    if(_dtSgTypeFilter!=='tous'&&r.type!==_dtSgTypeFilter)return false;
+    return true;
+  });
+
+  // KPI bar
+  var kpisHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">'+
+    '<div class="kpi"><div class="kpi-label">Ouverts</div><div class="kpi-value" style="color:var(--rouge)">'+cOuvert+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">En cours</div><div class="kpi-value" style="color:var(--orange)">'+cEnCours+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Résolus (30j)</div><div class="kpi-value" style="color:var(--vert)">'+cResolu+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Zones actives</div><div class="kpi-value">'+_zonesActives.size+'</div></div>'+
+  '</div>';
+
+  // Filters
+  var stPills=['tous','ouvert','en_cours','resolu'].map(function(f){
     var labels={tous:'Tous',ouvert:'Ouverts',en_cours:'En cours',resolu:'Résolus'};
-    var n=_dtSgFilter==='tous'?(counts[f]||0):(_dtSgFilter===f?rows.length:0);
+    var n={tous:allRows.length,ouvert:cOuvert,en_cours:cEnCours,resolu:cResolu}[f];
     var active=_dtSgFilter===f;
-    return '<button onclick="_dtSetSgFilter(\''+f+'\')" style="padding:6px 14px;border-radius:20px;border:1.5px solid '+(active?'var(--amber)':'var(--border)')+';background:'+(active?'var(--amber-pale)':'white')+';font-size:12px;font-weight:'+(active?'700':'500')+';color:'+(active?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+labels[f]+(n?' ('+n+')':'')+'</button>';
+    return '<button onclick="_dtSetSgFilter(\''+f+'\')" style="padding:5px 13px;border-radius:20px;border:1.5px solid '+(active?'var(--amber)':'var(--border)')+';background:'+(active?'var(--amber-pale)':'white')+';font-size:12px;font-weight:'+(active?'700':'500')+';color:'+(active?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+labels[f]+' ('+n+')</button>';
   }).join('');
-  var cards='';
+  var siteSelect='<select onchange="_dtSetSgSiteFilter(this.value)" style="padding:5px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px"><option value="tous">Tous les sites</option>'+
+    sites.map(function(s){return '<option value="'+s.id+'"'+(s.id===_dtSgSiteFilter?' selected':'')+'>'+escape_html(s.nom)+'</option>';}).join('')+'</select>';
+  var typeSelect='<select onchange="_dtSetSgTypeFilter(this.value)" style="padding:5px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px"><option value="tous">Tous types</option><option value="panne">Panne</option><option value="anomalie">Anomalie</option><option value="observation">Observation</option></select>';
+
+  var filtersHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:16px">'+
+    stPills+
+    '<span style="margin-left:auto;display:flex;gap:6px">'+siteSelect+typeSelect+'</span>'+
+  '</div>';
+
+  // Group by site → zone
+  var bySite={};
+  rows.forEach(function(r){
+    if(!bySite[r.groupe_id])bySite[r.groupe_id]=[];
+    bySite[r.groupe_id].push(r);
+  });
+
+  function _sgAccentColor(statut){return statut==='ouvert'?'var(--rouge)':statut==='en_cours'?'var(--orange)':'var(--vert)';}
+
+  var siteCardsHtml='';
   if(!rows.length){
-    cards='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px;opacity:.4">📍</div><div style="font-size:14px">Aucun signalement'+(_dtSgFilter!=='tous'?' dans cette catégorie':'')+'.</div></div>';
+    siteCardsHtml='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px;opacity:.4">📍</div><div>Aucun signalement</div></div>';
   }else{
-    cards=rows.map(function(r){
-      var st=(_SG_STATUTS&&_SG_STATUTS[r.statut])||{label:r.statut,color:'var(--text2)',bg:'var(--bg)'};
-      var typeLabel=(_SG_TYPES&&_SG_TYPES[r.type])||r.type||'Autre';
-      var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:null;
-      var sNom=siteMap[r.groupe_id]||'';
-      var date=r.created_at?new Date(r.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-      return '<div id="sg-card-'+r.id+'" style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;border-left:4px solid '+st.color+'">'+
-        '<div style="display:flex;align-items:flex-start;gap:12px">'+
-          '<div style="flex:1;min-width:0">'+
-            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">'+
-              '<span style="font-size:12px;font-weight:700;color:var(--dark)">'+typeLabel+'</span>'+
-              '<span style="font-size:11px;color:var(--text3)">· '+escape_html(sNom)+'</span>'+
-              (eqNom?'<span style="font-size:11px;color:var(--text3)">/ '+escape_html(eqNom)+'</span>':'')+
-              '<span style="margin-left:auto;font-size:11px;padding:3px 10px;border-radius:20px;background:'+st.bg+';color:'+st.color+';font-weight:700">'+st.label+'</span>'+
+    sites.forEach(function(site){
+      var sRows=bySite[site.id];
+      if(!sRows||!sRows.length)return;
+      var sOuv=sRows.filter(function(r){return r.statut==='ouvert';}).length;
+      var sEnc=sRows.filter(function(r){return r.statut==='en_cours';}).length;
+      // Group by zone
+      var byZone={};
+      sRows.forEach(function(r){
+        var zKey=(r.equipements_zone&&r.equipements_zone.zones&&r.equipements_zone.zones.nom)||'Sans zone';
+        if(!byZone[zKey])byZone[zKey]=[];
+        byZone[zKey].push(r);
+      });
+      var badgeHtml='';
+      if(sOuv>0)badgeHtml+='<span style="font-size:10px;font-weight:700;color:var(--rouge);background:#FDECEA;padding:2px 8px;border-radius:10px;border:1px solid var(--rouge)">'+sOuv+' ouvert'+(sOuv>1?'s':'')+'</span>';
+      if(sEnc>0)badgeHtml+='<span style="font-size:10px;font-weight:700;color:var(--orange);background:#FDF3E3;padding:2px 8px;border-radius:10px;border:1px solid var(--orange);margin-left:4px">'+sEnc+' en cours</span>';
+
+      var zonesHtml='';
+      Object.keys(byZone).forEach(function(zNom){
+        var zRows=byZone[zNom];
+        var sgCardsHtml=zRows.map(function(r){
+          var acc=_sgAccentColor(r.statut);
+          var st=(_SG_STATUTS&&_SG_STATUTS[r.statut])||{label:r.statut,color:'var(--text2)',bg:'var(--bg)'};
+          var typeLabel=(_SG_TYPES&&_SG_TYPES[r.type])||r.type||'Signalement';
+          var eqZNom=r.equipements_zone&&r.equipements_zone.nom?r.equipements_zone.nom:null;
+          var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:null;
+          // Breadcrumb: Zone > EquipZone > Equip
+          var bc='<span style="color:var(--text3);font-size:10px">'+escape_html(zNom)+'</span>';
+          if(eqZNom)bc+='<span style="color:var(--text3);font-size:10px"> › </span><span style="color:var(--text3);font-size:10px">'+escape_html(eqZNom)+'</span>';
+          if(eqNom)bc+='<span style="color:var(--text3);font-size:10px"> › </span><span style="color:var(--text3);font-size:10px;opacity:.7">'+escape_html(eqNom)+'</span>';
+          var date=r.created_at?new Date(r.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'';
+          var assignee=r.assigne_a||r.pris_en_charge_par||'';
+          var assignBadge=assignee
+            ?'<span style="font-size:11px;font-weight:600;color:var(--amber-dark);background:var(--amber-pale);padding:2px 8px;border-radius:10px;border:1px solid var(--amber)">👷 '+escape_html(assignee)+'</span>'
+            +'<button onclick="_sgAffecter(\''+r.id+'\')" style="font-size:11px;font-weight:600;color:var(--bleu);background:var(--bleu-pale);padding:2px 8px;border-radius:10px;border:1px solid var(--bleu);cursor:pointer;margin-left:4px">✏️ Réassigner</button>'
+            :'<button onclick="_sgAffecter(\''+r.id+'\')" style="font-size:11px;font-weight:600;color:var(--text2);background:white;padding:2px 8px;border-radius:10px;border:1.5px dashed var(--border);cursor:pointer">+ Assigner</button>';
+          return '<div id="sg-card-'+r.id+'" style="background:white;border:0.5px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;border-left:3px solid '+acc+'">'+
+            '<div style="margin-bottom:4px">'+bc+'</div>'+
+            '<div style="display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:5px">'+
+              '<span style="font-size:12px;font-weight:600;color:var(--dark)">'+escape_html(typeLabel)+'</span>'+
+              '<span style="font-size:11px;padding:2px 7px;border-radius:8px;background:'+st.bg+';color:'+st.color+';font-weight:600">'+st.label+'</span>'+
             '</div>'+
-            '<div style="font-size:13px;color:var(--text);margin-bottom:8px;line-height:1.5">'+escape_html(r.description||'')+'</div>'+
-            '<div style="font-size:11px;color:var(--text3)">'+
-              (r.signale_par?'👤 '+escape_html(r.signale_par)+'  ':'')+
-              (r.lieu?'📍 '+escape_html(r.lieu)+'  ':'')+
-              '🕐 '+date+
+            '<div style="font-size:12px;color:var(--text);line-height:1.4;margin-bottom:6px">'+escape_html((r.description||'').substring(0,150))+((r.description||'').length>150?'…':'')+'</div>'+
+            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+              '<span style="font-size:11px;color:var(--text3)">🕐 '+date+(r.signale_par?' · 👤 '+escape_html(r.signale_par):'')+'</span>'+
+              assignBadge+
             '</div>'+
-            (r.assigne_a?'<div style="margin-top:6px;font-size:12px;background:var(--amber-pale);border-radius:6px;padding:5px 10px;color:var(--amber-dark);font-weight:600;display:inline-block">👷 '+escape_html(r.assigne_a)+'</div>':'')+
+          '</div>';
+        }).join('');
+        zonesHtml+='<div style="margin-left:10px;margin-bottom:10px">'+
+          '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);padding:4px 0 4px 8px;border-left:2px solid var(--border);margin-bottom:6px">'+
+            '📍 '+escape_html(zNom)+
           '</div>'+
+          sgCardsHtml+
+        '</div>';
+      });
+
+      siteCardsHtml+='<div style="margin-bottom:14px">'+
+        '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:8px;margin-bottom:8px">'+
+          '<span style="font-size:14px">🏨</span>'+
+          '<span style="font-size:13px;font-weight:700;color:var(--dark);flex:1">'+escape_html(site.nom)+'</span>'+
+          badgeHtml+
         '</div>'+
+        zonesHtml+
+      '</div>';
+    });
+  }
+
+  // Zones chaudes
+  var hotHtml='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">🔥 Zones chaudes</div>';
+  if(_hotZones.length){
+    hotHtml+=_hotZones.map(function(z){
+      var barW=Math.round(z.n/_maxHot*100);
+      var col=z.n>=3?'var(--rouge)':z.n>=2?'var(--orange)':'var(--vert)';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)">'+
+        '<span style="font-size:11px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100px">'+escape_html(z.nom)+'</span>'+
+        '<div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+barW+'%;background:'+col+';border-radius:3px"></div></div>'+
+        '<span style="font-size:12px;font-weight:700;color:'+col+';min-width:14px;text-align:right">'+z.n+'</span>'+
       '</div>';
     }).join('');
+  }else{
+    hotHtml+='<div style="font-size:12px;color:var(--text3)">Aucun signalement actif</div>';
   }
+  // Récap par site
+  var recapHtml='<div style="margin-top:16px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px">Par hôtel</div>'+
+    '<div style="background:white;border:0.5px solid var(--border);border-radius:8px;overflow:hidden">'+
+    sites.map(function(s,i){
+      var sr=allRows.filter(function(r){return r.groupe_id===s.id;});
+      var sO=sr.filter(function(r){return r.statut==='ouvert';}).length;
+      var sE=sr.filter(function(r){return r.statut==='en_cours';}).length;
+      return '<div style="padding:7px 10px;'+(i>0?'border-top:0.5px solid var(--border)':'')+';display:flex;justify-content:space-between;align-items:center">'+
+        '<span style="font-size:11px;color:var(--text2)">'+escape_html(s.nom)+'</span>'+
+        '<span style="font-size:11px">'+(sO?'<b style="color:var(--rouge)">'+sO+'</b> <span style="color:var(--text3)">ouv.</span> ':'<span style="color:var(--vert)">0</span> <span style="color:var(--text3)">ouv.</span> ')+(sE?'· <b style="color:var(--orange)">'+sE+'</b> <span style="color:var(--text3)">enc.</span>':'')+'</span>'+
+      '</div>';
+    }).join('')+
+  '</div>';
+
   return '<div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px">'+filterHtml+'</div>'+
-    cards+
+    kpisHtml+
+    filtersHtml+
+    '<div style="display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:16px;align-items:start">'+
+      '<div>'+siteCardsHtml+'</div>'+
+      '<div>'+hotHtml+recapHtml+'</div>'+
+    '</div>'+
   '</div>';
 }
-function _dtSetSgFilter(f){_dtSgFilter=f;if(_session)renderDirTech(_session,'signalements');}
 
 /* ── DIR TECH : maintenances cross-site ── */
 var _dtMntFilter='tous';
