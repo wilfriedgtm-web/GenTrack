@@ -189,13 +189,31 @@ async function getFrequencesDisponibles(site: any): Promise<string[]> {
     if (!complete) freqs.push(freq);
   }
 
-  // Relevé horaire en dernier (option #2 ou plus)
+  // Relevé horaire
   if (site.releve_horaire_actif !== false) {
     const equipsReleve = await db('equipements', { query: `&site_id=eq.${site.id}&actif=eq.true&actif_releve=eq.true&limit=1` });
     if (Array.isArray(equipsReleve) && equipsReleve.length > 0) freqs.push('releve_horaire');
   }
 
+  // Relevé énergie — disponible si pas encore fait aujourd'hui et config existe
+  if (site.energie_actif !== false) {
+    const dejaSaisi = await releveEnergieFaitAujourdhui(site.id);
+    if (!dejaSaisi) {
+      const hasConfig = await db('energie_config', { query: `&site_id=eq.${site.id}&actif=eq.true&limit=1`, select: 'id' });
+      if (Array.isArray(hasConfig) && hasConfig.length > 0) freqs.push('releve_energie');
+    }
+  }
+
   return freqs;
+}
+
+// Vérifie si le relevé énergie a déjà été saisi aujourd'hui pour ce site
+async function releveEnergieFaitAujourdhui(siteId: string): Promise<boolean> {
+  const rows = await db('releves_energie', {
+    query: `&site_id=eq.${siteId}&date_releve=eq.${getToday()}&limit=1`,
+    select: 'id'
+  });
+  return Array.isArray(rows) && rows.length > 0;
 }
 
 // ── Calculs cuve — identiques au dashboard ────────────────────────────────────
@@ -274,6 +292,31 @@ function fmtRecap(nomEquip: string, questions: any[], reponses: Array<{question_
   text += `\nValidez cette saisie ? *(OUI / NON)*`;
   return text;
 }
+// ── Format relevé énergie ─────────────────────────────────────────────────────
+function fmtFluidQuestion(fluide: any, lastVal: any, idx: number, total: number): string {
+  let txt = `⚡ *Relevé énergie (${idx}/${total})*\n\n📊 *${fluide.nom}*`;
+  if (fluide.unite) txt += ` _(${fluide.unite})_`;
+  txt += '\n';
+  if (lastVal != null) txt += `_(Dernier relevé : *${lastVal}${fluide.unite ? ' ' + fluide.unite : ''}*)_`;
+  else txt += `_(Saisissez la valeur actuelle)_`;
+  return txt;
+}
+function fmtRecapEnergie(fluides: any[], reponses: Record<string, number>, lastReleve: Record<string, any>, siteNom: string): string {
+  let txt = `⚡ *Récap relevé énergie*\n_${siteNom} · ${getToday()}_\n\n`;
+  for (const f of fluides) {
+    const v = reponses[f.id];
+    if (v == null) continue;
+    const lv = lastReleve[f.id];
+    const delta = (f.type_valeur === 'index' && lv != null)
+      ? ` (+${Math.round((v - parseFloat(String(lv))) * 10) / 10}${f.unite ? ' ' + f.unite : ''})`
+      : '';
+    const emoji = (f.seuil_alerte_bas != null && v < f.seuil_alerte_bas) ? '⚠️' : '✅';
+    txt += `${emoji} ${f.nom} : *${v}${f.unite ? ' ' + f.unite : ''}*${delta}\n`;
+  }
+  txt += `\nValider ce relevé ? *(OUI / NON)*`;
+  return txt;
+}
+
 async function getLastSaisieContext(equipementId: string, questions: any[], lastValues: Record<string, string>): Promise<string> {
   const lastRE = await db('rondes_equipements', {
     query: `&equipement_id=eq.${equipementId}&statut=eq.valide&order=valide_at.desc&limit=1`
@@ -409,10 +452,11 @@ async function demarrerSaisie(phone: string, contact: any, site: any): Promise<a
   if (!freqs.length) return sendWA(phone, `✅ Toutes les rondes sont à jour.\n\nTapez *aide* pour les commandes.`);
 
   const freqLabels: Record<string, string> = {
-    releve_horaire: '📊 Relevé horaire',
-    journalier:     '☀️ Ronde journalière',
-    hebdo:          '📅 Ronde hebdomadaire',
-    mensuel:        '🗓️ Ronde mensuelle',
+    releve_horaire:  '📊 Relevé horaire',
+    journalier:      '☀️ Ronde journalière',
+    hebdo:           '📅 Ronde hebdomadaire',
+    mensuel:         '🗓️ Ronde mensuelle',
+    releve_energie:  '⚡ Relevé énergie',
   };
   const sd = { tech_id: contact.id, tech_nom: contact.nom, site_id: site.id, site_nom: site.nom };
 
@@ -431,6 +475,38 @@ async function envoyerLienReleve(phone: string, site: any, techNom: string): Pro
   return sendWA(phone,
     `📊 *Relevé horaire — ${site.nom}*\n\nBonjour ${techNom} !\n\nOuvrez ce lien pour saisir le relevé :\n${link}\n\n_Vous pouvez faire plusieurs relevés dans la journée._`
   );
+}
+
+async function demarrerReleveEnergie(phone: string, contact: any, site: any): Promise<any> {
+  const fluides = await db('energie_config', {
+    query: `&site_id=eq.${site.id}&actif=eq.true&order=ordre.asc`
+  });
+  if (!Array.isArray(fluides) || !fluides.length) {
+    return sendWA(phone, `⚠️ Aucun fluide configuré pour le relevé énergie.\nContactez votre responsable.`);
+  }
+  // Récupérer le dernier relevé pour afficher les valeurs précédentes
+  const lastReleveRaw = await db('releves_energie', {
+    query: `&site_id=eq.${site.id}&order=date_releve.desc&limit=1`
+  });
+  const lastRow = Array.isArray(lastReleveRaw) && lastReleveRaw.length > 0 ? lastReleveRaw[0] : null;
+  const lastReleve: Record<string, any> = lastRow?.valeurs || {};
+
+  const f = fluides[0];
+  const sd = {
+    site_id: site.id, site_nom: site.nom,
+    tech_id: contact.id, tech_nom: contact.nom,
+    fluides: fluides.map((fl: any) => ({
+      id: fl.id, nom: fl.nom,
+      unite: fl.unite || '',
+      type_valeur: fl.type_valeur || 'index',
+      seuil_alerte_bas: fl.seuil_alerte_bas ?? null
+    })),
+    reponses: {} as Record<string, number>,
+    field_idx: 0,
+    last_releve: lastReleve
+  };
+  await setSession(phone, 'energie_saisie', sd);
+  return sendWA(phone, fmtFluidQuestion(f, lastReleve[f.id] ?? null, 1, fluides.length));
 }
 
 async function demarrerRonde(phone: string, contact: any, site: any, sd: any, frequence: string): Promise<any> {
@@ -599,6 +675,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     if (isNaN(n) || n < 1 || n > freqs.length) return sendWA(phone, `Répondez avec un numéro entre 1 et ${freqs.length}.`);
     const freq = freqs[n - 1];
     if (freq === 'releve_horaire') return envoyerLienReleve(phone, site, contact.nom);
+    if (freq === 'releve_energie') return demarrerReleveEnergie(phone, contact, site);
     return demarrerRonde(phone, contact, site, sd, freq);
   }
 
@@ -1022,6 +1099,110 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     return sendWA(phone, `✅ *Ravitaillement enregistré !*\n\n🛢️ ${sd.cuve_nom}\n💧 ${sd.litres_ajoutes}L ajoutés — ${niveauL}L / ${cap}L (${pct}%) ${col}${autoJ ? `\n⏱️ Autonomie : ~${autoJ}j` : ''}${coutTxt}\n\n_Équipe notifiée 📲_`);
   }
 
+  // ── Relevé énergie — saisie des fluides ──────────────────────────────────
+  if (state === 'energie_saisie') {
+    const fluides: any[] = sd.fluides || [];
+    const reponses: Record<string, number> = sd.reponses || {};
+    const idx: number = sd.field_idx || 0;
+    const f = fluides[idx];
+    if (!f) return sendWA(phone, `Erreur : fluide introuvable. Tapez *saisie* pour recommencer.`);
+
+    const numVal = parseFloat(bodyText.trim().replace(',', '.'));
+    if (isNaN(numVal)) {
+      return sendWA(phone, `❌ Entrez un nombre.\n\n${fmtFluidQuestion(f, sd.last_releve?.[f.id] ?? null, idx + 1, fluides.length)}`);
+    }
+    // Validation index croissant
+    const lastVal = sd.last_releve?.[f.id];
+    if (f.type_valeur === 'index' && lastVal != null && numVal < parseFloat(String(lastVal))) {
+      return sendWA(phone, `❌ Valeur invalide. L'index doit être ≥ ${lastVal}${f.unite ? ' ' + f.unite : ''}.\n\n${fmtFluidQuestion(f, lastVal, idx + 1, fluides.length)}`);
+    }
+
+    const newReponses = { ...reponses, [f.id]: numVal };
+
+    // Alerte seuil bas — non bloquant
+    if (f.seuil_alerte_bas != null && numVal < f.seuil_alerte_bas) {
+      db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` }).then((responsables: any[]) => {
+        if (!Array.isArray(responsables)) return;
+        const alertMsg = `⚠️ *Alerte énergie — ${f.nom}*\n_${siteNom}_\n\nValeur : *${numVal}${f.unite ? ' ' + f.unite : ''}* (seuil : ${f.seuil_alerte_bas})\n\n_Relevé par ${contact.nom} · ${getHeure()}_`;
+        for (const r of responsables) if (r.whatsapp) sendWA(r.whatsapp, alertMsg).catch(() => {});
+      }).catch(() => {});
+    }
+
+    const next = idx + 1;
+    // Confirmation delta si index
+    let confirmMsg = '';
+    if (f.type_valeur === 'index' && lastVal != null) {
+      const delta = Math.round((numVal - parseFloat(String(lastVal))) * 10) / 10;
+      confirmMsg = `✅ ${f.nom} : *${numVal}${f.unite ? ' ' + f.unite : ''}* (+${delta}${f.unite ? ' ' + f.unite : ''})\n\n`;
+    } else {
+      confirmMsg = `✅ ${f.nom} : *${numVal}${f.unite ? ' ' + f.unite : ''}*\n\n`;
+    }
+
+    if (next < fluides.length) {
+      const nextF = fluides[next];
+      const nextLast = sd.last_releve?.[nextF.id] ?? null;
+      await setSession(phone, 'energie_saisie', { ...sd, reponses: newReponses, field_idx: next });
+      return sendWA(phone, `${confirmMsg}${fmtFluidQuestion(nextF, nextLast, next + 1, fluides.length)}`);
+    }
+
+    // Tous les fluides saisis → récap
+    await setSession(phone, 'energie_recap', { ...sd, reponses: newReponses });
+    return sendWA(phone, fmtRecapEnergie(fluides, newReponses, sd.last_releve || {}, siteNom));
+  }
+
+  // ── Relevé énergie — validation recap ────────────────────────────────────
+  if (state === 'energie_recap') {
+    const v = msg.toLowerCase();
+    if (v === 'non') {
+      await setSession(phone, 'idle', {});
+      return sendWA(phone, `❌ Relevé annulé.\n\nTapez *saisie* pour recommencer.`);
+    }
+    if (v !== 'oui') return sendWA(phone, `Répondez *OUI* pour valider ou *NON* pour annuler.`);
+
+    const valeurs = sd.reponses || {};
+    const today = getToday();
+
+    // Upsert dans releves_energie (un seul relevé par jour)
+    const existingRow = await db('releves_energie', {
+      query: `&site_id=eq.${sd.site_id}&date_releve=eq.${today}&limit=1`,
+      select: 'id'
+    });
+    if (Array.isArray(existingRow) && existingRow.length > 0) {
+      await db('releves_energie', {
+        method: 'PATCH',
+        query: `&id=eq.${existingRow[0].id}`,
+        body: { valeurs, saisi_par: contact.nom, updated_at: new Date().toISOString() }
+      });
+    } else {
+      await db('releves_energie', {
+        method: 'POST',
+        body: { site_id: sd.site_id, date_releve: today, valeurs, saisi_par: contact.nom }
+      });
+    }
+    await setSession(phone, 'idle', {});
+
+    // Notifier resp_tech — non bloquant
+    const fluides: any[] = sd.fluides || [];
+    const lastReleve: Record<string, any> = sd.last_releve || {};
+    db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` }).then((responsables: any[]) => {
+      if (!Array.isArray(responsables)) return;
+      const lines = fluides.map((f: any) => {
+        const val = valeurs[f.id];
+        if (val == null) return null;
+        const lv = lastReleve[f.id];
+        const delta = (f.type_valeur === 'index' && lv != null)
+          ? ` (+${Math.round((val - parseFloat(String(lv))) * 10) / 10}${f.unite ? ' ' + f.unite : ''})`
+          : '';
+        const em = (f.seuil_alerte_bas != null && val < f.seuil_alerte_bas) ? '⚠️' : '✅';
+        return `${em} ${f.nom} : *${val}${f.unite ? ' ' + f.unite : ''}*${delta}`;
+      }).filter(Boolean).join('\n');
+      const notifMsg = `⚡ *Relevé énergie — ${siteNom}*\n_${today} · ${getHeure()}_\n\n${lines}\n\n_Saisi par ${contact.nom}_`;
+      for (const r of responsables) if (r.whatsapp) sendWA(r.whatsapp, notifMsg).catch(() => {});
+    }).catch(() => {});
+
+    return sendWA(phone, `✅ *Relevé énergie validé !*\n_${today} · ${siteNom}_\n\n_Responsable notifié 📲_`);
+  }
+
   // ── Affectation interactive : choix du tech ──────────────────────────────
   if (state === 'affecter_choix') {
     const techs: any[] = sd.techs || [];
@@ -1203,6 +1384,7 @@ async function handleMessage(from: string, bodyText: string) {
     const activeStates = [
       'saisie_choix_freq','saisie_choix_equip','saisie_question','saisie_followup',
       'saisie_recap','saisie_correction','saisie_anomalie','saisie_anomalie_text',
+      'energie_saisie','energie_recap',
       'panne_equip','panne_type','panne_description',
       'resolu_choix','resolu_note','resolu_cout','resolu_technicien','resolu_final',
       'vidange_equip','vidange_intervenant','vidange_confirm',

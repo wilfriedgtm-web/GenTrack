@@ -9018,8 +9018,11 @@ function _calcEnergieStatut(releve,fluides,prevReleve){
     v=parseFloat(v);
     if(f.type_valeur==='instantane'){
       if(f.seuil_alerte_bas!=null){
-        if(v<f.seuil_alerte_bas)worst='depassement';
-        else if(v<f.seuil_alerte_bas*1.15&&worst==='ok')worst='surveiller';
+        // Normaliser en L si cuve (capacité connue)
+        var _cap=f.capacite?parseFloat(f.capacite):null;
+        var _vCmp=_cap!=null?(v>100?v:Math.round(v/100*_cap)):v;
+        if(_vCmp<f.seuil_alerte_bas)worst='depassement';
+        else if(_vCmp<f.seuil_alerte_bas*1.15&&worst==='ok')worst='surveiller';
       }
     }else{
       var pv=prevReleve&&prevReleve.valeurs&&prevReleve.valeurs[f.id];
@@ -9232,6 +9235,23 @@ function _exportEnergieCSV(){
 }
 
 /* ═══════════════════════════════════════════════════════
+   ⚡ ÉNERGIE — Helpers globaux
+   ═══════════════════════════════════════════════════════ */
+var _FLUID_ICONS={
+  'electricite':'⚡','elec':'⚡','kwh':'⚡','kw':'⚡',
+  'eau':'💧','water':'💧','m3':'💧','m³':'💧',
+  'gasoil':'🛢️','diesel':'🛢️','carburant':'🛢️','fuel':'🛢️',
+  'gaz':'🔥','butane':'🔥','propane':'🔥','gas':'🔥',
+  'cos':'🔌','cos phi':'🔌'
+};
+function _fluidIcon(f){
+  var nom=(f.nom||'').toLowerCase();
+  var keys=Object.keys(_FLUID_ICONS);
+  for(var i=0;i<keys.length;i++){if(nom.indexOf(keys[i])>=0)return _FLUID_ICONS[keys[i]];}
+  return '📊';
+}
+
+/* ═══════════════════════════════════════════════════════
    ⚡ ÉNERGIE — Vue principale resp_tech
    ═══════════════════════════════════════════════════════ */
 async function _rtEnergie(sid){
@@ -9336,19 +9356,6 @@ async function _rtEnergie(sid){
   });
 
   // ── TILES ──
-  var FLUID_ICONS={
-    'electricite':'⚡','elec':'⚡','kWh':'⚡','kw':'⚡',
-    'eau':'💧','water':'💧','m3':'💧','m³':'💧',
-    'gasoil':'🛢️','diesel':'🛢️','carburant':'🛢️','fuel':'🛢️',
-    'gaz':'🔥','butane':'🔥','propane':'🔥','gas':'🔥',
-    'cos':'🔌','cos phi':'🔌'
-  };
-  function _fluidIcon(f){
-    var nom=(f.nom||'').toLowerCase();
-    var keys=Object.keys(FLUID_ICONS);
-    for(var i=0;i<keys.length;i++){if(nom.indexOf(keys[i])>=0)return FLUID_ICONS[keys[i]];}
-    return '📊';
-  }
 
   var tilesHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px">';
   fluides.forEach(function(f){
@@ -9362,30 +9369,50 @@ async function _rtEnergie(sid){
     var devise=f.devise||'XOF';
     var isInstant=f.type_valeur==='instantane';
     var cap=f.capacite?parseFloat(f.capacite):null;
-    // Conso mensuelle pour instantanés : sommer les baisses quotidiennes × capacité
+    // ── Normalisation cuve : heuristique >100 → saisi en L, sinon en % ──
+    // (Azalaï saisit en L, Madame T saisit en %. Seuil toujours en L pour cuves.)
+    var lastValL=null,lastValPct=null;
+    if(isInstant&&cap!=null&&lastVal!=null){
+      var _cuveIsL=lastVal>100;
+      lastValL=_cuveIsL?Math.round(lastVal):Math.round(lastVal/100*cap);
+      lastValPct=_cuveIsL?Math.min(100,Math.round(lastVal/cap*100)):Math.min(100,lastVal);
+    }
+    // Conso mensuelle pour cuves : somme des baisses journalières en L
     var consoInstant=null;
     if(isInstant&&cap!=null){
       var drops=0;
-      deltasByFluide[f.id].forEach(function(d){if(d<0)drops+=Math.abs(d);});
-      consoInstant=Math.round(drops/100*cap);
+      var _prevRaw=null;
+      deltasByFluide[f.id].forEach(function(d){
+        if(d==null){_prevRaw=null;return;}
+        if(_prevRaw!=null){
+          var _dL=d>100?d:d/100*cap;
+          var _pL=_prevRaw>100?_prevRaw:_prevRaw/100*cap;
+          if(_dL<_pL)drops+=(_pL-_dL);
+        }
+        _prevRaw=d;
+      });
+      consoInstant=Math.round(drops);
     }
     var consoAffichee=isInstant?consoInstant:consoMois;
     var tarif=f.tarif?parseFloat(f.tarif):null;
     var budget=obj&&tarif?obj*tarif:null;
-    var coutReel=consoAffichee!=null&&tarif?consoAffichee*tarif:null;
-    var pct=obj&&consoAffichee!=null?consoAffichee/obj:null;
+    var coutReel=consoAffichee!=null&&consoAffichee>0&&tarif?consoAffichee*tarif:null;
+    var pct=obj&&consoAffichee!=null&&consoAffichee>0?consoAffichee/obj:null;
     var deltaCout=budget&&coutReel?coutReel-budget:null;
-    var alerte=f.seuil_alerte_bas!=null&&lastVal!=null&&lastVal<f.seuil_alerte_bas;
+    // Alerte seuil : pour cuves comparer en L, sinon comparer brut
+    var _compVal=isInstant&&cap!=null?lastValL:lastVal;
+    var alerte=f.seuil_alerte_bas!=null&&_compVal!=null&&_compVal<f.seuil_alerte_bas;
     var sur=pct!=null&&pct>1;
     var tileColor=alerte?'var(--rouge)':sur?'var(--amber-dark)':'var(--dark)';
     var deltaColor=pct==null?'var(--text3)':pct>1?'#E8841A':pct<0.95?'var(--vert)':'var(--text3)';
-    var restants=isInstant&&cap!=null&&lastVal!=null?Math.round(lastVal/100*cap):null;
+    // Litres restants et % jauge
+    var restants=isInstant&&cap!=null?lastValL:null;
     // Barre de progression
     var barPct=pct!=null?Math.min(100,Math.round(pct*100)):0;
     var barColor=alerte?'var(--rouge)':sur?'#E8841A':'#3B82F6';
     // Jauge niveau instantané
-    var niveauPct=isInstant&&lastVal!=null?Math.min(100,Math.max(0,lastVal)):0;
-    var niveauColor=alerte?'var(--rouge)':sur?'#E8841A':'#22c55e';
+    var niveauPct=isInstant?(cap!=null&&lastValPct!=null?lastValPct:(lastVal!=null?Math.min(100,Math.max(0,lastVal)):0)):0;
+    var niveauColor=alerte?'var(--rouge)':niveauPct<30?'#f59e0b':'#22c55e';
 
     tilesHtml+=
       '<div style="background:white;border:1.5px solid '+(alerte?'var(--rouge)':'var(--border)')+';border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:0">'+
@@ -9398,14 +9425,17 @@ async function _rtEnergie(sid){
         // Grand chiffre
         '<div style="font-size:28px;font-weight:800;color:'+tileColor+';line-height:1.1">'+
           (isInstant?
-            (lastVal!=null?lastVal.toLocaleString('fr-FR')+'<span style="font-size:14px;font-weight:500;color:var(--text3);margin-left:3px">%</span>':'—'):
+            (cap!=null?
+              (lastValL!=null?lastValL.toLocaleString('fr-FR')+'<span style="font-size:14px;font-weight:500;color:var(--text3);margin-left:3px">L</span>':'—'):
+              (lastVal!=null?lastVal.toLocaleString('fr-FR')+(f.unite?'<span style="font-size:14px;font-weight:500;color:var(--text3);margin-left:3px">'+escape_html(f.unite)+'</span>':''):'—')
+            ):
             (consoMois!=null?Math.round(consoMois).toLocaleString('fr-FR')+'<span style="font-size:13px;font-weight:500;color:var(--text3);margin-left:3px">'+(f.unite?escape_html(f.unite):'')+'</span>':'—')+
           '')+
         '</div>'+
         // Sous-titre
-        (isInstant&&restants!=null?
+        (isInstant&&cap!=null?
           '<div style="font-size:10px;color:var(--text2);margin-top:3px">'+
-            restants.toLocaleString('fr-FR')+' L restants'+(cap?' · citerne '+cap.toLocaleString('fr-FR')+' L':'')+
+            niveauPct+'% · citerne '+cap.toLocaleString('fr-FR')+' L'+
           '</div>':
           (!isInstant&&consoMois!=null?
             '<div style="font-size:10px;color:var(--text2);margin-top:3px">ce mois · dernier relevé : '+(lastVal!=null?lastVal.toLocaleString('fr-FR')+(f.unite?' '+f.unite:''):'—')+'</div>':
@@ -9415,7 +9445,7 @@ async function _rtEnergie(sid){
           '<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">'+
             '<div style="height:8px;background:'+niveauColor+';border-radius:4px;width:'+niveauPct+'%;transition:width .4s"></div>'+
           '</div>'+
-          (f.seuil_alerte_bas!=null?'<div style="font-size:9px;color:var(--rouge);margin-top:3px">⚑ Seuil alerte : '+f.seuil_alerte_bas+'%</div>':'')+
+          (f.seuil_alerte_bas!=null?'<div style="font-size:9px;color:var(--rouge);margin-top:3px">⚑ Alerte < '+f.seuil_alerte_bas.toLocaleString('fr-FR')+(cap?' L':'')+'</div>':'')+
         '</div>':'')+
         // Objectif + conso + barre (les deux types)
         (obj?'<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">'+
@@ -9555,7 +9585,10 @@ async function _rtEnergie(sid){
         var v=r.valeurs&&r.valeurs[f.id];
         var vNum=v!=null?parseFloat(v):null;
         var delta=deltasByFluide[f.id][relevesAsc.indexOf(r)];
-        var alerte=f.seuil_alerte_bas!=null&&vNum!=null&&vNum<f.seuil_alerte_bas;
+        // Normaliser pour seuil : cuves → L
+        var _fCap=f.capacite?parseFloat(f.capacite):null;
+        var _vCmp=vNum!=null&&f.type_valeur==='instantane'&&_fCap!=null?(vNum>100?vNum:Math.round(vNum/100*_fCap)):vNum;
+        var alerte=f.seuil_alerte_bas!=null&&_vCmp!=null&&_vCmp<f.seuil_alerte_bas;
         var deltaStr='';
         if(delta!=null&&f.type_valeur==='index'){
           var objJ=(_objActif[f.id]&&_objActif[f.id].valeur!=null)?parseFloat(_objActif[f.id].valeur)/daysInMonth:null;
@@ -9619,199 +9652,233 @@ async function _rtEnergie(sid){
 var _ECFG_COLS='30px 1fr 70px 90px 65px 85px 80px 80px 44px';
 
 async function _buildEnergieConfigTab(sid){
-  var[fluides,relevesCheck]=await Promise.all([
+  var[fluides,objsRows]=await Promise.all([
     supaGet('energie_config','site_id=eq.'+sid+'&select=id,nom,unite,type_valeur,tarif,seuil_alerte_bas,capacite,actif,ordre,devise&order=ordre.asc'),
-    supaGet('releves_energie','site_id=eq.'+sid+'&select=valeurs&limit=100')
+    supaGet('objectifs_energie','site_id=eq.'+sid+'&select=id,fluide_id,valeur,date_debut,date_fin,note&order=date_debut.desc&limit=200')
   ]);
 
-  var fluidesAvecDonnees={};
-  (relevesCheck||[]).forEach(function(r){
-    if(r.valeurs)Object.keys(r.valeurs).forEach(function(fid){fluidesAvecDonnees[fid]=true;});
+  // Cache pour les modals
+  window._energieCfgFluides=fluides||[];
+  window._energieCfgSid=sid;
+
+  // Objectifs actifs par fluide
+  var today=new Date().toISOString().split('T')[0];
+  var objActif={};
+  (objsRows||[]).forEach(function(o){
+    if(!o.date_debut||o.date_debut>today)return;
+    if(o.date_fin&&o.date_fin<today)return;
+    if(!objActif[o.fluide_id])objActif[o.fluide_id]=o;
   });
 
-  var h='<div style="max-width:760px">';
-  h+='<div style="font-size:12px;color:var(--text2);margin-bottom:16px">'+
-    'Configurez les fluides à suivre. Les objectifs mensuels sont définis directement dans l\'onglet Énergie.'+
+  var h='<div style="max-width:920px">';
+
+  // ── Header ──
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">'+
+    '<div>'+
+      '<div style="font-size:15px;font-weight:700;color:var(--text)">⚡ Fluides &amp; énergie</div>'+
+      '<div style="font-size:11px;color:var(--text3);margin-top:3px">Configurez les fluides suivis, leurs tarifs et objectifs mensuels</div>'+
+    '</div>'+
+    '<button onclick="_energieCfgAjouterModal(\''+sid+'\')" '+
+      'style="background:var(--amber);color:white;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">'+
+      '<span style="font-size:16px;line-height:1">+</span> Ajouter un fluide'+
+    '</button>'+
   '</div>';
 
-  // En-têtes
-  h+='<div style="display:grid;grid-template-columns:'+_ECFG_COLS+';gap:6px;padding:0 4px 6px;font-size:10px;font-weight:700;color:var(--text3);border-bottom:1.5px solid var(--border);margin-bottom:2px">'+
-    '<div style="text-align:center">#</div>'+
-    '<div>Nom du fluide</div>'+
-    '<div>Unité</div>'+
-    '<div>Type</div>'+
-    '<div>Devise</div>'+
-    '<div style="text-align:right">Tarif /u</div>'+
-    '<div style="text-align:right">Seuil bas</div>'+
-    '<div style="text-align:right">Capacité</div>'+
-    '<div style="text-align:center">Actif</div>'+
-  '</div>';
-
-  (fluides||[]).forEach(function(f){
-    var hasDonnees=!!fluidesAvecDonnees[f.id];
-    var fJs=f.id.replace(/'/g,"\\'");
-    h+='<div id="ecfg-row-'+f.id+'" style="display:grid;grid-template-columns:'+_ECFG_COLS+';gap:6px;align-items:center;padding:7px 4px;border-bottom:1px solid var(--border);background:'+(f.actif?'white':'var(--bg2)')+'">'+
-      // Ordre
-      '<div style="font-size:11px;color:var(--text3);text-align:center">'+f.ordre+'</div>'+
-      // Nom
-      '<input id="ecfg-nom-'+f.id+'" type="text" value="'+escape_html(f.nom)+'" '+
-        'style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;width:100%;box-sizing:border-box" '+
-        'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
-      // Unité
-      '<input id="ecfg-unite-'+f.id+'" type="text" value="'+escape_html(f.unite||'')+'" placeholder="kWh…" '+
-        'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box" '+
-        'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
-      // Type
-      '<select id="ecfg-type-'+f.id+'" '+
-        'style="border:1px solid var(--border);border-radius:6px;padding:5px 5px;font-size:11px;width:100%;box-sizing:border-box" '+
-        'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')">'+
-        '<option value="index"'+(f.type_valeur==='index'?' selected':'')+'>Index</option>'+
-        '<option value="instantane"'+(f.type_valeur==='instantane'?' selected':'')+'>Instantané</option>'+
-      '</select>'+
-      // Devise
-      '<select id="ecfg-devise-'+f.id+'" '+
-        'style="border:1px solid var(--border);border-radius:6px;padding:5px 4px;font-size:11px;width:100%;box-sizing:border-box" '+
-        'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')">'+
-        ['XOF','XAF','MAD','EUR','USD'].map(function(d){return'<option value="'+d+'"'+((f.devise||'XOF')===d?' selected':'')+'>'+d+'</option>';}).join('')+
-      '</select>'+
-      // Tarif
-      '<input id="ecfg-tarif-'+f.id+'" type="number" value="'+(f.tarif!=null?f.tarif:'')+'" placeholder="—" '+
-        'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" '+
-        'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
-      // Seuil bas
-      '<input id="ecfg-seuil-'+f.id+'" type="number" value="'+(f.seuil_alerte_bas!=null?f.seuil_alerte_bas:'')+'" placeholder="—" '+
-        'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" '+
-        'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
-      // Capacité
-      '<input id="ecfg-cap-'+f.id+'" type="number" value="'+(f.capacite!=null?f.capacite:'')+'" placeholder="—" '+
-        'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" '+
-        'onchange="_energieSauvegarder(\''+sid+'\',\''+fJs+'\')" />'+
-      // Toggle actif
-      '<div style="text-align:center">'+
-        '<label style="position:relative;display:inline-block;width:32px;height:18px">'+
-          '<input type="checkbox" '+(f.actif?'checked':'')+' onchange="_energieToggleActif(\''+sid+'\',\''+fJs+'\',this.checked)" style="opacity:0;width:0;height:0;position:absolute"/>'+
-          '<span style="position:absolute;inset:0;background:'+(f.actif?'var(--amber)':'#ccc')+';border-radius:18px;cursor:pointer"></span>'+
-          '<span style="position:absolute;left:'+(f.actif?'15px':'2px')+';top:2px;width:14px;height:14px;background:white;border-radius:50%"></span>'+
-        '</label>'+
-      '</div>'+
+  if(!fluides||!fluides.length){
+    h+='<div style="text-align:center;padding:48px;color:var(--text3);font-size:13px">'+
+      'Aucun fluide configuré.<br>Cliquez sur <strong>+ Ajouter un fluide</strong> pour commencer.'+
     '</div>';
-  });
+  }else{
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px">';
 
-  // Ligne d'ajout inline (cachée par défaut)
-  h+='<div id="ecfg-add-row" style="display:none;grid-template-columns:'+_ECFG_COLS+';gap:6px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--amber);background:var(--amber-pale)">'+
-    '<div style="font-size:11px;color:var(--text3);text-align:center">✦</div>'+
-    '<input id="ecfg-new-nom" type="text" placeholder="Nom du fluide *" '+
-      'style="border:1px solid var(--amber);border-radius:6px;padding:5px 8px;font-size:12px;width:100%;box-sizing:border-box" />'+
-    '<input id="ecfg-new-unite" type="text" placeholder="kWh…" '+
-      'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box" />'+
-    '<select id="ecfg-new-type" style="border:1px solid var(--border);border-radius:6px;padding:5px 5px;font-size:11px;width:100%;box-sizing:border-box">'+
-      '<option value="index">Index</option><option value="instantane">Instantané</option>'+
-    '</select>'+
-    '<select id="ecfg-new-devise" style="border:1px solid var(--border);border-radius:6px;padding:5px 4px;font-size:11px;width:100%;box-sizing:border-box">'+
-      '<option value="XOF">XOF</option><option value="XAF">XAF</option><option value="MAD">MAD</option><option value="EUR">EUR</option><option value="USD">USD</option>'+
-    '</select>'+
-    '<input id="ecfg-new-tarif" type="number" placeholder="—" '+
-      'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" />'+
-    '<input id="ecfg-new-seuil" type="number" placeholder="—" '+
-      'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" />'+
-    '<input id="ecfg-new-cap" type="number" placeholder="—" '+
-      'style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;width:100%;box-sizing:border-box;text-align:right" />'+
-    '<div style="display:flex;gap:4px">'+
-      '<button onclick="_energieConfirmerAjout(\''+sid+'\')" title="Valider" '+
-        'style="background:var(--amber);color:white;border:none;border-radius:5px;width:20px;height:20px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">✓</button>'+
-      '<button onclick="_energieAnnulerAjout()" title="Annuler" '+
-        'style="background:white;color:var(--text3);border:1px solid var(--border);border-radius:5px;width:20px;height:20px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">✕</button>'+
-    '</div>'+
-  '</div>';
+    (fluides||[]).forEach(function(f){
+      var fJs=f.id.replace(/'/g,"\\'");
+      var icon=_fluidIcon(f);
+      var devise=f.devise||'XOF';
+      var isCuve=f.type_valeur==='instantane'&&f.capacite!=null;
+      var typeLabel=f.type_valeur==='instantane'?'Instantané':'Index';
+      var activeObj=objActif[f.id];
+      var objVal=activeObj&&activeObj.valeur!=null?parseFloat(activeObj.valeur):null;
+      var objLabel=objVal!=null?objVal.toLocaleString('fr-FR')+'\u00a0'+(f.unite||'u')+'/mois':'Non défini';
+      var objSince=activeObj&&activeObj.date_debut
+        ?' · depuis '+new Date(activeObj.date_debut+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'})
+        :'';
+      var seuilLabel=f.seuil_alerte_bas!=null?f.seuil_alerte_bas.toLocaleString('fr-FR')+(isCuve?' L':''):null;
 
-  h+='<div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between">'+
-    '<div style="font-size:10px;color:var(--text3)">'+
-      '💡 <strong>Index</strong> : compteur croissant (kWh, m³). <strong>Instantané</strong> : niveau brut (%). '+
-      '<strong>Capacité</strong> : volume total du réservoir (L) pour calcul litres restants &amp; conso. <strong>Tarif</strong> : montant par unité dans la devise choisie.'+
-    '</div>'+
-    '<button onclick="_energieAfficherAjout()" id="ecfg-btn-add" '+
-      'style="flex-shrink:0;margin-left:16px;background:var(--amber);color:white;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">+ Ajouter</button>'+
+      h+='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;'+(f.actif?'':'opacity:0.62')+'">';
+
+      // ── Top: icon + nom/chips + badge + actions ──
+      h+='<div style="display:flex;align-items:flex-start;gap:10px">'+
+        '<div style="font-size:22px;line-height:1;flex-shrink:0;margin-top:3px">'+icon+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escape_html(f.nom)+'</div>'+
+          '<div style="display:flex;flex-wrap:wrap;gap:4px">'+
+            (f.unite?'<span style="font-size:10px;background:var(--bg2);color:var(--text2);border-radius:5px;padding:2px 7px">'+escape_html(f.unite)+'</span>':'')+
+            '<span style="font-size:10px;background:#fef3c7;color:#92400e;border-radius:5px;padding:2px 7px">'+escape_html(devise)+'</span>'+
+            '<span style="font-size:10px;background:var(--bg2);color:var(--text2);border-radius:5px;padding:2px 7px">'+typeLabel+'</span>'+
+            (seuilLabel?'<span style="font-size:10px;background:#fee2e2;color:#991b1b;border-radius:5px;padding:2px 7px">⚠ min '+seuilLabel+'</span>':'')+
+            (isCuve?'<span style="font-size:10px;background:#dbeafe;color:#1e40af;border-radius:5px;padding:2px 7px">🛢 '+parseFloat(f.capacite).toLocaleString('fr-FR')+' L</span>':'')+
+          '</div>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">'+
+          (f.actif
+            ?'<span style="font-size:9px;font-weight:700;background:#d1fae5;color:#065f46;border-radius:10px;padding:2px 8px">ACTIF</span>'
+            :'<span style="font-size:9px;font-weight:700;background:var(--bg2);color:var(--text3);border-radius:10px;padding:2px 8px">INACTIF</span>')+
+          '<div style="display:flex;gap:4px;margin-top:2px">'+
+            '<button onclick="_energieCfgEditFluidModal(\''+sid+'\',\''+fJs+'\')" title="Modifier" '+
+              'style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;width:28px;height:28px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">✏️</button>'+
+            '<button onclick="_energieDemanderSuppression(\''+sid+'\',\''+fJs+'\',\''+f.nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\') " title="Supprimer" '+
+              'style="background:white;border:1px solid #fca5a5;border-radius:6px;width:28px;height:28px;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0">✕</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+
+      // ── Séparateur ──
+      h+='<div style="border-top:1px solid var(--border)"></div>';
+
+      // ── Tarif ──
+      h+='<div style="display:flex;align-items:center;justify-content:space-between">'+
+        '<div style="font-size:11px;color:var(--text3)">Tarif unitaire</div>'+
+        '<div style="font-size:13px;font-weight:600;color:var(--text)">'+
+          (f.tarif!=null
+            ?f.tarif.toLocaleString('fr-FR')+'\u00a0'+escape_html(devise)+'/'+(f.unite||'u')
+            :'<span style="color:var(--text3);font-weight:400">Non défini</span>')+
+        '</div>'+
+      '</div>';
+
+      // ── Objectif mensuel ──
+      h+='<div style="display:flex;align-items:center;justify-content:space-between;background:#fffbeb;border-radius:8px;padding:8px 10px;border:1px solid #fde68a">'+
+        '<div>'+
+          '<div style="font-size:10px;color:var(--text3);margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Objectif mensuel</div>'+
+          '<div style="font-size:12px;font-weight:600;color:var(--text)">'+
+            escape_html(objLabel)+
+            '<span style="font-weight:400;color:var(--text3)">'+escape_html(objSince)+'</span>'+
+          '</div>'+
+        '</div>'+
+        '<button onclick="_energieModifierObjModal(\''+f.id+'\',\''+sid+'\')" '+
+          'style="background:var(--amber);color:white;border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0;margin-left:10px">Modifier</button>'+
+      '</div>';
+
+      // ── Toggle actif ──
+      h+='<div style="display:flex;align-items:center;justify-content:space-between">'+
+        '<div style="font-size:11px;color:var(--text3)">Statut</div>'+
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer">'+
+          '<span style="font-size:11px;color:var(--text2)">'+(f.actif?'Actif':'Inactif')+'</span>'+
+          '<div style="position:relative;display:inline-block;width:34px;height:19px">'+
+            '<input type="checkbox" '+(f.actif?'checked':'')+' onchange="_energieToggleActif(\''+sid+'\',\''+fJs+'\',this.checked)" style="opacity:0;width:0;height:0;position:absolute"/>'+
+            '<span style="position:absolute;inset:0;background:'+(f.actif?'var(--amber)':'#d1d5db')+';border-radius:19px;cursor:pointer"></span>'+
+            '<span style="position:absolute;left:'+(f.actif?'16px':'2px')+';top:2px;width:15px;height:15px;background:white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>'+
+          '</div>'+
+        '</label>'+
+      '</div>';
+
+      h+='</div>'; // end card
+    });
+
+    h+='</div>'; // end grid
+  }
+
+  // ── Légende ──
+  h+='<div style="margin-top:20px;font-size:10px;color:var(--text3);padding:10px 14px;background:var(--bg2);border-radius:8px">'+
+    '💡 <strong>Index</strong> : compteur croissant (kWh, m³). <strong>Instantané</strong> : niveau brut — pour cuve, saisir en <strong>litres</strong>. '+
+    '<strong>Capacité</strong> : volume total du réservoir (L). <strong>Tarif</strong> : montant par unité dans la devise choisie.'+
   '</div>';
 
   return h+'</div>';
 }
 
-function _energieAfficherAjout(){
-  var row=document.getElementById('ecfg-add-row');
-  if(row){
-    row.style.display='grid';
-    var inp=document.getElementById('ecfg-new-nom');
-    if(inp)inp.focus();
-    var btn=document.getElementById('ecfg-btn-add');
-    if(btn)btn.style.display='none';
-  }
+/* ── Modal helpers énergie config ── */
+var _ecfgEditFluidId=null;
+var _ecfgEditSid=null;
+
+function _energieCfgFormHtml(f){
+  var nom=f.nom||'';
+  var unite=f.unite||'';
+  var type=f.type_valeur||'index';
+  var devise=f.devise||'XOF';
+  return '<div class="cfg-form-group"><label class="cfg-form-label">Nom du fluide *</label>'+
+    '<input id="ecfg-edit-nom" type="text" class="cfg-form-input" value="'+escape_html(nom)+'" placeholder="ex: Électricité, Eau, Cuve gasoil…" /></div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Unité de mesure</label>'+
+    '<input id="ecfg-edit-unite" type="text" class="cfg-form-input" value="'+escape_html(unite)+'" placeholder="kWh, m³, L…" /></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+      '<div class="cfg-form-group"><label class="cfg-form-label">Type</label>'+
+        '<select id="ecfg-edit-type" class="cfg-form-input">'+
+          '<option value="index"'+(type==='index'?' selected':'')+'>Index (compteur)</option>'+
+          '<option value="instantane"'+(type==='instantane'?' selected':'')+'>Instantané (niveau)</option>'+
+        '</select></div>'+
+      '<div class="cfg-form-group"><label class="cfg-form-label">Devise</label>'+
+        '<select id="ecfg-edit-devise" class="cfg-form-input">'+
+          ['XOF','XAF','MAD','EUR','USD'].map(function(d){return'<option value="'+d+'"'+(devise===d?' selected':'')+'>'+d+'</option>';}).join('')+
+        '</select></div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">'+
+      '<div class="cfg-form-group"><label class="cfg-form-label">Tarif / unité</label>'+
+        '<input id="ecfg-edit-tarif" type="number" step="any" class="cfg-form-input" value="'+(f.tarif!=null?f.tarif:'')+'" placeholder="—" /></div>'+
+      '<div class="cfg-form-group"><label class="cfg-form-label">Seuil bas (L)</label>'+
+        '<input id="ecfg-edit-seuil" type="number" step="any" class="cfg-form-input" value="'+(f.seuil_alerte_bas!=null?f.seuil_alerte_bas:'')+'" placeholder="—" /></div>'+
+      '<div class="cfg-form-group"><label class="cfg-form-label">Capacité (L)</label>'+
+        '<input id="ecfg-edit-cap" type="number" step="any" class="cfg-form-input" value="'+(f.capacite!=null?f.capacite:'')+'" placeholder="Cuves seulement" /></div>'+
+    '</div>';
 }
 
-function _energieAnnulerAjout(){
-  var row=document.getElementById('ecfg-add-row');
-  if(row)row.style.display='none';
-  var btn=document.getElementById('ecfg-btn-add');
-  if(btn)btn.style.display='';
-  ['nom','unite','type','devise','tarif','seuil','cap'].forEach(function(f){
-    var el=document.getElementById('ecfg-new-'+f);
-    if(el)el.value=(f==='type'?'index':f==='devise'?'XOF':'');
-  });
+function _energieCfgAjouterModal(sid){
+  _ecfgEditFluidId=null; _ecfgEditSid=sid;
+  _showCfgModal(
+    '<div class="cfg-modal-title">➕ Ajouter un fluide</div>'+
+    _energieCfgFormHtml({})+
+    '<div style="display:flex;gap:10px;margin-top:6px">'+
+      '<button class="cfg-btn cfg-btn-amber" onclick="_energieCfgSaveFluid()">💾 Créer le fluide</button>'+
+      '<button class="cfg-btn" onclick="_closeCfgModal()" style="background:var(--bg2);color:var(--text2);border:none">Annuler</button>'+
+    '</div>'
+  );
+  var nomEl=document.getElementById('ecfg-edit-nom');
+  if(nomEl)setTimeout(function(){nomEl.focus();},50);
 }
 
-async function _energieConfirmerAjout(sid){
-  var nom=document.getElementById('ecfg-new-nom');
-  if(!nom||!nom.value.trim()){if(nom)nom.focus();return;}
-  var unite=document.getElementById('ecfg-new-unite');
-  var type=document.getElementById('ecfg-new-type');
-  var tarif=document.getElementById('ecfg-new-tarif');
-  var seuil=document.getElementById('ecfg-new-seuil');
+function _energieCfgEditFluidModal(sid,fid){
+  _ecfgEditFluidId=fid; _ecfgEditSid=sid;
+  var f=(window._energieCfgFluides||[]).find(function(x){return x.id===fid;})||{};
+  _showCfgModal(
+    '<div class="cfg-modal-title">✏️ Modifier — '+escape_html(f.nom||'Fluide')+'</div>'+
+    _energieCfgFormHtml(f)+
+    '<div style="display:flex;gap:10px;margin-top:6px">'+
+      '<button class="cfg-btn cfg-btn-amber" onclick="_energieCfgSaveFluid()">💾 Enregistrer</button>'+
+      '<button class="cfg-btn" onclick="_closeCfgModal()" style="background:var(--bg2);color:var(--text2);border:none">Annuler</button>'+
+    '</div>'
+  );
+}
 
-  var existing=await supaGet('energie_config','site_id=eq.'+sid+'&select=ordre&order=ordre.desc&limit=1');
-  var nextOrdre=(existing&&existing.length?existing[0].ordre:0)+1;
-
-  var deviseNew=document.getElementById('ecfg-new-devise');
+async function _energieCfgSaveFluid(){
+  var sid=_ecfgEditSid; var fid=_ecfgEditFluidId;
+  var nomEl=document.getElementById('ecfg-edit-nom');
+  if(!nomEl||!nomEl.value.trim()){if(nomEl)nomEl.focus();return;}
+  var g=function(id){return document.getElementById(id);};
   var payload={
-    site_id:sid,
-    nom:nom.value.trim(),
-    unite:unite&&unite.value.trim()?unite.value.trim():null,
-    type_valeur:type?type.value:'index',
-    devise:deviseNew?deviseNew.value:'XOF',
-    tarif:tarif&&tarif.value!==''?parseFloat(tarif.value):null,
-    seuil_alerte_bas:seuil&&seuil.value!==''?parseFloat(seuil.value):null,
-    capacite:(function(){var c=document.getElementById('ecfg-new-cap');return c&&c.value!==''?parseFloat(c.value):null;})(),
-    actif:true,
-    ordre:nextOrdre
-  };
-  var ok=await supaPost('energie_config',payload);
-  if(ok){
-    if(_session)renderRespTech(_session,'config');
-  }else{
-    alert('Erreur lors de l\'ajout.');
-  }
-}
-
-async function _energieSauvegarder(sid,fid){
-  var nom=document.getElementById('ecfg-nom-'+fid);
-  var unite=document.getElementById('ecfg-unite-'+fid);
-  var type=document.getElementById('ecfg-type-'+fid);
-  var deviseEl=document.getElementById('ecfg-devise-'+fid);
-  var tarif=document.getElementById('ecfg-tarif-'+fid);
-  var seuil=document.getElementById('ecfg-seuil-'+fid);
-  var capEl=document.getElementById('ecfg-cap-'+fid);
-  if(!nom)return;
-  var payload={
-    nom:nom.value.trim()||'Fluide',
-    unite:unite?unite.value.trim()||null:null,
-    type_valeur:type?type.value:'index',
-    devise:deviseEl?deviseEl.value:'XOF',
-    tarif:tarif&&tarif.value!==''?parseFloat(tarif.value):null,
-    seuil_alerte_bas:seuil&&seuil.value!==''?parseFloat(seuil.value):null,
-    capacite:capEl&&capEl.value!==''?parseFloat(capEl.value):null,
+    nom:nomEl.value.trim(),
+    unite:(function(){var e=g('ecfg-edit-unite');return e&&e.value.trim()?e.value.trim():null;})(),
+    type_valeur:(function(){var e=g('ecfg-edit-type');return e?e.value:'index';})(),
+    devise:(function(){var e=g('ecfg-edit-devise');return e?e.value:'XOF';})(),
+    tarif:(function(){var e=g('ecfg-edit-tarif');return e&&e.value!==''?parseFloat(e.value):null;})(),
+    seuil_alerte_bas:(function(){var e=g('ecfg-edit-seuil');return e&&e.value!==''?parseFloat(e.value):null;})(),
+    capacite:(function(){var e=g('ecfg-edit-cap');return e&&e.value!==''?parseFloat(e.value):null;})(),
     updated_at:new Date().toISOString()
   };
-  await supaPatch('energie_config',fid,payload);
-  var row=document.getElementById('ecfg-row-'+fid);
-  if(row){var orig=row.style.background;row.style.background='var(--vert-pale)';setTimeout(function(){row.style.background=orig;},600);}
+  var saveBtn=document.querySelector('#cfg-modal .cfg-btn-amber');
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='⏳…';}
+  if(fid){
+    await supaPatch('energie_config',fid,payload);
+  }else{
+    var existing=await supaGet('energie_config','site_id=eq.'+sid+'&select=ordre&order=ordre.desc&limit=1');
+    var nextOrdre=(existing&&existing.length?existing[0].ordre:0)+1;
+    var ok=await supaPost('energie_config',Object.assign({site_id:sid,actif:true,ordre:nextOrdre},payload));
+    if(!ok){
+      alert('Erreur lors de l\'ajout.');
+      if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 Créer le fluide';}
+      return;
+    }
+  }
+  _closeCfgModal();
+  if(_session)renderRespTech(_session,'config');
 }
 
 async function _energieToggleActif(sid,fid,actif){
