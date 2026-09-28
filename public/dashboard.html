@@ -2529,6 +2529,7 @@ async function _sgAffecterDirect(sgId,techNom,techWa,instr){
    MAINTENANCE
 ══════════════════════════════════════ */
 var _mntFilter='tous'; // tous | vidange | ravitaillement | preventive
+var _rtMntPeriod=30;
 
 var _MNT_TYPES={
   panne:{label:'Panne / Réparation',icon:'🔧',color:'var(--rouge)',bg:'var(--rouge-pale)'},
@@ -3456,128 +3457,135 @@ async function _rtMonEquipe(sid,session){
 async function _rtMaintenances(sid){
   var dc=document.getElementById('dash-content-main');
   if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
-
-  // Exclure source=signalement : les pannes brutes vivent dans l'onglet Signalements
-  // Garder seulement vidanges, pleins, et fiches maintenances (incl. pannes résolues)
-  var allRows=await supaGet('vue_journal_maintenance',
-    'site_id=eq.'+sid+'&source=not.in.(signalement,plein)&order=date_ref.desc&limit=200'+
-    '&select=id,type,titre,description,date_ref,equipement_nom,cout,statut,intervenant,notes,created_at,source,photo_url'
-  );
-
-  // KPIs mois courant
-  var moisDebut=new Date(new Date().getFullYear(),new Date().getMonth(),1);
-  var rowsMois=allRows.filter(function(r){return new Date(r.created_at)>=moisDebut;});
-  var rowsPannes=rowsMois.filter(function(r){return r.type==='panne';});
-  var rowsOps=rowsMois.filter(function(r){return r.type!=='panne'&&r.type!=='ravitaillement';});
-  var rowsRavito=rowsMois.filter(function(r){return r.type==='ravitaillement';});
-  var totalCout=rowsMois.filter(function(r){return r.type!=='ravitaillement';}).reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
-  var coutOps=rowsOps.reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
-  var coutPannes=rowsPannes.reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
-  var coutRavito=rowsRavito.reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
-  var nbOps=rowsOps.length;
-
-  // Lignes détail coût
-  var detailLines=[];
-  if(coutOps>0)detailLines.push('<span>⚙️ '+coutOps.toLocaleString('fr-FR')+' opérations</span>');
-  if(coutPannes>0)detailLines.push('<span>🔴 '+coutPannes.toLocaleString('fr-FR')+' pannes</span>');
-  if(coutRavito>0)detailLines.push('<span style="color:var(--bleu)">⛽ '+coutRavito.toLocaleString('fr-FR')+' carburant (suivi séparé)</span>');
-
-  var kpiHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px">'+
-    '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Coût interventions ce mois</div>'+
-    '<div style="font-size:22px;font-weight:800;color:var(--dark)">'+totalCout.toLocaleString('fr-FR')+' <span style="font-size:13px;font-weight:600;color:var(--text3)">FCFA</span></div>'+
-    (detailLines.length?'<div style="display:flex;gap:12px;margin-top:4px;font-size:11px;color:var(--text3)">'+detailLines.join('')+'</div>':
-      '<div style="font-size:11px;color:var(--text3)">Aucune dépense ce mois</div>')+
-  '</div>'+
-  '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px">'+
-    '<div style="font-size:11px;color:var(--text2);margin-bottom:2px">Opérations ce mois</div>'+
-    '<div style="font-size:22px;font-weight:800;color:var(--dark)">'+nbOps+'</div>'+
-    '<div style="font-size:11px;color:var(--text3)">vidanges · ravitaillements · maintenances</div>'+
+  var typeIcons={vidange:'🛢️',ravitaillement:'⛽',preventive:'📅',panne:'🔧'};
+  var typeBgs={vidange:'var(--orange-pale)',ravitaillement:'var(--bleu-pale)',preventive:'var(--vert-pale)',panne:'var(--rouge-pale)'};
+  var typeAccents={vidange:'var(--orange)',ravitaillement:'var(--bleu)',preventive:'var(--vert)',panne:'var(--rouge)'};
+  var cutoff=new Date();cutoff.setDate(cutoff.getDate()-_rtMntPeriod);
+  var cutoffStr=cutoff.toISOString().slice(0,10);
+  var baseSelect='id,type,titre,description,date_ref,equipement_nom,cout,statut,intervenant,notes,created_at,source,photo_url';
+  var results=await Promise.all([
+    supaGet('vue_journal_maintenance','site_id=eq.'+sid+'&source=not.in.(signalement,plein)&statut=neq.planifie&date_ref=gte.'+cutoffStr+'&order=date_ref.desc&limit=200&select='+baseSelect),
+    supaGet('vue_journal_maintenance','site_id=eq.'+sid+'&source=not.in.(signalement,plein)&statut=eq.planifie&order=date_ref.asc&limit=50&select='+baseSelect)
+  ]);
+  var rows=results[0];var upcoming=results[1];
+  /* KPIs */
+  var nbRealises=rows.filter(function(r){return r.statut==='realise';}).length;
+  var totalCout=rows.filter(function(r){return r.type!=='ravitaillement';}).reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
+  var coutRavito=rows.filter(function(r){return r.type==='ravitaillement';}).reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
+  function _rtKpi(lbl,val,sub,col){
+    return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px">'+
+      '<div style="font-size:10px;color:var(--text3);margin-bottom:4px">'+lbl+'</div>'+
+      '<div style="font-size:20px;font-weight:800;color:'+(col||'var(--dark)')+'">'+val+'</div>'+
+      '<div style="font-size:10px;color:var(--text3);margin-top:2px">'+sub+'</div>'+
+    '</div>';
+  }
+  var kpiHtml='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px">'+
+    _rtKpi('Interventions réalisées',nbRealises,_rtMntPeriod+' derniers jours','')+
+    _rtKpi('Coût interventions',totalCout.toLocaleString('fr-FR')+' FCFA','hors ravitaillement','')+
+    _rtKpi('Planifiées à venir',upcoming.length,'interventions programmées',upcoming.length>0?'var(--orange)':'')+
+    _rtKpi('Carburant',coutRavito>0?coutRavito.toLocaleString('fr-FR')+' FCFA':'—','suivi dans carburant','var(--bleu)')+
   '</div>';
-
-  // Exclure pannes des cards — elles vivent dans Signalements
-  var nonPannes=allRows.filter(function(r){return r.type!=='panne';});
-  var filtered=_mntFilter==='tous'?nonPannes:nonPannes.filter(function(r){
-    return r.type===_mntFilter;
-  });
-
-  var counts={tous:nonPannes.length,vidange:0,ravitaillement:0,preventive:0};
-  nonPannes.forEach(function(r){if(counts[r.type]!==undefined)counts[r.type]++;});
-
-  var filterHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">'+
-    [['tous','Tous'],['vidange','Vidanges'],['ravitaillement','Ravitaillements'],['preventive','Planifiées']].map(function(f){
-      var active=_mntFilter===f[0];
-      var n=counts[f[0]]||0;
-      return '<button onclick="_setMntFilter(\''+f[0]+'\')" style="font-size:11px;font-weight:'+(active?'700':'500')+';padding:5px 12px;border-radius:20px;border:1.5px solid '+(active?'var(--amber)':'var(--border)')+';background:'+(active?'var(--amber-pale)':'white')+';color:'+(active?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+f[1]+(n?' ('+n+')':'')+'</button>';
-    }).join('')+
+  /* filters */
+  var periodHtml=[7,30,90].map(function(d){
+    var a=_rtMntPeriod===d;
+    return '<button onclick="_rtMntPeriod='+d+';_setMntFilter(_mntFilter)" style="padding:5px 12px;border-radius:20px;border:1.5px solid '+(a?'var(--amber)':'var(--border)')+';background:'+(a?'var(--amber-pale)':'white')+';font-size:11px;font-weight:'+(a?'700':'500')+';color:'+(a?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+d+' jours</button>';
+  }).join('');
+  var allForCount=rows.filter(function(r){return r.type!=='panne';}).concat(upcoming);
+  var counts={tous:allForCount.length,vidange:0,ravitaillement:0,preventive:0};
+  allForCount.forEach(function(r){if(counts[r.type]!==undefined)counts[r.type]++;});
+  var typeHtml=[['tous','Tous types'],['vidange','Vidanges'],['ravitaillement','Ravitaillements'],['preventive','Préventive']].map(function(f){
+    var a=_mntFilter===f[0];
+    var n=counts[f[0]]||0;
+    return '<button onclick="_setMntFilter(\''+f[0]+'\')" style="padding:5px 12px;border-radius:20px;border:1.5px solid '+(a?'var(--amber)':'var(--border)')+';background:'+(a?'var(--amber-pale)':'white')+';font-size:11px;font-weight:'+(a?'700':'500')+';color:'+(a?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+f[1]+(n&&f[0]!=='tous'?' ('+n+')':'')+'</button>';
+  }).join('');
+  var filtersHtml='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px">'+
+    periodHtml+
+    '<div style="width:1px;height:18px;background:var(--border);margin:0 2px;flex-shrink:0"></div>'+
+    typeHtml+
   '</div>';
-
-  var typeIcons={vidange:'🛢️',ravitaillement:'⛽',preventive:'📅',plein:'⛽'};
-  var typeBgs={vidange:'var(--orange-pale)',ravitaillement:'var(--bleu-pale)',preventive:'var(--vert-pale)',plein:'var(--bleu-pale)'};
-  var typeColors={vidange:'var(--orange)',ravitaillement:'var(--bleu)',preventive:'var(--vert)',plein:'var(--bleu)'};
-
+  /* bandeau planifiées */
+  var displayUpcoming=_mntFilter==='tous'||_mntFilter==='preventive'?upcoming:upcoming.filter(function(r){return r.type===_mntFilter;});
+  var bannerHtml='';
+  if(displayUpcoming.length){
+    var snippet=displayUpcoming.slice(0,3).map(function(r){
+      var t=typeIcons[r.type]||'🔧';
+      var dStr=r.date_ref?new Date(r.date_ref+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'';
+      return '<span style="margin-right:10px">'+t+' '+escape_html(r.titre||r.type)+(dStr?' <span style="opacity:.65">'+dStr+'</span>':'')+'</span>';
+    }).join('');
+    var extra=displayUpcoming.length>3?'<span style="opacity:.6">+'+( displayUpcoming.length-3)+'</span>':'';
+    bannerHtml='<div style="background:var(--orange-pale);border:1.5px solid var(--orange);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:flex-start;gap:10px">'+
+      '<div style="font-size:18px;flex-shrink:0;margin-top:1px">📅</div>'+
+      '<div><div style="font-size:12px;font-weight:700;color:var(--orange-dark)">'+displayUpcoming.length+' planifiée'+(displayUpcoming.length>1?'s':'')+' à venir</div>'+
+        '<div style="font-size:11px;color:var(--orange-dark);margin-top:3px;line-height:1.6">'+snippet+extra+'</div>'+
+      '</div>'+
+    '</div>';
+  }
+  /* cards */
   function renderMntCard(r){
     var src=r.type||r.source||'';
     var icon=typeIcons[src]||'🔧';
     var bg=typeBgs[src]||'var(--bg)';
+    var accent=typeAccents[src]||'var(--border)';
     var isPlanifie=r.statut==='planifie';
     var isAnnule=r.statut==='annule';
     var dateStr=r.date_ref?new Date(r.date_ref+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'';
-    return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px'+(isPlanifie?';border-left:3px solid var(--amber)':!isPlanifie&&!isAnnule?';border-left:3px solid var(--vert)':'')+'">'+
-      // Bandeau réalisé en haut de la card (sauf planifié/annulé)
-      (!isPlanifie&&!isAnnule&&dateStr?
-        '<div style="background:var(--vert-pale);border-bottom:1px solid var(--vert-border,#c3e6c3);padding:4px 14px;display:flex;align-items:center;gap:6px">'+
-          '<span style="font-size:10px;font-weight:700;color:var(--vert)">✅ Réalisé le '+dateStr+'</span>'+
-        '</div>':
-        (isPlanifie?'<div style="background:var(--amber-pale);border-bottom:1px solid #f5d88e;padding:4px 14px;display:flex;align-items:center;gap:6px">'+
-          '<span style="font-size:10px;font-weight:700;color:var(--amber-dark)">📅 Planifié pour le '+dateStr+'</span>'+
-        '</div>':'')
-      )+
-      '<div style="padding:14px 16px">'+
-      '<div style="display:flex;align-items:flex-start;gap:10px">'+
-        '<div style="width:34px;height:34px;border-radius:50%;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">'+icon+'</div>'+
-        '<div style="flex:1;min-width:0">'+
-          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'+
-            '<span style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(r.titre||r.type||'Opération')+'</span>'+
-            (isAnnule?'<span style="font-size:10px;color:var(--text3)">Annulé</span>':'')+
+    return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:8px;display:grid;grid-template-columns:4px 1fr"'+(isPlanifie?' style="border-color:var(--amber)"':'')+'>'+
+      '<div style="background:'+accent+'"></div>'+
+      '<div>'+
+        (isPlanifie?
+          '<div style="background:var(--amber-pale);border-bottom:1px solid #f5d88e;padding:4px 14px"><span style="font-size:10px;font-weight:700;color:var(--amber-dark)">📅 Planifié pour le '+dateStr+'</span></div>':
+          (!isAnnule&&dateStr?'<div style="background:var(--vert-pale);border-bottom:1px solid var(--vert-border,#c3e6c3);padding:4px 14px"><span style="font-size:10px;font-weight:700;color:var(--vert)">✅ Réalisé le '+dateStr+'</span></div>':'')
+        )+
+        '<div style="padding:12px 14px">'+
+          '<div style="display:flex;align-items:flex-start;gap:10px">'+
+            '<div style="width:32px;height:32px;border-radius:8px;background:'+bg+';display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">'+icon+'</div>'+
+            '<div style="flex:1;min-width:0">'+
+              '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">'+
+                '<span style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(r.titre||r.type||'Opération')+'</span>'+
+                (isAnnule?'<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--border);color:var(--text3)">Annulé</span>':'')+
+              '</div>'+
+              (r.equipement_nom?'<div style="font-size:11px;color:var(--text2);margin-bottom:4px">🔩 '+escape_html(r.equipement_nom)+'</div>':'')+
+              (r.description?'<div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:4px">'+escape_html(r.description)+'</div>':'')+
+              '<div style="font-size:11px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap">'+
+                (r.intervenant?'<span>👷 '+escape_html(r.intervenant)+'</span>':'')+
+                (r.cout?'<span>💰 '+parseFloat(r.cout).toLocaleString('fr-FR')+' FCFA</span>':'')+
+              '</div>'+
+              (r.photo_url?'<div style="margin-top:8px"><a href="'+r.photo_url+'" target="_blank"><img src="'+r.photo_url+'" style="max-width:100%;max-height:160px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" onerror="this.style.display=\'none\'"></a></div>':'')+
+            '</div>'+
           '</div>'+
-          (r.description?'<div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:6px">'+escape_html(r.description)+'</div>':'')+
-          '<div style="font-size:11px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap">'+
-            (r.intervenant?'<span>👷 '+escape_html(r.intervenant)+'</span>':'')+
-            (r.cout?'<span>💰 '+parseFloat(r.cout).toLocaleString('fr-FR')+' FCFA</span>':'')+
+          '<div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
+            (isPlanifie?
+              '<button onclick="_mntMarquerRealise(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Marquer réalisé</button>'+
+              '<button onclick="_mntAnnuler(\''+r.id+'\')" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;color:var(--text2);background:white;cursor:pointer">Annuler</button>'
+              :
+              (!isAnnule?'<button onclick="_mntEditer(\''+r.id+'\',\''+escape_html(r.source||'maintenance')+'\','+(r.cout||0)+',\''+escape_html((r.notes||'').replace(/'/g,'\\\'').replace(/\n/g,' '))+'\')" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:11px;font-weight:600;color:var(--text2);background:white;cursor:pointer">✏️ Modifier</button>':'')
+            )+
           '</div>'+
-          (r.photo_url?'<div style="margin-top:8px"><a href="'+r.photo_url+'" target="_blank"><img src="'+r.photo_url+'" style="max-width:100%;max-height:160px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" onerror="this.style.display=\'none\'"></a></div>':'')+
         '</div>'+
       '</div>'+
-      '<div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
-        (isPlanifie?
-          '<button onclick="_mntMarquerRealise(\''+r.id+'\')" style="flex:1;padding:8px;border:1.5px solid var(--vert-border);border-radius:8px;font-size:12px;font-weight:600;color:var(--vert);background:var(--vert-pale);cursor:pointer">✅ Marquer réalisé</button>'+
-          '<button onclick="_mntAnnuler(\''+r.id+'\')" style="padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;color:var(--text2);background:white;cursor:pointer">Annuler</button>'
-          :
-          (!isAnnule?'<button onclick="_mntEditer(\''+r.id+'\',\''+escape_html(r.source||'maintenance')+'\','+(r.cout||0)+',\''+escape_html((r.notes||'').replace(/'/g,'\\\'').replace(/\n/g,' '))+'\')" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:11px;font-weight:600;color:var(--text2);background:white;cursor:pointer">✏️ Modifier</button>':'')
-        )+
-      '</div>'+
-      '</div>'+ // close padding div
     '</div>';
   }
-
+  var displayRows=rows.filter(function(r){
+    if(r.type==='panne')return false;
+    if(_mntFilter!=='tous'&&r.type!==_mntFilter)return false;
+    return true;
+  });
   var cardsHtml='';
-  if(!filtered.length){
-    cardsHtml='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px;opacity:.4">🔧</div><div style="font-size:14px">Aucune opération.</div></div>';
-  } else {
-    var aVenir=filtered.filter(function(r){return r.statut==='planifie';});
-    var realises=filtered.filter(function(r){return r.statut!=='planifie';});
-    var aVenirHtml=aVenir.length?
-      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">À venir</div>'+
-      aVenir.map(renderMntCard).join('')+
-      (realises.length?'<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin:14px 0 8px">Réalisées</div>':''):'';
-    cardsHtml=aVenirHtml+realises.map(renderMntCard).join('');
+  if(!displayUpcoming.length&&!displayRows.length){
+    cardsHtml='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px;opacity:.4">🔧</div><div style="font-size:14px">Aucune opération sur cette période.</div></div>';
+  }else{
+    var sectionPlan=displayUpcoming.length?
+      '<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">À venir</div>'+
+      displayUpcoming.map(renderMntCard).join(''):'';
+    var sectionReal=displayRows.length?
+      (displayUpcoming.length?'<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;margin:14px 0 8px">Réalisées</div>':'')+
+      displayRows.map(renderMntCard).join(''):'';
+    cardsHtml=sectionPlan+sectionReal;
   }
-
-  return '<div>'+kpiHtml+filterHtml+cardsHtml+
+  return kpiHtml+filtersHtml+bannerHtml+cardsHtml+
     '<div style="text-align:center;margin-top:12px">'+
       '<button onclick="_mntCreer(\''+sid+'\')" style="padding:9px 18px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:700;color:var(--dark);cursor:pointer">＋ Nouvelle opération</button>'+
-    '</div>'+
-  '</div>';
+    '</div>';
 }
 
 function _setMntFilter(f){
