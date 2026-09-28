@@ -7221,7 +7221,7 @@ async function _dtRapport(sids,session){
   var sitesData={};
   sids.forEach(function(sid){sitesData[sid]={nom:siteMap[sid]||sid,litres:0,coutCarb:0,pannes:0,coutPannes:0,mntCout:0,rondes:0};});
   pleins.forEach(function(p){if(sitesData[p.site_id]){sitesData[p.site_id].litres+=Number(p.litres_ajoutes)||0;sitesData[p.site_id].coutCarb+=Number(p.cout)||0;}});
-  maintenances.forEach(function(m){if(sitesData[m.groupe_id])sitesData[m.groupe_id].mntCout+=Number(m.cout)||0;});
+  maintenances.forEach(function(m){if(sitesData[m.groupe_id]&&m.type!=='ravitaillement')sitesData[m.groupe_id].mntCout+=Number(m.cout)||0;});
   signalements.forEach(function(s){if(sitesData[s.groupe_id]){sitesData[s.groupe_id].pannes++;sitesData[s.groupe_id].coutPannes+=Number(s.cout_intervention)||0;}});
   rondes.forEach(function(r){if(sitesData[r.site_id])sitesData[r.site_id].rondes++;});
   var totLitres=0,totCarb=0,totPannes=0,totCoutPannes=0,totMnt=0;
@@ -8734,7 +8734,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   var siteData={};
   sites.forEach(function(s){siteData[s.id]={nom:s.nom,litres:0,coutCarb:0,pannes:0,pannesTot:0,panneCout:0,mntCout:0,mntCount:0,rondes:0,rondesVal:0,rondesTot:0,mttrH:[],mttr:null};});
   pleins.forEach(function(p){if(siteData[p.site_id]){siteData[p.site_id].litres+=Number(p.litres_ajoutes)||0;siteData[p.site_id].coutCarb+=Number(p.cout)||0;}});
-  maintenances.forEach(function(m){if(siteData[m.groupe_id]){siteData[m.groupe_id].mntCout+=Number(m.cout)||0;siteData[m.groupe_id].mntCount++;}});
+  maintenances.forEach(function(m){if(siteData[m.groupe_id]){if(m.type!=='ravitaillement')siteData[m.groupe_id].mntCout+=Number(m.cout)||0;siteData[m.groupe_id].mntCount++;}});
   signalements.forEach(function(s){if(siteData[s.groupe_id]){siteData[s.groupe_id].pannesTot++;if(s.statut!=='resolu')siteData[s.groupe_id].pannes++;siteData[s.groupe_id].panneCout+=Number(s.cout_intervention)||0;if(s.statut==='resolu'&&s.created_at&&s.resolved_at){var ttr=(new Date(s.resolved_at)-new Date(s.created_at))/3600000;if(ttr>=0)siteData[s.groupe_id].mttrH.push(ttr);}}});
   var reByRonde={};rondesEq.forEach(function(re){if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];reByRonde[re.ronde_id].push(re);});
   rondes.forEach(function(r){if(siteData[r.site_id]){siteData[r.site_id].rondes++;var eq=reByRonde[r.id]||[];siteData[r.site_id].rondesTot+=eq.length;siteData[r.site_id].rondesVal+=eq.filter(function(re){return re.statut==='valide';}).length;}});
@@ -9202,7 +9202,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   var tauxRondes=totalTot>0?Math.round(totalVal/totalTot*100):null;
   var nbSgOuverts=signalements.filter(function(s){return s.statut!=='resolu';}).length;
   var nbSgResolus=signalements.filter(function(s){return s.statut==='resolu';}).length;
-  var coutTotal=maintenances.reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
+  var coutTotal=maintenances.filter(function(m){return m.type!=='ravitaillement';}).reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
   var nbMaintenances=maintenances.length;
   var cuves=equips.filter(function(e){return e.capacite_litres!=null;});
   var ges=equips.filter(function(e){return e.conso_theorique_lh!=null&&e.capacite_litres==null;});
