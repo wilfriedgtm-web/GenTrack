@@ -326,6 +326,7 @@ var _configSecondaryCollapsed=true; // section équipements sans suivi, réduite
 var _energieCfgWizardStep=0; // 0=choix template 1=personnalisation
 var _energieCfgWizardTemplate=null; // '1_index'|'2_jour_nuit'|'3_hc_hp_pointe'|'aucun'
 var _energieCfgWizardRows=[]; // [{nom,unite,type_valeur,seuil_alerte_bas,objectif_mensuel,actif}]
+var _energieCfgWizardSousFluides=[]; // sous-compteurs sélectionnés [{nom,unite,type_valeur,groupe}]
 
 function $id(id){return document.getElementById(id);}
 function app(){return $id('app');}
@@ -10180,6 +10181,47 @@ async function _energieEditNote(releveId,currentNote){
   if(inp){inp.focus();inp.select();}
 }
 
+async function _energieSaveNbChambres(sid){
+  var inp=document.getElementById('ecfg-nb-chambres');
+  var msg=document.getElementById('ecfg-nb-msg');
+  if(!inp)return;
+  var val=inp.value.trim();
+  var nb=val!==''?parseInt(val):null;
+  if(nb!=null&&(nb<1||nb>9999)){alert('Valeur entre 1 et 9999.');return;}
+  var ok=await supaPatch('sites',sid,{nb_chambres:nb});
+  if(ok){if(msg){msg.style.display='inline';setTimeout(function(){msg.style.display='none';},2000);}}
+  else{alert('Erreur lors de l\'enregistrement.');}
+}
+
+async function _energieSaveToPct(sid){
+  var dateEl=document.getElementById('to-date-inp');
+  var pctEl=document.getElementById('to-pct-inp');
+  var msgEl=document.getElementById('to-save-msg');
+  if(!dateEl||!pctEl)return;
+  var dateVal=dateEl.value.trim();
+  var pctVal=pctEl.value.trim();
+  if(!dateVal){alert('Date requise.');return;}
+  var pctNum=pctVal!==''?parseFloat(pctVal):null;
+  if(pctNum!=null&&(pctNum<0||pctNum>100)){alert('Le TO% doit être entre 0 et 100.');return;}
+  // Chercher si un relevé existe pour cette date
+  var existing=await supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=eq.'+dateVal+'&select=id&limit=1');
+  var ok=false;
+  if(existing&&existing.length){
+    ok=await supaPatch('releves_energie',existing[0].id,{to_percent:pctNum});
+  }else{
+    // Créer un relevé minimal pour cette date avec uniquement to_percent
+    var row=await supaPost('releves_energie',{site_id:sid,date_releve:dateVal,valeurs:{},to_percent:pctNum,saisi_par:(_session&&_session.contact&&_session.contact.nom)||null});
+    ok=!!row;
+  }
+  if(ok){
+    if(msgEl){msgEl.style.display='inline';setTimeout(function(){msgEl.style.display='none';},2500);}
+    // Refresh onglet
+    setTimeout(function(){if(_session)renderRespTech(_session,'energie');},300);
+  }else{
+    alert('Erreur lors de l\'enregistrement du TO%.');
+  }
+}
+
 async function _energieSaveNote(releveId,newNote){
   await supaPatch('releves_energie',releveId,{note:newNote||null});
   var cell=document.getElementById('enote-cell-'+releveId);
@@ -10332,8 +10374,8 @@ async function _rtEnergie(sid){
 
   var[fluides,relevesRows,siteRows,objsRows]=await Promise.all([
     supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,seuil_alerte_bas,objectif_mensuel,capacite,ordre,devise&order=ordre.asc'),
-    supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+moisDebut+'&select=id,date_releve,valeurs,saisi_par,note&order=date_releve.asc&limit=62'),
-    supaGet('sites','id=eq.'+sid+'&select=nom&limit=1'),
+    supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+moisDebut+'&select=id,date_releve,valeurs,saisi_par,note,to_percent&order=date_releve.asc&limit=62'),
+    supaGet('sites','id=eq.'+sid+'&select=nom,nb_chambres&limit=1'),
     supaGet('objectifs_energie','site_id=eq.'+sid+'&select=id,fluide_id,valeur,date_debut,date_fin,note&order=date_debut.desc&limit=200')
   ]);
 
@@ -10353,6 +10395,7 @@ async function _rtEnergie(sid){
   window._energieObjsRows=objsRows||[];
 
   var siteNom=siteRows&&siteRows.length?siteRows[0].nom:'';
+  var nbChambres=siteRows&&siteRows.length&&siteRows[0].nb_chambres?parseInt(siteRows[0].nb_chambres):null;
   _energieFluides=fluides||[];
   _energieReleves=(relevesRows||[]);
 
@@ -10543,6 +10586,76 @@ async function _rtEnergie(sid){
   });
   tilesHtml+='</div>';
 
+  // ── KPI kWh/chambre + TO% ──
+  // Calculer kWh total mois = somme des fluides kWh (type index, unite kWh)
+  var kwhFluides=fluides.filter(function(f){return f.unite&&f.unite.toLowerCase()==='kwh'&&f.type_valeur==='index';});
+  var kwhTotalMois=0;var hasKwhData=false;
+  kwhFluides.forEach(function(f){var c=consoMoisByFluide[f.id];if(c!=null){kwhTotalMois+=c;hasKwhData=true;}});
+  // m³ total mois
+  var m3Fluides=fluides.filter(function(f){return f.unite&&f.unite.toLowerCase()==='m³'&&f.type_valeur==='index';});
+  var m3TotalMois=0;var hasM3Data=false;
+  m3Fluides.forEach(function(f){var c=consoMoisByFluide[f.id];if(c!=null){m3TotalMois+=c;hasM3Data=true;}});
+  // TO% moyen du mois (moyenne des to_percent des relevés)
+  var toValues=relevesAsc.map(function(r){return r.to_percent!=null?parseFloat(r.to_percent):null;}).filter(function(v){return v!=null;});
+  var toMoyenPct=toValues.length?Math.round(toValues.reduce(function(a,b){return a+b;},0)/toValues.length*10)/10:null;
+  // Releve du jour : to_percent
+  var todayReleve=releveByDate[today];
+  var toPctToday=todayReleve&&todayReleve.to_percent!=null?parseFloat(todayReleve.to_percent):null;
+
+  // KPI tiles (kWh/chambre, m³/chambre) — only if nb_chambres and TO% known
+  var kpiHtml='';
+  if(nbChambres&&(hasKwhData||hasM3Data)){
+    var toForKpi=toMoyenPct!=null?toMoyenPct:(toPctToday!=null?toPctToday:null);
+    var chambresOcc=toForKpi!=null?Math.round(nbChambres*toForKpi/100):null;
+    kpiHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px">';
+    if(hasKwhData&&nbChambres){
+      var kwhParChambre=chambresOcc?Math.round(kwhTotalMois/chambresOcc*10)/10:null;
+      kpiHtml+='<div style="background:white;border:1.5px solid #dbeafe;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px">'+
+        '<div style="font-size:10px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.5px">⚡ kWh / chambre occupée</div>'+
+        '<div style="font-size:28px;font-weight:800;color:var(--dark)">'+
+          (kwhParChambre!=null?kwhParChambre.toLocaleString('fr-FR')+'<span style="font-size:13px;font-weight:500;color:var(--text3);margin-left:3px">kWh</span>':'<span style="font-size:14px;color:var(--text3)">— TO% requis</span>')+
+        '</div>'+
+        '<div style="font-size:10px;color:var(--text2)">'+(kwhTotalMois?Math.round(kwhTotalMois).toLocaleString('fr-FR')+' kWh total · ':'')+
+          (chambresOcc?chambresOcc+' ch. occ.'+' (TO '+toForKpi+'%)':
+           (nbChambres?nbChambres+' ch. · TO% non saisi':''))+
+        '</div>'+
+      '</div>';
+    }
+    if(hasM3Data&&nbChambres){
+      var m3ParChambre=chambresOcc?Math.round(m3TotalMois/chambresOcc*100)/100:null;
+      kpiHtml+='<div style="background:white;border:1.5px solid #d1fae5;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px">'+
+        '<div style="font-size:10px;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:.5px">💧 m³ / chambre occupée</div>'+
+        '<div style="font-size:28px;font-weight:800;color:var(--dark)">'+
+          (m3ParChambre!=null?m3ParChambre.toLocaleString('fr-FR')+'<span style="font-size:13px;font-weight:500;color:var(--text3);margin-left:3px">m³</span>':'<span style="font-size:14px;color:var(--text3)">— TO% requis</span>')+
+        '</div>'+
+        '<div style="font-size:10px;color:var(--text2)">'+(m3TotalMois?Math.round(m3TotalMois*10)/10+' m³ total · ':'')+
+          (chambresOcc?chambresOcc+' ch. occ.'+' (TO '+toForKpi+'%)':
+           (nbChambres?nbChambres+' ch. · TO% non saisi':''))+
+        '</div>'+
+      '</div>';
+    }
+    kpiHtml+='</div>';
+  }
+
+  // ── TO% quick-entry panel ──
+  var toPanelHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">'+
+    '<div style="font-size:13px;font-weight:700;color:var(--dark);white-space:nowrap">🏨 Taux d\'occupation</div>'+
+    '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px;flex-wrap:wrap">'+
+      '<label style="font-size:11px;color:var(--text2);white-space:nowrap">Date</label>'+
+      '<input id="to-date-inp" type="date" value="'+today+'" '+
+        'style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px"/>'+
+      '<label style="font-size:11px;color:var(--text2);white-space:nowrap">TO%</label>'+
+      '<input id="to-pct-inp" type="number" min="0" max="100" step="0.1" placeholder="ex: 72.5" '+
+        'value="'+(toPctToday!=null?toPctToday:'')+'" '+
+        'style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;width:90px"/>'+
+      '<button onclick="_energieSaveToPct(\''+sid+'\')" '+
+        'style="background:var(--amber);color:white;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Enregistrer</button>'+
+      '<span id="to-save-msg" style="font-size:11px;color:var(--vert);display:none">✓ Sauvegardé</span>'+
+    '</div>'+
+    (toMoyenPct!=null?'<div style="font-size:11px;color:var(--text3);white-space:nowrap">Moy. mois : <strong style="color:var(--dark)">'+toMoyenPct+'%</strong></div>':
+     '<div style="font-size:11px;color:var(--text3)">Aucun TO% saisi ce mois</div>')+
+  '</div>';
+
   // ── BAR CHART + PANEL OBJECTIFS (2 colonnes) ──
   var chartTabsHtml=fluides.map(function(f){
     var isFirst=fluides[0].id===f.id;
@@ -10628,13 +10741,14 @@ async function _rtEnergie(sid){
           _fluidIcon(f)+' '+escape_html(f.nom)+(f.unite?' ('+escape_html(f.unite)+')':'')+
         '</th>';
       }).join('')+
+      '<th style="padding:8px 10px;text-align:right;color:var(--text2);font-weight:600;white-space:nowrap">TO%</th>'+
       '<th style="padding:8px 10px;text-align:left;color:var(--text2);font-weight:600;white-space:nowrap">Saisie par</th>'+
       '<th style="padding:8px 10px;text-align:left;color:var(--text2);font-weight:600;white-space:nowrap">Note</th>'+
       '<th style="padding:8px 10px;text-align:center;color:var(--text2);font-weight:600;white-space:nowrap">Statut</th>'+
     '</tr></thead><tbody>';
 
   if(!relevesDesc.length){
-    tblHtml+='<tr><td colspan="'+(3+fluides.length+2)+'" style="padding:24px;text-align:center;color:var(--text3)">Aucun relevé ce mois</td></tr>';
+    tblHtml+='<tr><td colspan="'+(3+fluides.length+3)+'" style="padding:24px;text-align:center;color:var(--text3)">Aucun relevé ce mois</td></tr>';
   }
   relevesDesc.forEach(function(r,ri){
     var isToday=r.date_releve===today;
@@ -10664,6 +10778,9 @@ async function _rtEnergie(sid){
           deltaStr+
         '</td>';
       }).join('')+
+      '<td style="padding:8px 10px;text-align:right;color:'+(r.to_percent!=null?'var(--dark)':'var(--text3)')+'">'+
+        (r.to_percent!=null?parseFloat(r.to_percent).toLocaleString('fr-FR')+'%':'—')+
+      '</td>'+
       '<td style="padding:8px 10px;color:var(--text2);white-space:nowrap;font-size:10px">'+(r.saisi_par?escape_html(r.saisi_par):'—')+'</td>'+
       '<td id="enote-cell-'+r.id+'" style="padding:8px 10px;min-width:100px">'+
         '<span id="enote-span-'+r.id+'" onclick="_energieEditNote(\''+r.id+'\',\''+escape_html(r.note||'')+'\''+')" '+
@@ -10706,7 +10823,7 @@ async function _rtEnergie(sid){
     if(_energieCurrentFluide)_renderEnergieChart(_energieCurrentFluide);
   },50);
 
-  return headerHtml+tilesHtml+chartHtml+tblHtml;
+  return headerHtml+toPanelHtml+tilesHtml+kpiHtml+chartHtml+tblHtml;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -10716,10 +10833,12 @@ async function _rtEnergie(sid){
 var _ECFG_COLS='30px 1fr 70px 90px 65px 85px 80px 80px 44px';
 
 async function _buildEnergieConfigTab(sid){
-  var[fluides,objsRows]=await Promise.all([
+  var[fluides,objsRows,siteRows]=await Promise.all([
     supaGet('energie_config','site_id=eq.'+sid+'&select=id,nom,unite,type_valeur,tarif,seuil_alerte_bas,capacite,actif,ordre,devise&order=ordre.asc'),
-    supaGet('objectifs_energie','site_id=eq.'+sid+'&select=id,fluide_id,valeur,date_debut,date_fin,note&order=date_debut.desc&limit=200')
+    supaGet('objectifs_energie','site_id=eq.'+sid+'&select=id,fluide_id,valeur,date_debut,date_fin,note&order=date_debut.desc&limit=200'),
+    supaGet('sites','id=eq.'+sid+'&select=nb_chambres&limit=1')
   ]);
+  var nbChambresConfig=siteRows&&siteRows.length&&siteRows[0].nb_chambres!=null?siteRows[0].nb_chambres:'';
 
   // Cache pour les modals
   window._energieCfgFluides=fluides||[];
@@ -10743,7 +10862,7 @@ async function _buildEnergieConfigTab(sid){
   }
 
   // ── Header (fluides déjà configurés) ──
-  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">'+
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px">'+
     '<div>'+
       '<div style="font-size:15px;font-weight:700;color:var(--text)">⚡ Fluides &amp; énergie</div>'+
       '<div style="font-size:11px;color:var(--text3);margin-top:3px">Configurez les fluides suivis, leurs tarifs et objectifs mensuels</div>'+
@@ -10757,6 +10876,18 @@ async function _buildEnergieConfigTab(sid){
         'style="background:var(--amber);color:white;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">'+
         '<span style="font-size:16px;line-height:1">+</span> Ajouter un fluide'+
       '</button>'+
+    '</div>'+
+  '</div>'+
+  // ── Paramètre site : nb_chambres ──
+  '<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--dark);white-space:nowrap">🏨 Nb. de chambres</div>'+
+    '<div style="font-size:11px;color:var(--text3)">Utilisé pour calculer kWh/chambre occupée et m³/chambre</div>'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-left:auto">'+
+      '<input id="ecfg-nb-chambres" type="number" min="1" max="9999" placeholder="ex: 120" value="'+escape_html(''+nbChambresConfig)+'" '+
+        'style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;font-weight:700;width:90px;text-align:center"/>'+
+      '<button onclick="_energieSaveNbChambres(\''+sid+'\')" '+
+        'style="background:var(--amber);color:white;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer">Enregistrer</button>'+
+      '<span id="ecfg-nb-msg" style="font-size:11px;color:var(--vert);display:none">✓</span>'+
     '</div>'+
   '</div>';
 
@@ -10875,8 +11006,20 @@ var _ENERGIE_TEMPLATES={
 };
 var _ENERGIE_EXTRAS=[
   {nom:'Eau bâche potable',unite:'m³',type_valeur:'index',seuil_alerte_bas:null,objectif_mensuel:null},
-  {nom:'Citerne gasoil (GE)',unite:'%',type_valeur:'instantane',seuil_alerte_bas:30,objectif_mensuel:null},
-  {nom:'Cos phi réseau',unite:null,type_valeur:'instantane',seuil_alerte_bas:0.85,objectif_mensuel:null}
+  {nom:'Citerne gasoil (GE)',unite:'L',type_valeur:'instantane',seuil_alerte_bas:500,objectif_mensuel:null},
+  {nom:'Gaz butane (citerne)',unite:'L',type_valeur:'instantane',seuil_alerte_bas:500,objectif_mensuel:null},
+  {nom:'Cos phi réseau',unite:null,type_valeur:'instantane',seuil_alerte_bas:0.85,objectif_mensuel:null},
+  {nom:'Réactif réseau',unite:'kvar',type_valeur:'index',seuil_alerte_bas:null,objectif_mensuel:null}
+];
+var _ENERGIE_SOUSFLUIDES=[
+  {nom:'Élec Buanderie',unite:'kWh',type_valeur:'index',groupe:'Buanderie'},
+  {nom:'Eau Buanderie',unite:'m³',type_valeur:'index',groupe:'Buanderie'},
+  {nom:'Élec Spa / Fitness',unite:'kWh',type_valeur:'index',groupe:'Spa'},
+  {nom:'Eau Spa / Fitness',unite:'m³',type_valeur:'index',groupe:'Spa'},
+  {nom:'Élec Cuisine',unite:'kWh',type_valeur:'index',groupe:'Cuisine'},
+  {nom:'Eau Cuisine',unite:'m³',type_valeur:'index',groupe:'Cuisine'},
+  {nom:'Eau Piscine',unite:'m³',type_valeur:'index',groupe:'Piscine'},
+  {nom:'Eau Jardins / Espaces verts',unite:'m³',type_valeur:'index',groupe:'Jardins'}
 ];
 
 function _energieCfgWizardHtml(sid){
@@ -10929,6 +11072,7 @@ function _energieCfgWizardSelectTemplate(key,sid){
   var baseRows=key==='aucun'?[]:(_ENERGIE_TEMPLATES[key]||[]).map(function(r){return Object.assign({},r,{actif:true});});
   var extrasRows=_ENERGIE_EXTRAS.map(function(r){return Object.assign({},r,{actif:true});});
   _energieCfgWizardRows=baseRows.concat(extrasRows);
+  _energieCfgWizardSousFluides=[];
   if(_session)renderRespTech(_session,'config');
 }
 
@@ -10936,6 +11080,7 @@ function _energieCfgWizardReset(sid){
   _energieCfgWizardStep=0;
   _energieCfgWizardTemplate=null;
   _energieCfgWizardRows=[];
+  _energieCfgWizardSousFluides=[];
   // Note admin : reset supprime les fluides existants côté UX mais ne DELETE pas en DB
   if(!window.confirm('Réinitialiser la configuration avec un nouveau modèle ?\n\nVos fluides actuels seront conservés en base — vous pourrez les supprimer manuellement si besoin.'))return;
   if(_session)renderRespTech(_session,'config');
@@ -10961,6 +11106,40 @@ function _energieCfgWizardStep1Html(sid){
     '</tr>';
   }).join('');
 
+  // ── Sous-compteurs section ──
+  var groupes={};
+  _ENERGIE_SOUSFLUIDES.forEach(function(sf){
+    if(!groupes[sf.groupe])groupes[sf.groupe]=[];
+    groupes[sf.groupe].push(sf);
+  });
+  var groupeKeys=Object.keys(groupes);
+  var sousFluidesSectionHtml='<div style="margin-top:22px;border:1.5px solid var(--border);border-radius:10px;background:white;overflow:hidden">'+
+    '<div style="padding:12px 14px;background:var(--creme);border-bottom:1px solid var(--border)">'+
+      '<div style="font-size:12px;font-weight:700;color:var(--dark)">Sous-compteurs par département <span style="font-size:10px;font-weight:400;color:var(--text3)">(optionnel)</span></div>'+
+      '<div style="font-size:11px;color:var(--text2);margin-top:2px">Cochez les sous-compteurs disponibles dans cet hôtel. Ils seront ajoutés comme fluides supplémentaires.</div>'+
+    '</div>'+
+    '<div style="padding:12px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px">'+
+    groupeKeys.map(function(gKey){
+      var icons={'Buanderie':'🧺','Spa':'💧','Cuisine':'🍳','Piscine':'🏊','Jardins':'🌿'};
+      var icon=icons[gKey]||'📊';
+      var sfHtml=groupes[gKey].map(function(sf,sfi){
+        var sfIdx=_ENERGIE_SOUSFLUIDES.indexOf(sf);
+        var isSelected=_energieCfgWizardSousFluides.some(function(x){return x.nom===sf.nom;});
+        return '<label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:4px 0">'+
+          '<input type="checkbox" '+(isSelected?'checked':'')+' onchange="_energieCfgWizardToggleSousFluide('+sfIdx+',this.checked)" style="cursor:pointer"/>'+
+          '<span style="font-size:11px;color:var(--text)">'+escape_html(sf.nom)+
+            '<span style="color:var(--text3);font-size:10px"> '+escape_html(sf.unite||'')+'</span>'+
+          '</span>'+
+        '</label>';
+      }).join('');
+      return '<div>'+
+        '<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">'+icon+' '+escape_html(gKey)+'</div>'+
+        sfHtml+
+      '</div>';
+    }).join('')+
+    '</div>'+
+  '</div>';
+
   return '<div style="max-width:900px">'+
     '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:12px">Étape 2 — Personnaliser les fluides</div>'+
     '<div style="font-size:12px;color:var(--text2);margin-bottom:14px">Renommez, ajustez les seuils et objectifs. Décochez les fluides à ne pas suivre.</div>'+
@@ -10980,6 +11159,7 @@ function _energieCfgWizardStep1Html(sid){
       '<button onclick="_energieCfgWizardAddRow(\''+sid+'\')" '+
         'style="background:none;border:1px dashed var(--border);border-radius:6px;padding:6px 14px;font-size:11px;color:var(--text2);cursor:pointer">+ Ajouter un fluide</button>'+
     '</div>'+
+    sousFluidesSectionHtml+
     '<div style="display:flex;gap:10px;margin-top:18px;align-items:center">'+
       '<button onclick="_energieCfgWizardBack(\''+sid+'\')" '+
         'style="background:none;border:1.5px solid var(--border);border-radius:8px;padding:9px 16px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer">← Retour</button>'+
@@ -11001,10 +11181,22 @@ function _energieCfgWizardAddRow(sid){
   if(_session)renderRespTech(_session,'config');
 }
 
+function _energieCfgWizardToggleSousFluide(idx,checked){
+  var sf=_ENERGIE_SOUSFLUIDES[idx];
+  if(!sf)return;
+  if(checked){
+    var already=_energieCfgWizardSousFluides.some(function(x){return x.nom===sf.nom;});
+    if(!already)_energieCfgWizardSousFluides.push(sf);
+  }else{
+    _energieCfgWizardSousFluides=_energieCfgWizardSousFluides.filter(function(x){return x.nom!==sf.nom;});
+  }
+}
+
 function _energieCfgWizardBack(sid){
   _energieCfgWizardStep=0;
   _energieCfgWizardTemplate=null;
   _energieCfgWizardRows=[];
+  _energieCfgWizardSousFluides=[];
   if(_session)renderRespTech(_session,'config');
 }
 
@@ -11031,6 +11223,20 @@ async function _energieCfgWizardSaveAll(sid){
       ordre:toSave.length+1
     });
   }
+  // Ajouter les sous-compteurs sélectionnés
+  _energieCfgWizardSousFluides.forEach(function(sf){
+    toSave.push({
+      site_id:sid,
+      nom:sf.nom,
+      unite:sf.unite||null,
+      type_valeur:sf.type_valeur||'index',
+      seuil_alerte_bas:null,
+      objectif_mensuel:null,
+      actif:true,
+      ordre:toSave.length+1
+    });
+  });
+
   if(!toSave.length){alert('Aucun fluide actif à enregistrer.');return;}
   var btn=document.getElementById('ewiz-save-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳ Enregistrement…';}
@@ -11048,6 +11254,7 @@ async function _energieCfgWizardSaveAll(sid){
   _energieCfgWizardStep=0;
   _energieCfgWizardTemplate=null;
   _energieCfgWizardRows=[];
+  _energieCfgWizardSousFluides=[];
   if(_session)renderRespTech(_session,'config');
 }
 
