@@ -323,6 +323,9 @@ var _configSelectedEqId=null;
 var _configCurrentTab='equipements';
 var _configEquipCache={}; // id → equip object, évite les problèmes d'échappement dans onclick
 var _configSecondaryCollapsed=true; // section équipements sans suivi, réduite par défaut
+var _energieCfgWizardStep=0; // 0=choix template 1=personnalisation
+var _energieCfgWizardTemplate=null; // '1_index'|'2_jour_nuit'|'3_hc_hp_pointe'|'aucun'
+var _energieCfgWizardRows=[]; // [{nom,unite,type_valeur,seuil_alerte_bas,objectif_mensuel,actif}]
 
 function $id(id){return document.getElementById(id);}
 function app(){return $id('app');}
@@ -492,7 +495,7 @@ function _goToSignalement(sgId){
 
 function navTo(id){
   if(!_session)return;
-  if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;_zonesWizardStep=0;}
+  if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;_zonesWizardStep=0;_energieCfgWizardStep=0;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];}
   if(_session.role==='resp_tech')renderRespTech(_session,id);
   else if(_session.role==='dir_tech'){
     if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,id);
@@ -5303,6 +5306,7 @@ async function _moveQ(qId, freqKey, dir){
 
 function _switchConfigTab(tab){
   _configCurrentTab=tab;
+  if(tab!=='energie'){_energieCfgWizardStep=0;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];}
   if(!_session)return;
   renderRespTech(_session,'config');
 }
@@ -10732,24 +10736,32 @@ async function _buildEnergieConfigTab(sid){
 
   var h='<div style="max-width:920px">';
 
-  // ── Header ──
+  // ── Si aucun fluide : afficher le wizard ──
+  if(!fluides||!fluides.length){
+    h+=_energieCfgWizardHtml(sid);
+    return h+'</div>';
+  }
+
+  // ── Header (fluides déjà configurés) ──
   h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">'+
     '<div>'+
       '<div style="font-size:15px;font-weight:700;color:var(--text)">⚡ Fluides &amp; énergie</div>'+
       '<div style="font-size:11px;color:var(--text3);margin-top:3px">Configurez les fluides suivis, leurs tarifs et objectifs mensuels</div>'+
     '</div>'+
-    '<button onclick="_energieCfgAjouterModal(\''+sid+'\')" '+
-      'style="background:var(--amber);color:white;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">'+
-      '<span style="font-size:16px;line-height:1">+</span> Ajouter un fluide'+
-    '</button>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="_energieCfgWizardReset(\''+sid+'\')" '+
+        'style="background:white;color:var(--text2);border:1.5px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer">'+
+        '🔄 Réinitialiser avec un modèle'+
+      '</button>'+
+      '<button onclick="_energieCfgAjouterModal(\''+sid+'\')" '+
+        'style="background:var(--amber);color:white;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px">'+
+        '<span style="font-size:16px;line-height:1">+</span> Ajouter un fluide'+
+      '</button>'+
+    '</div>'+
   '</div>';
 
-  if(!fluides||!fluides.length){
-    h+='<div style="text-align:center;padding:48px;color:var(--text3);font-size:13px">'+
-      'Aucun fluide configuré.<br>Cliquez sur <strong>+ Ajouter un fluide</strong> pour commencer.'+
-    '</div>';
-  }else{
-    h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px">';
+  // Fluides existants — affichage en cards
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px">';
 
     (fluides||[]).forEach(function(f){
       var fJs=f.id.replace(/'/g,"\\'");
@@ -10836,7 +10848,6 @@ async function _buildEnergieConfigTab(sid){
     });
 
     h+='</div>'; // end grid
-  }
 
   // ── Légende ──
   h+='<div style="margin-top:20px;font-size:10px;color:var(--text3);padding:10px 14px;background:var(--bg2);border-radius:8px">'+
@@ -10845,6 +10856,199 @@ async function _buildEnergieConfigTab(sid){
   '</div>';
 
   return h+'</div>';
+}
+
+/* ── Wizard templates énergie ── */
+var _ENERGIE_TEMPLATES={
+  '1_index':[
+    {nom:'Électricité',unite:'kWh',type_valeur:'index',seuil_alerte_bas:null,objectif_mensuel:null}
+  ],
+  '2_jour_nuit':[
+    {nom:'Électricité Jour (K1)',unite:'kWh',type_valeur:'index',seuil_alerte_bas:null,objectif_mensuel:null},
+    {nom:'Électricité Nuit (K2)',unite:'kWh',type_valeur:'index',seuil_alerte_bas:null,objectif_mensuel:null}
+  ],
+  '3_hc_hp_pointe':[
+    {nom:'Heures creuses',unite:'kWh',type_valeur:'index',seuil_alerte_bas:null,objectif_mensuel:null},
+    {nom:'Heures pleines',unite:'kWh',type_valeur:'index',seuil_alerte_bas:null,objectif_mensuel:null},
+    {nom:'Pointe',unite:'kWh',type_valeur:'index',seuil_alerte_bas:null,objectif_mensuel:null}
+  ]
+};
+var _ENERGIE_EXTRAS=[
+  {nom:'Eau bâche potable',unite:'m³',type_valeur:'index',seuil_alerte_bas:null,objectif_mensuel:null},
+  {nom:'Citerne gasoil (GE)',unite:'%',type_valeur:'instantane',seuil_alerte_bas:30,objectif_mensuel:null},
+  {nom:'Cos phi réseau',unite:null,type_valeur:'instantane',seuil_alerte_bas:0.85,objectif_mensuel:null}
+];
+
+function _energieCfgWizardHtml(sid){
+  if(_energieCfgWizardStep===0){
+    return _energieCfgWizardStep0Html(sid);
+  }
+  if(_energieCfgWizardStep===1){
+    return _energieCfgWizardStep1Html(sid);
+  }
+  return '';
+}
+
+function _energieCfgWizardStep0Html(sid){
+  var tmpl=[
+    {key:'1_index',title:'1 index',desc:'Un seul compteur (ex. SENELEC monophasé)',tag:'Hôtel simple'},
+    {key:'2_jour_nuit',title:'2 index Jour / Nuit',desc:'K1 Jour + K2 Nuit (bi-horaire SENELEC)',tag:'Standard'},
+    {key:'3_hc_hp_pointe',title:'3 index HC / HP / Pointe',desc:'Heures creuses + HP + Pointe (CIE Abidjan, ENEO)',tag:'Grands hôtels'}
+  ];
+  var cards=tmpl.map(function(t){
+    return '<div onclick="_energieCfgWizardSelectTemplate(\''+t.key+'\',\''+sid+'\')" '+
+      'style="border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .15s;background:white" '+
+      'onmouseover="this.style.borderColor=\'var(--amber)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:5px">⚡ '+t.title+'</div>'+
+      '<div style="font-size:11px;color:var(--text2);line-height:1.5;margin-bottom:8px">'+t.desc+'</div>'+
+      '<span style="font-size:10px;background:var(--amber-pale);color:var(--amber-dark);border-radius:4px;padding:2px 8px;font-weight:600">'+t.tag+'</span>'+
+    '</div>';
+  }).join('');
+
+  return '<div style="max-width:680px">'+
+    '<div style="text-align:center;padding:24px 0 20px">'+
+      '<div style="font-size:32px;margin-bottom:8px">⚡</div>'+
+      '<div style="font-size:16px;font-weight:700;color:var(--text)">Configurer les relevés énergie</div>'+
+      '<div style="font-size:13px;color:var(--text2);margin-top:4px">Commencez par choisir le type de compteur électrique sur ce site.</div>'+
+    '</div>'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">Étape 1 — Type de compteur électrique</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">'+cards+'</div>'+
+    '<div style="text-align:center;margin-top:8px">'+
+      '<button onclick="_energieCfgWizardSelectTemplate(\'aucun\',\''+sid+'\')" '+
+        'style="background:none;border:none;font-size:12px;color:var(--text3);cursor:pointer;text-decoration:underline">'+
+        'Pas d\'électricité de ville sur ce site →'+
+      '</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function _energieCfgWizardSelectTemplate(key,sid){
+  _energieCfgWizardTemplate=key;
+  _energieCfgWizardStep=1;
+  // Construire les rows
+  var baseRows=key==='aucun'?[]:(_ENERGIE_TEMPLATES[key]||[]).map(function(r){return Object.assign({},r,{actif:true});});
+  var extrasRows=_ENERGIE_EXTRAS.map(function(r){return Object.assign({},r,{actif:true});});
+  _energieCfgWizardRows=baseRows.concat(extrasRows);
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _energieCfgWizardReset(sid){
+  _energieCfgWizardStep=0;
+  _energieCfgWizardTemplate=null;
+  _energieCfgWizardRows=[];
+  // Note admin : reset supprime les fluides existants côté UX mais ne DELETE pas en DB
+  if(!window.confirm('Réinitialiser la configuration avec un nouveau modèle ?\n\nVos fluides actuels seront conservés en base — vous pourrez les supprimer manuellement si besoin.'))return;
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _energieCfgWizardStep1Html(sid){
+  var rows=_energieCfgWizardRows;
+  var rowsHtml=rows.map(function(r,i){
+    var actifCheck=r.actif?'checked':'';
+    var typOpts='<option value="index"'+(r.type_valeur==='index'?' selected':'')+'>Index</option>'+
+                '<option value="instantane"'+(r.type_valeur==='instantane'?' selected':'')+'>Instantané</option>';
+    return '<tr style="'+(r.actif?'':'opacity:0.45')+'" id="ewiz-row-'+i+'">'+
+      '<td style="padding:6px 8px">'+
+        '<input type="checkbox" '+actifCheck+' onchange="_energieCfgWizardRowToggle('+i+',this.checked)" style="margin-right:4px"/>'+
+      '</td>'+
+      '<td style="padding:6px 4px"><input id="ewiz-nom-'+i+'" type="text" class="cfg-form-input" style="font-size:12px;padding:5px 8px;min-width:160px" value="'+escape_html(r.nom||'')+'"></td>'+
+      '<td style="padding:6px 4px"><input id="ewiz-unite-'+i+'" type="text" class="cfg-form-input" style="font-size:12px;padding:5px 8px;width:70px" value="'+escape_html(r.unite||'')+'" placeholder="—"></td>'+
+      '<td style="padding:6px 4px">'+
+        '<select id="ewiz-type-'+i+'" class="cfg-form-input" style="font-size:12px;padding:5px 6px;width:108px">'+typOpts+'</select>'+
+      '</td>'+
+      '<td style="padding:6px 4px"><input id="ewiz-seuil-'+i+'" type="number" step="any" class="cfg-form-input" style="font-size:12px;padding:5px 8px;width:80px" value="'+(r.seuil_alerte_bas!=null?r.seuil_alerte_bas:'')+'" placeholder="—"></td>'+
+      '<td style="padding:6px 4px"><input id="ewiz-obj-'+i+'" type="number" step="any" class="cfg-form-input" style="font-size:12px;padding:5px 8px;width:90px" value="'+(r.objectif_mensuel!=null?r.objectif_mensuel:'')+'" placeholder="—"></td>'+
+    '</tr>';
+  }).join('');
+
+  return '<div style="max-width:900px">'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:12px">Étape 2 — Personnaliser les fluides</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:14px">Renommez, ajustez les seuils et objectifs. Décochez les fluides à ne pas suivre.</div>'+
+    '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:white">'+
+    '<table style="width:100%;border-collapse:collapse;font-size:12px">'+
+    '<thead><tr style="background:var(--creme)">'+
+      '<th style="padding:8px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);width:34px"></th>'+
+      '<th style="padding:8px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);text-align:left">Nom</th>'+
+      '<th style="padding:8px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);text-align:left">Unité</th>'+
+      '<th style="padding:8px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);text-align:left">Type</th>'+
+      '<th style="padding:8px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);text-align:left">Alerte si &lt;</th>'+
+      '<th style="padding:8px;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);text-align:left">Objectif/mois</th>'+
+    '</tr></thead>'+
+    '<tbody>'+rowsHtml+'</tbody>'+
+    '</table></div>'+
+    '<div style="margin-top:8px;text-align:right">'+
+      '<button onclick="_energieCfgWizardAddRow(\''+sid+'\')" '+
+        'style="background:none;border:1px dashed var(--border);border-radius:6px;padding:6px 14px;font-size:11px;color:var(--text2);cursor:pointer">+ Ajouter un fluide</button>'+
+    '</div>'+
+    '<div style="display:flex;gap:10px;margin-top:18px;align-items:center">'+
+      '<button onclick="_energieCfgWizardBack(\''+sid+'\')" '+
+        'style="background:none;border:1.5px solid var(--border);border-radius:8px;padding:9px 16px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer">← Retour</button>'+
+      '<button onclick="_energieCfgWizardSaveAll(\''+sid+'\')" id="ewiz-save-btn" '+
+        'style="background:var(--amber);color:white;border:none;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer">Enregistrer et activer</button>'+
+      '<span id="ewiz-save-msg" style="font-size:11px;color:var(--vert);display:none">✓ Enregistré !</span>'+
+    '</div>'+
+  '</div>';
+}
+
+function _energieCfgWizardRowToggle(i,checked){
+  _energieCfgWizardRows[i].actif=checked;
+  var row=document.getElementById('ewiz-row-'+i);
+  if(row)row.style.opacity=checked?'':'0.45';
+}
+
+function _energieCfgWizardAddRow(sid){
+  _energieCfgWizardRows.push({nom:'Nouveau fluide',unite:'',type_valeur:'index',seuil_alerte_bas:null,objectif_mensuel:null,actif:true});
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _energieCfgWizardBack(sid){
+  _energieCfgWizardStep=0;
+  _energieCfgWizardTemplate=null;
+  _energieCfgWizardRows=[];
+  if(_session)renderRespTech(_session,'config');
+}
+
+async function _energieCfgWizardSaveAll(sid){
+  // Lire les valeurs depuis le DOM
+  var rows=_energieCfgWizardRows;
+  var toSave=[];
+  for(var i=0;i<rows.length;i++){
+    var nomEl=document.getElementById('ewiz-nom-'+i);
+    var uniteEl=document.getElementById('ewiz-unite-'+i);
+    var typeEl=document.getElementById('ewiz-type-'+i);
+    var seuilEl=document.getElementById('ewiz-seuil-'+i);
+    var objEl=document.getElementById('ewiz-obj-'+i);
+    var nom=nomEl?nomEl.value.trim():'';
+    if(!nom||!rows[i].actif)continue;
+    toSave.push({
+      site_id:sid,
+      nom:nom,
+      unite:uniteEl&&uniteEl.value.trim()?uniteEl.value.trim():null,
+      type_valeur:typeEl?typeEl.value:'index',
+      seuil_alerte_bas:seuilEl&&seuilEl.value!==''?parseFloat(seuilEl.value):null,
+      objectif_mensuel:objEl&&objEl.value!==''?parseFloat(objEl.value):null,
+      actif:true,
+      ordre:toSave.length+1
+    });
+  }
+  if(!toSave.length){alert('Aucun fluide actif à enregistrer.');return;}
+  var btn=document.getElementById('ewiz-save-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Enregistrement…';}
+  // INSERT séquentiellement
+  var errors=0;
+  for(var j=0;j<toSave.length;j++){
+    var ok=await supaPost('energie_config',toSave[j]);
+    if(!ok)errors++;
+  }
+  if(errors>0){
+    alert(errors+' erreur(s) lors de l\'enregistrement. Vérifiez les données.');
+    if(btn){btn.disabled=false;btn.textContent='Enregistrer et activer';}
+    return;
+  }
+  _energieCfgWizardStep=0;
+  _energieCfgWizardTemplate=null;
+  _energieCfgWizardRows=[];
+  if(_session)renderRespTech(_session,'config');
 }
 
 /* ── Modal helpers énergie config ── */
