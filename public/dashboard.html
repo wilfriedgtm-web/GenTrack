@@ -10303,6 +10303,60 @@ async function _energieSaveNote(releveId,newNote){
   }
 }
 
+function _energieEditToPct(releveId, currentVal){
+  var cell=document.getElementById('eto-cell-'+releveId);
+  if(!cell)return;
+  // Stocker la valeur d'origine pour annulation
+  cell.setAttribute('data-orig',currentVal!=null?currentVal:'');
+  cell.innerHTML='<input id="eto-inp-'+releveId+'" type="number" min="0" max="100" step="1" '+
+    'value="'+(currentVal!=null?currentVal:'')+'" placeholder="%" '+
+    'style="border:1px solid var(--amber);border-radius:5px;padding:3px 6px;font-size:12px;width:58px;text-align:right;-moz-appearance:textfield" '+
+    'onblur="_energieSaveToPctInline(\''+releveId+'\',this.value,false)" '+
+    'onkeydown="if(event.key===\'Enter\'){this.blur();}else if(event.key===\'Escape\'){_energieCancelToPct(\''+releveId+'\');}" />';
+  var inp=document.getElementById('eto-inp-'+releveId);
+  if(inp){inp.focus();inp.select();}
+}
+
+function _energieCancelToPct(releveId){
+  var cell=document.getElementById('eto-cell-'+releveId);
+  if(!cell)return;
+  // Prevent the blur save by marking as cancelled
+  var inp=document.getElementById('eto-inp-'+releveId);
+  if(inp)inp.removeAttribute('onblur');
+  var orig=cell.getAttribute('data-orig');
+  var origVal=orig!==''?parseFloat(orig):null;
+  _energieRestoreToPctCell(releveId,origVal);
+}
+
+function _energieRestoreToPctCell(releveId,val){
+  var cell=document.getElementById('eto-cell-'+releveId);
+  if(!cell)return;
+  cell.innerHTML='<span id="eto-span-'+releveId+'" onclick="_energieEditToPct(\''+releveId+'\','+(val!=null?val:'null')+')" '+
+    'style="cursor:pointer;color:'+(val!=null?'var(--dark)':'var(--text3)')+';font-size:12px" title="Cliquer pour saisir le TO%">'+
+    (val!=null?val.toLocaleString('fr-FR')+'%':'—')+
+  '</span>';
+}
+
+async function _energieSaveToPctInline(releveId, rawVal){
+  var val=rawVal!=null&&rawVal!==''?parseFloat(rawVal):null;
+  if(val!=null&&(val<0||val>100)){
+    alert('Le TO% doit être entre 0 et 100.');
+    var inp=document.getElementById('eto-inp-'+releveId);
+    if(inp){inp.focus();inp.select();}
+    return;
+  }
+  var ok=await supaPatch('releves_energie',releveId,{to_percent:val});
+  if(ok){
+    // Re-render complet pour recalculer kWh/chambre dans les KPI
+    if(_session)setTimeout(function(){renderRespTech(_session,'energie');},200);
+  }else{
+    alert('Erreur lors de l\'enregistrement du TO%.');
+    var cell=document.getElementById('eto-cell-'+releveId);
+    var orig=cell?cell.getAttribute('data-orig'):'';
+    _energieRestoreToPctCell(releveId,orig!==''?parseFloat(orig):null);
+  }
+}
+
 async function _energieSaveObjectifs(sid){
   var fluides=_energieFluides;
   var btn=document.getElementById('energie-obj-btn');
@@ -10850,8 +10904,11 @@ async function _rtEnergie(sid){
           deltaStr+
         '</td>';
       }).join('')+
-      '<td style="padding:8px 10px;text-align:right;color:'+(r.to_percent!=null?'var(--dark)':'var(--text3)')+'">'+
-        (r.to_percent!=null?parseFloat(r.to_percent).toLocaleString('fr-FR')+'%':'—')+
+      '<td id="eto-cell-'+r.id+'" style="padding:8px 10px;text-align:right">'+
+        '<span id="eto-span-'+r.id+'" onclick="_energieEditToPct(\''+r.id+'\','+(r.to_percent!=null?parseFloat(r.to_percent):'null')+')" '+
+          'style="cursor:pointer;color:'+(r.to_percent!=null?'var(--dark)':'var(--text3)')+';font-size:12px" title="Cliquer pour saisir le TO%">'+
+          (r.to_percent!=null?parseFloat(r.to_percent).toLocaleString('fr-FR')+'%':'—')+
+        '</span>'+
       '</td>'+
       '<td style="padding:8px 10px;color:var(--text2);white-space:nowrap;font-size:10px">'+(r.saisi_par?escape_html(r.saisi_par):'—')+'</td>'+
       '<td id="enote-cell-'+r.id+'" style="padding:8px 10px;min-width:100px">'+
