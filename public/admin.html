@@ -211,20 +211,18 @@ let openClientTab = 'infos';
 // ── LOAD ───────────────────────────────────────────────────
 async function loadAll() {
   document.getElementById('sync-status').textContent = 'Chargement…';
-  const [clients, sites, equipements, questions, rondes, rondes_eq, alertes, signalements, tokens, contacts, types_eq] = await Promise.all([
+  const [clients, sites, equipements, questions, alertes, signalements, tokens, contacts, types_eq] = await Promise.all([
     api('clients','','*'),
     api('sites','','*'),
     api('equipements','','*'),
     api('questions','&order=ordre.asc','*'),
-    api('rondes','&order=created_at.desc&limit=200','*'),
-    api('rondes_equipements','','*'),
     api('alertes','&order=created_at.desc','*'),
     api('signalements','&order=created_at.desc&limit=200','*'),
     api('tokens','','*'),
     api('contacts','','*'),
     api('types_equipements','&order=nom.asc','*'),
   ]);
-  S = { clients, sites, equipements, questions, rondes, rondes_equipements: rondes_eq, alertes, signalements, tokens, contacts, types_equipements: types_eq };
+  S = { clients, sites, equipements, questions, rondes: [], rondes_equipements: [], alertes, signalements, tokens, contacts, types_equipements: types_eq };
   document.getElementById('sync-status').textContent = `Màj ${new Date().toLocaleTimeString('fr-FR')}`;
   const openA = alertes.filter(a=>!a.resolue).length;
   const badge = document.getElementById('alert-badge');
@@ -410,7 +408,6 @@ function renderClientFiche() {
   const groupes = []; // legacy removed
   const tokens = S.tokens.filter(t=>t.client_id===c.id);
   const contacts = S.contacts.filter(x=>x.client_id===c.id);
-  const rondes = S.rondes.filter(r=>sites.find(s=>s.id===r.site_id)).slice(0,50);
   const tabs = {infos:'Infos', sites:'Sites & Équipements', questions:'Questions', contacts:'Contacts', acces:'Accès', historique:'Historique'};
   let tabContent='';
   if (openClientTab==='infos') tabContent=renderTabInfos(c);
@@ -418,15 +415,33 @@ function renderClientFiche() {
   else if (openClientTab==='questions') tabContent=renderTabQuestions(c,allEquip);
   else if (openClientTab==='contacts') tabContent=renderTabContacts(c,contacts);
   else if (openClientTab==='acces') tabContent=renderTabAcces(c,tokens);
-  else if (openClientTab==='historique') tabContent=renderTabHistorique(c,rondes,allEquip,sites);
+  else if (openClientTab==='historique') tabContent='<p style="color:var(--text-muted);font-size:13px;padding:20px 0">Chargement…</p>';
   showModal('modal-client',`<div class="modal modal-lg">
     <div class="modal-header">
       <div><h3>${esc(c.nom)}</h3><div style="font-size:11px;color:var(--text-muted);margin-top:2px">${c.ville||''} ${c.pays||''} · ${c.plan||''} · ${fmtCFA(c.prix_mensuel||0)}/mois</div></div>
       <div style="display:flex;align-items:center;gap:8px"><span class="kpi-badge ${c.actif?'badge-green':'badge-gray'}">${c.actif?'Actif':'Inactif'}</span><button class="close-btn" onclick="closeModal('modal-client')">×</button></div>
     </div>
     <div style="padding:0 22px"><div class="tabs">${Object.entries(tabs).map(([k,v])=>`<div class="tab ${openClientTab===k?'active':''}" onclick="openClient('${c.id}','${k}')">${v}</div>`).join('')}</div></div>
-    <div class="modal-body" style="padding-top:0">${tabContent}</div>
+    <div class="modal-body" style="padding-top:0" id="client-modal-body">${tabContent}</div>
   </div>`);
+  if (openClientTab==='historique') loadHistorique(c.id);
+}
+
+async function loadHistorique(clientId) {
+  const c = S.clients.find(x=>x.id===clientId); if(!c) return;
+  const sites = S.sites.filter(s=>s.client_id===clientId);
+  const siteIds = sites.map(s=>s.id);
+  const allEquip = S.equipements.filter(e=>siteIds.includes(e.site_id));
+  if (!siteIds.length) {
+    const el=document.getElementById('client-modal-body'); if(el)el.innerHTML='<p style="color:var(--text-muted);font-size:13px">Aucun site enregistré.</p>';
+    return;
+  }
+  const rondes = await api('rondes','&site_id=in.('+siteIds.join(',')+')'+'&order=date_ronde.desc&limit=50','*');
+  const rondeIds = (rondes||[]).map(r=>r.id);
+  const rondesEq = rondeIds.length ? await api('rondes_equipements','&ronde_id=in.('+rondeIds.join(',')+')'+'&limit=1000','*') : [];
+  const el = document.getElementById('client-modal-body');
+  if (!el || openClientId !== clientId || openClientTab !== 'historique') return;
+  el.innerHTML = renderTabHistorique(c, rondes||[], rondesEq||[], allEquip, sites);
 }
 
 // TAB INFOS
@@ -663,11 +678,11 @@ function renderTabAcces(client, tokens) {
 }
 
 // TAB HISTORIQUE
-function renderTabHistorique(client, rondes, allEquip, sites) {
+function renderTabHistorique(client, rondes, rondesEq, allEquip, sites) {
   if (!rondes.length) return '<p style="color:var(--text-muted);font-size:13px">Aucune ronde enregistrée.</p>';
   return rondes.map(r => {
     const site = sites.find(s=>s.id===r.site_id);
-    const rondeEquips = S.rondes_equipements.filter(re=>re.ronde_id===r.id);
+    const rondeEquips = rondesEq.filter(re=>re.ronde_id===r.id);
     const sigs = S.signalements.filter(s=>s.ronde_id===r.id);
     const sigsHtml = sigs.length ? `<div style="margin-top:8px;padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:12px">
       <div style="font-weight:600;color:#92400e;margin-bottom:4px">⚠️ ${sigs.length} anomalie${sigs.length>1?'s':''} détectée${sigs.length>1?'s':''} pendant la ronde</div>
