@@ -496,7 +496,7 @@ function _goToSignalement(sgId){
 
 function navTo(id){
   if(!_session)return;
-  if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;_zonesWizardStep=0;_energieCfgWizardStep=0;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];}
+  if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;_zonesWizardStep=0;_eqImportStep=0;_energieCfgWizardStep=0;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];}
   if(_session.role==='resp_tech')renderRespTech(_session,id);
   else if(_session.role==='dir_tech'){
     if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,id);
@@ -3790,6 +3790,13 @@ var _zonesWizardEqSel={}; // {categorie:[nom_eq,...]}
 // _zonesWizardEqTracking supprimé — equipements_zone est pour signalements uniquement (pas de ronde/relevé)
 var _zonesWizardSid=null;
 var _zonesWizardDedupCount=0; // doublons supprimés auto à l'import
+// ── Import équipements en masse ──
+var _eqImportStep=0; // 0=off,1=upload,2=preview,3=assign+confirm
+var _eqImportByCat={}; // {cat:[nomEq,...]}
+var _eqImportSid=null;
+var _eqImportMode='add'; // 'add'|'replace'
+var _eqImportManualCats=[]; // cats en mode sélection manuelle
+var _eqImportManualSel={}; // {cat:[zoneId,...]} sélection manuelle
 
 var _ZONE_EQ_TEMPLATES={
   'Restauration':['Climatisation','Réfrigérateur industriel','Lave-vaisselle','Four professionnel','Hotte d\'aspiration','Caisse enregistreuse'],
@@ -3927,6 +3934,9 @@ async function _buildZonesConfigTab(sid){
     window._zonesCacheZones=existingZones;
     window._zonesCacheEqSalle=zoneEquipsSalle;
 
+    // Wizard import équipements en masse (step > 0)
+    if(_eqImportStep>0){return _eqImportRenderStep(existingZones,sid);}
+
     // Stats
     var totalEq=zoneEquipsSalle.length;
     var bycat={};
@@ -3974,6 +3984,11 @@ async function _buildZonesConfigTab(sid){
           '<input type="file" accept=".xlsx,.xls" style="display:none" onchange="_zonesHandleFile(this.files[0],\''+sid+'\')">'+
           '📂 Re-importer'+
         '</label>'+
+        // Bouton import équipements
+        '<button onclick="_eqImportStart(\''+sid+'\')" '+
+          'style="padding:7px 14px;border:1.5px solid var(--bleu);border-radius:9px;background:var(--bleu-pale);color:var(--bleu);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;white-space:nowrap">'+
+          '📥 Équipements'+
+        '</button>'+
         // Bouton tout supprimer
         '<button onclick="_zonesDeleteAll()" '+
           'style="padding:7px 10px;border:1.5px solid var(--rouge-border);border-radius:9px;background:var(--rouge-pale);color:var(--rouge);font-size:12px;font-weight:600;cursor:pointer" title="Supprimer toutes les zones">'+
@@ -4680,6 +4695,380 @@ function _zonesHandleFile(file,sid){
     s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
     s.onload=function(){doparse(window.XLSX);};
     s.onerror=function(){if(statusEl)statusEl.textContent='Impossible de charger SheetJS. Vérifiez votre connexion.';};
+    document.head.appendChild(s);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// IMPORT ÉQUIPEMENTS EN MASSE
+// ══════════════════════════════════════════════════════════════
+
+function _eqImportStart(sid){
+  _eqImportSid=sid;_eqImportStep=1;_eqImportByCat={};
+  _eqImportManualCats=[];_eqImportManualSel={};
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _eqImportBack(){
+  _eqImportStep=Math.max(0,_eqImportStep-1);
+  if(_eqImportStep===0){_eqImportByCat={};_eqImportManualCats=[];_eqImportManualSel={};}
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _eqImportRenderStep(zones,sid){
+  if(_eqImportStep===1)return _eqImportRenderUpload(zones,sid);
+  if(_eqImportStep===2)return _eqImportRenderPreview(zones,sid);
+  if(_eqImportStep===3)return _eqImportRenderAssign(zones,sid);
+  return '';
+}
+
+function _eqImportRenderUpload(zones,sid){
+  var catSet={};
+  zones.forEach(function(z){catSet[z.categorie||'Autre']=true;});
+  var catCount=Object.keys(catSet).length;
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">'+
+    '<button onclick="_eqImportBack()" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">← Retour</button>'+
+    '<div style="flex:1;font-size:14px;font-weight:700;color:var(--dark)">Importer équipements</div>'+
+  '</div>'+
+  '<div style="background:var(--bleu-pale);border:1.5px solid var(--bleu);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px">'+
+    '<div style="font-size:24px">📊</div>'+
+    '<div style="flex:1">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--bleu)">Télécharger le modèle Excel</div>'+
+      '<div style="font-size:11px;color:var(--text2);margin-top:2px">Pré-rempli avec '+catCount+' type'+(catCount!==1?'s':'')+' de zone de ce site. Modifiez et réimportez.</div>'+
+    '</div>'+
+    '<button onclick="_eqImportDownloadTemplate()" style="padding:8px 16px;border:none;border-radius:8px;background:var(--bleu);color:white;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:inherit">⬇ Télécharger</button>'+
+  '</div>'+
+  '<div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:8px">Ou importez votre fichier</div>'+
+  '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">Fichier Excel avec 2 colonnes : <strong>Type de zone</strong> et <strong>Équipement</strong>. Une ligne par équipement.</div>'+
+  '<label style="display:block;border:1.5px dashed var(--border);border-radius:12px;padding:32px;text-align:center;cursor:pointer;background:white">'+
+    '<input type="file" accept=".xlsx,.xls" style="display:none" onchange="_eqImportHandleFile(this.files[0],\''+sid+'\')">'+
+    '<div style="font-size:28px;margin-bottom:8px;opacity:.5">📂</div>'+
+    '<div style="font-size:13px;font-weight:600;color:var(--dark)">Choisir un fichier Excel</div>'+
+    '<div style="font-size:11px;color:var(--text3);margin-top:4px">.xlsx · .xls</div>'+
+  '</label>'+
+  '<div id="eq-import-status" style="margin-top:8px;font-size:12px;color:var(--text3)"></div>';
+}
+
+function _eqImportRenderPreview(zones,sid){
+  var cats=Object.keys(_eqImportByCat);
+  if(!cats.length)return '<div style="text-align:center;padding:40px;color:var(--text3)">Aucun équipement trouvé dans le fichier.</div>';
+  var totalEq=0;cats.forEach(function(c){totalEq+=(_eqImportByCat[c]||[]).length;});
+  var cardsHtml=cats.map(function(cat){
+    var eqs=_eqImportByCat[cat]||[];
+    var icon=_ZONE_CAT_ICONS[cat]||'📍';
+    var matchZones=zones.filter(function(z){return (z.categorie||'Autre')===cat;});
+    var matchColor=matchZones.length?'var(--vert)':'var(--orange)';
+    var matchInfo=matchZones.length
+      ?(matchZones.length+' zone'+(matchZones.length!==1?'s':'')+' correspondante'+(matchZones.length!==1?'s':''))
+      :'⚠️ Aucune zone de ce type sur ce site';
+    var eqList=eqs.map(function(eq,i){
+      var catKey=cat.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px">'+
+        '<span style="flex:1">'+escape_html(eq)+'</span>'+
+        '<button onclick="_eqImportRemoveEq(\''+catKey+'\','+i+')" style="border:none;background:none;color:var(--text3);cursor:pointer;font-size:12px;padding:0 4px;line-height:1;border-radius:3px" title="Supprimer">✕</button>'+
+      '</div>';
+    }).join('');
+    var inputId='eqi-add-'+cat.replace(/[^a-z0-9]/gi,'_');
+    return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+        '<span style="font-size:18px">'+icon+'</span>'+
+        '<div style="flex:1">'+
+          '<div style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(cat)+'</div>'+
+          '<div style="font-size:11px;color:'+matchColor+';margin-top:1px">'+matchInfo+'</div>'+
+        '</div>'+
+        '<span style="font-size:11px;font-weight:700;background:var(--amber-pale);color:var(--amber-dark);padding:2px 8px;border-radius:10px">'+eqs.length+' équipement'+(eqs.length!==1?'s':'')+'</span>'+
+      '</div>'+
+      '<div style="max-height:180px;overflow-y:auto">'+eqList+'</div>'+
+      '<div style="display:flex;gap:6px;margin-top:8px">'+
+        '<input id="'+inputId+'" placeholder="Ajouter un équipement…" style="flex:1;border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;font-family:inherit;outline:none">'+
+        '<button onclick="_eqImportAddEq(\''+cat.replace(/\\/g,'\\\\').replace(/'/g,"\\'")+'\',\''+inputId+'\')" style="padding:5px 12px;border:1.5px solid var(--amber);border-radius:6px;background:var(--amber-pale);color:var(--amber-dark);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">＋</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'+
+    '<button onclick="_eqImportBack()" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">← Retour</button>'+
+    '<div style="flex:1;font-size:14px;font-weight:700;color:var(--dark)">'+cats.length+' type'+(cats.length!==1?'s':'')+' · '+totalEq+' équipements</div>'+
+    '<button onclick="_eqImportGoAssign()" style="padding:7px 18px;border:none;border-radius:8px;background:var(--amber);color:white;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Assigner →</button>'+
+  '</div>'+
+  '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px">'+cardsHtml+'</div>';
+}
+
+function _eqImportRenderAssign(zones,sid){
+  var cats=Object.keys(_eqImportByCat);
+  var totalEqCreate=0;
+  var catRows=cats.map(function(cat){
+    var eqs=_eqImportByCat[cat]||[];
+    var matchZones=zones.filter(function(z){return (z.categorie||'Autre')===cat;});
+    var isManual=_eqImportManualCats.indexOf(cat)>=0;
+    var selIds=isManual?(_eqImportManualSel[cat]||[]):matchZones.map(function(z){return z.id;});
+    var nTarget=selIds.length;
+    totalEqCreate+=eqs.length*nTarget;
+    var icon=_ZONE_CAT_ICONS[cat]||'📍';
+    var catKey=cat.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    var manualHtml='';
+    if(isManual&&matchZones.length){
+      manualHtml='<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;max-height:120px;overflow-y:auto;padding:6px;background:var(--creme);border-radius:8px">'+
+        matchZones.map(function(z){
+          var sel=selIds.indexOf(z.id)>=0;
+          return '<button onclick="_eqImportToggleZone(\''+catKey+'\',\''+z.id+'\')" '+
+            'style="padding:4px 10px;border:1.5px solid '+(sel?'var(--amber)':'var(--border)')+';border-radius:20px;background:'+(sel?'var(--amber)':'white')+';color:'+(sel?'white':'var(--text2)')+';font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">'+
+            escape_html(z.nom)+
+          '</button>';
+        }).join('')+
+      '</div>';
+    }
+    return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:10px">'+
+      '<div style="display:flex;align-items:center;gap:8px">'+
+        '<span style="font-size:18px">'+icon+'</span>'+
+        '<div style="flex:1">'+
+          '<span style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(cat)+'</span>'+
+          '<span style="font-size:11px;color:var(--text3);margin-left:8px">'+eqs.length+' équipement'+(eqs.length!==1?'s':'')+'</span>'+
+        '</div>'+
+        (matchZones.length?
+          '<div style="display:flex;align-items:center;gap:6px">'+
+            '<span style="font-size:12px;font-weight:700;color:var(--vert)">'+nTarget+'/'+matchZones.length+' zone'+(matchZones.length!==1?'s':'')+' ciblée'+(nTarget!==1?'s':'')+'</span>'+
+            (matchZones.length>1?'<button onclick="_eqImportToggleManual(\''+catKey+'\','+matchZones.length+')" '+
+              'style="padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:white;font-size:10px;font-weight:600;color:var(--text2);cursor:pointer;font-family:inherit">'+
+              (isManual?'Tout':'Sélection')+'</button>':'')+
+          '</div>'
+          :'<span style="font-size:11px;color:var(--orange)">⚠️ Aucune zone</span>')+
+      '</div>'+
+      manualHtml+
+    '</div>';
+  }).join('');
+
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'+
+    '<button onclick="_eqImportBack()" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">← Retour</button>'+
+    '<div style="flex:1;font-size:14px;font-weight:700;color:var(--dark)">Assigner aux zones</div>'+
+  '</div>'+
+  catRows+
+  '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-top:4px;margin-bottom:16px">'+
+    '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:10px">Mode d\'import</div>'+
+    '<label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:8px">'+
+      '<input type="radio" name="eq-import-mode" value="add" '+(_eqImportMode==='add'?'checked':'')+' onchange="_eqImportMode=\'add\'" style="accent-color:var(--amber)">'+
+      '<div><strong>Ajouter</strong> — conserve les équipements existants, ajoute les nouveaux</div>'+
+    '</label>'+
+    '<label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">'+
+      '<input type="radio" name="eq-import-mode" value="replace" '+(_eqImportMode==='replace'?'checked':'')+' onchange="_eqImportMode=\'replace\'" style="accent-color:var(--rouge)">'+
+      '<div><strong style="color:var(--rouge)">Remplacer</strong> — supprime les équipements existants des zones ciblées avant d\'importer</div>'+
+    '</label>'+
+  '</div>'+
+  '<div style="background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:16px">'+
+    '<div style="text-align:center;flex:1">'+
+      '<div style="font-size:26px;font-weight:800;color:var(--amber-dark)">'+totalEqCreate+'</div>'+
+      '<div style="font-size:11px;color:var(--text2)">lignes à créer</div>'+
+    '</div>'+
+    '<div style="width:1px;background:var(--amber-border);align-self:stretch"></div>'+
+    '<div style="font-size:11px;color:var(--text2);flex:2;line-height:1.7">'+
+      cats.map(function(cat){
+        var eqs=_eqImportByCat[cat]||[];
+        var isManual=_eqImportManualCats.indexOf(cat)>=0;
+        var mz=isManual?(_eqImportManualSel[cat]||[]).length:zones.filter(function(z){return (z.categorie||'Autre')===cat;}).length;
+        return escape_html(cat)+' : '+eqs.length+' × '+mz+' zone'+(mz!==1?'s':'');
+      }).join('<br>')+
+    '</div>'+
+  '</div>'+
+  '<div id="eq-import-progress" style="font-size:12px;color:var(--text2);margin-bottom:10px"></div>'+
+  '<div style="display:flex;gap:10px">'+
+    '<button onclick="_eqImportBack()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer;font-family:inherit">Annuler</button>'+
+    (totalEqCreate>0?'<button onclick="_eqImportConfirm()" style="flex:2;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--amber);color:white;cursor:pointer;font-family:inherit">🚀 Lancer l\'import</button>':'')+
+  '</div>';
+}
+
+function _eqImportGoAssign(){
+  _eqImportStep=3;_eqImportManualCats=[];_eqImportManualSel={};
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _eqImportToggleManual(cat,total){
+  var idx=_eqImportManualCats.indexOf(cat);
+  if(idx>=0){
+    _eqImportManualCats.splice(idx,1);
+  } else {
+    _eqImportManualCats.push(cat);
+    var zones=window._zonesCacheZones||[];
+    if(!_eqImportManualSel[cat]){
+      _eqImportManualSel[cat]=zones.filter(function(z){return (z.categorie||'Autre')===cat;}).map(function(z){return z.id;});
+    }
+  }
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _eqImportToggleZone(cat,zoneId){
+  if(!_eqImportManualSel[cat])_eqImportManualSel[cat]=[];
+  var arr=_eqImportManualSel[cat];
+  var idx=arr.indexOf(zoneId);
+  if(idx>=0)arr.splice(idx,1);else arr.push(zoneId);
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _eqImportRemoveEq(cat,idx){
+  if(_eqImportByCat[cat]){_eqImportByCat[cat].splice(idx,1);if(!_eqImportByCat[cat].length)delete _eqImportByCat[cat];}
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _eqImportAddEq(cat,inputId){
+  var inp=document.getElementById(inputId);
+  if(!inp)return;
+  var val=(inp.value||'').trim();
+  if(!val)return;
+  if(!_eqImportByCat[cat])_eqImportByCat[cat]=[];
+  if(_eqImportByCat[cat].indexOf(val)<0)_eqImportByCat[cat].push(val);
+  inp.value='';
+  if(_session)renderRespTech(_session,'config');
+}
+
+async function _eqImportConfirm(){
+  var sid=_eqImportSid||(_session&&_session.groupe_id);
+  if(!sid)return;
+  var zones=window._zonesCacheZones||[];
+  var progEl=document.getElementById('eq-import-progress');
+  var btn=document.querySelector('[onclick="_eqImportConfirm()"]');
+  if(btn){btn.disabled=true;btn.textContent='Import en cours…';}
+
+  // Zones cibles par catégorie
+  var zonesByCat={};
+  Object.keys(_eqImportByCat).forEach(function(cat){
+    var isManual=_eqImportManualCats.indexOf(cat)>=0;
+    if(isManual){
+      zonesByCat[cat]=(_eqImportManualSel[cat]||[]).map(function(id){return zones.find(function(z){return z.id===id;});}).filter(Boolean);
+    } else {
+      zonesByCat[cat]=zones.filter(function(z){return (z.categorie||'Autre')===cat;});
+    }
+  });
+
+  // Mode replace : supprimer les équipements existants par chunks
+  if(_eqImportMode==='replace'){
+    var allIds=[];
+    Object.values(zonesByCat).forEach(function(zs){zs.forEach(function(z){allIds.push(z.id);});});
+    if(allIds.length){
+      if(progEl)progEl.textContent='Suppression des équipements existants…';
+      var delChunk=50;
+      for(var ci=0;ci<allIds.length;ci+=delChunk){
+        var chunk=allIds.slice(ci,ci+delChunk);
+        try{
+          await fetch(window.SUPA_URL+'/rest/v1/equipements_zone?zone_id=in.('+chunk.join(',')+')',{
+            method:'DELETE',
+            headers:{'apikey':window.SUPA_KEY,'Authorization':'Bearer '+window.SUPA_KEY,'Prefer':'return=minimal'}
+          });
+        }catch(e){console.warn('delete chunk error',e);}
+      }
+    }
+  }
+
+  // Construire les lignes à insérer
+  var eqRows=[];
+  Object.keys(_eqImportByCat).forEach(function(cat){
+    var eqs=_eqImportByCat[cat]||[];
+    var targetZones=zonesByCat[cat]||[];
+    targetZones.forEach(function(z){
+      eqs.forEach(function(eqNom){
+        eqRows.push({site_id:sid,zone_id:z.id,nom:eqNom+' — '+z.nom,actif:true});
+      });
+    });
+  });
+
+  if(!eqRows.length){if(progEl)progEl.textContent='Aucun équipement à créer.';return;}
+
+  // Batch insert par chunks de 500
+  var batchSize=500;
+  for(var i=0;i<eqRows.length;i+=batchSize){
+    var batch=eqRows.slice(i,i+batchSize);
+    if(progEl)progEl.textContent='Import '+(Math.min(i+batchSize,eqRows.length))+'/'+eqRows.length+'…';
+    try{
+      await fetch(window.SUPA_URL+'/rest/v1/equipements_zone',{
+        method:'POST',
+        headers:{'apikey':window.SUPA_KEY,'Authorization':'Bearer '+window.SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify(batch)
+      });
+    }catch(e){console.warn('insert chunk error',e);}
+  }
+
+  _eqImportStep=0;_eqImportByCat={};_eqImportManualCats=[];_eqImportManualSel={};
+  if(_session)renderRespTech(_session,'config');
+}
+
+// Télécharger le modèle Excel
+function _eqImportDownloadTemplate(){
+  var zones=window._zonesCacheZones||[];
+  var catSet={};
+  zones.forEach(function(z){catSet[z.categorie||'Autre']=true;});
+  _ZONE_CATS.forEach(function(c){catSet[c]=true;});
+  var cats=Object.keys(catSet);
+  function doDownload(XLSX){
+    var rows=[['Type de zone','Équipement']];
+    cats.forEach(function(cat){
+      var templates=_ZONE_EQ_TEMPLATES[cat]||[];
+      if(templates.length){templates.forEach(function(eq){rows.push([cat,eq]);});}
+      else{rows.push([cat,'']);}
+      rows.push(['','']);
+    });
+    var ws=XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols']=[{wch:22},{wch:42}];
+    var wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Équipements');
+    XLSX.writeFile(wb,'modele-equipements-gentrack.xlsx');
+  }
+  if(window.XLSX){doDownload(window.XLSX);}
+  else{
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=function(){doDownload(window.XLSX);};
+    document.head.appendChild(s);
+  }
+}
+
+// Parser le fichier Excel uploadé
+function _eqImportHandleFile(file,sid){
+  if(!file)return;
+  _eqImportSid=sid;
+  var statusEl=document.getElementById('eq-import-status');
+  if(statusEl)statusEl.textContent='Chargement…';
+  function doparse(XLSX){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      try{
+        var wb=XLSX.read(e.target.result,{type:'array'});
+        var result={};
+        wb.SheetNames.forEach(function(sheetName){
+          var ws=wb.Sheets[sheetName];
+          var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+          if(!rows.length)return;
+          var catCol=-1,eqCol=-1,headerRow=-1;
+          for(var ri=0;ri<Math.min(rows.length,5);ri++){
+            for(var ci=0;ci<rows[ri].length;ci++){
+              var cn=(rows[ri][ci]+'').trim().toUpperCase()
+                .replace(/[ÉÈÊË]/g,'E').replace(/[ÀÂÄÁ]/g,'A').replace(/[ÙÛÜÚ]/g,'U');
+              if((cn.indexOf('TYPE')>=0||cn.indexOf('ZONE')>=0||cn.indexOf('CATEGORIE')>=0)&&catCol<0)catCol=ci;
+              if((cn.indexOf('EQUIPEMENT')>=0||cn.indexOf('MATERIEL')>=0||cn.indexOf('NOM')>=0)&&eqCol<0)eqCol=ci;
+            }
+            if(catCol>=0&&eqCol>=0){headerRow=ri;break;}
+          }
+          // Si pas d'en-tête trouvé : chercher avec 1 seule colonne (liste simple)
+          if(headerRow<0&&eqCol<0&&rows[0]){catCol=-1;eqCol=0;headerRow=0;}
+          if(eqCol<0)return;
+          for(var di=headerRow+1;di<rows.length;di++){
+            var cat=catCol>=0?(rows[di][catCol]+'').trim():sheetName;
+            var eq=(rows[di][eqCol]+'').trim();
+            if(!cat||!eq||eq.indexOf('(Saisir')===0)continue;
+            if(!result[cat])result[cat]=[];
+            if(result[cat].indexOf(eq)<0)result[cat].push(eq);
+          }
+        });
+        var count=Object.values(result).reduce(function(a,v){return a+v.length;},0);
+        if(!count){if(statusEl)statusEl.textContent='Aucun équipement trouvé. Vérifiez les colonnes "Type de zone" et "Équipement".';return;}
+        _eqImportByCat=result;_eqImportStep=2;
+        if(_session)renderRespTech(_session,'config');
+      }catch(err){if(statusEl)statusEl.textContent='Erreur: '+err.message;console.error(err);}
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  if(window.XLSX){doparse(window.XLSX);}
+  else{
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=function(){doparse(window.XLSX);};
+    s.onerror=function(){if(statusEl)statusEl.textContent='Impossible de charger SheetJS.';};
     document.head.appendChild(s);
   }
 }
