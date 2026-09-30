@@ -7,7 +7,7 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;min-height:100vh;padding:24px 16px}
-.container{max-width:620px;margin:0 auto}
+.container{max-width:660px;margin:0 auto}
 .brand{display:flex;align-items:center;gap:10px;margin-bottom:24px}
 .brand-logo{width:32px;height:32px;background:#1a1a1a;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700}
 .brand-name{font-size:16px;font-weight:600}
@@ -27,15 +27,49 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .field label{font-size:12px;color:#666;font-weight:500}
 .field input,.field select,.field textarea{border:1px solid #ddd;border-radius:8px;padding:9px 11px;font-size:14px;color:#1a1a1a;background:#fff;width:100%;transition:border .15s;font-family:inherit}
 .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#1a1a1a}
-.field textarea{resize:vertical;min-height:80px}
-.fluide-table{width:100%;border-collapse:collapse}
-.fluide-table th{font-size:11px;color:#888;font-weight:500;text-align:right;padding:0 6px 8px;white-space:nowrap}
-.fluide-table th:first-child{text-align:left}
-.fluide-table td{padding:5px 6px;vertical-align:middle}
-.fluide-table td:first-child{font-size:13px;font-weight:500;white-space:nowrap;padding-right:12px}
-.fluide-table input{border:1px solid #ddd;border-radius:6px;padding:7px 8px;font-size:12px;width:100%;text-align:right;color:#1a1a1a;background:#fff}
-.fluide-table input:focus{outline:none;border-color:#1a1a1a}
-.fluide-table tr+tr td{border-top:1px solid #f0f0f0;padding-top:8px}
+.field textarea{resize:vertical;min-height:70px}
+/* Fluides */
+.preset-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.preset-btn{font-size:12px;border:1px solid #ddd;border-radius:20px;padding:5px 12px;cursor:pointer;background:#fff;color:#555;transition:all .15s}
+.preset-btn:hover,.preset-btn.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.fluide-table{width:100%;border-collapse:collapse;font-size:12px}
+.fluide-table th{font-size:11px;color:#888;font-weight:500;padding:0 5px 8px;text-align:right;white-space:nowrap}
+.fluide-table th:first-child,.fluide-table th:nth-child(2){text-align:left}
+.fluide-table td{padding:5px;vertical-align:middle;border-top:1px solid #f0f0f0}
+.fluide-table tr:first-child td{border-top:none}
+.fluide-table input[type=text],.fluide-table input[type=number]{border:1px solid #e0e0e0;border-radius:6px;padding:6px 7px;font-size:12px;width:100%;text-align:right;color:#1a1a1a;background:#fff}
+.fluide-table input[type=text]:focus,.fluide-table input[type=number]:focus{outline:none;border-color:#1a1a1a}
+.fluide-nom-cell{display:flex;align-items:center;gap:6px}
+.fluide-nom-cell input{text-align:left!important;font-weight:500}
+.fluide-nom-cell .unit-tag{font-size:10px;color:#aaa;white-space:nowrap}
+.btn-del-row{background:none;border:none;cursor:pointer;color:#ccc;font-size:16px;padding:0 2px;line-height:1}
+.btn-del-row:hover{color:#e55}
+.btn-sous{background:none;border:1px solid #ddd;border-radius:5px;font-size:10px;padding:3px 7px;cursor:pointer;color:#888;white-space:nowrap}
+.btn-sous.active{border-color:#888;color:#1a1a1a;background:#f5f5f3}
+.sous-rows{background:#fafaf8}
+.sous-rows td{padding:4px 5px!important;border-top:none!important}
+.sous-row-inner{display:flex;align-items:center;gap:6px}
+.sous-row-inner input{flex:1;border:1px solid #e8e8e6;border-radius:5px;padding:5px 7px;font-size:11px}
+/* Techniciens */
+.tech-table{width:100%;border-collapse:collapse;font-size:13px}
+.tech-table th{font-size:11px;color:#888;font-weight:500;padding:0 8px 8px;text-align:left}
+.tech-table td{padding:5px 8px;border-top:1px solid #f0f0f0;vertical-align:middle}
+.tech-table tr:first-child td{border-top:none}
+.tech-table input,.tech-table select{border:1px solid #e0e0e0;border-radius:6px;padding:6px 8px;font-size:12px;width:100%;background:#fff;color:#1a1a1a}
+.tech-table input:focus,.tech-table select:focus{outline:none;border-color:#1a1a1a}
+.wa-input-wrap{display:flex;align-items:center;gap:0}
+.wa-flag{background:#f0f0ee;border:1px solid #e0e0e0;border-right:none;border-radius:6px 0 0 6px;padding:6px 8px;font-size:12px;color:#555;white-space:nowrap}
+.wa-input-wrap input{border-radius:0 6px 6px 0!important}
+.btn-add{font-size:12px;color:#666;border:1px dashed #ccc;border-radius:7px;padding:7px 14px;background:none;cursor:pointer;width:100%;margin-top:10px;text-align:center}
+.btn-add:hover{border-color:#888;color:#1a1a1a;background:#fafaf8}
+/* Chambres */
+.chambre-table{width:100%;border-collapse:collapse;font-size:13px}
+.chambre-table th{font-size:11px;color:#888;font-weight:500;padding:0 8px 8px;text-align:left}
+.chambre-table td{padding:5px 8px;border-top:1px solid #f0f0f0;vertical-align:top}
+.chambre-table tr:first-child td{border-top:none}
+.chambre-table input[type=text],.chambre-table input[type=number]{border:1px solid #e0e0e0;border-radius:6px;padding:6px 8px;font-size:12px;width:100%}
+.chambre-table input[type=text]:focus,.chambre-table input[type=number]:focus{outline:none;border-color:#1a1a1a}
+/* Workflow */
 .radio-group{display:flex;flex-direction:column;gap:10px}
 .radio-opt{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid #ddd;border-radius:8px;cursor:pointer;transition:border .15s}
 .radio-opt:hover{border-color:#aaa}
@@ -43,7 +77,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .radio-opt input[type=radio]{margin-top:2px;flex-shrink:0;accent-color:#1a1a1a}
 .radio-opt-label{font-size:13px;font-weight:500}
 .radio-opt-sub{font-size:12px;color:#888;margin-top:2px}
-.tpl-box{border:1px dashed #ccc;border-radius:8px;padding:14px;display:flex;align-items:center;gap:12px;background:#fafaf8}
+/* Upload */
+.tpl-box{border:1px dashed #ccc;border-radius:8px;padding:14px;display:flex;align-items:center;gap:12px;background:#fafaf8;margin-bottom:12px}
 .tpl-info{flex:1}
 .tpl-info strong{display:block;font-size:13px;font-weight:600;margin-bottom:2px}
 .tpl-info span{font-size:11px;color:#888}
@@ -66,13 +101,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .file-item-del{cursor:pointer;color:#aaa;flex-shrink:0;font-size:16px;line-height:1;border:none;background:none;padding:0}
 .file-item-del:hover{color:#e55}
 .badge-opt{font-size:10px;background:#f0f0ee;color:#888;border-radius:20px;padding:2px 7px;font-weight:500;margin-left:6px}
+/* Nav */
 .foot{display:flex;justify-content:space-between;align-items:center;margin-top:4px;padding-top:4px}
 .btn-prev{font-size:14px;color:#666;background:none;border:1px solid #ddd;border-radius:8px;padding:10px 18px;cursor:pointer}
 .btn-prev:hover{border-color:#aaa;color:#1a1a1a}
 .btn-next{font-size:14px;color:#fff;background:#1a1a1a;border:none;border-radius:8px;padding:10px 22px;cursor:pointer;display:flex;align-items:center;gap:6px}
 .btn-next:hover{background:#333}
 .btn-next:disabled{background:#ccc;cursor:not-allowed}
-.error{color:#c0392b;font-size:12px;margin-top:4px}
+.error{color:#c0392b;font-size:12px;margin-top:8px}
+/* Success */
 .success-box{background:#f0faf4;border:1px solid #a8e6c0;border-radius:12px;padding:28px;text-align:center}
 .success-icon{font-size:40px;margin-bottom:12px}
 .success-title{font-size:20px;font-weight:700;color:#1a7a45;margin-bottom:6px}
@@ -87,7 +124,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </style>
 </head>
 <body>
-
 <div class="container">
   <div class="brand">
     <div class="brand-logo">GT</div>
@@ -96,8 +132,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="brand-sub">Pré-configuration GenTrack · Lien sécurisé</div>
     </div>
   </div>
-
-  <div class="progress" id="progress">
+  <div class="progress">
     <div class="prog-step active" id="pb0"></div>
     <div class="prog-step" id="pb1"></div>
     <div class="prog-step" id="pb2"></div>
@@ -105,7 +140,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="prog-step" id="pb4"></div>
   </div>
 
-  <!-- ÉTAPE 1 : Infos -->
+  <!-- ÉTAPE 1 : Infos hôtel -->
   <div id="page0">
     <div class="step-header">
       <div class="step-num">Étape 1 / 5</div>
@@ -116,7 +151,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <div class="card-title">🏨 L'hôtel</div>
       <div class="grid2" style="margin-bottom:12px">
         <div class="field"><label>Nom de l'hôtel *</label><input type="text" id="hotelName" placeholder="ex : Azalai Hotel Dakar" oninput="document.getElementById('brand-hotel').textContent=this.value||'Votre hôtel'"></div>
-        <div class="field"><label>Nombre de chambres *</label><input type="number" id="nbChambres" placeholder="ex : 200" min="1"></div>
+        <div class="field"><label>Nombre total de chambres *</label><input type="number" id="nbChambres" placeholder="ex : 200" min="1"></div>
       </div>
       <div class="grid2">
         <div class="field"><label>Ville *</label><input type="text" id="ville" placeholder="ex : Dakar"></div>
@@ -141,11 +176,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         </div>
       </div>
     </div>
-    <div id="err0" class="error" style="display:none">Veuillez remplir tous les champs obligatoires (*).</div>
-    <div class="foot">
-      <span></span>
-      <button class="btn-next" onclick="goNext0()">Suivant →</button>
+    <div class="card">
+      <div class="card-title">🔧 Équipe technique</div>
+      <p style="font-size:12px;color:#888;margin-bottom:12px">Techniciens qui utiliseront GenTrack — on leur enverra leur accès avant le rendez-vous.</p>
+      <table class="tech-table">
+        <thead><tr>
+          <th style="width:35%">Prénom et nom</th>
+          <th style="width:25%">Rôle</th>
+          <th>WhatsApp</th>
+          <th style="width:28px"></th>
+        </tr></thead>
+        <tbody id="tech-tbody"></tbody>
+      </table>
+      <button class="btn-add" onclick="addTech()">+ Ajouter un technicien</button>
     </div>
+    <div id="err0" class="error" style="display:none">Veuillez remplir tous les champs obligatoires (*).</div>
+    <div class="foot"><span></span><button class="btn-next" onclick="goNext0()">Suivant →</button></div>
   </div>
 
   <!-- ÉTAPE 2 : Fluides + Workflow -->
@@ -157,42 +203,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
     <div class="card">
       <div class="card-title">⚡ Fluides suivis</div>
-      <table class="fluide-table">
-        <thead>
-          <tr>
-            <th style="text-align:left">Fluide</th>
-            <th>Objectif / mois</th>
-            <th>Coût unitaire</th>
-            <th>Seuil alerte</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>⚡ Élec K1 <span style="font-size:11px;color:#aaa">kWh</span></td>
-            <td><input type="number" id="f-k1-obj" placeholder="ex : 42000"></td>
-            <td><input type="text" id="f-k1-cout" placeholder="ex : 0,12 €/kWh"></td>
-            <td><input type="number" id="f-k1-seuil" placeholder="ex : 50000"></td>
-          </tr>
-          <tr>
-            <td>⚡ Élec K2 <span style="font-size:11px;color:#aaa">kWh</span></td>
-            <td><input type="number" id="f-k2-obj" placeholder="ex : 26000"></td>
-            <td><input type="text" id="f-k2-cout" placeholder="ex : 0,09 €/kWh"></td>
-            <td><input type="number" id="f-k2-seuil" placeholder="ex : 30000"></td>
-          </tr>
-          <tr>
-            <td>💧 Eau <span style="font-size:11px;color:#aaa">m³</span></td>
-            <td><input type="number" id="f-eau-obj" placeholder="ex : 320"></td>
-            <td><input type="text" id="f-eau-cout" placeholder="ex : 1,50 €/m³"></td>
-            <td><input type="number" id="f-eau-seuil" placeholder="ex : 400"></td>
-          </tr>
-          <tr>
-            <td>🛢 Gasoil <span style="font-size:11px;color:#aaa">L</span></td>
-            <td><input type="number" id="f-gasoil-obj" placeholder="—"></td>
-            <td><input type="text" id="f-gasoil-cout" placeholder="ex : 0,85 €/L"></td>
-            <td><input type="number" id="f-gasoil-seuil" placeholder="—"></td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="preset-bar">
+        <span style="font-size:12px;color:#888;align-self:center;margin-right:4px">Région :</span>
+        <button class="preset-btn" onclick="applyPreset('afrique-ouest',this)">🌍 Afrique de l'Ouest</button>
+        <button class="preset-btn" onclick="applyPreset('maghreb',this)">🌍 Maghreb</button>
+        <button class="preset-btn" onclick="applyPreset('europe',this)">🇪🇺 Europe</button>
+        <button class="preset-btn" onclick="applyPreset('libre',this)">✏️ Personnalisé</button>
+      </div>
+      <div id="fluides-container"></div>
+      <button class="btn-add" onclick="addFluide()">+ Ajouter un fluide</button>
     </div>
     <div class="card">
       <div class="card-title">⚙️ Workflow d'affectation des interventions</div>
@@ -223,30 +242,74 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div id="page2" style="display:none">
     <div class="step-header">
       <div class="step-num">Étape 3 / 5</div>
-      <div class="step-title">Structure de l'hôtel</div>
-      <div class="step-desc">Zones, lieux et équipements. Téléchargez le modèle, remplissez-le et re-uploadez-le — ou complétez-le lors du rendez-vous.</div>
+      <div class="step-title">Structure & équipements</div>
+      <div class="step-desc">Zones communes, répartition des chambres et fiches de ronde existantes.</div>
     </div>
+
+    <!-- 3A : Structure hôtel (parties communes + chambres) -->
     <div class="card">
-      <div class="card-title">📋 Modèle Excel zones / lieux / équipements</div>
+      <div class="card-title">🏗️ Structure de l'hôtel — Parties communes & chambres</div>
+      <p style="font-size:12px;color:#888;margin-bottom:12px">Téléchargez le modèle Excel, complétez-le avec vos bâtiments, étages, locaux et numéros de chambre, puis uploadez-le.</p>
       <div class="tpl-box">
         <div class="tpl-info">
-          <strong>zones_lieux_equipements_template.csv</strong>
-          <span>Colonnes : Zone · Lieu · Équipement · Type · Capacité · Seuil alerte · Unité</span>
+          <strong>structure_hotel_template.xlsx</strong>
+          <span>2 feuilles : PARTIE COMMUNE (Bâtiment · Étage · Zone · Désignation) et CHAMBRE (Bâtiment · Étage · N° · Type)</span>
         </div>
-        <a class="btn-dl" onclick="downloadTemplate()" href="#">⬇ Télécharger</a>
+        <a class="btn-dl" href="/structure_hotel_template.xlsx" download>⬇ Télécharger</a>
       </div>
-      <div class="or-sep">ou uploader votre fichier complété</div>
+      <div class="or-sep">uploader votre fichier complété</div>
       <div class="upload-zone" id="uz-structure" ondragover="onDragOver(event,'uz-structure')" ondragleave="onDragLeave(event,'uz-structure')" ondrop="onDrop(event,'uz-structure','files-structure')">
         <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
         <p>Glissez votre fichier ici ou cliquez</p>
-        <small>.xlsx · .csv · max 20 Mo</small>
-        <input type="file" id="input-structure" accept=".xlsx,.xls,.csv" onchange="addFiles('files-structure',this.files)">
+        <small>.xlsx · max 20 Mo</small>
+        <input type="file" id="input-structure" accept=".xlsx,.xls" onchange="addFiles('files-structure',this.files)">
       </div>
       <div class="file-list" id="files-structure"></div>
     </div>
+
+    <!-- 3B : Équipements de ronde -->
     <div class="card">
-      <div class="card-title">📷 Fiches de ronde actuelles <span class="badge-opt">optionnel</span></div>
-      <p style="font-size:12px;color:#888;margin-bottom:10px">Vos check-lists de ronde existantes — papier scanné, photos ou Excel. On s'en inspirera pendant la réunion.</p>
+      <div class="card-title">🔧 Équipements de ronde</div>
+      <p style="font-size:12px;color:#888;margin-bottom:12px">Liste de tous les équipements à contrôler lors des rondes, avec seuils et fréquences.</p>
+      <div class="tpl-box">
+        <div class="tpl-info">
+          <strong>zones_equipements_ronde_template.csv</strong>
+          <span>Zone · Lieu · Équipement · Type contrôle · Fréquence · Capacité · Seuil min · Seuil max · Unité · Remarques</span>
+        </div>
+        <a class="btn-dl" onclick="downloadTemplateRonde()" href="#">⬇ Télécharger</a>
+      </div>
+      <div class="or-sep">uploader votre fichier complété</div>
+      <div class="upload-zone" id="uz-ronde-equip" ondragover="onDragOver(event,'uz-ronde-equip')" ondragleave="onDragLeave(event,'uz-ronde-equip')" ondrop="onDrop(event,'uz-ronde-equip','files-ronde-equip')">
+        <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        <p>Glissez votre fichier ici ou cliquez</p>
+        <small>.xlsx · .csv · max 20 Mo</small>
+        <input type="file" id="input-ronde-equip" accept=".xlsx,.xls,.csv" onchange="addFiles('files-ronde-equip',this.files)">
+      </div>
+      <div class="file-list" id="files-ronde-equip"></div>
+    </div>
+
+    <!-- 3B : Chambres -->
+    <div class="card">
+      <div class="card-title">🛏 Répartition des chambres</div>
+      <p style="font-size:12px;color:#888;margin-bottom:12px">Indiquez les types de chambres, leur nombre et les équipements standards de chaque type.</p>
+      <table class="chambre-table" style="width:100%">
+        <thead>
+          <tr>
+            <th style="width:35%">Type de chambre</th>
+            <th style="width:15%">Nb</th>
+            <th>Équipements principaux</th>
+            <th style="width:30px"></th>
+          </tr>
+        </thead>
+        <tbody id="chambres-tbody"></tbody>
+      </table>
+      <button class="btn-add" onclick="addChambreType()">+ Ajouter un type</button>
+    </div>
+
+    <!-- 3C : Documents de ronde -->
+    <div class="card">
+      <div class="card-title">📷 Documents de ronde existants <span class="badge-opt">optionnel</span></div>
+      <p style="font-size:12px;color:#888;margin-bottom:10px">Check-lists papier scannées, photos ou Excel de vos rondes actuelles. On s'en inspirera lors du rendez-vous.</p>
       <div class="upload-zone" id="uz-ronde" ondragover="onDragOver(event,'uz-ronde')" ondragleave="onDragLeave(event,'uz-ronde')" ondrop="onDrop(event,'uz-ronde','files-ronde')">
         <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 20M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
         <p>Photos, PDF ou Excel de vos rondes actuelles</p>
@@ -255,6 +318,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </div>
       <div class="file-list" id="files-ronde"></div>
     </div>
+
     <div class="foot">
       <button class="btn-prev" onclick="goTo(1)">← Retour</button>
       <button class="btn-next" onclick="goTo(3)">Suivant →</button>
@@ -271,7 +335,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="card">
       <div class="card-title">💬 Message <span class="badge-opt">optionnel</span></div>
       <div class="field">
-        <label>Précisez des particularités, des questions ou des contraintes</label>
+        <label>Particularités, questions ou contraintes à nous signaler</label>
         <textarea id="message" placeholder="ex : Nous avons 2 groupes électrogènes, je ne sais pas comment les intégrer…"></textarea>
       </div>
     </div>
@@ -296,18 +360,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
     <div class="next-steps">
       <div style="font-size:13px;font-weight:600;margin-bottom:10px">Prochaines étapes</div>
-      <div class="next-step-item">
-        <div class="step-icon done">✓</div>
-        <span>Vos données sont reçues et vérifiées par l'équipe GenTrack</span>
-      </div>
-      <div class="next-step-item">
-        <div class="step-icon pending">2</div>
-        <span>Import dans la plateforme avant le rendez-vous d'onboarding</span>
-      </div>
-      <div class="next-step-item">
-        <div class="step-icon pending">3</div>
-        <span>Seuils manquants, capacités et zones complétés ensemble lors du rendez-vous</span>
-      </div>
+      <div class="next-step-item"><div class="step-icon done">✓</div><span>Vos données sont reçues et vérifiées par l'équipe GenTrack</span></div>
+      <div class="next-step-item"><div class="step-icon pending">2</div><span>Import dans la plateforme avant le rendez-vous d'onboarding</span></div>
+      <div class="next-step-item"><div class="step-icon pending">3</div><span>Seuils manquants, capacités et zones complétés ensemble lors du rendez-vous</span></div>
     </div>
   </div>
 </div>
@@ -318,151 +373,388 @@ const SUPABASE_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const EDGE_FN=SUPABASE_URL+'/functions/v1/onboarding-email';
 
 var cur=0;
-var filesMap={'files-structure':[],'files-ronde':[]};
+var filesMap={'files-structure':[],'files-ronde-equip':[],'files-ronde':[]};
 
+/* ── TECHNICIENS ── */
+var techData=[];
+var techIdx=0;
+var TECH_ROLES=['Technicien maintenance','Électricien','Plombier','Climatisation / HVAC','Responsable ronde','Autre'];
+
+function initTech(){
+  if(techData.length>0)return;
+  // Start with one empty row
+  techData.push({idx:techIdx++,nom:'',role:'Technicien maintenance',wa:''});
+  renderTech();
+}
+function renderTech(){
+  var tb=document.getElementById('tech-tbody');
+  if(!tb)return;
+  tb.innerHTML=techData.map(function(t,i){
+    var roleOpts=TECH_ROLES.map(function(r){return '<option'+(r===t.role?' selected':'')+'>'+escH(r)+'</option>';}).join('');
+    return '<tr id="trow-'+t.idx+'">'+
+      '<td><input type="text" value="'+escH(t.nom)+'" placeholder="ex : Ibrahima Sow" onchange="techData['+i+'].nom=this.value"></td>'+
+      '<td><select onchange="techData['+i+'].role=this.value">'+roleOpts+'</select></td>'+
+      '<td><div class="wa-input-wrap"><span class="wa-flag">📱 +</span><input type="tel" value="'+escH(t.wa)+'" placeholder="221 77 000 00 00" onchange="techData['+i+'].wa=this.value"></div></td>'+
+      '<td><button class="btn-del-row" onclick="removeTech('+i+')">×</button></td>'+
+    '</tr>';
+  }).join('');
+}
+function addTech(){techData.push({idx:techIdx++,nom:'',role:'Technicien maintenance',wa:''});renderTech();}
+function removeTech(i){if(techData.length>1)techData.splice(i,1);renderTech();}
+
+/* ── NAVIGATION ── */
 function goTo(n){
   document.getElementById('page'+cur).style.display='none';
   cur=n;
   document.getElementById('page'+cur).style.display='';
   updateProgress();
   window.scrollTo(0,0);
+  if(n===1)renderFluides();
+  if(n===2)renderChambres();
   if(n===3)buildSummary();
 }
-
 function updateProgress(){
   for(var i=0;i<5;i++){
     var el=document.getElementById('pb'+i);
     el.className='prog-step'+(i<cur?' done':i===cur?' active':'');
   }
 }
-
 function goNext0(){
   var err=document.getElementById('err0');
   err.style.display='none';
   var ok=v('hotelName')&&v('nbChambres')&&v('ville')&&v('pays')&&v('contactNom')&&v('contactTel')&&v('contactEmail');
   if(!ok){err.style.display='block';return;}
+  initTech();
   goTo(1);
 }
-
 function v(id){return (document.getElementById(id).value||'').trim()!=='';}
-
 function selectWorkflow(optId){
   document.getElementById('wf-opt1').classList.toggle('selected',optId==='wf-opt1');
   document.getElementById('wf-opt2').classList.toggle('selected',optId==='wf-opt2');
   document.querySelector('#'+optId+' input').checked=true;
 }
 
-function downloadTemplate(){
-  var csv='Zone,Lieu,Equipement,Type de controle,Capacite,Seuil alerte,Unite\n'+
-    'Etages,Couloir etage 1,Climatisation corridor,Visuel,,,\n'+
-    'Etages,Couloir etage 1,Eclairage de secours,Visuel,,,\n'+
-    'Cuisine,Cuisine principale,Groupe froid 1,Temperature relevee,500L,7,°C\n'+
-    'Cuisine,Cuisine principale,Groupe froid 2,Temperature relevee,300L,7,°C\n'+
-    'Chaufferie,Local technique,Chaudiere principale,Visuel + releve pression,,,bar\n'+
-    'Piscine,Plage piscine,Pompe filtration,Visuel,,,\n'+
-    'Parking,Parking sous-sol,Pompe relevage,Visuel,,,\n';
+/* ── FLUIDES ── */
+var PRESETS={
+  'afrique-ouest':{k1_cout:'60 FCFA/kWh',k2_cout:'60 FCFA/kWh',eau_cout:'350 FCFA/m³',gasoil_cout:'850 FCFA/L'},
+  'maghreb':{k1_cout:'1.20 MAD/kWh',k2_cout:'1.00 MAD/kWh',eau_cout:'8 MAD/m³',gasoil_cout:'12 MAD/L'},
+  'europe':{k1_cout:'0.18 €/kWh',k2_cout:'0.15 €/kWh',eau_cout:'2.50 €/m³',gasoil_cout:'1.80 €/L'},
+  'libre':{}
+};
+var FLUIDE_TYPES=[
+  {icon:'⚡',nom:'Élec K1',unite:'kWh'},
+  {icon:'⚡',nom:'Élec K2',unite:'kWh'},
+  {icon:'💧',nom:'Eau',unite:'m³'},
+  {icon:'🛢',nom:'Gasoil',unite:'L'},
+  {icon:'🔥',nom:'Gaz butane',unite:'kg'},
+  {icon:'🌡',nom:'Eau chaude sanitaire',unite:'m³'},
+  {icon:'🧪',nom:'Réactif piscine',unite:'kg'},
+  {icon:'❄',nom:'Climatisation centralisée',unite:'kWh'},
+  {icon:'⚡',nom:'Autre compteur',unite:''},
+];
+// fluidesData: [{idx,icon,nom,unite,obj,cout,seuil,sousCmptrs:[{nom}],showSous}]
+var fluidesData=[];
+var fluidesIdx=0;
+var currentPreset='';
+
+function initFluides(){
+  if(fluidesData.length>0)return;
+  var defaults=[0,1,2,3]; // K1, K2, Eau, Gasoil
+  defaults.forEach(function(i){
+    fluidesData.push({idx:fluidesIdx++,icon:FLUIDE_TYPES[i].icon,nom:FLUIDE_TYPES[i].nom,unite:FLUIDE_TYPES[i].unite,obj:'',cout:'',seuil:'',sousCmptrs:[],showSous:false});
+  });
+}
+
+function renderFluides(){
+  initFluides();
+  var c=document.getElementById('fluides-container');
+  if(!fluidesData.length){c.innerHTML='<p style="font-size:12px;color:#aaa;text-align:center;padding:12px">Aucun fluide — cliquez "+ Ajouter un fluide" ci-dessous.</p>';return;}
+  c.innerHTML='<table class="fluide-table" style="width:100%">'+
+    '<thead><tr>'+
+    '<th style="text-align:left;width:30%">Fluide</th>'+
+    '<th style="width:18%">Objectif/mois</th>'+
+    '<th style="width:22%">Coût unitaire</th>'+
+    '<th style="width:18%">Seuil alerte</th>'+
+    '<th style="width:80px"></th>'+
+    '</tr></thead>'+
+    '<tbody id="fluides-tbody"></tbody>'+
+    '</table>';
+  var tb=document.getElementById('fluides-tbody');
+  fluidesData.forEach(function(f,i){
+    tb.innerHTML+=renderFluideRow(f,i);
+  });
+}
+
+function renderFluideRow(f,i){
+  var html='<tr id="frow-'+f.idx+'">'+
+    '<td><div class="fluide-nom-cell">'+
+      '<span>'+f.icon+'</span>'+
+      '<input type="text" style="text-align:left" value="'+escH(f.nom)+'" placeholder="Nom" onchange="fluidesData['+i+'].nom=this.value">'+
+      '<span class="unit-tag"><input type="text" value="'+escH(f.unite)+'" placeholder="unité" style="width:44px;text-align:center;font-size:10px;border:1px solid #e0e0e0;border-radius:4px;padding:3px 4px" onchange="fluidesData['+i+'].unite=this.value"></span>'+
+    '</div></td>'+
+    '<td><input type="number" value="'+escH(f.obj||'')+'" placeholder="ex : 42000" onchange="fluidesData['+i+'].obj=this.value"></td>'+
+    '<td><input type="text" value="'+escH(f.cout||'')+'" placeholder="—" onchange="fluidesData['+i+'].cout=this.value"></td>'+
+    '<td><input type="number" value="'+escH(f.seuil||'')+'" placeholder="—" onchange="fluidesData['+i+'].seuil=this.value"></td>'+
+    '<td style="text-align:right;white-space:nowrap;padding-right:0">'+
+      '<button class="btn-sous'+(f.showSous?' active':'')+'" onclick="toggleSous('+i+')" title="Sous-compteurs">⊕ SC</button>'+
+      ' <button class="btn-del-row" onclick="removeFluide('+i+')" title="Supprimer">×</button>'+
+    '</td>'+
+  '</tr>';
+  if(f.showSous){
+    html+='<tr class="sous-rows"><td colspan="5" style="padding:6px 8px 10px;background:#fafaf8;border-radius:0 0 6px 6px">';
+    html+='<div style="font-size:11px;color:#888;margin-bottom:6px">Sous-compteurs de '+escH(f.nom)+' (ex : Buanderie, Spa, Cuisine…)</div>';
+    f.sousCmptrs.forEach(function(s,si){
+      html+='<div class="sous-row-inner" style="margin-bottom:5px">'+
+        '<input type="text" value="'+escH(s.nom)+'" placeholder="Nom du sous-compteur" onchange="fluidesData['+i+'].sousCmptrs['+si+'].nom=this.value">'+
+        '<button class="btn-del-row" onclick="removeSousCmptre('+i+','+si+')" style="font-size:13px">×</button>'+
+      '</div>';
+    });
+    html+='<button class="btn-add" style="margin-top:6px;padding:5px 10px;font-size:11px" onclick="addSousCmptre('+i+')">+ Sous-compteur</button>';
+    html+='</td></tr>';
+  }
+  return html;
+}
+
+function addFluide(){
+  // Show picker
+  var picker='<div id="fluide-picker" style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:12px;margin-top:8px">';
+  picker+='<div style="font-size:12px;color:#888;margin-bottom:8px">Choisir un type :</div>';
+  picker+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
+  FLUIDE_TYPES.forEach(function(t,i){
+    picker+='<button onclick="addFluidePick('+i+')" style="font-size:12px;border:1px solid #ddd;border-radius:6px;padding:5px 10px;background:#fff;cursor:pointer;display:flex;align-items:center;gap:5px">'+t.icon+' '+escH(t.nom)+'</button>';
+  });
+  picker+='</div></div>';
+  var existing=document.getElementById('fluide-picker');
+  if(existing)existing.remove();
+  document.getElementById('fluides-container').insertAdjacentHTML('afterend',picker);
+}
+function addFluidePick(typeIdx){
+  var t=FLUIDE_TYPES[typeIdx];
+  var f={idx:fluidesIdx++,icon:t.icon,nom:t.nom,unite:t.unite,obj:'',cout:'',seuil:'',sousCmptrs:[],showSous:false};
+  // Apply current preset for cost hint
+  if(currentPreset){
+    var p=PRESETS[currentPreset];
+    if(t.nom.indexOf('K1')>=0&&p.k1_cout)f.cout=p.k1_cout;
+    else if(t.nom.indexOf('K2')>=0&&p.k2_cout)f.cout=p.k2_cout;
+    else if(t.nom==='Eau'&&p.eau_cout)f.cout=p.eau_cout;
+    else if(t.nom==='Gasoil'&&p.gasoil_cout)f.cout=p.gasoil_cout;
+  }
+  fluidesData.push(f);
+  document.getElementById('fluide-picker').remove();
+  renderFluides();
+}
+function removeFluide(i){fluidesData.splice(i,1);renderFluides();}
+function toggleSous(i){fluidesData[i].showSous=!fluidesData[i].showSous;renderFluides();}
+function addSousCmptre(i){fluidesData[i].sousCmptrs.push({nom:''});renderFluides();}
+function removeSousCmptre(i,si){fluidesData[i].sousCmptrs.splice(si,1);renderFluides();}
+
+function applyPreset(key,btn){
+  currentPreset=key;
+  document.querySelectorAll('.preset-btn').forEach(function(b){b.classList.remove('active');});
+  if(btn)btn.classList.add('active');
+  var p=PRESETS[key]||{};
+  // Apply to existing fluides
+  fluidesData.forEach(function(f){
+    if(f.nom.indexOf('K1')>=0&&p.k1_cout)f.cout=p.k1_cout;
+    else if(f.nom.indexOf('K2')>=0&&p.k2_cout)f.cout=p.k2_cout;
+    else if(f.nom==='Eau'&&p.eau_cout)f.cout=p.eau_cout;
+    else if(f.nom==='Gasoil'&&p.gasoil_cout)f.cout=p.gasoil_cout;
+  });
+  renderFluides();
+}
+
+/* ── CHAMBRES ── */
+var chambresData=[];
+var chambresIdx=0;
+
+function initChambres(){
+  if(chambresData.length>0)return;
+  var defaults=[
+    {nom:'Chambre Standard',nb:'',equip:'Climatisation, TV, Téléphone, Minibar, Coffre-fort'},
+    {nom:'Chambre Supérieure',nb:'',equip:'Climatisation, TV, Téléphone, Minibar, Coffre-fort, Baignoire'},
+    {nom:'Suite',nb:'',equip:'Climatisation multi-split, TV, Téléphone, Minibar, Coffre-fort, Baignoire, Salon séparé'},
+  ];
+  defaults.forEach(function(d){
+    chambresData.push({idx:chambresIdx++,nom:d.nom,nb:d.nb,equip:d.equip});
+  });
+}
+
+function renderChambres(){
+  initChambres();
+  var tb=document.getElementById('chambres-tbody');
+  tb.innerHTML=chambresData.map(function(c,i){
+    return '<tr id="crow-'+c.idx+'">'+
+      '<td><input type="text" value="'+escH(c.nom)+'" placeholder="ex : Suite Junior" onchange="chambresData['+i+'].nom=this.value"></td>'+
+      '<td><input type="number" value="'+escH(c.nb||'')+'" placeholder="0" min="0" style="text-align:center" onchange="chambresData['+i+'].nb=this.value"></td>'+
+      '<td><input type="text" value="'+escH(c.equip)+'" placeholder="Clim, TV, Minibar…" onchange="chambresData['+i+'].equip=this.value"></td>'+
+      '<td style="text-align:right"><button class="btn-del-row" onclick="removeChambreType('+i+')">×</button></td>'+
+    '</tr>';
+  }).join('');
+}
+
+function addChambreType(){
+  chambresData.push({idx:chambresIdx++,nom:'',nb:'',equip:''});
+  renderChambres();
+}
+function removeChambreType(i){chambresData.splice(i,1);renderChambres();}
+
+/* ── TEMPLATES DOWNLOAD ── */
+function downloadTemplateRonde(){
+  var bom='﻿';
+  var rows=[
+    ['Zone','Lieu','Equipement','Type de controle','Frequence','Capacite','Valeur normale','Seuil alerte min','Seuil alerte max','Unite','Remarques'],
+    // Cuisine
+    ['Cuisine','Cuisine principale','Groupe froid chambre froide positive','Temperature relevee','Quotidienne','1200 L','3','1','6','°C','Alarme si >6°C'],
+    ['Cuisine','Cuisine principale','Groupe froid chambre froide negative','Temperature relevee','Quotidienne','600 L','-18','-22','-15','°C',''],
+    ['Cuisine','Cuisine principale','Hotte cuisine','Visuel fonctionnement','Quotidienne','','','','','','Vérifier ventilation'],
+    ['Cuisine','Cuisine principale','Lave-vaisselle industriel','Visuel + temperature eau','Quotidienne','','65','60','','°C',''],
+    ['Cuisine','Stockage sec','Climatisation stockage','Temperature','Quotidienne','','18','15','22','°C',''],
+    // Piscine
+    ['Piscine','Bassin principal','pH eau piscine','Relevé pH-mètre','Quotidienne','250 m³','7.2','7.0','7.6','pH','Ajuster réactif si hors seuil'],
+    ['Piscine','Bassin principal','Chlore eau piscine','Relevé colorimétrique','Quotidienne','','1.5','0.5','3.0','mg/L',''],
+    ['Piscine','Bassin principal','Pompe filtration principale','Visuel fonctionnement','Quotidienne','','','','','','Vérifier pression filtre'],
+    ['Piscine','Bassin principal','Pompe filtration secondaire','Visuel fonctionnement','Quotidienne','','','','','',''],
+    ['Piscine','Local technique','Niveau bac de dosage chlore','Visuel niveau','Hebdomadaire','200 L','','20','','%','Recommander réassort si <20%'],
+    ['Piscine','Plage piscine','Eclairage plage et bassin','Visuel','Quotidienne','','','','','',''],
+    // Chaufferie / GE
+    ['Chaufferie','Local GE','Groupe electrogene principal','Visuel + niveau gasoil','Quotidienne','5000 L','','15','','%','Alerte si niveau cuve <15%'],
+    ['Chaufferie','Local GE','Groupe electrogene secours','Visuel + test hebdo','Hebdomadaire','2000 L','','15','','%','Test charge hebdomadaire'],
+    ['Chaufferie','Local technique','Chaudiere principale','Visuel + pression','Quotidienne','','3','2.5','4','bar',''],
+    ['Chaufferie','Local technique','Ballon eau chaude sanitaire','Temperature + pression','Quotidienne','2000 L','60','55','65','°C','Legionellose si <55°C'],
+    ['Chaufferie','Local technique','Pompe circulation ECS','Visuel fonctionnement','Quotidienne','','','','','',''],
+    // HVAC
+    ['HVAC','Toiture','CTA centrale air neuf','Visuel + pression filtre','Hebdomadaire','10000 m³/h','','','','','Changer filtre si pression > seuil'],
+    ['HVAC','Sous-sol','Groupe froid central','Fonctionnement + temperature','Quotidienne','','7','5','9','°C',''],
+    ['HVAC','Sous-sol','Tour de refroidissement','Visuel niveau eau + purge','Hebdomadaire','','','','','','Traitement légionellose mensuel'],
+    // Etages
+    ['Etages','Couloir RDC','Eclairage de secours','Visuel','Hebdomadaire','','','','','','Test autonomie mensuel'],
+    ['Etages','Couloir etage 1','Climatisation corridor','Visuel fonctionnement','Quotidienne','','','','','',''],
+    ['Etages','Couloir etage 2','Eclairage de secours','Visuel','Hebdomadaire','','','','','',''],
+    ['Etages','Escaliers','Eclairage escalier','Visuel','Quotidienne','','','','','',''],
+    // Buanderie
+    ['Buanderie','Salle de lavage','Machine a laver 1','Visuel fonctionnement','Quotidienne','','','','','',''],
+    ['Buanderie','Salle de lavage','Sechoir industriel 1','Visuel + nettoyage filtre','Quotidienne','','','','','','Vider filtre peluches quotidiennement'],
+    ['Buanderie','Salle de lavage','Calandre repassage','Visuel','Quotidienne','','','','','',''],
+    ['Buanderie','Local technique','Adoucisseur eau','Niveau sel','Hebdomadaire','','','20','','%',''],
+    // Spa / Fitness
+    ['Spa','Hammam','Temperature hammam','Relevé thermometre','Quotidienne','','45','40','50','°C',''],
+    ['Spa','Hammam','Generateur vapeur','Visuel + niveau eau','Quotidienne','','','','','',''],
+    ['Spa','Jacuzzi','pH jacuzzi','Relevé pH-mètre','Quotidienne','5 m³','7.2','7.0','7.6','pH',''],
+    ['Spa','Jacuzzi','Chlore jacuzzi','Relevé','Quotidienne','','3','2','5','mg/L',''],
+    ['Spa','Salle fitness','Climatisation fitness','Visuel','Quotidienne','','','','','',''],
+    // Parking
+    ['Parking','Parking sous-sol','Pompe relevage eaux','Visuel','Quotidienne','','','','','','Vérifier niveau fosse'],
+    ['Parking','Parking sous-sol','Extracteurs ventilation','Visuel fonctionnement','Quotidienne','','','','','',''],
+    ['Parking','Parking sous-sol','Eclairage de secours','Visuel','Hebdomadaire','','','','','',''],
+    // Eau
+    ['Eau','Bâche à eau','Niveau bâche principale','Relevé niveau','Quotidienne','200 m³','','20','','%','Alerte si <20%'],
+    ['Eau','Local pompes','Pompe surpression principale','Visuel + pression','Quotidienne','','3.5','3','4','bar',''],
+    ['Eau','Local pompes','Pompe surpression secours','Visuel','Quotidienne','','','','','',''],
+    // Electricite
+    ['Electricite','TGBT','Tableau general basse tension','Visuel + temperature','Hebdomadaire','','','','60','°C','Thermographie annuelle'],
+    ['Electricite','TGBT','Transformateur HTA/BTA','Visuel + bruit','Hebdomadaire','','','','','',''],
+    ['Electricite','Toiture','Panneaux solaires','Visuel + relevé production','Hebdomadaire','','','','','',''],
+    // Restauration
+    ['Restaurant','Salle restaurant','Climatisation salle principale','Visuel','Quotidienne','','','','','',''],
+    ['Restaurant','Terrasse','Ventilateurs brumisateurs','Visuel','Quotidienne','','','','','','Saisonnier'],
+    // Securite
+    ['Securite','Sous-sol','Sprinklers','Visuel','Mensuelle','','','','','','Test pression trimestriel'],
+    ['Securite','Tous niveaux','Detecteurs fumee','Test','Mensuelle','','','','','','Remplacement piles si necessaire'],
+    ['Securite','Entree principale','Groupe electrogene UPS','Test','Mensuelle','','','','','',''],
+  ];
+  var csv=bom+rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
   var url=URL.createObjectURL(blob);
   var a=document.createElement('a');
-  a.href=url;a.download='zones_lieux_equipements_template.csv';
+  a.href=url;a.download='zones_equipements_ronde_template.csv';
   document.body.appendChild(a);a.click();
   setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},500);
   return false;
 }
 
+/* ── FILES ── */
 function addFiles(listId,files){
   for(var i=0;i<files.length;i++) filesMap[listId].push(files[i]);
   renderFileList(listId);
 }
-
-function removeFile(listId,idx){
-  filesMap[listId].splice(idx,1);
-  renderFileList(listId);
-}
-
+function removeFile(listId,idx){filesMap[listId].splice(idx,1);renderFileList(listId);}
 function renderFileList(listId){
   var el=document.getElementById(listId);
   el.innerHTML=filesMap[listId].map(function(f,i){
     var kb=Math.round(f.size/1024);
     var size=kb>1024?(Math.round(kb/102.4)/10)+' Mo':kb+' Ko';
     return '<div class="file-item">'+
-      '<span style="font-size:16px">'+(f.type.startsWith('image')?'🖼':'📄')+'</span>'+
+      '<span style="font-size:16px">'+(f.type&&f.type.startsWith('image')?'🖼':'📄')+'</span>'+
       '<span class="file-item-name">'+escH(f.name)+'</span>'+
       '<span class="file-item-size">'+size+'</span>'+
       '<button class="file-item-del" onclick="removeFile(\''+listId+'\','+i+')" title="Retirer">×</button>'+
     '</div>';
   }).join('');
 }
-
-function escH(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-
 function onDragOver(e,id){e.preventDefault();document.getElementById(id).classList.add('dragover');}
 function onDragLeave(e,id){document.getElementById(id).classList.remove('dragover');}
-function onDrop(e,zoneId,listId){
-  e.preventDefault();
-  document.getElementById(zoneId).classList.remove('dragover');
-  addFiles(listId,e.dataTransfer.files);
-}
+function onDrop(e,zoneId,listId){e.preventDefault();document.getElementById(zoneId).classList.remove('dragover');addFiles(listId,e.dataTransfer.files);}
 
+/* ── SUMMARY ── */
 function buildSummary(){
   var hotel=v('hotelName')?document.getElementById('hotelName').value:'—';
   var wf=document.querySelector('input[name=workflow]:checked');
   var wfLabel=wf&&wf.value==='auto-affecte'?'Autonomie par technicien':'Resp. tech. affecte les interventions';
-  var fluides=[
-    {nom:'Élec K1',obj:document.getElementById('f-k1-obj').value,cout:document.getElementById('f-k1-cout').value,seuil:document.getElementById('f-k1-seuil').value},
-    {nom:'Élec K2',obj:document.getElementById('f-k2-obj').value,cout:document.getElementById('f-k2-cout').value,seuil:document.getElementById('f-k2-seuil').value},
-    {nom:'Eau',obj:document.getElementById('f-eau-obj').value,cout:document.getElementById('f-eau-cout').value,seuil:document.getElementById('f-eau-seuil').value},
-    {nom:'Gasoil',obj:document.getElementById('f-gasoil-obj').value,cout:document.getElementById('f-gasoil-cout').value,seuil:document.getElementById('f-gasoil-seuil').value},
-  ].filter(function(f){return f.obj||f.cout||f.seuil;});
-  var nStruct=filesMap['files-structure'].length;
-  var nRonde=filesMap['files-ronde'].length;
+  var chambresOk=chambresData.filter(function(c){return c.nom||c.nb;});
+  var sous=fluidesData.filter(function(f){return f.sousCmptrs&&f.sousCmptrs.length;});
+  var techOk=techData.filter(function(t){return t.nom||t.wa;});
   var html='<b>'+escH(hotel)+'</b> · '+escH(document.getElementById('ville').value)+', '+escH(document.getElementById('pays').value)+'<br>'+
     document.getElementById('nbChambres').value+' chambres · Resp. tech. : '+escH(document.getElementById('contactNom').value)+'<br>'+
     'Workflow : '+wfLabel+'<br>'+
-    (fluides.length?'Fluides renseignés : '+fluides.map(function(f){return f.nom;}).join(', ')+'<br>':'Aucun fluide renseigné<br>')+
-    (nStruct?nStruct+' fichier(s) structure':'Pas de fichier structure')+
-    (nRonde?' · '+nRonde+' document(s) ronde':'');
+    'Fluides : '+(fluidesData.length?fluidesData.map(function(f){return f.nom;}).join(', '):'aucun')+'<br>'+
+    (sous.length?'Sous-compteurs : '+sous.map(function(f){return f.nom+'('+f.sousCmptrs.length+')';}).join(', ')+'<br>':'')+
+    (chambresOk.length?'Types de chambres : '+chambresOk.map(function(c){return escH(c.nom)+(c.nb?' ×'+c.nb:'');}).join(', ')+'<br>':'')+
+    (techOk.length?'Équipe technique : '+techOk.map(function(t){return escH(t.nom||'?')+' ('+t.role+(t.wa?' · +'+t.wa:'')+')'}).join(', ')+'<br>':'')+
+    (filesMap['files-structure'].length?filesMap['files-structure'].length+' fichier(s) structure hôtel<br>':'')+
+    (filesMap['files-ronde-equip'].length?filesMap['files-ronde-equip'].length+' fichier(s) équipements de ronde<br>':'')+
+    (filesMap['files-ronde'].length?filesMap['files-ronde'].length+' document(s) de ronde existants':'');
   document.getElementById('summary-content').innerHTML=html;
 }
 
+/* ── UPLOAD (BUG FIX: encode path segments) ── */
 async function uploadFile(file,prefix){
   var slug=(document.getElementById('hotelName').value||'hotel').replace(/[^a-z0-9]/gi,'-').toLowerCase();
-  var path=slug+'/'+prefix+'/'+Date.now()+'-'+file.name;
-  var res=await fetch(SUPABASE_URL+'/storage/v1/object/onboarding/'+path,{
+  var safeName=file.name.replace(/[^a-z0-9.\-_]/gi,'_');
+  var path=slug+'/'+prefix+'/'+Date.now()+'-'+safeName;
+  var encodedPath=path.split('/').map(function(seg){return encodeURIComponent(seg);}).join('/');
+  var res=await fetch(SUPABASE_URL+'/storage/v1/object/onboarding/'+encodedPath,{
     method:'POST',
     headers:{'Authorization':'Bearer '+SUPABASE_ANON,'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},
     body:file
   });
-  if(!res.ok)throw new Error('Upload échoué : '+file.name);
-  return {nom:file.name,url:SUPABASE_URL+'/storage/v1/object/public/onboarding/'+path};
+  if(!res.ok){var t=await res.text();throw new Error('Upload échoué ('+res.status+'): '+file.name+' — '+t);}
+  return {nom:file.name,url:SUPABASE_URL+'/storage/v1/object/public/onboarding/'+encodedPath};
 }
 
+/* ── SEND ── */
 async function sendForm(){
   var btn=document.getElementById('btn-send');
   var err=document.getElementById('err3');
   var upMsg=document.getElementById('uploading-msg');
   err.style.display='none';
   btn.disabled=true;btn.textContent='Envoi…';
-
   try{
-    // Upload fichiers
     var fichiers=[];
-    var allFiles=filesMap['files-structure'].concat(filesMap['files-ronde']);
+    var allFiles=filesMap['files-structure'].concat(filesMap['files-ronde-equip']).concat(filesMap['files-ronde']);
     if(allFiles.length){
       upMsg.style.display='block';
-      for(var i=0;i<filesMap['files-structure'].length;i++){
-        fichiers.push(await uploadFile(filesMap['files-structure'][i],'structure'));
-      }
-      for(var j=0;j<filesMap['files-ronde'].length;j++){
-        fichiers.push(await uploadFile(filesMap['files-ronde'][j],'ronde'));
-      }
+      for(var i=0;i<filesMap['files-structure'].length;i++)fichiers.push(await uploadFile(filesMap['files-structure'][i],'structure'));
+      for(var k=0;k<filesMap['files-ronde-equip'].length;k++)fichiers.push(await uploadFile(filesMap['files-ronde-equip'][k],'ronde-equip'));
+      for(var j=0;j<filesMap['files-ronde'].length;j++)fichiers.push(await uploadFile(filesMap['files-ronde'][j],'ronde'));
       upMsg.style.display='none';
     }
-
-    // Données fluides
     var wfVal=document.querySelector('input[name=workflow]:checked').value;
     var wfLabel=wfVal==='auto-affecte'?'Autonomie — chaque technicien reçoit et clôture ses signalements':'Centralisation — le resp. tech. affecte chaque intervention';
-
+    var fluidesPayload={};
+    fluidesData.forEach(function(f){
+      var key=f.nom+(f.unite?' ('+f.unite+')':'');
+      fluidesPayload[key]={objectif:f.obj,cout:f.cout,seuil:f.seuil,sousCmptrs:f.sousCmptrs.map(function(s){return s.nom;}).filter(Boolean)};
+    });
     var payload={
       hotelName:document.getElementById('hotelName').value,
       nbChambres:document.getElementById('nbChambres').value,
@@ -474,18 +766,13 @@ async function sendForm(){
       contactRole:document.getElementById('contactRole').value,
       workflow:wfLabel,
       message:document.getElementById('message').value,
-      fluides:{
-        'Élec K1 (kWh)':{objectif:document.getElementById('f-k1-obj').value,cout:document.getElementById('f-k1-cout').value,seuil:document.getElementById('f-k1-seuil').value},
-        'Élec K2 (kWh)':{objectif:document.getElementById('f-k2-obj').value,cout:document.getElementById('f-k2-cout').value,seuil:document.getElementById('f-k2-seuil').value},
-        'Eau (m³)':{objectif:document.getElementById('f-eau-obj').value,cout:document.getElementById('f-eau-cout').value,seuil:document.getElementById('f-eau-seuil').value},
-        'Gasoil (L)':{objectif:document.getElementById('f-gasoil-obj').value,cout:document.getElementById('f-gasoil-cout').value,seuil:document.getElementById('f-gasoil-seuil').value},
-      },
+      fluides:fluidesPayload,
+      equipe:techData.filter(function(t){return t.nom||t.wa;}).map(function(t){return {nom:t.nom,role:t.role,whatsapp:t.wa?'+'+t.wa.replace(/^\+/,''):''}}),
+      chambres:chambresData.map(function(c){return {type:c.nom,nb:c.nb,equip:c.equip};}),
       fichiers:fichiers,
     };
-
     var res=await fetch(EDGE_FN,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if(!res.ok){var e=await res.text();throw new Error(e);}
-
     goTo(4);
   }catch(ex){
     upMsg.style.display='none';
@@ -494,6 +781,11 @@ async function sendForm(){
     btn.disabled=false;btn.textContent='Envoyer →';
   }
 }
+
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// Init tech table on page load (step 1 is visible)
+initTech();
 </script>
 </body>
 </html>
