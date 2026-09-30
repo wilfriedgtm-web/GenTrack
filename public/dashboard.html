@@ -3795,8 +3795,12 @@ var _eqImportStep=0; // 0=off,1=upload,2=preview,3=assign+confirm
 var _eqImportByCat={}; // {cat:[nomEq,...]}
 var _eqImportSid=null;
 var _eqImportMode='add'; // 'add'|'replace'
-var _eqImportManualCats=[]; // cats en mode sélection manuelle
-var _eqImportManualSel={}; // {cat:[zoneId,...]} sélection manuelle
+var _eqImportAssignMode='bloc'; // 'bloc'|'individual'
+var _eqImportBlocZones=[]; // zone IDs sélectionnées en mode bloc
+var _eqImportIndivZones={}; // {eqKey:[zoneId,...]} overrides par équipement
+var _eqImportActiveIndivKey=null; // équipement dont le picker est ouvert
+var _eqImportManualCats=[]; // legacy (non utilisé)
+var _eqImportManualSel={}; // legacy (non utilisé)
 
 var _ZONE_EQ_TEMPLATES={
   'Restauration':['Climatisation','Réfrigérateur industriel','Lave-vaisselle','Four professionnel','Hotte d\'aspiration','Caisse enregistreuse'],
@@ -4705,13 +4709,13 @@ function _zonesHandleFile(file,sid){
 
 function _eqImportStart(sid){
   _eqImportSid=sid;_eqImportStep=1;_eqImportByCat={};
-  _eqImportManualCats=[];_eqImportManualSel={};
+  _eqImportBlocZones=[];_eqImportIndivZones={};_eqImportActiveIndivKey=null;_eqImportAssignMode='bloc';
   if(_session)renderRespTech(_session,'config');
 }
 
 function _eqImportBack(){
   _eqImportStep=Math.max(0,_eqImportStep-1);
-  if(_eqImportStep===0){_eqImportByCat={};_eqImportManualCats=[];_eqImportManualSel={};}
+  if(_eqImportStep===0){_eqImportByCat={};_eqImportBlocZones=[];_eqImportIndivZones={};_eqImportActiveIndivKey=null;_eqImportAssignMode='bloc';}
   if(_session)renderRespTech(_session,'config');
 }
 
@@ -4795,54 +4799,136 @@ function _eqImportRenderPreview(zones,sid){
 
 function _eqImportRenderAssign(zones,sid){
   var cats=Object.keys(_eqImportByCat);
-  var totalEqCreate=0;
-  var catRows=cats.map(function(cat){
-    var eqs=_eqImportByCat[cat]||[];
-    var matchZones=zones.filter(function(z){return (z.categorie||'Autre')===cat;});
-    var isManual=_eqImportManualCats.indexOf(cat)>=0;
-    var selIds=isManual?(_eqImportManualSel[cat]||[]):matchZones.map(function(z){return z.id;});
-    var nTarget=selIds.length;
-    totalEqCreate+=eqs.length*nTarget;
-    var icon=_ZONE_CAT_ICONS[cat]||'📍';
-    var catKey=cat.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    var manualHtml='';
-    if(isManual&&matchZones.length){
-      manualHtml='<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;max-height:120px;overflow-y:auto;padding:6px;background:var(--creme);border-radius:8px">'+
-        matchZones.map(function(z){
-          var sel=selIds.indexOf(z.id)>=0;
-          return '<button onclick="_eqImportToggleZone(\''+catKey+'\',\''+z.id+'\')" '+
-            'style="padding:4px 10px;border:1.5px solid '+(sel?'var(--amber)':'var(--border)')+';border-radius:20px;background:'+(sel?'var(--amber)':'white')+';color:'+(sel?'white':'var(--text2)')+';font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">'+
-            escape_html(z.nom)+
-          '</button>';
-        }).join('')+
-      '</div>';
-    }
-    return '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:10px">'+
-      '<div style="display:flex;align-items:center;gap:8px">'+
-        '<span style="font-size:18px">'+icon+'</span>'+
-        '<div style="flex:1">'+
-          '<span style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(cat)+'</span>'+
-          '<span style="font-size:11px;color:var(--text3);margin-left:8px">'+eqs.length+' équipement'+(eqs.length!==1?'s':'')+'</span>'+
+  var allEqs=[];
+  cats.forEach(function(cat){
+    (_eqImportByCat[cat]||[]).forEach(function(eq,idx){
+      allEqs.push({key:cat+'__'+idx,cat:cat,nom:eq});
+    });
+  });
+  var totalEq=allEqs.length;
+
+  // Calcul total lignes
+  var totalRows=0;
+  if(_eqImportAssignMode==='bloc'){
+    totalRows=totalEq*_eqImportBlocZones.length;
+  } else {
+    allEqs.forEach(function(eq){
+      var ids=_eqImportIndivZones.hasOwnProperty(eq.key)?_eqImportIndivZones[eq.key]:_eqImportBlocZones;
+      totalRows+=ids.length;
+    });
+  }
+
+  // Zones groupées par catégorie pour le picker
+  var zoneByCat={};
+  zones.forEach(function(z){
+    var c=z.categorie||'Autre';
+    if(!zoneByCat[c])zoneByCat[c]=[];
+    zoneByCat[c].push(z);
+  });
+
+  // Render zone picker (DOM direct pour toggle sans re-render)
+  function renderZonePicker(selectedIds,pickerId,fnToggle,fnToggleCat){
+    var groupsHtml=Object.keys(zoneByCat).map(function(c){
+      var czones=zoneByCat[c];
+      var icon=_ZONE_CAT_ICONS[c]||'📍';
+      var selCount=czones.filter(function(z){return selectedIds.indexOf(z.id)>=0;}).length;
+      var allIdsJson=JSON.stringify(czones.map(function(z){return z.id;}));
+      var cEsc=c.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      return '<div class="eq-zone-group" style="margin-bottom:10px">'+
+        '<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">'+
+          '<span style="font-size:13px">'+icon+'</span>'+
+          '<span style="font-size:12px;font-weight:700;color:var(--dark);flex:1">'+escape_html(c)+'</span>'+
+          '<span id="'+pickerId+'-cnt-'+c.replace(/[^a-z0-9]/gi,'_')+'" style="font-size:11px;color:var(--text2)">'+selCount+'/'+czones.length+'</span>'+
+          '<button onclick="'+fnToggleCat+'(\''+cEsc+'\','+allIdsJson+',true,\''+pickerId+'\')" '+
+            'style="padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:white;font-size:10px;cursor:pointer;font-family:inherit;color:var(--text2)">Tout</button>'+
+          '<button onclick="'+fnToggleCat+'(\''+cEsc+'\','+allIdsJson+',false,\''+pickerId+'\')" '+
+            'style="padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:white;font-size:10px;cursor:pointer;font-family:inherit;color:var(--text2)">Aucun</button>'+
         '</div>'+
-        (matchZones.length?
-          '<div style="display:flex;align-items:center;gap:6px">'+
-            '<span style="font-size:12px;font-weight:700;color:var(--vert)">'+nTarget+'/'+matchZones.length+' zone'+(matchZones.length!==1?'s':'')+' ciblée'+(nTarget!==1?'s':'')+'</span>'+
-            (matchZones.length>1?'<button onclick="_eqImportToggleManual(\''+catKey+'\','+matchZones.length+')" '+
-              'style="padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:white;font-size:10px;font-weight:600;color:var(--text2);cursor:pointer;font-family:inherit">'+
-              (isManual?'Tout':'Sélection')+'</button>':'')+
+        '<div style="display:flex;flex-wrap:wrap;gap:5px">'+
+          czones.map(function(z){
+            var sel=selectedIds.indexOf(z.id)>=0;
+            return '<button class="eq-zone-chip" data-name="'+escape_html(z.nom.toLowerCase())+'" '+
+              'data-zone="'+z.id+'" data-cat="'+escape_html(c)+'" '+
+              'onclick="'+fnToggle+'(\''+z.id+'\',this,\''+pickerId+'\')" '+
+              'style="padding:3px 9px;border:1.5px solid '+(sel?'var(--amber)':'var(--border)')+';border-radius:14px;'+
+              'background:'+(sel?'var(--amber)':'white')+';color:'+(sel?'white':'var(--text2)')+';'+
+              'font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">'+
+              escape_html(z.nom)+
+            '</button>';
+          }).join('')+
+        '</div>'+
+      '</div>';
+    }).join('');
+    return '<div style="margin-bottom:8px">'+
+      '<input placeholder="🔍 Rechercher…" oninput="_eqImportZoneFilter(this.value,\''+pickerId+'\')" '+
+        'style="width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;font-family:inherit;outline:none">'+
+    '</div>'+
+    '<div id="'+pickerId+'">'+groupsHtml+'</div>';
+  }
+
+  // Toggle bloc
+  var modeHtml='<div style="display:flex;gap:8px;margin-bottom:14px">'+
+    _buildModeBtn('🗂 Même zones pour tous','bloc')+
+    _buildModeBtn('📋 Par équipement','individual')+
+  '</div>';
+
+  function _buildModeBtn(label,mode){
+    var active=_eqImportAssignMode===mode;
+    return '<button onclick="_eqImportToggleAssignMode(\''+mode+'\')" '+
+      'style="flex:1;padding:8px;border:1.5px solid '+(active?'var(--amber)':'var(--border)')+';border-radius:8px;'+
+      'background:'+(active?'var(--amber-pale)':'white')+';font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;'+
+      'color:'+(active?'var(--amber-dark)':'var(--text2)')+'">'+label+'</button>';
+  }
+
+  var pickerHtml='';
+  if(_eqImportAssignMode==='bloc'){
+    pickerHtml='<div style="font-size:12px;color:var(--text2);margin-bottom:8px">'+
+      totalEq+' équipements seront ajoutés à chaque zone sélectionnée.</div>'+
+      '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;max-height:360px;overflow-y:auto">'+
+        renderZonePicker(_eqImportBlocZones,'eq-bloc-picker','_eqImportToggleBlocZone','_eqImportToggleBlocCat')+
+      '</div>';
+  } else {
+    pickerHtml=allEqs.map(function(eq){
+      var selIds=_eqImportIndivZones.hasOwnProperty(eq.key)?_eqImportIndivZones[eq.key]:_eqImportBlocZones;
+      var nSel=selIds.length;
+      var isOpen=_eqImportActiveIndivKey===eq.key;
+      var keyEsc=eq.key.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var pickerId='eq-indiv-'+eq.key.replace(/[^a-z0-9]/gi,'_');
+      return '<div style="background:white;border:1.5px solid '+(isOpen?'var(--amber)':'var(--border)')+';border-radius:10px;margin-bottom:6px;overflow:hidden">'+
+        '<div style="display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer" onclick="_eqImportSetActiveIndiv(\''+keyEsc+'\')">'+
+          '<span style="flex:1;font-size:12px;font-weight:600;color:var(--dark)">'+escape_html(eq.nom)+'</span>'+
+          (_eqImportIndivZones.hasOwnProperty(eq.key)?'<span style="font-size:10px;color:var(--text3);font-style:italic">personnalisé</span>':'')+
+          '<span style="font-size:11px;color:'+(nSel?'var(--amber-dark)':'var(--text3)')+';font-weight:700">'+nSel+' zone'+(nSel!==1?'s':'')+'</span>'+
+          '<span style="font-size:10px;color:var(--text3)">'+(isOpen?'▲':'▼')+'</span>'+
+        '</div>'+
+        (isOpen?
+          '<div style="border-top:1px solid var(--border);padding:10px 12px;max-height:280px;overflow-y:auto">'+
+            (_eqImportIndivZones.hasOwnProperty(eq.key)?
+              '<button onclick="_eqImportResetIndiv(\''+keyEsc+'\')" style="font-size:10px;color:var(--text3);border:none;background:none;cursor:pointer;margin-bottom:6px;text-decoration:underline">↺ Réinitialiser (utiliser sélection bloc)</button><br>':'')+
+            renderZonePicker(selIds,pickerId,
+              '_eqImportToggleIndivZoneK(\''+keyEsc+'\',',
+              '_eqImportToggleIndivCatK(\''+keyEsc+'\',')+
           '</div>'
-          :'<span style="font-size:11px;color:var(--orange)">⚠️ Aucune zone</span>')+
-      '</div>'+
-      manualHtml+
-    '</div>';
-  }).join('');
+        :'')+
+      '</div>';
+    }).join('');
+  }
 
   return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">'+
     '<button onclick="_eqImportBack()" style="padding:7px 14px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">← Retour</button>'+
-    '<div style="flex:1;font-size:14px;font-weight:700;color:var(--dark)">Assigner aux zones</div>'+
+    '<div style="flex:1;font-size:14px;font-weight:700;color:var(--dark)">Affecter aux zones</div>'+
   '</div>'+
-  catRows+
-  '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-top:4px;margin-bottom:16px">'+
+  modeHtml+pickerHtml+
+  '<div style="background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:12px;padding:12px 16px;margin:12px 0;display:flex;align-items:center;gap:12px">'+
+    '<div style="text-align:center">'+
+      '<div id="eq-import-total" style="font-size:24px;font-weight:800;color:var(--amber-dark)">'+totalRows+'</div>'+
+      '<div style="font-size:11px;color:var(--text2)">lignes à créer</div>'+
+    '</div>'+
+    '<div style="font-size:11px;color:var(--text2);line-height:1.7">'+totalEq+' équipements · '+
+      (_eqImportAssignMode==='bloc'?_eqImportBlocZones.length+' zone'+((_eqImportBlocZones.length!==1)?'s':'')+' sélectionnée'+((_eqImportBlocZones.length!==1)?'s':''):'sélection individuelle')+
+    '</div>'+
+  '</div>'+
+  '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:14px">'+
     '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:10px">Mode d\'import</div>'+
     '<label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:8px">'+
       '<input type="radio" name="eq-import-mode" value="add" '+(_eqImportMode==='add'?'checked':'')+' onchange="_eqImportMode=\'add\'" style="accent-color:var(--amber)">'+
@@ -4850,57 +4936,145 @@ function _eqImportRenderAssign(zones,sid){
     '</label>'+
     '<label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">'+
       '<input type="radio" name="eq-import-mode" value="replace" '+(_eqImportMode==='replace'?'checked':'')+' onchange="_eqImportMode=\'replace\'" style="accent-color:var(--rouge)">'+
-      '<div><strong style="color:var(--rouge)">Remplacer</strong> — supprime les équipements existants des zones ciblées avant d\'importer</div>'+
+      '<div><strong style="color:var(--rouge)">Remplacer</strong> — supprime les équipements existants des zones ciblées</div>'+
     '</label>'+
-  '</div>'+
-  '<div style="background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:16px">'+
-    '<div style="text-align:center;flex:1">'+
-      '<div style="font-size:26px;font-weight:800;color:var(--amber-dark)">'+totalEqCreate+'</div>'+
-      '<div style="font-size:11px;color:var(--text2)">lignes à créer</div>'+
-    '</div>'+
-    '<div style="width:1px;background:var(--amber-border);align-self:stretch"></div>'+
-    '<div style="font-size:11px;color:var(--text2);flex:2;line-height:1.7">'+
-      cats.map(function(cat){
-        var eqs=_eqImportByCat[cat]||[];
-        var isManual=_eqImportManualCats.indexOf(cat)>=0;
-        var mz=isManual?(_eqImportManualSel[cat]||[]).length:zones.filter(function(z){return (z.categorie||'Autre')===cat;}).length;
-        return escape_html(cat)+' : '+eqs.length+' × '+mz+' zone'+(mz!==1?'s':'');
-      }).join('<br>')+
-    '</div>'+
   '</div>'+
   '<div id="eq-import-progress" style="font-size:12px;color:var(--text2);margin-bottom:10px"></div>'+
   '<div style="display:flex;gap:10px">'+
     '<button onclick="_eqImportBack()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer;font-family:inherit">Annuler</button>'+
-    (totalEqCreate>0?'<button onclick="_eqImportConfirm()" style="flex:2;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--amber);color:white;cursor:pointer;font-family:inherit">🚀 Lancer l\'import</button>':'')+
+    (totalRows>0?'<button onclick="_eqImportConfirm()" style="flex:2;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--amber);color:white;cursor:pointer;font-family:inherit">🚀 Lancer l\'import</button>':'')+
   '</div>';
 }
 
 function _eqImportGoAssign(){
-  _eqImportStep=3;_eqImportManualCats=[];_eqImportManualSel={};
+  _eqImportStep=3;_eqImportAssignMode='bloc';_eqImportIndivZones={};_eqImportActiveIndivKey=null;
+  // Pré-sélectionner toutes les zones du site
+  var zones=window._zonesCacheZones||[];
+  _eqImportBlocZones=zones.map(function(z){return z.id;});
   if(_session)renderRespTech(_session,'config');
 }
 
-function _eqImportToggleManual(cat,total){
-  var idx=_eqImportManualCats.indexOf(cat);
-  if(idx>=0){
-    _eqImportManualCats.splice(idx,1);
+function _eqImportToggleAssignMode(mode){
+  _eqImportAssignMode=mode;_eqImportActiveIndivKey=null;
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _eqImportSetActiveIndiv(key){
+  _eqImportActiveIndivKey=(_eqImportActiveIndivKey===key)?null:key;
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _eqImportResetIndiv(key){
+  delete _eqImportIndivZones[key];
+  if(_session)renderRespTech(_session,'config');
+}
+
+// ── Bloc mode toggles (DOM direct, pas de re-render) ──
+function _eqImportToggleBlocZone(zoneId,btn,pickerId){
+  var idx=_eqImportBlocZones.indexOf(zoneId);
+  if(idx>=0){_eqImportBlocZones.splice(idx,1);_eqImportSetChipSel(btn,false);}
+  else{_eqImportBlocZones.push(zoneId);_eqImportSetChipSel(btn,true);}
+  _eqImportUpdateCatCount(pickerId,btn.dataset.cat,_eqImportBlocZones);
+  _eqImportUpdateTotal();
+}
+
+function _eqImportToggleBlocCat(cat,allIds,selectAll,pickerId){
+  if(selectAll){
+    allIds.forEach(function(id){if(_eqImportBlocZones.indexOf(id)<0)_eqImportBlocZones.push(id);});
   } else {
-    _eqImportManualCats.push(cat);
-    var zones=window._zonesCacheZones||[];
-    if(!_eqImportManualSel[cat]){
-      _eqImportManualSel[cat]=zones.filter(function(z){return (z.categorie||'Autre')===cat;}).map(function(z){return z.id;});
-    }
+    allIds.forEach(function(id){var i=_eqImportBlocZones.indexOf(id);if(i>=0)_eqImportBlocZones.splice(i,1);});
   }
-  if(_session)renderRespTech(_session,'config');
+  _eqImportRefreshPicker(pickerId,_eqImportBlocZones);
+  _eqImportUpdateTotal();
 }
 
-function _eqImportToggleZone(cat,zoneId){
-  if(!_eqImportManualSel[cat])_eqImportManualSel[cat]=[];
-  var arr=_eqImportManualSel[cat];
+// ── Individual mode toggles (DOM direct) ──
+function _eqImportToggleIndivZone(key,zoneId,btn,pickerId){
+  if(!_eqImportIndivZones.hasOwnProperty(key))_eqImportIndivZones[key]=_eqImportBlocZones.slice();
+  var arr=_eqImportIndivZones[key];
   var idx=arr.indexOf(zoneId);
-  if(idx>=0)arr.splice(idx,1);else arr.push(zoneId);
-  if(_session)renderRespTech(_session,'config');
+  if(idx>=0){arr.splice(idx,1);_eqImportSetChipSel(btn,false);}
+  else{arr.push(zoneId);_eqImportSetChipSel(btn,true);}
+  _eqImportUpdateCatCount(pickerId,btn.dataset.cat,arr);
+  _eqImportUpdateTotal();
 }
+
+function _eqImportToggleIndivCat(key,cat,allIds,selectAll,pickerId){
+  if(!_eqImportIndivZones.hasOwnProperty(key))_eqImportIndivZones[key]=_eqImportBlocZones.slice();
+  var arr=_eqImportIndivZones[key];
+  if(selectAll){allIds.forEach(function(id){if(arr.indexOf(id)<0)arr.push(id);});}
+  else{allIds.forEach(function(id){var i=arr.indexOf(id);if(i>=0)arr.splice(i,1);});}
+  _eqImportRefreshPicker(pickerId,arr);
+  _eqImportUpdateTotal();
+}
+
+// ── DOM helpers ──
+function _eqImportSetChipSel(btn,sel){
+  btn.style.background=sel?'var(--amber)':'white';
+  btn.style.borderColor=sel?'var(--amber)':'var(--border)';
+  btn.style.color=sel?'white':'var(--text2)';
+}
+
+function _eqImportRefreshPicker(pickerId,selectedIds){
+  var picker=document.getElementById(pickerId);
+  if(!picker)return;
+  picker.querySelectorAll('.eq-zone-chip').forEach(function(btn){
+    _eqImportSetChipSel(btn,selectedIds.indexOf(btn.dataset.zone||btn.getAttribute('data-zone'))>=0);
+  });
+  // update all cat counts
+  picker.querySelectorAll('.eq-zone-group').forEach(function(grp){
+    var cat=grp.querySelector('.eq-zone-chip');
+    if(!cat)return;
+    var catName=cat.dataset.cat;
+    _eqImportUpdateCatCount(pickerId,catName,selectedIds);
+  });
+}
+
+function _eqImportUpdateCatCount(pickerId,cat,selectedIds){
+  var picker=document.getElementById(pickerId);
+  if(!picker)return;
+  var catKey=cat.replace(/[^a-z0-9]/gi,'_');
+  var el=picker.querySelector('[id$="-cnt-'+catKey+'"]')||document.getElementById(pickerId+'-cnt-'+catKey);
+  if(!el)return;
+  var chips=picker.querySelectorAll('.eq-zone-chip[data-cat="'+cat+'"]');
+  var total=chips.length;
+  var sel=Array.from(chips).filter(function(b){return selectedIds.indexOf(b.dataset.zone||b.getAttribute('data-zone'))>=0;}).length;
+  el.textContent=sel+'/'+total;
+}
+
+function _eqImportUpdateTotal(){
+  var el=document.getElementById('eq-import-total');
+  if(!el)return;
+  var allEqs=[];
+  Object.keys(_eqImportByCat).forEach(function(cat){(_eqImportByCat[cat]||[]).forEach(function(eq,idx){allEqs.push(cat+'__'+idx);});});
+  var total=0;
+  if(_eqImportAssignMode==='bloc'){
+    total=allEqs.length*_eqImportBlocZones.length;
+  } else {
+    allEqs.forEach(function(key){
+      var ids=_eqImportIndivZones.hasOwnProperty(key)?_eqImportIndivZones[key]:_eqImportBlocZones;
+      total+=ids.length;
+    });
+  }
+  el.textContent=total;
+}
+
+function _eqImportZoneFilter(val,pickerId){
+  var q=(val||'').trim().toLowerCase();
+  var picker=document.getElementById(pickerId);
+  if(!picker)return;
+  picker.querySelectorAll('.eq-zone-chip').forEach(function(btn){
+    btn.style.display=(!q||btn.dataset.name.indexOf(q)>=0)?'':'none';
+  });
+  picker.querySelectorAll('.eq-zone-group').forEach(function(grp){
+    var visible=grp.querySelectorAll('.eq-zone-chip:not([style*="display: none"])').length;
+    grp.style.display=visible?'':'none';
+  });
+}
+
+// Wrappers mode individuel (key en 1er param pour compatibilité onclick inline)
+function _eqImportToggleIndivZoneK(key,zoneId,btn,pickerId){_eqImportToggleIndivZone(key,zoneId,btn,pickerId);}
+function _eqImportToggleIndivCatK(key,cat,allIds,selectAll,pickerId){_eqImportToggleIndivCat(key,cat,allIds,selectAll,pickerId);}
 
 function _eqImportRemoveEq(cat,idx){
   if(_eqImportByCat[cat]){_eqImportByCat[cat].splice(idx,1);if(!_eqImportByCat[cat].length)delete _eqImportByCat[cat];}
@@ -4926,26 +5100,26 @@ async function _eqImportConfirm(){
   var btn=document.querySelector('[onclick="_eqImportConfirm()"]');
   if(btn){btn.disabled=true;btn.textContent='Import en cours…';}
 
-  // Zones cibles par catégorie
-  var zonesByCat={};
+  // Construire la map eq → zones cibles
+  var allEqsForConfirm=[];
   Object.keys(_eqImportByCat).forEach(function(cat){
-    var isManual=_eqImportManualCats.indexOf(cat)>=0;
-    if(isManual){
-      zonesByCat[cat]=(_eqImportManualSel[cat]||[]).map(function(id){return zones.find(function(z){return z.id===id;});}).filter(Boolean);
-    } else {
-      zonesByCat[cat]=zones.filter(function(z){return (z.categorie||'Autre')===cat;});
-    }
+    (_eqImportByCat[cat]||[]).forEach(function(eq,idx){
+      var key=cat+'__'+idx;
+      var targetIds=_eqImportIndivZones.hasOwnProperty(key)?_eqImportIndivZones[key]:_eqImportBlocZones;
+      allEqsForConfirm.push({nom:eq,zoneIds:targetIds});
+    });
   });
 
-  // Mode replace : supprimer les équipements existants par chunks
+  // Mode replace : supprimer équipements sur toutes les zones ciblées
   if(_eqImportMode==='replace'){
-    var allIds=[];
-    Object.values(zonesByCat).forEach(function(zs){zs.forEach(function(z){allIds.push(z.id);});});
-    if(allIds.length){
+    var delIdSet={};
+    allEqsForConfirm.forEach(function(eq){eq.zoneIds.forEach(function(id){delIdSet[id]=true;});});
+    var delIds=Object.keys(delIdSet);
+    if(delIds.length){
       if(progEl)progEl.textContent='Suppression des équipements existants…';
       var delChunk=50;
-      for(var ci=0;ci<allIds.length;ci+=delChunk){
-        var chunk=allIds.slice(ci,ci+delChunk);
+      for(var ci=0;ci<delIds.length;ci+=delChunk){
+        var chunk=delIds.slice(ci,ci+delChunk);
         try{
           await fetch(window.SUPA_URL+'/rest/v1/equipements_zone?zone_id=in.('+chunk.join(',')+')',{
             method:'DELETE',
@@ -4957,14 +5131,13 @@ async function _eqImportConfirm(){
   }
 
   // Construire les lignes à insérer
+  var zoneMap={};
+  (window._zonesCacheZones||[]).forEach(function(z){zoneMap[z.id]=z;});
   var eqRows=[];
-  Object.keys(_eqImportByCat).forEach(function(cat){
-    var eqs=_eqImportByCat[cat]||[];
-    var targetZones=zonesByCat[cat]||[];
-    targetZones.forEach(function(z){
-      eqs.forEach(function(eqNom){
-        eqRows.push({site_id:sid,zone_id:z.id,nom:eqNom+' — '+z.nom,actif:true});
-      });
+  allEqsForConfirm.forEach(function(eq){
+    eq.zoneIds.forEach(function(zid){
+      var z=zoneMap[zid];
+      if(z)eqRows.push({site_id:sid,zone_id:zid,nom:eq.nom+' — '+z.nom,actif:true});
     });
   });
 
@@ -4984,7 +5157,7 @@ async function _eqImportConfirm(){
     }catch(e){console.warn('insert chunk error',e);}
   }
 
-  _eqImportStep=0;_eqImportByCat={};_eqImportManualCats=[];_eqImportManualSel={};
+  _eqImportStep=0;_eqImportByCat={};_eqImportBlocZones=[];_eqImportIndivZones={};_eqImportActiveIndivKey=null;
   if(_session)renderRespTech(_session,'config');
 }
 
