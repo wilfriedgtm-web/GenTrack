@@ -211,7 +211,7 @@ let openClientTab = 'infos';
 // ── LOAD ───────────────────────────────────────────────────
 async function loadAll() {
   document.getElementById('sync-status').textContent = 'Chargement…';
-  const [clients, sites, equipements, questions, alertes, signalements, tokens, contacts, types_eq] = await Promise.all([
+  const [clients, sites, equipements, questions, alertes, signalements, tokens, contacts, types_eq, rondes] = await Promise.all([
     api('clients','','*'),
     api('sites','','*'),
     api('equipements','','*'),
@@ -221,8 +221,9 @@ async function loadAll() {
     api('tokens','','*'),
     api('contacts','','*'),
     api('types_equipements','&order=nom.asc','*'),
+    api('rondes','&order=date_ronde.desc&limit=100','id,site_id,date_ronde,frequence,created_at'),
   ]);
-  S = { clients, sites, equipements, questions, rondes: [], rondes_equipements: [], alertes, signalements, tokens, contacts, types_equipements: types_eq };
+  S = { clients, sites, equipements, questions, rondes: rondes||[], rondes_equipements: [], alertes, signalements, tokens, contacts, types_equipements: types_eq };
   document.getElementById('sync-status').textContent = `Màj ${new Date().toLocaleTimeString('fr-FR')}`;
   const openA = alertes.filter(a=>!a.resolue).length;
   const badge = document.getElementById('alert-badge');
