@@ -3,6 +3,10 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabaseClient';
 
+function isAdmin(user) {
+  return user?.app_metadata?.role === 'admin';
+}
+
 export default function AuthGuard({ children }) {
   const [ready, setReady] = useState(false);
   const router = useRouter();
@@ -11,14 +15,14 @@ export default function AuthGuard({ children }) {
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
-      if (!data.session) {
+      if (!data.session || !isAdmin(data.session.user)) {
         router.replace('/login');
       } else {
         setReady(true);
       }
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) router.replace('/login');
+      if (!session || !isAdmin(session.user)) router.replace('/login');
     });
     return () => {
       mounted = false;

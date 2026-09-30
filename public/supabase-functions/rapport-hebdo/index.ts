@@ -110,14 +110,16 @@ async function buildMessages(site: any, equipements: any[], dateDebut: string, d
   const messages: string[] = [];
 
   // ── Message 1 : En-tête ──────────────────────────────────────
-  const tauxGlobal      = Math.round((nbRondes / 7) * 100);
+  // Rondes attendues : 7/semaine si journalier, 1/semaine si uniquement hebdo
+  const rondesAttendues = site.journalier_actif ? 7 : 1;
+  const tauxGlobal      = Math.round((Math.min(nbRondes, rondesAttendues) / rondesAttendues) * 100);
   const tauxEmoji       = tauxGlobal >= 80 ? '🟢' : tauxGlobal >= 50 ? '🟡' : '🔴';
   const nbAnomalies     = anomalies.length;
   const nbSignalements  = signalements.length;
   const nbResolus       = signalements.filter((s: any) => s.statut === 'resolu').length;
 
   let intro = `📊 *Rapport hebdomadaire — GenTrack*\n*${site.nom}*\n📅 ${dateDebutFmt} → ${dateFinFmt}\n${'─'.repeat(28)}\n\n`;
-  intro += `${tauxEmoji} *${nbRondes}/7 rondes* effectuées (${tauxGlobal}%)\n`;
+  intro += `${tauxEmoji} *${nbRondes}/${rondesAttendues} rondes* effectuées (${tauxGlobal}%)\n`;
   if (nbAnomalies)    intro += `⚠️ ${nbAnomalies} anomalie${nbAnomalies > 1 ? 's' : ''} relevée${nbAnomalies > 1 ? 's' : ''}\n`;
   if (nbSignalements) intro += `🚨 ${nbSignalements} signalement${nbSignalements > 1 ? 's' : ''} (${nbResolus} résolu${nbResolus > 1 ? 's' : ''})\n`;
   if (!nbAnomalies && !nbSignalements) intro += `✅ Semaine sans incident\n`;
@@ -132,12 +134,12 @@ async function buildMessages(site: any, equipements: any[], dateDebut: string, d
       const anoGe    = anomalies.filter((a: any) => reIds.includes(a.ronde_equipement_id));
       const sgGe     = signalements.filter((s: any) => s.equipement_id === ge.id);
       const nbSaisies = reIds.length;
-      const tEmoji   = nbSaisies >= 5 ? '🟢' : nbSaisies >= 3 ? '🟡' : '🔴';
+      const tEmoji   = nbSaisies >= Math.ceil(rondesAttendues * 0.7) ? '🟢' : nbSaisies >= Math.ceil(rondesAttendues * 0.4) ? '🟡' : '🔴';
 
       const qCompteur = questions.find((q: any) => q.equipement_id === ge.id && q.texte.toLowerCase().includes('compteur'));
       const qHuile    = questions.find((q: any) => q.equipement_id === ge.id && q.texte.toLowerCase().includes('huile'));
 
-      let block = `*${ge.nom}*\n   ${tEmoji} ${nbSaisies}/7 rondes`;
+      let block = `*${ge.nom}*\n   ${tEmoji} ${nbSaisies}/${rondesAttendues} rondes`;
 
       if (qCompteur) {
         const vals = repsGe.filter((r: any) => r.question_id === qCompteur.id)
@@ -220,9 +222,9 @@ async function buildMessages(site: any, equipements: any[], dateDebut: string, d
       const anoEq  = anomalies.filter((a: any) => reIds.includes(a.ronde_equipement_id));
       const sgEq   = signalements.filter((s: any) => s.equipement_id === eq.id);
       const nbSaisies = reIds.length;
-      const tEmoji = nbSaisies >= 5 ? '🟢' : nbSaisies >= 3 ? '🟡' : '🔴';
+      const tEmoji = nbSaisies >= Math.ceil(rondesAttendues * 0.7) ? '🟢' : nbSaisies >= Math.ceil(rondesAttendues * 0.4) ? '🟡' : '🔴';
 
-      let block = `*${eq.nom}*\n   ${tEmoji} ${nbSaisies}/7 vérifications`;
+      let block = `*${eq.nom}*\n   ${tEmoji} ${nbSaisies}/${rondesAttendues} vérifications`;
 
       // Température — question contenant "température" ou "temp"
       const qTemp = questions.find((q: any) =>
@@ -238,7 +240,7 @@ async function buildMessages(site: any, equipements: any[], dateDebut: string, d
           const tActuel = temps[temps.length - 1];
           const unite = qTemp.unite || '°C';
           // Seuil alerte si défini
-          const hors = (qTemp.seuil_min != null && tActuel > qTemp.seuil_min) || (qTemp.seuil_max != null && tActuel < qTemp.seuil_max);
+          const hors = (qTemp.seuil_min != null && tActuel < qTemp.seuil_min) || (qTemp.seuil_max != null && tActuel > qTemp.seuil_max);
           const tEmoji2 = hors ? '🔴' : '🟢';
           block += `\n   ${tEmoji2} Temp actuelle : *${tActuel}${unite}*`;
           if (tMin !== tMax) block += ` (min ${tMin}${unite} / max ${tMax}${unite})`;
@@ -268,7 +270,7 @@ async function buildMessages(site: any, equipements: any[], dateDebut: string, d
   // ── Message final : Signalements sans équipement + résumé ────
   const sgSansEquip = signalements.filter((s: any) => !s.equipement_id);
   let résumé = `${'─'.repeat(28)}\n📈 *Résumé semaine*\n`;
-  résumé += `   ${tauxEmoji} ${nbRondes}/7 rondes · ${tauxGlobal}%\n`;
+  résumé += `   ${tauxEmoji} ${nbRondes}/${rondesAttendues} rondes · ${tauxGlobal}%\n`;
   if (nbAnomalies)    résumé += `   ⚠️ ${nbAnomalies} anomalie${nbAnomalies > 1 ? 's' : ''}\n`;
   if (nbSignalements) résumé += `   🚨 ${nbSignalements} signalement${nbSignalements > 1 ? 's' : ''} · ${nbResolus} résolu${nbResolus > 1 ? 's' : ''}\n`;
   if (sgSansEquip.length) {
@@ -291,10 +293,12 @@ serve(async (_req) => {
   console.log('[rapport-hebdo]', new Date().toISOString());
 
   const aujourd = new Date();
+  const hier = new Date(aujourd);
+  hier.setDate(aujourd.getDate() - 1);
   const il_y_a_7j = new Date(aujourd);
   il_y_a_7j.setDate(aujourd.getDate() - 7);
   const dateDebut = il_y_a_7j.toISOString().split('T')[0];
-  const dateFin   = aujourd.toISOString().split('T')[0];
+  const dateFin   = hier.toISOString().split('T')[0];
 
   const stats = { rapports_envoyes: 0, messages_envoyes: 0, erreurs: 0 };
   const sites = await dbGet('sites', '&actif=eq.true&hebdo_actif=eq.true');

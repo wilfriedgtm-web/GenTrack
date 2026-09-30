@@ -10,30 +10,34 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const SUPA_URL    = Deno.env.get('SUPABASE_URL')    || 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
-const SUPA_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY') || '';
-const TWILIO_SID  = Deno.env.get('TWILIO_SID')   || '';
-const TWILIO_TOKEN= Deno.env.get('TWILIO_TOKEN') || '';
-const TWILIO_FROM = Deno.env.get('TWILIO_NUMBER')|| 'whatsapp:+19843418695';
-const ANON_KEY    = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
-const BASE_URL    = 'https://gen-track.vercel.app';
+const SUPA_URL         = Deno.env.get('SUPABASE_URL')           || 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
+const SUPA_KEY         = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const TWILIO_SID       = Deno.env.get('TWILIO_SID')             || '';
+const TWILIO_TOKEN     = Deno.env.get('TWILIO_TOKEN')            || '';
+const TWILIO_FROM      = Deno.env.get('TWILIO_NUMBER')           || 'whatsapp:+19843418695';
+const PROSPECT_NOTIFY  = Deno.env.get('PROSPECT_NOTIFY_NUMBER')  || '';
+const WEBHOOK_URL      = Deno.env.get('WEBHOOK_URL')             || '';
+const BASE_URL         = 'https://gen-track.vercel.app';
 
 // ── DB helper ─────────────────────────────────────────────────────────────────
 async function db(table: string, opts: any = {}) {
-  const { method = 'GET', body, query = '', select = '*' } = opts;
-  const key = SUPA_KEY || ANON_KEY;
+  const { method = 'GET', body, query = '', select = '*', prefer } = opts;
+  const key = SUPA_KEY;
   const url = `${SUPA_URL}/rest/v1/${table}?select=${select}${query}`;
+  const defaultPrefer = method === 'POST' ? 'return=representation' : method === 'PATCH' ? 'return=representation' : '';
   const res = await fetch(url, {
     method,
     headers: {
       'apikey': key, 'Authorization': `Bearer ${key}`,
       'Content-Type': 'application/json',
-      'Prefer': method === 'POST' ? 'return=representation' : method === 'PATCH' ? 'return=representation' : ''
+      'Prefer': prefer ?? defaultPrefer,
     },
     body: body ? JSON.stringify(body) : undefined
   });
   if (res.status === 204) return [];
-  return res.json();
+  const text = await res.text();
+  if (!text.trim()) return [];
+  return JSON.parse(text);
 }
 
 // ── Twilio ────────────────────────────────────────────────────────────────────
@@ -58,8 +62,12 @@ async function getSession(phone: string) {
   return Array.isArray(rows) ? rows[0] || null : null;
 }
 async function setSession(phone: string, state: string, data: any = {}) {
-  await db('sessions', { method: 'DELETE', query: `&phone=eq.${encodeURIComponent(phone)}` });
-  await db('sessions', { method: 'POST', body: { phone, state, data: JSON.stringify(data), updated_at: new Date().toISOString() } });
+  await db('sessions', {
+    method: 'POST',
+    query: '&on_conflict=phone',
+    prefer: 'resolution=merge-duplicates,return=minimal',
+    body: { phone, state, data: JSON.stringify(data), updated_at: new Date().toISOString() },
+  });
 }
 
 // ── Dates ─────────────────────────────────────────────────────────────────────
@@ -148,6 +156,16 @@ async function getEquipementsRestants(rondeId: string, siteId: string, frequence
     });
     if (Array.isArray(qs) && qs.length > 0) restants.push(e);
   }
+  // Ajouter "Relevé énergie" comme équipement spécial pour la ronde journalière
+  if (frequence === 'journalier') {
+    const dejaSaisi = await releveEnergieFaitAujourdhui(siteId);
+    if (!dejaSaisi) {
+      const hasConfig = await db('energie_config', { query: `&site_id=eq.${siteId}&actif=eq.true&limit=1`, select: 'id' });
+      if (Array.isArray(hasConfig) && hasConfig.length > 0) {
+        restants.push({ id: '__releve_energie__', nom: '⚡ Relevé énergie' });
+      }
+    }
+  }
   return restants;
 }
 
@@ -171,8 +189,8 @@ async function rondeCompleteDepuis(siteId: string, frequence: string, dateFrom: 
 // - mensuel : bloqué si déjà complet ce mois
 async function getFrequencesDisponibles(site: any): Promise<string[]> {
   const freqs: string[] = [];
-  // Pour les rondes : compter uniquement les équipements actif_ronde
-  const equipsRonde = await db('equipements', { query: `&site_id=eq.${site.id}&actif=eq.true&actif_ronde=eq.true` });
+  // Pour les rondes : compter uniquement les équipements actif_ronde, hors cuves (capacite_litres)
+  const equipsRonde = await db('equipements', { query: `&site_id=eq.${site.id}&actif=eq.true&actif_ronde=eq.true&capacite_litres=is.null` });
   const nbEquip = Array.isArray(equipsRonde) ? equipsRonde.length : 0;
 
   const periodMap: Record<string, string> = {
@@ -509,6 +527,40 @@ async function demarrerReleveEnergie(phone: string, contact: any, site: any): Pr
   return sendWA(phone, fmtFluidQuestion(f, lastReleve[f.id] ?? null, 1, fluides.length));
 }
 
+// Lancé depuis la ronde — stocke le contexte ronde pour y revenir après validation
+async function demarrerReleveEnergieDepuisRonde(phone: string, contact: any, site: any, rondeCtx: any): Promise<any> {
+  const fluides = await db('energie_config', { query: `&site_id=eq.${site.id}&actif=eq.true&order=ordre.asc` });
+  if (!Array.isArray(fluides) || !fluides.length) {
+    return sendWA(phone, `⚠️ Aucun fluide configuré pour le relevé énergie.\nContactez votre responsable.`);
+  }
+  const lastReleveRaw = await db('releves_energie', { query: `&site_id=eq.${site.id}&order=date_releve.desc&limit=1` });
+  const lastRow = Array.isArray(lastReleveRaw) && lastReleveRaw.length > 0 ? lastReleveRaw[0] : null;
+  const lastReleve: Record<string, any> = lastRow?.valeurs || {};
+  const f = fluides[0];
+  const sd = {
+    site_id: site.id, site_nom: site.nom,
+    tech_id: contact.id, tech_nom: contact.nom,
+    fluides: fluides.map((fl: any) => ({
+      id: fl.id, nom: fl.nom, unite: fl.unite || '',
+      type_valeur: fl.type_valeur || 'index', seuil_alerte_bas: fl.seuil_alerte_bas ?? null
+    })),
+    reponses: {} as Record<string, number>,
+    field_idx: 0,
+    last_releve: lastReleve,
+    ronde_context: {
+      ronde_id: rondeCtx.ronde_id,
+      site_id: rondeCtx.site_id,
+      site_nom: rondeCtx.site_nom,
+      frequence: rondeCtx.frequence,
+      tech_id: rondeCtx.tech_id,
+      tech_nom: rondeCtx.tech_nom,
+      client_id: rondeCtx.client_id || null
+    }
+  };
+  await setSession(phone, 'energie_saisie', sd);
+  return sendWA(phone, fmtFluidQuestion(f, lastReleve[f.id] ?? null, 1, fluides.length));
+}
+
 async function demarrerRonde(phone: string, contact: any, site: any, sd: any, frequence: string): Promise<any> {
   const rondeId = await getOrCreateRonde(site.id, contact.id, frequence);
   const restants = await getEquipementsRestants(rondeId, site.id, frequence);
@@ -685,6 +737,15 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     const n = parseInt(msg.trim()) - 1;
     if (isNaN(n) || n < 0 || n >= restants.length) return sendWA(phone, `Répondez avec un numéro entre 1 et ${restants.length}.`);
     const equip = restants[n];
+
+    // Équipement spécial : relevé énergie depuis la ronde
+    if (equip.id === '__releve_energie__') {
+      const siteRaw = await db('sites', { query: `&id=eq.${sd.site_id}&limit=1` });
+      const siteObj = Array.isArray(siteRaw) ? siteRaw[0] : null;
+      if (!siteObj) return sendWA(phone, `Erreur : site introuvable.`);
+      return demarrerReleveEnergieDepuisRonde(phone, contact, siteObj, sd);
+    }
+
     const questions = await getQuestions(equip.id, sd.frequence);
     if (!questions.length) return sendWA(phone, `Aucune question configurée pour ${equip.nom}.`);
     const reId = await getOrCreateRondeEquipement(sd.ronde_id, equip.id);
@@ -831,6 +892,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       signale_par: contact.nom,
       statut: 'ouvert',
       source: 'ronde',
+      ronde_id: sd.ronde_id || null,
     }}).catch(() => {});
     // Notifier resp_tech (non bloquant)
     db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` }).then((responsables: any[]) => {
@@ -995,7 +1057,8 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
   if (state === 'vidange_confirm') {
     if (msg === '2') { await setSession(phone, 'idle', {}); return sendWA(phone, `❌ Annulée.`); }
     if (msg !== '1') return sendWA(phone, `*1* pour confirmer, *2* pour annuler.`);
-    const prochainSeuil = (sd.heures_total || 0) + (sd.seuil_vidange || 250);
+    const seuil = sd.seuil_vidange || 250;
+    const prochainSeuil = Math.ceil((sd.heures_total + 0.01) / seuil) * seuil + seuil;
     await db('vidanges', { method: 'POST', body: {
       site_id: sd.site_id,
       equipement_id: sd.equip_id,
@@ -1200,6 +1263,13 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       for (const r of responsables) if (r.whatsapp) sendWA(r.whatsapp, notifMsg).catch(() => {});
     }).catch(() => {});
 
+    // Si lancé depuis une ronde, retour à la liste des équipements restants
+    if (sd.ronde_context?.ronde_id) {
+      await sendWA(phone, `✅ *Relevé énergie validé !*\n_${today} · ${siteNom}_`);
+      const siteRaw = await db('sites', { query: `&id=eq.${sd.ronde_context.site_id}&limit=1` });
+      const siteObj = Array.isArray(siteRaw) ? siteRaw[0] : null;
+      return continuerRonde(phone, sd.ronde_context, contact, siteObj);
+    }
     return sendWA(phone, `✅ *Relevé énergie validé !*\n_${today} · ${siteNom}_\n\n_Responsable notifié 📲_`);
   }
 
@@ -1447,11 +1517,35 @@ async function handleMessage(from: string, bodyText: string) {
     const label = pays[msg.trim()];
     if (!label) return sendWA(phone, `Répondez avec *1*, *2*, *3* ou *4* 👇`);
     await setSession(phone, 'prospect_done', { ...sd2, pays: label });
-    sendWA('+33658150628', `🔔 *Nouveau prospect GenTrack*\n\n📱 ${phone}\n📝 ${sd2.groupes}\n🌍 ${label}`).catch(() => {});
+    if (PROSPECT_NOTIFY) sendWA(PROSPECT_NOTIFY, `🔔 *Nouveau prospect GenTrack*\n\n📱 ${phone}\n📝 ${sd2.groupes}\n🌍 ${label}`).catch(() => {});
     return sendWA(phone, `🎉 Parfait !\n\nUn conseiller GenTrack vous contactera dans les 24h.\n\n_Tapez *aide* pour découvrir les fonctionnalités._`);
   }
   await setSession(phone, 'prospect_groupes', {});
   return sendWA(phone, `👋 *Bienvenue sur GenTrack !*\n\nGérez vos groupes électrogènes directement par WhatsApp.\n\n✅ Saisie quotidienne\n✅ Alertes carburant automatiques\n✅ Rapport hebdomadaire\n\nCombien de groupes gérez-vous ?\n\n*1* — 1 groupe\n*2* — 2 à 5 groupes\n*3* — Plus de 5 groupes`);
+}
+
+// ── Validation signature Twilio ───────────────────────────────────────────────
+async function validateTwilioSignature(req: Request, rawBody: string): Promise<boolean> {
+  if (!TWILIO_TOKEN) {
+    console.warn('[security] TWILIO_TOKEN non configuré — validation signature désactivée');
+    return true;
+  }
+  const signature = req.headers.get('X-Twilio-Signature') || '';
+  if (!signature) return false;
+
+  const params = new URLSearchParams(rawBody);
+  const sorted = [...params.entries()].sort(([a], [b]) => a.localeCompare(b));
+  let toSign = WEBHOOK_URL || req.url;
+  for (const [key, val] of sorted) toSign += key + val;
+
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw', enc.encode(TWILIO_TOKEN),
+    { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(toSign));
+  const expected = btoa(String.fromCharCode(...new Uint8Array(sig)));
+  return expected === signature;
 }
 
 // ── Entrée webhook ────────────────────────────────────────────────────────────
@@ -1459,11 +1553,17 @@ serve(async (req) => {
   if (req.method === 'GET') return new Response('GenTrack WhatsApp Bot v7 ✅', { status: 200 });
   try {
     const text = await req.text();
+    if (!await validateTwilioSignature(req, text)) {
+      console.warn('[security] Signature Twilio invalide — requête rejetée');
+      return new Response('Forbidden', { status: 403 });
+    }
     const params = new URLSearchParams(text);
     const from = params.get('From') || '';
     const body = params.get('Body') || '';
     if (!from || !body) return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
-    handleMessage(from, body).catch(e => console.error('handleMessage error:', e));
+    const work = handleMessage(from, body).catch(e => console.error('handleMessage error:', e));
+    // Empêche le runtime Supabase de couper la fonction avant la fin du traitement
+    (globalThis as any).EdgeRuntime?.waitUntil(work);
     return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
   } catch (err) {
     console.error('Erreur webhook:', err);

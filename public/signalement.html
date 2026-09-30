@@ -493,12 +493,15 @@ function _equipComboRender(q){
 
   var html='';
   items.forEach(function(item){
-    var esc=item.label.replace(/'/g,"\\'");
-    var safe=item.label.replace(/&/g,'&amp;').replace(/</g,'&lt;');
-    var highlighted=q?safe.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<strong style="color:var(--amber)">$1</strong>'):safe;
-    html+='<div onmousedown="_equipComboSelect(\''+item.val+'\',\''+esc+'\')" style="padding:10px 14px;font-size:14px;color:var(--dark);cursor:pointer;border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'white\'">'+highlighted+'</div>';
+    var safeVal=item.val.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    var safeLabel=item.label.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    var highlighted=q?safeLabel.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<strong style="color:var(--amber)">$1</strong>'):safeLabel;
+    html+='<div data-val="'+safeVal+'" data-label="'+safeLabel+'" style="padding:10px 14px;font-size:14px;color:var(--dark);cursor:pointer;border-bottom:1px solid var(--border)" onmouseover="this.style.background=\'var(--bg)\'" onmouseout="this.style.background=\'white\'">'+highlighted+'</div>';
   });
   list.innerHTML=html;
+  list.querySelectorAll('[data-val]').forEach(function(el){
+    el.addEventListener('mousedown',function(){_equipComboSelect(el.dataset.val,el.dataset.label);});
+  });
 }
 
 function _esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}

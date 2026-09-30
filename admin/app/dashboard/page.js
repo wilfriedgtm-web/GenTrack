@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabaseClient';
 export default function OverviewPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -15,6 +16,8 @@ export default function OverviewPage() {
         supabase.from('equipements').select('id, actif'),
         supabase.from('alertes').select('id, resolue'),
       ]);
+      const err = clients.error || sites.error || equipements.error || alertes.error;
+      if (err) { setError(err.message); setLoading(false); return; }
       setStats({
         clients: clients.data || [],
         sites: sites.data || [],
@@ -26,7 +29,8 @@ export default function OverviewPage() {
     load();
   }, []);
 
-  if (loading || !stats) return <p className="text-gray-500">Chargement...</p>;
+  if (loading) return <p className="text-gray-500">Chargement...</p>;
+  if (error) return <p className="text-red-500">Erreur : {error}</p>;
 
   const alertesOuvertes = stats.alertes.filter((a) => !a.resolue).length;
 

@@ -5,17 +5,29 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const SUPA_URL    = Deno.env.get('SUPABASE_URL')             || 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
-const SUPA_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY') || '';
+const SUPA_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const TWILIO_SID  = Deno.env.get('TWILIO_SID')               || '';
 const TWILIO_TOKEN= Deno.env.get('TWILIO_TOKEN')              || '';
 const TWILIO_FROM = Deno.env.get('TWILIO_NUMBER')             || 'whatsapp:+19843418695';
 const APP_URL     = Deno.env.get('APP_URL')                   || 'https://gen-track.vercel.app';
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'content-type, apikey, authorization',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+// Production + previews Vercel du même projet (gen-track-*.vercel.app)
+const VERCEL_PREVIEW_RE = /^https:\/\/gen-track(-[a-z0-9]+)*\.vercel\.app$/;
+
+function isAllowedOrigin(origin: string): boolean {
+  return origin === 'https://gen-track.vercel.app' || VERCEL_PREVIEW_RE.test(origin);
+}
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin') || '';
+  const allowed = isAllowedOrigin(origin) ? origin : '';
+  return {
+    'Access-Control-Allow-Origin':  allowed,
+    'Access-Control-Allow-Headers': 'content-type, apikey, authorization',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
 
 const TYPE_LABELS: Record<string, string> = {
   panne:    '🔧 Panne',
@@ -68,8 +80,9 @@ function getHeure() {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
-  if (req.method !== 'POST')   return new Response('Method not allowed', { status: 405, headers: CORS });
+  const cors = corsHeaders(req);
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (req.method !== 'POST')   return new Response('Method not allowed', { status: 405, headers: cors });
 
   try {
     const {
@@ -87,7 +100,7 @@ serve(async (req) => {
     if (!site_id) {
       return new Response(
         JSON.stringify({ error: 'site_id requis' }),
-        { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -141,13 +154,13 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ ok: true, sent }),
-      { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } }
+      { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }
     );
   } catch (e) {
     console.error('[notify-signalement]', e);
     return new Response(
       JSON.stringify({ error: String(e) }),
-      { status: 500, headers: { ...CORS, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } }
     );
   }
 });

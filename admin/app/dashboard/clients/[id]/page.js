@@ -14,6 +14,7 @@ export default function ClientDetailPage() {
   const [contacts, setContacts] = useState([]);
   const [gardiens, setGardiens] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
 
   const [showSiteForm, setShowSiteForm] = useState(false);
   const [siteForm, setSiteForm] = useState({
@@ -33,12 +34,20 @@ export default function ClientDetailPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: clientData }, { data: sitesData }, { data: contactsData }, { data: gardiensData }] = await Promise.all([
+    setLoadError(null);
+    const [
+      { data: clientData, error: e1 },
+      { data: sitesData, error: e2 },
+      { data: contactsData, error: e3 },
+      { data: gardiensData, error: e4 },
+    ] = await Promise.all([
       supabase.from('clients').select('*').eq('id', id).single(),
       supabase.from('sites').select('*').eq('client_id', id).order('nom'),
       supabase.from('contacts').select('*').eq('client_id', id).order('nom'),
       supabase.from('gardiens').select('*').eq('client_id', id).order('nom'),
     ]);
+    const err = e1 || e2 || e3 || e4;
+    if (err) { setLoadError(err.message); setLoading(false); return; }
     setClient(clientData);
     setSites(sitesData || []);
     setContacts(contactsData || []);
@@ -51,26 +60,34 @@ export default function ClientDetailPage() {
   }, [load]);
 
   async function saveClientField(field, value) {
+    const prev = client[field];
     setClient((c) => ({ ...c, [field]: value }));
-    await supabase.from('clients').update({ [field]: value }).eq('id', id);
+    const { error } = await supabase.from('clients').update({ [field]: value }).eq('id', id);
+    if (error) {
+      setClient((c) => ({ ...c, [field]: prev }));
+      alert('Erreur lors de la sauvegarde : ' + error.message);
+    }
   }
 
   async function createSite(e) {
     e.preventDefault();
-    await supabase.from('sites').insert({ ...siteForm, client_id: id });
+    const { error } = await supabase.from('sites').insert({ ...siteForm, client_id: id });
+    if (error) { alert('Erreur : ' + error.message); return; }
     setSiteForm({ nom: '', ville: '', pays: '', journalier_actif: true, hebdo_actif: false, mensuel_actif: false });
     setShowSiteForm(false);
     load();
   }
 
   async function toggleSiteFreq(site, field) {
-    await supabase.from('sites').update({ [field]: !site[field] }).eq('id', site.id);
+    const { error } = await supabase.from('sites').update({ [field]: !site[field] }).eq('id', site.id);
+    if (error) { alert('Erreur : ' + error.message); return; }
     load();
   }
 
   async function createContact(e) {
     e.preventDefault();
-    await supabase.from('contacts').insert({ ...contactForm, client_id: id, site_id: contactForm.site_id || null });
+    const { error } = await supabase.from('contacts').insert({ ...contactForm, client_id: id, site_id: contactForm.site_id || null });
+    if (error) { alert('Erreur : ' + error.message); return; }
     setContactForm({ nom: '', role: 'resp_tech', whatsapp: '', email: '', site_id: '' });
     setShowContactForm(false);
     load();
@@ -78,7 +95,8 @@ export default function ClientDetailPage() {
 
   async function createGardien(e) {
     e.preventDefault();
-    await supabase.from('gardiens').insert({ ...gardienForm, client_id: id });
+    const { error } = await supabase.from('gardiens').insert({ ...gardienForm, client_id: id });
+    if (error) { alert('Erreur : ' + error.message); return; }
     setGardienForm({ nom: '', whatsapp: '', metier: '' });
     setShowGardienForm(false);
     load();
@@ -86,11 +104,14 @@ export default function ClientDetailPage() {
 
   async function deleteClient() {
     if (!confirm('Supprimer ce client et toutes ses données liées ?')) return;
-    await supabase.from('clients').delete().eq('id', id);
+    const { error } = await supabase.from('clients').delete().eq('id', id);
+    if (error) { alert('Erreur lors de la suppression : ' + error.message); return; }
     router.replace('/dashboard/clients');
   }
 
-  if (loading || !client) return <p className="text-gray-500">Chargement...</p>;
+  if (loading) return <p className="text-gray-500">Chargement...</p>;
+  if (loadError) return <p className="text-red-500">Erreur : {loadError}</p>;
+  if (!client) return <p className="text-gray-500">Client introuvable.</p>;
 
   return (
     <div className="space-y-8">
