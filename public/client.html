@@ -409,10 +409,11 @@ function renderHotelView(client,siteId,siteName,opts,containerId){
           var equipIds=allEquips.map(function(e){return e.id;});
           Promise.all([
             api('reponses','&ronde_equipement_id=in.('+allREids.join(',')+')'),
-            equipIds.length?api('vidanges','&equipement_id=in.('+equipIds.join(',')+')'+'&order=date.desc'):Promise.resolve([])
+            equipIds.length?api('vidanges','&equipement_id=in.('+equipIds.join(',')+')'+'&order=date.desc'):Promise.resolve([]),
+            api('signalements','&ronde_id=in.('+rondeIds.join(',')+')')
           ]).then(function(rv){
-            var reponses=rv[0],vidanges=rv[1]||[];
-            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,reponses,questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap,vidanges);
+            var reponses=rv[0],vidanges=rv[1]||[],sigRondes=rv[2]||[];
+            renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,reponses,questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap,vidanges,sigRondes);
           });
         });
       });
@@ -444,7 +445,7 @@ function renderHotelView(client,siteId,siteName,opts,containerId){
 // ════════════════════════════════════════
 // NOUVEAU SYSTÈME — rendu DOM
 // ════════════════════════════════════════
-function renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,reponses,questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap,vidanges){
+function renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips,cuveEquip,equips,typeMap,rondes,rondesEq,reponses,questions,alertes,pannesOuv,pannesRes,today,now,debut30,showFull,contactMap,vidanges,sigRondes){
   if(!contactMap)contactMap={};
   var rootEl=containerId?document.getElementById(containerId):document.getElementById('app');
   if(!rootEl)return;
@@ -525,7 +526,7 @@ function renderHotelViewNewDom(client,siteId,siteName,opts,containerId,allEquips
   var presenceHtml=buildPresenceSectionNew(equips,typeMap,saisieSetN,today);
   var cuveHtml=buildCuveCardNew(cuveEquip,reByEquip,geEquips,consoLh,today);
   var pannesHtml=buildPannesSection(pannesOuv,showFull?pannesRes:[],[],{},panneLabels,showFull);
-  var rondesLogHtml=buildRondesLog(rondes,allEquips,rondesEq,reponses,questions,contactMap);
+  var rondesLogHtml=buildRondesLog(rondes,allEquips,rondesEq,reponses,questions,contactMap,sigRondes||[]);
   var recommandationsHtml=buildRecommandationsNew(alertes);
   var vidangesHtml=buildVidangesNew(geEquips,reByEquip,vidangesMap);
   var anomaliesHtml=buildAnomaliesNew(reponses,questions,rondesEq,rondes,allEquips,debut30);
@@ -998,11 +999,12 @@ function renderChartNew(){
   });
 }
 
-function buildRondesLog(rondes,equips,rondesEq,reponses,questions,contactMap){
+function buildRondesLog(rondes,equips,rondesEq,reponses,questions,contactMap,sigRondes){
   if(!rondes.length)return '';
   if(!contactMap)contactMap={};
   if(!reponses)reponses=[];
   if(!questions)questions=[];
+  if(!sigRondes)sigRondes=[];
   var equipMap={};equips.forEach(function(e){equipMap[e.id]=e;});
   var repByRE={};
   reponses.forEach(function(rep){
@@ -1014,6 +1016,12 @@ function buildRondesLog(rondes,equips,rondesEq,reponses,questions,contactMap){
   rondesEq.forEach(function(re){
     if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];
     reByRonde[re.ronde_id].push(re);
+  });
+  var sigByRonde={};
+  sigRondes.forEach(function(s){
+    if(!s.ronde_id)return;
+    if(!sigByRonde[s.ronde_id])sigByRonde[s.ronde_id]=[];
+    sigByRonde[s.ronde_id].push(s);
   });
   var sorted=rondes.slice().sort(function(a,b){return b.date_ronde.localeCompare(a.date_ronde);}).slice(0,30);
   var freqLabel={journalier:'Journalière',hebdo:'Hebdomadaire',mensuel:'Mensuelle'};
@@ -1060,10 +1068,27 @@ function buildRondesLog(rondes,equips,rondesEq,reponses,questions,contactMap){
         '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--texte);margin-bottom:4px">'+eq.nom+'</div>'+
         lignes+'</div>';
     });
-    var hasDetail=equipBlocs.length>0;
+    var sigsRonde=sigByRonde[r.id]||[];
+    var sigsHtml='';
+    if(sigsRonde.length){
+      var sigsLignes=sigsRonde.map(function(s){
+        var eqNom=s.equipement_id&&equipMap[s.equipement_id]?equipMap[s.equipement_id].nom:'—';
+        var badge=s.statut==='resolu'
+          ?'<span style="background:#dcfce7;color:#166534;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600">Résolu</span>'
+          :'<span style="background:#fef9c3;color:#854d0e;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600">Ouvert</span>';
+        return '<div style="display:flex;align-items:baseline;gap:8px;padding:3px 0;border-bottom:1px solid #fde68a;font-size:12px">'+
+          '<span style="font-weight:600;color:#92400e">'+eqNom+'</span>'+
+          '<span style="color:#78350f;flex:1">'+s.description+'</span>'+
+          badge+'</div>';
+      }).join('');
+      sigsHtml='<div style="margin-top:10px;padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px">'+
+        '<div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:4px">⚠️ '+sigsRonde.length+' anomalie'+(sigsRonde.length>1?'s':'')+' signalée'+(sigsRonde.length>1?'s':'')+' pendant cette ronde</div>'+
+        sigsLignes+'</div>';
+    }
+    var hasDetail=equipBlocs.length>0||sigsHtml.length>0;
     var detailSection=hasDetail?
       '<tr id="'+detailId+'" style="display:none"><td colspan="4" style="padding:0">'+
-        '<div style="padding:12px 16px;background:var(--surface2);border-top:1px solid var(--bordure)">'+equipBlocs+'</div>'+
+        '<div style="padding:12px 16px;background:var(--surface2);border-top:1px solid var(--bordure)">'+equipBlocs+sigsHtml+'</div>'+
       '</td></tr>':'';
 
     rows+='<tr style="cursor:'+(hasDetail?'pointer':'default')+'"'+(hasDetail?' onclick="toggleRondeDetail(\''+detailId+'\')"':'')+'>'+
