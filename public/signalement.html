@@ -122,8 +122,14 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
     <div id="sg-error" class="sg-error"></div>
 
     <!-- Qui signale -->
-    <div class="sg-section">
+    <div class="sg-section" id="sg-who-section">
       <div class="sg-label">Votre prénom</div>
+      <!-- Chips de sélection rapide (si des demandeurs sont enregistrés) -->
+      <div id="sg-who-chips-wrap" style="display:none;margin-bottom:10px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Sélection rapide :</div>
+        <div id="sg-who-chips" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
+      <!-- Champ prénom toujours visible -->
       <input id="sg-prenom" class="sg-input" type="text" placeholder="Ex : Fatou, Ibrahima…" autocomplete="given-name"/>
     </div>
 
@@ -218,16 +224,18 @@ var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
 var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
 
 var _groupeId=null;
-var _equips=[];       // équipements techniques (table equipements)
-var _equipZones=[];   // équipements d'inventaire de zone (table equipements_zone)
-var _equipComboItems=[];  // liste aplatie pour le combobox [{val,label,group}]
-var _rondeOnly=false;     // mode équipement de ronde direct (bypass sélection salle)
+var _equips=[];
+var _equipZones=[];
+var _equipComboItems=[];
+var _rondeOnly=false;
 var _zones=[];
-var _selectedZoneId=null;    // zone/sous-zone sélectionnée (chip)
-var _selectedCatZoneIds=[];  // tous les zone_id de la catégorie sélectionnée
-var _lockedZoneId=null;      // zone pré-remplie depuis URL ?zone=
+var _selectedZoneId=null;
+var _selectedCatZoneIds=[];
+var _lockedZoneId=null;
 var _selectedType=null;
 var _photoFile=null;
+var _demandeurs=[];          // contacts demandeurs du site
+var _selectedDemandeurId=null; // contact sélectionné
 
 var _catIcons={
   'chambre':'🛏️','chambres':'🛏️','room':'🛏️','rooms':'🛏️',
@@ -276,16 +284,20 @@ async function init(){
 
   document.getElementById('sg-site-name').textContent=sites[0].nom||'';
 
-  // Charger zones, équipements techniques et équipements de zone en parallèle
+  // Charger zones, équipements et contacts demandeurs en parallèle
   var equipParam=params.get('equip')||'';
+  var ROLES_DEMANDEUR="role=in.(gouvernant,fb_manager,reception,demandeur)";
   var results=await Promise.all([
     supa('zones','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,etage,categorie&order=ordre.asc'),
     supa('equipements','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id,types_equipements(nom)&order=ordre_ronde.asc'),
-    supa('equipements_zone','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id&order=nom.asc')
+    supa('equipements_zone','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id&order=nom.asc'),
+    supa('contacts','site_id=eq.'+siteId+'&actif=eq.true&'+ROLES_DEMANDEUR+'&select=id,nom,role&order=nom.asc')
   ]);
   _zones=results[0]||[];
   _equips=results[1]||[];
   _equipZones=results[2]||[];
+  _demandeurs=results[3]||[];
+  _buildWhoPicker();
 
   // Construire les tuiles catégories
   _buildZoneTiles();
@@ -506,6 +518,51 @@ function _equipComboRender(q){
 
 function _esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
+var ROLE_LABELS_SG={gouvernant:'Gouvernant(e)',fb_manager:'F&B',reception:'Réception',demandeur:'Autre'};
+
+function _buildWhoPicker(){
+  if(!_demandeurs.length) return; // champ libre suffit
+  var wrap=document.getElementById('sg-who-chips-wrap');
+  wrap.style.display='block';
+  var chips=document.getElementById('sg-who-chips');
+  var html='';
+  _demandeurs.forEach(function(d){
+    var roleLabel=ROLE_LABELS_SG[d.role]||d.role||'';
+    html+='<button type="button" data-id="'+d.id+'" onclick="_selectDemandeur(\''+d.id+'\',this)" '+
+      'style="padding:8px 13px;border-radius:22px;border:1.5px solid var(--border);background:white;'+
+      'font-size:13px;font-weight:600;color:var(--dark);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px">'+
+      '<span>'+_esc(d.nom)+'</span>'+
+      (roleLabel?'<span style="font-size:10px;font-weight:700;color:var(--text3)">'+_esc(roleLabel)+'</span>':'')+
+    '</button>';
+  });
+  chips.innerHTML=html;
+}
+
+function _selectDemandeur(id,btn){
+  var allBtns=document.getElementById('sg-who-chips').querySelectorAll('button');
+  allBtns.forEach(function(b){
+    b.style.background='white';b.style.borderColor='var(--border)';b.style.color='var(--dark)';
+  });
+  if(_selectedDemandeurId===id){
+    // Désélectionner si re-clic
+    _selectedDemandeurId=null;
+    document.getElementById('sg-prenom').value='';
+    return;
+  }
+  _selectedDemandeurId=id;
+  btn.style.background='var(--amber-pale)';
+  btn.style.borderColor='var(--amber-border)';
+  btn.style.color='var(--amber-dark)';
+  // Auto-remplir le prénom
+  var d=_demandeurs.find(function(x){return x.id===id;});
+  if(d)document.getElementById('sg-prenom').value=d.nom;
+}
+
+function _getSignaleurInfo(){
+  var prenom=(document.getElementById('sg-prenom').value||'').trim();
+  return {prenom:prenom||null,contactId:_selectedDemandeurId||null};
+}
+
 function _onZoneChange(zoneId){
   _selectedZoneId=zoneId||null;
   _renderEquipOptions(_selectedZoneId?[_selectedZoneId]:null);
@@ -535,7 +592,8 @@ function _onPhotoChange(input){
 }
 
 async function _submit(){
-  var prenom=(document.getElementById('sg-prenom').value||'').trim();
+  var _who=_getSignaleurInfo();
+  var prenom=_who.prenom;
   var precision=(document.getElementById('sg-lieu').value||'').trim();
   var equipRaw=document.getElementById('sg-equip').value||'';
   var equipId=equipRaw.startsWith('eq:')?equipRaw.slice(3):(equipRaw&&!equipRaw.startsWith('ez:')?equipRaw:null);
@@ -594,6 +652,7 @@ async function _submit(){
       equipement_id:equipId||null,
       equipement_zone_id:equipZoneId||null,
       signale_par:prenom||null,
+      signaleur_contact_id:_who.contactId||null,
       lieu:lieuFinal,
       type:_selectedType,
       description:desc,
@@ -647,6 +706,10 @@ function _reset(){
   document.getElementById('sg-desc').value='';
   document.querySelectorAll('.type-pill').forEach(function(b){b.classList.remove('selected');});
   _selectedType=null;_photoFile=null;
+  _selectedDemandeurId=null;
+  document.getElementById('sg-who-chips').querySelectorAll('button').forEach(function(b){
+    b.style.background='white';b.style.borderColor='var(--border)';b.style.color='var(--dark)';
+  });
   var preview=document.getElementById('sg-photo-preview');
   preview.src='';preview.style.display='none';
   var pzone=document.getElementById('sg-photo-zone');

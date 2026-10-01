@@ -3466,6 +3466,7 @@ async function _rtMonEquipe(sid,session){
   '</div>';
 }
 
+
 async function _rtMaintenances(sid){
   var dc=document.getElementById('dash-content-main');
   if(dc){dc.style.padding='24px';dc.style.maxWidth='960px';}
@@ -5373,7 +5374,7 @@ async function _rtConfig(sid){
 
 async function _buildContactsTab(sid){
   var contacts=await supaGet('contacts','site_id=eq.'+sid+'&select=id,nom,role,whatsapp,email,actif,notif_signalement&order=nom.asc');
-  var ROLES={resp_tech:'⚙️ Resp. technique',dir_tech:'🏗️ Dir. technique',dir_ops:'📊 Dir. opérations',technicien:'🔧 Technicien',autre:'👤 Autre'};
+  var ROLES={resp_tech:'⚙️ Resp. technique',dir_tech:'🏗️ Dir. technique',dir_ops:'📊 Dir. opérations',technicien:'🔧 Technicien',gouvernant:'👤 Gouvernant(e)',fb_manager:'🍽️ F&B Manager',reception:'🏨 Réception',demandeur:'📋 Demandeur',autre:'👤 Autre'};
 
   var byRole={};
   contacts.forEach(function(c){
@@ -5385,7 +5386,7 @@ async function _buildContactsTab(sid){
   var html='<div style="max-width:680px">'+
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
       '<div style="font-size:12px;color:var(--text2);line-height:1.5">'+
-        'Gérez les personnes à contacter. Cochez <strong>Signalements WA</strong> sur un contact pour qu\'il reçoive les notifications WhatsApp lors d\'un signalement — peu importe son rôle.'+
+        'Gérez les contacts de votre équipe. Le <strong>resp. technique</strong> reçoit les clôtures d\'intervention. Les rôles <strong>gouvernant, F&B, réception, demandeur</strong> peuvent être sélectionnés par le signaleur et recevront la clôture WA directement.'+
       '</div>'+
       '<button class="cfg-btn-primary" style="white-space:nowrap;margin-left:16px" onclick="_openAddContactModal()">＋ Ajouter</button>'+
     '</div>';
@@ -5464,8 +5465,8 @@ async function _buildContactsTab(sid){
 }
 
 function _openAddContactModal(){
-  var roleOpts=['resp_tech','dir_tech','dir_ops','technicien','autre'].map(function(r){
-    var labels={resp_tech:'Resp. technique',dir_tech:'Dir. technique',dir_ops:'Dir. opérations',technicien:'Technicien',autre:'Autre'};
+  var roleOpts=['resp_tech','dir_tech','dir_ops','technicien','gouvernant','fb_manager','reception','demandeur','autre'].map(function(r){
+    var labels={resp_tech:'Resp. technique',dir_tech:'Dir. technique',dir_ops:'Dir. opérations',technicien:'Technicien',gouvernant:'Gouvernant(e)',fb_manager:'F&B Manager',reception:'Réception',demandeur:'Demandeur',autre:'Autre'};
     return '<option value="'+r+'">'+labels[r]+'</option>';
   }).join('');
   _showCfgModal(
@@ -5502,8 +5503,8 @@ async function _saveNewContact(){
 }
 
 function _openEditContactModal(cId,nom,role,wa,email,actif,notifSg){
-  var roleOpts=['resp_tech','dir_tech','dir_ops','technicien','autre'].map(function(r){
-    var labels={resp_tech:'Resp. technique',dir_tech:'Dir. technique',dir_ops:'Dir. opérations',technicien:'Technicien',autre:'Autre'};
+  var roleOpts=['resp_tech','dir_tech','dir_ops','technicien','gouvernant','fb_manager','reception','demandeur','autre'].map(function(r){
+    var labels={resp_tech:'Resp. technique',dir_tech:'Dir. technique',dir_ops:'Dir. opérations',technicien:'Technicien',gouvernant:'Gouvernant(e)',fb_manager:'F&B Manager',reception:'Réception',demandeur:'Demandeur',autre:'Autre'};
     return '<option value="'+r+'"'+(r===role?' selected':'')+'>'+labels[r]+'</option>';
   }).join('');
   _showCfgModal(

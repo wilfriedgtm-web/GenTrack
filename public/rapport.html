@@ -79,13 +79,6 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 @keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
 .rp-confirm-title{font-size:22px;font-weight:800;color:var(--dark);margin-bottom:8px}
 .rp-confirm-sub{font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:28px}
-.rp-wa-btn{
-  display:flex;align-items:center;justify-content:center;gap:10px;
-  width:100%;padding:15px;border:none;border-radius:var(--radius);
-  background:#25D366;color:#fff;font-size:15px;font-weight:700;cursor:pointer;
-  box-shadow:0 4px 14px rgba(37,211,102,.35);margin-bottom:12px;
-}
-.rp-wa-btn:active{transform:scale(.98)}
 .rp-done-btn{
   width:100%;padding:13px;border:1.5px solid var(--border);border-radius:var(--radius);
   background:var(--white);color:var(--text2);font-size:14px;font-weight:600;cursor:pointer;
@@ -184,10 +177,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 <div id="rp-confirm" class="rp-confirm">
   <div class="rp-confirm-icon">✅</div>
   <div class="rp-confirm-title">Rapport envoyé !</div>
-  <div class="rp-confirm-sub">L'intervention a été enregistrée.<br>Le signalement est marqué comme résolu.</div>
-  <button id="rp-wa-notif" class="rp-wa-btn" onclick="_notifResp()" style="display:none">
-    <span style="font-size:20px">💬</span> Notifier le responsable
-  </button>
+  <div class="rp-confirm-sub">L'intervention a été enregistrée.<br>Le responsable et le demandeur ont été notifiés.</div>
   <button class="rp-done-btn" onclick="window.close()">Fermer</button>
 </div>
 
@@ -195,8 +185,7 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
 var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
 
-var _sg=null;       // signalement object
-var _respWa=null;   // resp_tech WhatsApp number
+var _sg=null;
 var _photoFile=null;
 
 var _TYPE_LABELS={panne:'⚡ Panne',anomalie:'👁 Anomalie',bruit:'🔊 Bruit anormal',odeur:'💨 Odeur suspecte',fuite:'💧 Fuite',seuil:'📈 Seuil dépassé',autre:'📝 Autre'};
@@ -264,16 +253,6 @@ async function init(){
 
   // Pre-fill technician name
   if(_sg.assigne_a)document.getElementById('rp-tech').value=_sg.assigne_a;
-
-  // Fetch resp_tech contact for notification
-  if(_sg.groupe_id){
-    var contacts=await supa('contacts',
-      'site_id=eq.'+_sg.groupe_id+'&actif=eq.true&whatsapp=not.is.null&select=nom,whatsapp,role&order=created_at.asc'
-    );
-    // Prefer resp_tech role, fallback to first contact with WA
-    var respContact=contacts.find(function(c){return c.role==='resp_tech';})||contacts[0]||null;
-    if(respContact&&respContact.whatsapp)_respWa=respContact.whatsapp;
-  }
 
   document.getElementById('rp-loading').style.display='none';
   document.getElementById('rp-main').style.display='block';
@@ -380,33 +359,24 @@ async function _submit(){
     document.getElementById('rp-main').style.display='none';
     document.getElementById('rp-confirm').style.display='flex';
 
-    // 4. Afficher bouton WA si resp_tech a un numéro
-    if(_respWa){
-      document.getElementById('rp-wa-notif').style.display='flex';
-      // Préparer le message pour le resp_tech
-      var typeLabel=_TYPE_LABELS[_sg.type]||_sg.type||'Intervention';
-      window._notifMsg='✅ *Intervention résolue — GenTrack*\n\n'+
-        '🔧 *Type :* '+typeLabel+'\n'+
-        (eqNom?'⚙️ *Équipement :* '+eqNom+'\n':'')+
-        (_sg.lieu?'📍 *Lieu :* '+_sg.lieu+'\n':'')+
-        '👷 *Technicien :* '+tech+'\n'+
-        '📝 *Travaux :* '+travaux+'\n'+
-        (cout?'💰 *Coût :* '+cout.toLocaleString('fr-FR')+' FCFA\n':'')+
-        (duree?'⏱ *Durée :* '+dureeLabel+'\n':'')+
-        '\nSignalement clôturé.';
-    }
+    // 4. Notifier automatiquement resp_tech + signaleur via edge function (fire & forget)
+    fetch(SUPA_URL+'/functions/v1/notify-cloture',{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({
+        signalement_id:_sg.id,
+        tech_nom:tech,
+        travaux:travaux,
+        cout:cout||null,
+        duree_label:dureeLabel||null
+      })
+    }).catch(function(){});
   }catch(e){
     errEl.textContent='Erreur lors de l\'envoi. Vérifiez votre connexion et réessayez.';
     errEl.style.display='block';
     btn.disabled=false;
     btn.textContent='✅ Soumettre le rapport';
   }
-}
-
-function _notifResp(){
-  if(!_respWa||!window._notifMsg)return;
-  var num=_respWa.replace(/\D/g,'');
-  window.open('https://wa.me/'+num+'?text='+encodeURIComponent(window._notifMsg),'_blank');
 }
 
 init();
