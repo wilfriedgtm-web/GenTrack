@@ -642,8 +642,6 @@ function buildLayout(session,activeNav,contentHtml){
       '<div id="rapport-menu" style="display:none;position:absolute;right:40px;top:60px;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:200;padding:6px;min-width:180px">'+
         [7,14,30].map(function(n){return '<button onclick="_openRapportHebdo('+n+')" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">📋&#8239;'+n+' derniers jours</button>';}).join('')+
         '<div style="height:1px;background:var(--border);margin:4px 8px"></div>'+
-        '<button onclick="_openRapportEnergieMensuel();var m=document.getElementById(\'rapport-menu\');if(m)m.style.display=\'none\'" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">⚡&#8239;Énergie mensuelle</button>'+
-        '<div style="height:1px;background:var(--border);margin:4px 8px"></div>'+
         '<button onclick="_openAfficheBotRT()" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">📋&#8239;Affiche bot WhatsApp</button>'+
       '</div>':
     session.role==='dir_tech'?
@@ -9760,7 +9758,7 @@ async function _openRapportHebdo(period){
     var periodeStr=dateDebut.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})+' – '+dateFin.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
 
     var[siteRow,equips,rondes,signalements,maintenances]=await Promise.all([
-      supaGet('sites','id=eq.'+sid+'&select=nom&limit=1'),
+      supaGet('sites','id=eq.'+sid+'&select=nom,nb_chambres&limit=1'),
       supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,capacite_litres,conso_theorique_lh,types_equipements(nom)&order=ordre_ronde.asc'),
       supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+cutoff+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=200'),
       supaGet('signalements','groupe_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,type,description,statut,signale_par,equipement_id,equipement_zone_id,cout_intervention,created_at,resolved_at,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=60'),
@@ -9895,12 +9893,13 @@ async function _openRapportHebdo(period){
 
     // Énergie
     var[energieFluides,relevesEnergiePeriode,pleinsPeriode]=await Promise.all([
-      supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,objectif_mensuel,capacite,devise&order=ordre.asc'),
-      supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+cutoff+'&select=date_releve,valeurs,saisi_par&order=date_releve.asc&limit=100'),
+      supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,budget_par_chambre,objectif_mensuel,capacite,devise&order=ordre.asc'),
+      supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+cutoff+'&select=date_releve,valeurs,saisi_par,to_percent&order=date_releve.asc&limit=100'),
       supaGet('pleins','site_id=eq.'+sid+'&date=gte.'+cutoff+'&select=date,litres_ajoutes&order=date.asc&limit=50')
     ]);
 
-    var html=_buildRapportPro(siteNom,periodeStr,period,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[]);
+    var _nbCh=siteRow.length&&siteRow[0].nb_chambres?parseInt(siteRow[0].nb_chambres):null;
+    var html=_buildRapportPro(siteNom,periodeStr,period,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[],_nbCh);
     var w=window.open('','_blank');
     if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
     w.document.write(html);w.document.close();
@@ -9908,34 +9907,8 @@ async function _openRapportHebdo(period){
   finally{if(btn){btn.disabled=false;btn.textContent='📄 Rapport ▾';}}
 }
 
-async function _openRapportEnergieMensuel(){
-  var m=document.getElementById('rapport-menu');if(m)m.style.display='none';
-  var btn=document.getElementById('rapport-btn');
-  if(btn){btn.disabled=true;btn.textContent='⏳ Chargement...';}
-  try{
-    var sid=_session&&_session.site_ids&&_session.site_ids[0];
-    if(!sid){alert('Aucun site configuré.');return;}
-    var now=new Date();
-    var offset=_rtEnergieMoisOffset||0;
-    var tgt=new Date(now.getFullYear(),now.getMonth()+offset,1);
-    var moisDebut=tgt.toISOString().split('T')[0];
-    var moisFin=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).toISOString().split('T')[0];
-    var daysInMonth=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).getDate();
-    var moisLabel=tgt.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
-    var[fluides,relevesRows,siteRows]=await Promise.all([
-      supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,budget_par_chambre,objectif_mensuel,devise,ordre&order=ordre.asc'),
-      supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=date_releve,valeurs,to_percent&order=date_releve.asc&limit=62'),
-      supaGet('sites','id=eq.'+sid+'&select=nom,nb_chambres&limit=1')
-    ]);
-    var html=_buildRapportEnergieMensuel(moisLabel,daysInMonth,fluides||[],relevesRows||[],siteRows&&siteRows.length?siteRows[0]:null);
-    var w=window.open('','_blank');
-    if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
-    w.document.write(html);w.document.close();
-  }catch(e){console.error(e);alert('Erreur : '+(e.message||e));}
-  finally{if(btn){btn.disabled=false;btn.textContent='📄 Rapport ▾';}}
-}
 
-function _buildRapportEnergieMensuel(moisLabel,daysInMonth,fluides,releves,siteRow){
+function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,releves,siteRow){
   var siteNom=siteRow?siteRow.nom:'';
   var nbChambres=siteRow&&siteRow.nb_chambres?parseInt(siteRow.nb_chambres):null;
   var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -10057,7 +10030,7 @@ function _buildRapportEnergieMensuel(moisLabel,daysInMonth,fluides,releves,siteR
   return h;
 }
 
-function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides,relevesEnergie,pleinsSite){
+function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides,relevesEnergie,pleinsSite,nbChambres){
   var respNom=(session.contact&&session.contact.nom)||'Responsable technique';
   var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -10182,6 +10155,9 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   energieFluides=energieFluides||[];relevesEnergie=relevesEnergie||[];
   var energieData=[];
   pleinsSite=pleinsSite||[];
+  var _toValsP=relevesEnergie.map(function(r){return r.to_percent!=null?parseFloat(r.to_percent):null;}).filter(function(v){return v!=null;});
+  var _toMoyP=_toValsP.length?_toValsP.reduce(function(a,b){return a+b;},0)/_toValsP.length:null;
+  var chambresOccP=nbChambres&&_toMoyP?Math.round(nbChambres*_toMoyP/100):null;
   if(energieFluides.length&&relevesEnergie.length){
     energieFluides.forEach(function(f){
       var pts=relevesEnergie.map(function(r){
@@ -10212,7 +10188,8 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
       var _rLastIsL=lastVal!=null&&lastVal>100;
       var restants=isInstant&&cap!=null&&lastVal!=null?(_rLastIsL?Math.round(lastVal):Math.round(lastVal/100*cap)):null;
       var lastValPctR=isInstant&&cap!=null&&lastVal!=null?(_rLastIsL?Math.min(100,Math.round(lastVal/cap*100)):Math.min(100,Math.round(lastVal))):null;
-      var budget=obj!=null&&tarif!=null?Math.round(obj*tarif):null;
+      var bpcF=f.budget_par_chambre!=null?parseFloat(f.budget_par_chambre):null;
+      var budget=bpcF&&chambresOccP?Math.round(bpcF*chambresOccP*period):obj!=null&&tarif!=null?Math.round(obj*tarif*period/30):null;
       var vs=cout!=null&&budget!=null?cout-budget:null;
       energieData.push({f:f,pts:pts,isInstant:isInstant,cap:cap,tarif:tarif,obj:obj,lastVal:lastVal,lastValPct:lastValPctR,conso:conso,cout:cout,restants:restants,budget:budget,vs:vs,pleins:isInstant?pleinsSite:[]});
     });
@@ -10509,6 +10486,36 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
         chartSvg+
       '</div>';
     });
+    // Résumé FCFA
+    var _cR=0,_bR=0,_hcR=false;
+    energieData.forEach(function(d){if(d.cout!=null){_cR+=d.cout;_hcR=true;}if(d.budget!=null)_bR+=d.budget;});
+    if(_hcR){
+      var _eR=_bR?_cR-_bR:null;
+      var _epR=_eR!=null&&_bR?Math.round(_eR/_bR*100):null;
+      var _fpChR=chambresOccP?Math.round(_cR/chambresOccP):null;
+      var _fbChR=chambresOccP&&_bR?Math.round(_bR/chambresOccP):null;
+      function _pColR(p){return p==null?'var(--text3)':p<=0?'var(--vert)':p<=10?'#C49A1C':'var(--rouge)';}
+      function _fPctR(p){return p==null?'—':(p>0?'+':'')+p+'%';}
+      h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0 20px">';
+      h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Coût total énergie</div>';
+      h+='<div style="font-size:17px;font-weight:700">'+fmtCout(_cR,'XOF')+'</div></div>';
+      if(_bR){
+        h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Budget pro-rata '+period+'j</div>';
+        h+='<div style="font-size:17px;font-weight:700">'+fmtCout(_bR,'XOF')+'</div></div>';
+        if(_eR!=null){
+          h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Écart vs budget</div>';
+          h+='<div style="font-size:17px;font-weight:700;color:'+_pColR(_epR)+'">'+_fPctR(_epR)+'</div>';
+          h+='<div style="font-size:10px;color:'+_pColR(_epR)+';margin-top:2px">'+(_eR>0?'+':'')+fmtCout(_eR,'XOF')+'</div></div>';
+        }
+      }
+      if(_fpChR){
+        h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">FCFA / ch. occ.</div>';
+        h+='<div style="font-size:17px;font-weight:700">'+_fpChR.toLocaleString('fr-FR')+'</div>';
+        h+=(_fbChR?'<div style="font-size:10px;color:var(--text3);margin-top:2px">Budget : '+_fbChR.toLocaleString('fr-FR')+'</div>':'');
+        h+='<div style="font-size:10px;color:var(--text3);margin-top:1px">'+chambresOccP+' ch. occ. · TO '+Math.round(_toMoyP)+'%</div></div>';
+      }
+      h+='</div>';
+    }
   }
 
   // Rondes
