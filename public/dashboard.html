@@ -6795,7 +6795,7 @@ async function _dtAccueil(session,sids,cid){
   var _now=new Date();
   var moisDebut=new Date(_now.getFullYear(),_now.getMonth(),1).toISOString().split('T')[0];
 
-  var[sites,equips,rondes,alertes,pannes,pannes7,energieFluidesDT,relevesEnergieDT,sigsAll]=await Promise.all([
+  var[sites,equips,rondes,alertes,pannes,pannes7,energieFluidesDT,relevesEnergieDT,sigsAll,instantaneFluidesDT,latestRelsDT]=await Promise.all([
     supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres'),
     supaGet('equipements','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id'),
     supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=eq.'+today+'&select=id,site_id,frequence,technicien_id'),
@@ -6804,7 +6804,9 @@ async function _dtAccueil(session,sids,cid){
     supaGet('signalements','groupe_id=in.('+sidStr+')&type=eq.panne&created_at=gte.'+since7+'&select=id,groupe_id,type,description,created_at,statut,equipements(nom)&order=created_at.desc&limit=30'),
     supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,devise,tarif&order=ordre.asc'),
     supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+moisDebut+'&select=site_id,date_releve,valeurs&order=date_releve.asc&limit=300'),
-    supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+since30+'T00:00:00&select=id,groupe_id,equipement_id,equipement_zone_id,lieu,description,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=600')
+    supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+since30+'T00:00:00&select=id,groupe_id,equipement_id,equipement_zone_id,lieu,description,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=600'),
+    supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=eq.instantane&select=id,site_id,nom,unite,capacite&order=ordre.asc'),
+    supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+dateNJours(35)+'&select=site_id,valeurs,date_releve&order=date_releve.desc&limit='+(sids.length*3))
   ]);
 
   var rIds=rondes.map(function(r){return r.id;});
@@ -6840,6 +6842,19 @@ async function _dtAccueil(session,sids,cid){
   }
 
   var siteMap={};var nbChambresMapAcc={};sites.forEach(function(s){siteMap[s.id]=s.nom;nbChambresMapAcc[s.id]=s.nb_chambres?parseInt(s.nb_chambres):null;});
+  var niveauxAccBySite={};
+  var _latRelBySiteAcc={};(latestRelsDT||[]).forEach(function(r){if(!_latRelBySiteAcc[r.site_id])_latRelBySiteAcc[r.site_id]=r;});
+  sids.forEach(function(sid){
+    var ifls=(instantaneFluidesDT||[]).filter(function(f){return f.site_id===sid;});
+    var lastR=_latRelBySiteAcc[sid]||null;
+    var _ni=[];
+    ifls.forEach(function(f){
+      var val=lastR&&lastR.valeurs&&lastR.valeurs[f.id]!=null?parseFloat(lastR.valeurs[f.id]):null;if(val==null)return;
+      var cap=f.capacite!=null?parseFloat(f.capacite):null;
+      var pct=cap&&cap>0?Math.round(val/cap*100):f.unite==='%'?Math.round(val):null;
+      _ni.push({nom:f.nom,unite:f.unite||'',val:val,pct:pct,date:lastR?lastR.date_releve:null});
+    });if(_ni.length)niveauxAccBySite[sid]=_ni;
+  });
   var eqBySite={};equips.forEach(function(e){eqBySite[e.site_id]=(eqBySite[e.site_id]||0)+1;});
   var pannesBySite={};pannes.forEach(function(p){pannesBySite[p.groupe_id]=(pannesBySite[p.groupe_id]||0)+1;});
   var rondesBySite={};
@@ -6995,6 +7010,20 @@ async function _dtAccueil(session,sids,cid){
             '<span style="font-size:11px;font-weight:600;color:'+_ecC+'">'+_fmtAcc(_cT)+(_bT?' <span style="font-size:9px;font-weight:400;color:var(--text3)">/ budget '+_fmtAcc(_bT)+'</span>':'')+'</span>'+
           '</div>':'')+
         '</div>';
+      })()+
+      (function(){
+        var _niv=niveauxAccBySite[sid]||[];
+        if(!_niv.length)return '';
+        var _wS=(energieBySite[sid]&&energieBySite[sid].length)?'margin-top:8px;padding-top:6px;border-top:1px dashed var(--border)':'margin-top:8px;padding-top:8px;border-top:1px solid var(--border)';
+        var _nh='<div style="'+_wS+'"><div style="font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Niveaux</div><div style="display:flex;gap:6px;flex-wrap:wrap">';
+        _niv.forEach(function(f){
+          var _cN=f.pct!=null?(f.pct<20?'var(--rouge)':f.pct<40?'var(--orange)':'var(--vert)'):'var(--text2)';
+          _nh+='<div style="flex:1;min-width:72px"><div style="font-size:9px;color:var(--text3);margin-bottom:2px">'+escape_html(f.nom)+'</div>'+
+            '<div style="font-size:10px;font-weight:700;color:'+_cN+'">'+f.val.toLocaleString('fr-FR')+(f.unite?' '+escape_html(f.unite):'')+'</div>'+
+            (f.pct!=null?'<div style="height:3px;background:var(--border);border-radius:2px;margin-top:2px;overflow:hidden"><div style="width:'+Math.min(100,f.pct)+'%;height:100%;border-radius:2px;background:'+_cN+'"></div></div>':'')+
+          '</div>';
+        });
+        return _nh+'</div></div>';
       })()+
       (function(){
         var tops=topSigsBySite[sid]||[];
@@ -8031,11 +8060,12 @@ async function _dtEnergie(sids,session){
   var moisLabel=tgt.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
   moisLabel=moisLabel.charAt(0).toUpperCase()+moisLabel.slice(1);
 
-  var[sites,fluides,releves,objs]=await Promise.all([
+  var[sites,fluides,releves,objs,niveauxFluides]=await Promise.all([
     supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres&order=nom.asc'),
     supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,devise,tarif,budget_par_chambre&order=ordre.asc'),
     supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=site_id,date_releve,valeurs,to_percent&order=date_releve.asc&limit=600'),
-    supaGet('objectifs_energie','site_id=in.('+sidStr+')&select=fluide_id,valeur,date_debut,date_fin&order=date_debut.desc&limit=400')
+    supaGet('objectifs_energie','site_id=in.('+sidStr+')&select=fluide_id,valeur,date_debut,date_fin&order=date_debut.desc&limit=400'),
+    supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=eq.instantane&select=id,site_id,nom,unite,capacite&order=ordre.asc')
   ]);
 
   var siteMap={};var nbChambresMap={};
@@ -8110,6 +8140,23 @@ async function _dtEnergie(sids,session){
       items.push({id:f.id,nom:f.nom,unite:f.unite||'',conso:conso!=null?Math.round(conso):null,obj:obj!=null?Math.round(obj):null,objRef:objRef,pct:pct,col:col,devise:f.devise||'',tarif:_tE||0,kwhParChambre:kwhParChambre,cout:_coutE,budget:_budgetE});
     });
     if(items.length)consoData[sid]=items;
+  });
+
+  // Niveaux instantanés (butane, cuve gasoil) par site
+  var niveauxData={};
+  sids.forEach(function(sid){
+    var ifls=(niveauxFluides||[]).filter(function(f){return f.site_id===sid;});
+    if(!ifls.length)return;
+    var last=(relevesBySite[sid]||[]).slice(-1)[0]||null;
+    var _niv=[];
+    ifls.forEach(function(f){
+      var val=last&&last.valeurs&&last.valeurs[f.id]!=null?parseFloat(last.valeurs[f.id]):null;
+      if(val==null)return;
+      var cap=f.capacite!=null?parseFloat(f.capacite):null;
+      var pct=cap&&cap>0?Math.round(val/cap*100):f.unite==='%'?Math.round(val):null;
+      _niv.push({nom:f.nom,unite:f.unite||'',val:val,pct:pct,date:last.date_releve});
+    });
+    if(_niv.length)niveauxData[sid]=_niv;
   });
 
   // Global KPIs: group by fluide nom+unite across all sites
@@ -8238,6 +8285,24 @@ async function _dtEnergie(sids,session){
             (_epS!=null?'<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;background:'+(_epS>10?'#FDECEA':_epS>0?'#FDF3E3':'#E8F5EE')+';color:'+_colS+'">'+(_epS>0?'+':'')+_epS+'%</span>':'')+
           '</div>'+
         '</div>';
+      })()+
+      (function(){
+        var _niv=niveauxData[sid]||[];
+        if(!_niv.length)return '';
+        var _nh='<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">'+
+          '<div style="font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">💧 Niveaux actuels</div>'+
+          '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+        _niv.forEach(function(f){
+          var _colN=f.pct!=null?(f.pct<20?'var(--rouge)':f.pct<40?'var(--orange)':'var(--vert)'):'var(--text2)';
+          _nh+='<div style="flex:1;min-width:90px;border:1px solid var(--border);border-radius:8px;padding:6px 10px">'+
+            '<div style="font-size:9px;color:var(--text3);margin-bottom:3px">'+escape_html(f.nom)+'</div>'+
+            '<div style="font-size:13px;font-weight:700;color:'+_colN+'">'+f.val.toLocaleString('fr-FR')+(f.unite?' '+escape_html(f.unite):'')+'</div>'+
+            (f.pct!=null?'<div style="margin-top:4px;height:4px;background:var(--border);border-radius:2px;overflow:hidden"><div style="width:'+Math.min(100,f.pct)+'%;height:100%;border-radius:2px;background:'+_colN+'"></div></div>':'')+
+            '<div style="font-size:8px;color:var(--text3);margin-top:3px">'+escape_html(f.date||'')+'</div>'+
+          '</div>';
+        });
+        _nh+='</div></div>';
+        return _nh;
       })()+
     '</div>';
   });
