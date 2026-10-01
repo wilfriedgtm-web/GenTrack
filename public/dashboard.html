@@ -11753,7 +11753,7 @@ var _ENERGIE_TEMPLATES={
 var _ENERGIE_EXTRAS=[
   {nom:'Eau bâche potable',unite:'m³',type_valeur:'index',seuil_alerte_bas:null,objectif_mensuel:null},
   {nom:'Citerne gasoil (GE)',unite:'L',type_valeur:'instantane',seuil_alerte_bas:500,objectif_mensuel:null},
-  {nom:'Gaz butane (citerne)',unite:'L',type_valeur:'instantane',seuil_alerte_bas:500,objectif_mensuel:null},
+  {nom:'Gaz butane (citerne)',unite:'%',type_valeur:'instantane',seuil_alerte_bas:30,capacite:4000,budget_par_chambre:243.6,objectif_mensuel:null},
   {nom:'Cos phi réseau',unite:null,type_valeur:'instantane',seuil_alerte_bas:0.85,objectif_mensuel:null},
   {nom:'Réactif réseau',unite:'kvar',type_valeur:'index',seuil_alerte_bas:null,objectif_mensuel:null}
 ];
@@ -12055,7 +12055,9 @@ function _energieCfgAjouterModal(sid){
         var esc=escape_html(s.nom).replace(/'/g,"\\'");
         var uniteEsc=escape_html(s.unite||'').replace(/'/g,"\\'");
         var seuil=s.seuil_alerte_bas!=null?s.seuil_alerte_bas:'';
-        return '<button onclick="_energieCfgSuggestion(\''+esc+'\',\''+uniteEsc+'\',\''+s.type_valeur+'\','+seuil+')" '+
+        var cap=s.capacite!=null?s.capacite:'';
+        var bpc=s.budget_par_chambre!=null?s.budget_par_chambre:'';
+        return '<button onclick="_energieCfgSuggestion(\''+esc+'\',\''+uniteEsc+'\',\''+s.type_valeur+'\','+seuil+','+cap+','+bpc+')" '+
           'style="font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:20px;background:var(--bg2);cursor:pointer;color:var(--text2)">'+
           escape_html(s.nom)+(s.unite?' <span style="color:var(--text3)">'+escape_html(s.unite)+'</span>':'')+
         '</button>';
@@ -12076,15 +12078,19 @@ function _energieCfgAjouterModal(sid){
   if(nomEl)setTimeout(function(){nomEl.focus();},50);
 }
 
-function _energieCfgSuggestion(nom,unite,type_valeur,seuil){
+function _energieCfgSuggestion(nom,unite,type_valeur,seuil,capacite,bpc){
   var nomEl=document.getElementById('ecfg-edit-nom');
   var uniteEl=document.getElementById('ecfg-edit-unite');
   var typeEl=document.getElementById('ecfg-edit-type');
   var seuilEl=document.getElementById('ecfg-edit-seuil');
+  var capEl=document.getElementById('ecfg-edit-cap');
+  var bpcEl=document.getElementById('ecfg-edit-bpc');
   if(nomEl)nomEl.value=nom;
   if(uniteEl)uniteEl.value=unite;
   if(typeEl)typeEl.value=type_valeur;
   if(seuilEl&&seuil!==undefined&&seuil!=='')seuilEl.value=seuil;
+  if(capEl&&capacite!==undefined&&capacite!=='')capEl.value=capacite;
+  if(bpcEl&&bpc!==undefined&&bpc!=='')bpcEl.value=bpc;
   if(nomEl)nomEl.focus();
 }
 
