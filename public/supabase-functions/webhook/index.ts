@@ -159,12 +159,9 @@ async function getEquipementsRestants(rondeId: string, siteId: string, frequence
   }
   // Ajouter "Relevé énergie" comme équipement spécial pour la ronde journalière
   if (frequence === 'journalier') {
-    const dejaSaisi = await releveEnergieFaitAujourdhui(siteId);
-    if (!dejaSaisi) {
-      const hasConfig = await db('energie_config', { query: `&site_id=eq.${siteId}&actif=eq.true&limit=1`, select: 'id' });
-      if (Array.isArray(hasConfig) && hasConfig.length > 0) {
-        restants.push({ id: '__releve_energie__', nom: '⚡ Relevé énergie' });
-      }
+    const hasConfig = await db('energie_config', { query: `&site_id=eq.${siteId}&actif=eq.true&limit=1`, select: 'id' });
+    if (Array.isArray(hasConfig) && hasConfig.length > 0) {
+      restants.push({ id: '__releve_energie__', nom: '⚡ Relevé énergie' });
     }
   }
   return restants;
@@ -214,13 +211,10 @@ async function getFrequencesDisponibles(site: any): Promise<string[]> {
     if (Array.isArray(equipsReleve) && equipsReleve.length > 0) freqs.push('releve_horaire');
   }
 
-  // Relevé énergie — disponible si pas encore fait aujourd'hui et config existe
+  // Relevé énergie — toujours disponible si config existe (upsert gère les doublons)
   if (site.energie_actif !== false) {
-    const dejaSaisi = await releveEnergieFaitAujourdhui(site.id);
-    if (!dejaSaisi) {
-      const hasConfig = await db('energie_config', { query: `&site_id=eq.${site.id}&actif=eq.true&limit=1`, select: 'id' });
-      if (Array.isArray(hasConfig) && hasConfig.length > 0) freqs.push('releve_energie');
-    }
+    const hasConfig = await db('energie_config', { query: `&site_id=eq.${site.id}&actif=eq.true&limit=1`, select: 'id' });
+    if (Array.isArray(hasConfig) && hasConfig.length > 0) freqs.push('releve_energie');
   }
 
   return freqs;
