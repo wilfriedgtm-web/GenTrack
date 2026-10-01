@@ -4832,7 +4832,7 @@ function _eqImportRenderAssign(zones,sid){
       var czones=zoneByCat[c];
       var icon=_ZONE_CAT_ICONS[c]||'📍';
       var selCount=czones.filter(function(z){return selectedIds.indexOf(z.id)>=0;}).length;
-      var allIdsJson=JSON.stringify(czones.map(function(z){return z.id;}));
+      var allIdsJson="['"+czones.map(function(z){return z.id;}).join("','")+"']";
       var cEsc=c.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
       return '<div class="eq-zone-group" style="margin-bottom:10px">'+
         '<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">'+
