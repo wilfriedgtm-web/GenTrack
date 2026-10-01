@@ -6796,13 +6796,13 @@ async function _dtAccueil(session,sids,cid){
   var moisDebut=new Date(_now.getFullYear(),_now.getMonth(),1).toISOString().split('T')[0];
 
   var[sites,equips,rondes,alertes,pannes,pannes7,energieFluidesDT,relevesEnergieDT,sigsAll]=await Promise.all([
-    supaGet('sites','id=in.('+sidStr+')&select=id,nom'),
+    supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres'),
     supaGet('equipements','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id'),
     supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=eq.'+today+'&select=id,site_id,frequence,technicien_id'),
     supaGet('alertes','client_id=eq.'+cid+'&resolue=eq.false&select=id,type,severite,message,created_at&order=created_at.desc&limit=50'),
     supaGet('signalements','groupe_id=in.('+sidStr+')&type=eq.panne&statut=neq.resolu&select=id,groupe_id,type,description,created_at,equipements(nom)&order=created_at.desc&limit=50'),
     supaGet('signalements','groupe_id=in.('+sidStr+')&type=eq.panne&created_at=gte.'+since7+'&select=id,groupe_id,type,description,created_at,statut,equipements(nom)&order=created_at.desc&limit=30'),
-    supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,devise&order=ordre.asc'),
+    supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,devise,tarif&order=ordre.asc'),
     supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+moisDebut+'&select=site_id,date_releve,valeurs&order=date_releve.asc&limit=300'),
     supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+since30+'T00:00:00&select=id,groupe_id,equipement_id,equipement_zone_id,lieu,description,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=600')
   ]);
@@ -6839,7 +6839,7 @@ async function _dtAccueil(session,sids,cid){
     });
   }
 
-  var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
+  var siteMap={};var nbChambresMapAcc={};sites.forEach(function(s){siteMap[s.id]=s.nom;nbChambresMapAcc[s.id]=s.nb_chambres?parseInt(s.nb_chambres):null;});
   var eqBySite={};equips.forEach(function(e){eqBySite[e.site_id]=(eqBySite[e.site_id]||0)+1;});
   var pannesBySite={};pannes.forEach(function(p){pannesBySite[p.groupe_id]=(pannesBySite[p.groupe_id]||0)+1;});
   var rondesBySite={};
@@ -6870,7 +6870,10 @@ async function _dtAccueil(session,sids,cid){
       }
       var obj=f.objectif_mensuel!=null?parseFloat(f.objectif_mensuel):null;
       var pct=conso!=null&&obj?Math.round(conso/obj*100):null;
-      items.push({nom:f.nom,unite:f.unite||'',conso:conso!=null?Math.round(conso):null,obj:obj!=null?Math.round(obj):null,pct:pct});
+      var _tA=f.tarif!=null?parseFloat(f.tarif):null;
+      var _coutA=conso!=null&&_tA?Math.round(conso*_tA):null;
+      var _budgetA=obj!=null&&_tA?Math.round(obj*_tA):null;
+      items.push({nom:f.nom,unite:f.unite||'',conso:conso!=null?Math.round(conso):null,obj:obj!=null?Math.round(obj):null,pct:pct,cout:_coutA,budget:_budgetA});
     });
     if(items.length)energieBySite[sid]=items;
   });
@@ -6981,9 +6984,16 @@ async function _dtAccueil(session,sids,cid){
             bar+
           '</div>';
         }).join('');
+        var _cT=0,_bT=0,_hc=false;efItems.forEach(function(x){if(x.cout!=null){_cT+=x.cout;_hc=true;}if(x.budget)_bT+=x.budget;});
+        function _fmtAcc(v){if(v==null)return'—';var a=Math.abs(v),s=v<0?'-':'';if(a>=1e6)return s+(a/1e6).toFixed(1).replace('.',',')+' M XOF';if(a>=1e3)return s+Math.round(a/1e3)+' k XOF';return s+Math.round(a)+' XOF';}
+        var _ecC=_hc&&_bT?(_cT>_bT?'var(--rouge)':'var(--vert)'):'var(--text3)';
         return '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">'+
           '<div style="font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">⚡ Énergie · ce mois</div>'+
           '<div style="display:flex;gap:8px;flex-wrap:wrap">'+rows+'</div>'+
+          (_hc?'<div style="margin-top:6px;padding-top:5px;border-top:1px dashed var(--border);display:flex;align-items:center;justify-content:space-between">'+
+            '<span style="font-size:10px;color:var(--text3)">Coût estimé</span>'+
+            '<span style="font-size:11px;font-weight:600;color:'+_ecC+'">'+_fmtAcc(_cT)+(_bT?' <span style="font-size:9px;font-weight:400;color:var(--text3)">/ budget '+_fmtAcc(_bT)+'</span>':'')+'</span>'+
+          '</div>':'')+
         '</div>';
       })()+
       (function(){
@@ -8023,7 +8033,7 @@ async function _dtEnergie(sids,session){
 
   var[sites,fluides,releves,objs]=await Promise.all([
     supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres&order=nom.asc'),
-    supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,devise,tarif&order=ordre.asc'),
+    supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,devise,tarif,budget_par_chambre&order=ordre.asc'),
     supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=site_id,date_releve,valeurs,to_percent&order=date_releve.asc&limit=600'),
     supaGet('objectifs_energie','site_id=in.('+sidStr+')&select=fluide_id,valeur,date_debut,date_fin&order=date_debut.desc&limit=400')
   ]);
@@ -8088,15 +8098,16 @@ async function _dtEnergie(sids,session){
       var col=pct!=null?(pct>100?'var(--rouge)':pct>80?'var(--orange)':'var(--vert)'):'var(--border)';
       // kWh/chambre occupée
       var kwhParChambre=null;
-      if(f.unite&&f.unite.toLowerCase()==='kwh'&&f.type_valeur==='index'&&conso!=null){
-        var _nbC=nbChambresMap[sid];
-        var _to=toMoyenBySite[sid];
-        if(_nbC&&_to!=null){
-          var _chambresOcc=Math.round(_nbC*_to/100);
-          kwhParChambre=_chambresOcc>0?Math.round(conso/_chambresOcc*10)/10:null;
-        }
+      var _nbCE=nbChambresMap[sid];var _toE=toMoyenBySite[sid];
+      var _chOccE=_nbCE&&_toE!=null?Math.round(_nbCE*_toE/100):null;
+      if(f.unite&&f.unite.toLowerCase()==='kwh'&&f.type_valeur==='index'&&conso!=null&&_chOccE){
+        kwhParChambre=_chOccE>0?Math.round(conso/_chOccE*10)/10:null;
       }
-      items.push({id:f.id,nom:f.nom,unite:f.unite||'',conso:conso!=null?Math.round(conso):null,obj:obj!=null?Math.round(obj):null,objRef:objRef,pct:pct,col:col,devise:f.devise||'',tarif:parseFloat(f.tarif)||0,kwhParChambre:kwhParChambre});
+      var _tE=f.tarif!=null?parseFloat(f.tarif):null;
+      var _bpcE=f.budget_par_chambre!=null?parseFloat(f.budget_par_chambre):null;
+      var _coutE=conso!=null&&_tE?Math.round(conso*_tE):null;
+      var _budgetE=_bpcE&&_chOccE?Math.round(_bpcE*_chOccE*daysElapsed):obj!=null&&_tE?Math.round(obj*_tE*daysElapsed/daysInMonth):null;
+      items.push({id:f.id,nom:f.nom,unite:f.unite||'',conso:conso!=null?Math.round(conso):null,obj:obj!=null?Math.round(obj):null,objRef:objRef,pct:pct,col:col,devise:f.devise||'',tarif:_tE||0,kwhParChambre:kwhParChambre,cout:_coutE,budget:_budgetE});
     });
     if(items.length)consoData[sid]=items;
   });
@@ -8150,6 +8161,25 @@ async function _dtEnergie(sids,session){
       '<div class="kpi-trend">Meilleur : '+escape_html(best.nom)+(worst.nom!==best.nom?' · Pire : '+escape_html(worst.nom)+' ('+worst.val.toLocaleString('fr-FR')+'kWh)':'')+'</div>'+
     '</div>';
   }
+  // FCFA KPI tiles
+  var _cTotDT=0,_bTotDT=0,_hcDT=false;
+  sids.forEach(function(sid){(consoData[sid]||[]).forEach(function(f){if(f.cout!=null){_cTotDT+=f.cout;_hcDT=true;}if(f.budget!=null)_bTotDT+=f.budget;});});
+  if(_hcDT){
+    function _fmtDT(v){if(v==null)return'—';var a=Math.abs(v),s=v<0?'-':'';if(a>=1e6)return s+(a/1e6).toFixed(1).replace('.',',')+' M';if(a>=1e3)return s+Math.round(a/1e3)+' k';return s+Math.round(a);}
+    var _eDT=_bTotDT?_cTotDT-_bTotDT:null;
+    var _epDT=_eDT!=null&&_bTotDT?Math.round(_eDT/_bTotDT*100):null;
+    var _colEcDT=_epDT==null?'var(--text3)':_epDT<=0?'var(--vert)':_epDT<=10?'#C49A1C':'var(--rouge)';
+    kpisHtml+='<div class="kpi" style="border-left:3px solid var(--amber)">'+
+      '<div class="kpi-label">💰 Coût total énergie</div>'+
+      '<div class="kpi-value" style="color:var(--amber-dark)">'+_fmtDT(_cTotDT)+' XOF</div>'+
+      '<div class="kpi-trend">'+(_bTotDT?'Budget : '+_fmtDT(_bTotDT)+' XOF':'Budget non défini')+'</div>'+
+    '</div>';
+    if(_epDT!=null)kpisHtml+='<div class="kpi">'+
+      '<div class="kpi-label">📊 Écart budget</div>'+
+      '<div class="kpi-value" style="color:'+_colEcDT+'">'+(_epDT>0?'+':'')+_epDT+'%</div>'+
+      '<div class="kpi-trend">'+(_epDT>0?'Au-dessus du budget':'En dessous du budget')+'</div>'+
+    '</div>';
+  }
   kpisHtml+='</div>';
 
   // Site cards
@@ -8167,14 +8197,18 @@ async function _dtEnergie(sids,session){
     var badgeTxt=worst.pct>100?'Dépassement':worst.pct>80?'Proche objectif':worst.pct>=0?'Objectif tenu':'En cours';
     var rows=items.map(function(f){
       var barW=f.pct!=null?Math.min(100,f.pct):0;
-      var bar='<div style="flex:1;height:6px;background:#F2EDE7;border-radius:3px;overflow:hidden;min-width:60px">'+
+      var bar='<div style="height:6px;background:#F2EDE7;border-radius:3px;overflow:hidden">'+
         '<div style="height:100%;width:'+barW+'%;background:'+f.col+';border-radius:3px;transition:width .3s"></div></div>';
-      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #F5F0EA">'+
-        '<div style="font-size:12px;color:var(--text2);min-width:90px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(f.nom)+'</div>'+
+      var _cFmt=function(v){if(v==null)return'—';var a=Math.abs(v),s=v<0?'-':'';if(a>=1e6)return s+(a/1e6).toFixed(1).replace('.',',')+' M';if(a>=1e3)return s+Math.round(a/1e3)+' k';return s+Math.round(a);};
+      var _coutCol=f.cout!=null&&f.budget!=null?(f.cout>f.budget?'var(--rouge)':'var(--vert)'):'#92400e';
+      return '<div style="display:grid;grid-template-columns:100px 1fr 68px 42px 58px 58px 58px;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid #F5F0EA">'+
+        '<div style="font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(f.nom)+'</div>'+
         bar+
-        '<div style="font-size:12px;font-weight:700;color:'+f.col+';min-width:60px;text-align:right">'+(f.conso!=null?f.conso.toLocaleString('fr-FR')+' '+escape_html(f.unite):'—')+'</div>'+
-        '<div style="font-size:10px;color:var(--text3);min-width:38px;text-align:right">'+(f.pct!=null?f.pct+'%':'—')+'</div>'+
-        '<div style="font-size:10px;font-weight:600;color:#1e40af;min-width:54px;text-align:right">'+(f.kwhParChambre!=null?f.kwhParChambre.toLocaleString('fr-FR')+'<span style="font-weight:400;color:var(--text3)"> kWh</span>':'—')+'</div>'+
+        '<div style="font-size:12px;font-weight:700;color:'+f.col+';text-align:right">'+(f.conso!=null?f.conso.toLocaleString('fr-FR')+' '+escape_html(f.unite):'—')+'</div>'+
+        '<div style="font-size:10px;color:var(--text3);text-align:right">'+(f.pct!=null?f.pct+'%':'—')+'</div>'+
+        '<div style="font-size:10px;font-weight:600;color:#1e40af;text-align:right">'+(f.kwhParChambre!=null?f.kwhParChambre.toLocaleString('fr-FR')+'<span style="font-weight:400;color:var(--text3)"> kWh</span>':'—')+'</div>'+
+        '<div style="font-size:10px;font-weight:600;color:'+_coutCol+';text-align:right">'+(f.cout!=null?_cFmt(f.cout)+'<span style="font-weight:400;color:var(--text3)"> XOF</span>':'—')+'</div>'+
+        '<div style="font-size:10px;color:var(--text3);text-align:right">'+(f.budget!=null?_cFmt(f.budget)+' XOF':'—')+'</div>'+
       '</div>';
     }).join('');
     var _toSite=toMoyenBySite[sid];
@@ -8186,10 +8220,25 @@ async function _dtEnergie(sids,session){
         '<div style="font-size:14px;font-weight:700;color:var(--dark);display:flex;align-items:center">🏨 '+escape_html(sNom)+toChip+'</div>'+
         '<span style="font-size:10px;font-weight:700;color:'+badgeCol+';background:'+badgeBg+';padding:3px 9px;border-radius:10px;border:1px solid '+badgeCol+'">'+badgeTxt+'</span>'+
       '</div>'+
-      '<div style="font-size:10px;font-weight:600;color:var(--text3);display:grid;grid-template-columns:1fr auto auto auto auto;gap:8px;padding-bottom:4px;text-transform:uppercase;letter-spacing:.5px">'+
-        '<span>Fluide</span><span></span><span style="text-align:right">Conso</span><span style="text-align:right">vs Obj</span><span style="text-align:right">/ ch. occ.</span>'+
+      '<div style="font-size:10px;font-weight:600;color:var(--text3);display:grid;grid-template-columns:100px 1fr 68px 42px 58px 58px 58px;gap:6px;padding-bottom:4px;text-transform:uppercase;letter-spacing:.5px">'+
+        '<span>Fluide</span><span></span><span style="text-align:right">Conso</span><span style="text-align:right">Obj%</span><span style="text-align:right">/ch.occ</span><span style="text-align:right">Coût</span><span style="text-align:right">Budget</span>'+
       '</div>'+
       rows+
+      (function(){
+        var _cS=0,_bS=0,_hcS=false;items.forEach(function(f){if(f.cout!=null){_cS+=f.cout;_hcS=true;}if(f.budget!=null)_bS+=f.budget;});
+        if(!_hcS)return '';
+        var _fS=function(v){if(v==null)return'—';var a=Math.abs(v),s=v<0?'-':'';if(a>=1e6)return s+(a/1e6).toFixed(1).replace('.',',')+' M';if(a>=1e3)return s+Math.round(a/1e3)+' k';return s+Math.round(a);};
+        var _ecS=_bS?_cS-_bS:null,_epS=_ecS!=null&&_bS?Math.round(_ecS/_bS*100):null;
+        var _colS=_epS==null?'var(--text3)':_epS<=0?'var(--vert)':_epS<=10?'#C49A1C':'var(--rouge)';
+        return '<div style="margin-top:8px;padding-top:8px;border-top:1.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'+
+          '<span style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;font-weight:600">💰 Total énergie</span>'+
+          '<div style="display:flex;align-items:center;gap:12px">'+
+            '<span style="font-size:12px;font-weight:700;color:'+_colS+'">'+_fS(_cS)+' XOF</span>'+
+            (_bS?'<span style="font-size:10px;color:var(--text3)">Budget : '+_fS(_bS)+' XOF</span>':'')+
+            (_epS!=null?'<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;background:'+(_epS>10?'#FDECEA':_epS>0?'#FDF3E3':'#E8F5EE')+';color:'+_colS+'">'+(_epS>0?'+':'')+_epS+'%</span>':'')+
+          '</div>'+
+        '</div>';
+      })()+
     '</div>';
   });
 
@@ -8212,7 +8261,7 @@ async function _dtEnergie(sids,session){
       var items=consoData[sid]||[];
       var match=items.find(function(x){return x.nom===fl.nom;});
       if(!match)return;
-      siteRows.push({sid:sid,nom:siteMap[sid]||sid,conso:match.conso,obj:match.obj,pct:match.pct,col:match.col,unite:match.unite,kwhParChambre:match.kwhParChambre||null});
+      siteRows.push({sid:sid,nom:siteMap[sid]||sid,conso:match.conso,obj:match.obj,pct:match.pct,col:match.col,unite:match.unite,kwhParChambre:match.kwhParChambre||null,cout:match.cout||null,budget:match.budget||null});
     });
     if(!siteRows.length)return;
     siteRows.sort(function(a,b){return(b.pct||0)-(a.pct||0);});
@@ -8222,13 +8271,17 @@ async function _dtEnergie(sids,session){
       var barW=maxConso>0&&r.conso!=null?Math.round(r.conso/maxConso*100):0;
       var kwhCh=r.kwhParChambre!=null?r.kwhParChambre.toLocaleString('fr-FR')+' kWh':'—';
       var toStr=toMoyenBySite[r.sid]!=null?toMoyenBySite[r.sid]+'%':'—';
+      var _fCmp=function(v){if(v==null)return'—';var a=Math.abs(v),s=v<0?'-':'';if(a>=1e6)return s+(a/1e6).toFixed(1).replace('.',',')+' M';if(a>=1e3)return s+Math.round(a/1e3)+' k';return s+Math.round(a);};
+      var _colCmp=r.cout!=null&&r.budget!=null?(r.cout>r.budget?'var(--rouge)':'var(--vert)'):'#92400e';
       rows2+='<tr style="border-bottom:1px solid #F5F0EA">'+
         '<td style="padding:7px 8px;font-size:12px;color:var(--text2);white-space:nowrap">'+escape_html(r.nom)+'</td>'+
-        '<td style="padding:7px 8px;width:35%"><div style="height:8px;background:#F2EDE7;border-radius:4px;overflow:hidden">'+
+        '<td style="padding:7px 8px;width:25%"><div style="height:8px;background:#F2EDE7;border-radius:4px;overflow:hidden">'+
           '<div style="height:100%;width:'+barW+'%;background:'+r.col+';border-radius:4px"></div></div></td>'+
         '<td style="padding:7px 8px;font-size:12px;font-weight:700;color:var(--dark);text-align:right;white-space:nowrap">'+(r.conso!=null?r.conso.toLocaleString('fr-FR')+' '+escape_html(r.unite):'—')+'</td>'+
         '<td style="padding:7px 8px;font-size:12px;font-weight:700;color:'+r.col+';text-align:right">'+(r.pct!=null?r.pct+'%':'—')+'</td>'+
         (isKwh?'<td style="padding:7px 8px;font-size:11px;font-weight:600;color:#1e40af;text-align:right">'+kwhCh+'</td><td style="padding:7px 8px;font-size:10px;color:var(--text3);text-align:right">TO '+toStr+'</td>':'')+
+        '<td style="padding:7px 8px;font-size:11px;font-weight:600;color:'+_colCmp+';text-align:right;white-space:nowrap">'+(r.cout!=null?_fCmp(r.cout)+' XOF':'—')+'</td>'+
+        '<td style="padding:7px 8px;font-size:10px;color:var(--text3);text-align:right;white-space:nowrap">'+(r.budget!=null?_fCmp(r.budget)+' XOF':'—')+'</td>'+
       '</tr>';
     });
     comparHtml+='<div style="background:white;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px">'+
@@ -8236,10 +8289,12 @@ async function _dtEnergie(sids,session){
       '<table style="width:100%;border-collapse:collapse">'+
         '<thead><tr style="border-bottom:2px solid var(--border)">'+
           '<th style="padding:5px 8px;font-size:10px;font-weight:700;color:var(--text3);text-align:left;text-transform:uppercase;letter-spacing:.5px">Site</th>'+
-          '<th style="padding:5px 8px;width:35%"></th>'+
+          '<th style="padding:5px 8px;width:25%"></th>'+
           '<th style="padding:5px 8px;font-size:10px;font-weight:700;color:var(--text3);text-align:right;text-transform:uppercase;letter-spacing:.5px">Conso</th>'+
           '<th style="padding:5px 8px;font-size:10px;font-weight:700;color:var(--text3);text-align:right;text-transform:uppercase;letter-spacing:.5px">% Obj</th>'+
           (isKwh?'<th style="padding:5px 8px;font-size:10px;font-weight:700;color:#1e40af;text-align:right;text-transform:uppercase;letter-spacing:.5px">kWh/ch.occ.</th><th style="padding:5px 8px;font-size:10px;font-weight:700;color:var(--text3);text-align:right;text-transform:uppercase;letter-spacing:.5px">TO%</th>':'')+
+          '<th style="padding:5px 8px;font-size:10px;font-weight:700;color:#92400e;text-align:right;text-transform:uppercase;letter-spacing:.5px">Coût XOF</th>'+
+          '<th style="padding:5px 8px;font-size:10px;font-weight:700;color:var(--text3);text-align:right;text-transform:uppercase;letter-spacing:.5px">Budget</th>'+
         '</tr></thead><tbody>'+rows2+'</tbody>'+
       '</table>'+
     '</div>';
