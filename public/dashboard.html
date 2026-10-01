@@ -7896,7 +7896,7 @@ async function _dtRapport(sids,session){
     supaGet('maintenances','groupe_id=in.('+sidStr+')&date_intervention=gte.'+cutoff+'&statut=eq.realise&select=id,groupe_id,type,cout'),
     supaGet('signalements','groupe_id=in.('+sidStr+')&type=eq.panne&created_at=gte.'+cutoff+'&select=id,groupe_id,statut,cout_intervention'),
     supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+cutoff+'&select=id,site_id,date_ronde'),
-    supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel&order=ordre.asc'),
+    supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id,nom,unite,type_valeur,objectif_mensuel&order=ordre.asc'),
     supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+cutoff+'&select=site_id,date_releve,valeurs,to_percent&order=date_releve.asc&limit=500')
   ]);
   var siteMap={};var nbChambresMapR={};
@@ -7947,7 +7947,8 @@ async function _dtRapport(sids,session){
       }
       var objPeriode=f.objectif_mensuel!=null?Math.round(parseFloat(f.objectif_mensuel)*period/30):null;
       var pct=conso!=null&&objPeriode?Math.round(conso/objPeriode*100):null;
-      return{nom:f.nom,unite:f.unite||'',conso:conso!=null?Math.round(conso):null,obj:objPeriode,pct:pct};
+      var consoFmt=conso!=null?(f.type_valeur==='instantane'?conso:Math.round(conso)):null;
+      return{nom:f.nom,unite:f.unite||'',conso:consoFmt,isInstant:f.type_valeur==='instantane',obj:objPeriode,pct:pct};
     });
     energieRapBySite[sid]=items;
   });
@@ -9551,7 +9552,7 @@ async function _openRapportDT(period){
       supaGet('maintenances','groupe_id=in.('+sidStr+')&date_intervention=gte.'+cutoff+'&select=id,groupe_id,type,titre,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=200'),
       supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+cutoff+'T00:00:00&select=id,groupe_id,type,description,statut,signale_par,cout_intervention,created_at,resolved_at,equipement_id,equipement_zone_id,lieu,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=200'),
       supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+cutoff+'&select=id,site_id,date_ronde,frequence&order=date_ronde.asc&limit=500'),
-      supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel&order=ordre.asc'),
+      supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id,nom,unite,type_valeur,objectif_mensuel&order=ordre.asc'),
       supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+cutoff+'&select=site_id,date_releve,valeurs&order=date_releve.asc&limit=500')
     ]);
     var rIds=rondes.map(function(r){return r.id;});
@@ -9610,7 +9611,8 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
       }else{var vl2=last&&last.valeurs&&last.valeurs[f.id];conso=vl2!=null?parseFloat(vl2):null;}
       var objPeriode=f.objectif_mensuel!=null?Math.round(parseFloat(f.objectif_mensuel)*period/30):null;
       var pct=conso!=null&&objPeriode?Math.round(conso/objPeriode*100):null;
-      return{nom:f.nom,unite:f.unite||'',conso:conso!=null?Math.round(conso):null,obj:objPeriode,pct:pct};
+      var consoFmt=conso!=null?(f.type_valeur==='instantane'?conso:Math.round(conso)):null;
+      return{nom:f.nom,unite:f.unite||'',conso:consoFmt,isInstant:f.type_valeur==='instantane',obj:objPeriode,pct:pct};
     });
     energieBySite[site.id]=items;
   });
