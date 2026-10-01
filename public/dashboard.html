@@ -364,6 +364,18 @@ async function supaGet(table,qs){
     return[];
   }
 }
+async function supaGetAll(table,qs,pageSize){
+  pageSize=pageSize||1000;
+  var all=[];var offset=0;
+  while(true){
+    var page=await supaGet(table,qs+'&limit='+pageSize+'&offset='+offset);
+    if(!page||!page.length)break;
+    all=all.concat(page);
+    if(page.length<pageSize)break;
+    offset+=pageSize;
+  }
+  return all;
+}
 async function supaPatch(table,id,data){
   try{
     var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?id=eq.'+id,{
@@ -3908,7 +3920,7 @@ async function _buildZonesConfigTab(sid){
     var [existingZones,zoneEquips,zoneEquipsSalle,sgOpen]=await Promise.all([
       supaGet('zones','site_id=eq.'+sid+'&order=categorie.asc,etage.asc,nom.asc&select=id,nom,etage,categorie,type,actif'),
       supaGet('equipements','site_id=eq.'+sid+'&zone_id=not.is.null&actif=eq.true&select=id,nom,zone_id,actif_ronde,actif_releve&order=nom.asc'),
-      supaGet('equipements_zone','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,zone_id&order=nom.asc&limit=20000'),
+      supaGetAll('equipements_zone','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,zone_id&order=nom.asc'),
       supaGet('signalements','site_id=eq.'+sid+'&statut=neq.resolu&select=zone_id&limit=500')
     ]);
     existingZones=existingZones||[];
