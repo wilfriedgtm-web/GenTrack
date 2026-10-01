@@ -6845,13 +6845,18 @@ async function _dtAccueil(session,sids,cid){
   var niveauxAccBySite={};
   var _latRelBySiteAcc={};(latestRelsDT||[]).forEach(function(r){if(!_latRelBySiteAcc[r.site_id])_latRelBySiteAcc[r.site_id]=r;});
   sids.forEach(function(sid){
-    var ifls=(instantaneFluidesDT||[]).filter(function(f){return f.site_id===sid;});
+    var ifls=(instantaneFluidesDT||[]).filter(function(f){
+      if(f.site_id!==sid)return false;
+      if(f.capacite==null)return false; // exclure métriques sans capacité (ex. Cos phi)
+      var n=(f.nom||'').toLowerCase();
+      return n.indexOf('gasoil')<0&&n.indexOf('cuve')<0; // déjà affiché dans "Cuve carburant"
+    });
     var lastR=_latRelBySiteAcc[sid]||null;
     var _ni=[];
     ifls.forEach(function(f){
-      var val=lastR&&lastR.valeurs&&lastR.valeurs[f.id]!=null?parseFloat(lastR.valeurs[f.id]):null;if(val==null)return;
+      var val=lastR&&lastR.valeurs&&lastR.valeurs[f.id]!=null?parseFloat(lastR.valeurs[f.id]):null;
       var cap=f.capacite!=null?parseFloat(f.capacite):null;
-      var pct=cap&&cap>0?Math.round(val/cap*100):f.unite==='%'?Math.round(val):null;
+      var pct=val!=null&&cap&&cap>0?Math.round(val/cap*100):val!=null&&f.unite==='%'?Math.round(val):null;
       _ni.push({nom:f.nom,unite:f.unite||'',val:val,pct:pct,date:lastR?lastR.date_releve:null});
     });if(_ni.length)niveauxAccBySite[sid]=_ni;
   });
@@ -7019,7 +7024,7 @@ async function _dtAccueil(session,sids,cid){
         _niv.forEach(function(f){
           var _cN=f.pct!=null?(f.pct<20?'var(--rouge)':f.pct<40?'var(--orange)':'var(--vert)'):'var(--text2)';
           _nh+='<div style="flex:1;min-width:72px"><div style="font-size:9px;color:var(--text3);margin-bottom:2px">'+escape_html(f.nom)+'</div>'+
-            '<div style="font-size:10px;font-weight:700;color:'+_cN+'">'+f.val.toLocaleString('fr-FR')+(f.unite?' '+escape_html(f.unite):'')+'</div>'+
+            '<div style="font-size:10px;font-weight:700;color:'+_cN+'">'+(f.val!=null?f.val.toLocaleString('fr-FR')+(f.unite?' '+escape_html(f.unite):''):'—')+'</div>'+
             (f.pct!=null?'<div style="height:3px;background:var(--border);border-radius:2px;margin-top:2px;overflow:hidden"><div style="width:'+Math.min(100,f.pct)+'%;height:100%;border-radius:2px;background:'+_cN+'"></div></div>':'')+
           '</div>';
         });
@@ -8142,19 +8147,18 @@ async function _dtEnergie(sids,session){
     if(items.length)consoData[sid]=items;
   });
 
-  // Niveaux instantanés (butane, cuve gasoil) par site
+  // Niveaux instantanés (butane, cuve gasoil) par site — exclure métriques sans capacité (Cos phi)
   var niveauxData={};
   sids.forEach(function(sid){
-    var ifls=(niveauxFluides||[]).filter(function(f){return f.site_id===sid;});
+    var ifls=(niveauxFluides||[]).filter(function(f){return f.site_id===sid&&f.capacite!=null;});
     if(!ifls.length)return;
     var last=(relevesBySite[sid]||[]).slice(-1)[0]||null;
     var _niv=[];
     ifls.forEach(function(f){
       var val=last&&last.valeurs&&last.valeurs[f.id]!=null?parseFloat(last.valeurs[f.id]):null;
-      if(val==null)return;
       var cap=f.capacite!=null?parseFloat(f.capacite):null;
-      var pct=cap&&cap>0?Math.round(val/cap*100):f.unite==='%'?Math.round(val):null;
-      _niv.push({nom:f.nom,unite:f.unite||'',val:val,pct:pct,date:last.date_releve});
+      var pct=val!=null&&cap&&cap>0?Math.round(val/cap*100):val!=null&&f.unite==='%'?Math.round(val):null;
+      _niv.push({nom:f.nom,unite:f.unite||'',val:val,pct:pct,date:last?last.date_releve:null});
     });
     if(_niv.length)niveauxData[sid]=_niv;
   });
@@ -8296,7 +8300,7 @@ async function _dtEnergie(sids,session){
           var _colN=f.pct!=null?(f.pct<20?'var(--rouge)':f.pct<40?'var(--orange)':'var(--vert)'):'var(--text2)';
           _nh+='<div style="flex:1;min-width:90px;border:1px solid var(--border);border-radius:8px;padding:6px 10px">'+
             '<div style="font-size:9px;color:var(--text3);margin-bottom:3px">'+escape_html(f.nom)+'</div>'+
-            '<div style="font-size:13px;font-weight:700;color:'+_colN+'">'+f.val.toLocaleString('fr-FR')+(f.unite?' '+escape_html(f.unite):'')+'</div>'+
+            '<div style="font-size:13px;font-weight:700;color:'+_colN+'">'+(f.val!=null?f.val.toLocaleString('fr-FR')+(f.unite?' '+escape_html(f.unite):''):'—')+'</div>'+
             (f.pct!=null?'<div style="margin-top:4px;height:4px;background:var(--border);border-radius:2px;overflow:hidden"><div style="width:'+Math.min(100,f.pct)+'%;height:100%;border-radius:2px;background:'+_colN+'"></div></div>':'')+
             '<div style="font-size:8px;color:var(--text3);margin-top:3px">'+escape_html(f.date||'')+'</div>'+
           '</div>';
