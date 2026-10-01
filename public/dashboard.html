@@ -7997,6 +7997,10 @@ async function _dtRapport(sids,session){
 }
 function _dtSetRapportPeriod(n){_dtRapportPeriod=n;if(_session)renderDirTech(_session,'rapport');}
 
+/* ── RESP TECH : Énergie sélecteur de mois ── */
+var _rtEnergieMoisOffset=0; // 0 = mois en cours, -1 = mois-1, etc.
+function _rtSetEnergieMois(n){_rtEnergieMoisOffset=n;if(_session)renderRespTech(_session,'energie');}
+
 /* ── DIR TECH : Énergie multi-sites ── */
 var _dtEnergiePeriod=0; // 0 = mois en cours, -1 = mois-1, -2 = mois-2
 function _dtSetEnergiePeriod(n){_dtEnergiePeriod=n;if(_session)renderDirTech(_session,'energie');}
@@ -11067,15 +11071,18 @@ async function _rtEnergie(sid){
 
   var today=todayStr();
   var now=new Date();
-  var moisDebut=new Date(now.getFullYear(),now.getMonth(),1).toISOString().split('T')[0];
-  var daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  var offset=_rtEnergieMoisOffset||0;
+  var tgt=new Date(now.getFullYear(),now.getMonth()+offset,1);
+  var moisDebut=tgt.toISOString().split('T')[0];
+  var moisFin=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).toISOString().split('T')[0];
+  var daysInMonth=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).getDate();
   var since60=dateNJours(60);
 
   _energieSidGlobal=sid;
 
   var[fluides,relevesRows,siteRows,objsRows]=await Promise.all([
     supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,seuil_alerte_bas,objectif_mensuel,capacite,ordre,devise&order=ordre.asc'),
-    supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+moisDebut+'&select=id,date_releve,valeurs,saisi_par,note,to_percent&order=date_releve.asc&limit=62'),
+    supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=id,date_releve,valeurs,saisi_par,note,to_percent&order=date_releve.asc&limit=62'),
     supaGet('sites','id=eq.'+sid+'&select=nom,nb_chambres&limit=1'),
     supaGet('objectifs_energie','site_id=eq.'+sid+'&select=id,fluide_id,valeur,date_debut,date_fin,note&order=date_debut.desc&limit=200')
   ]);
@@ -11366,8 +11373,21 @@ async function _rtEnergie(sid){
     '</button>';
   }).join('');
 
-  var moisLabel=now.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
-  var nextMois=new Date(now.getFullYear(),now.getMonth()+1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  var moisLabel=tgt.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  moisLabel=moisLabel.charAt(0).toUpperCase()+moisLabel.slice(1);
+  var nextMois=new Date(tgt.getFullYear(),tgt.getMonth()+1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+
+  // ── Sélecteur de mois ──
+  var moisNavBtns=[-5,-4,-3,-2,-1,0].map(function(n){
+    var lbl=new Date(now.getFullYear(),now.getMonth()+n,1).toLocaleDateString('fr-FR',{month:'short',year:'2-digit'});
+    lbl=lbl.charAt(0).toUpperCase()+lbl.slice(1);
+    var on=(offset===n);
+    return '<button onclick="_rtSetEnergieMois('+n+')" style="padding:5px 11px;border-radius:20px;border:1.5px solid '+(on?'var(--amber)':'var(--border)')+';background:'+(on?'var(--amber-pale)':'white')+';font-size:11px;font-weight:'+(on?'700':'500')+';color:'+(on?'var(--amber-dark)':'var(--text2)')+';cursor:pointer;white-space:nowrap">'+lbl+(n===0?' ●':'')+'</button>';
+  }).join('');
+  var moisNavHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;align-items:center">'+
+    '<span style="font-size:11px;color:var(--text3);margin-right:2px">Mois :</span>'+
+    moisNavBtns+
+  '</div>';
 
   var objPanelHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px;height:fit-content">'+
     '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:2px">Objectifs &amp; tarifs</div>'+
@@ -11420,9 +11440,9 @@ async function _rtEnergie(sid){
   '</div>';
 
   // ── TABLEAU ──
-  var todayReleve=releveByDate[today];
+  var todayReleve=offset===0?releveByDate[today]:null;
   var nbReleves=relevesAsc.length;
-  var dayOfMonth=now.getDate();
+  var dayOfMonth=offset===0?Math.min(now.getDate(),daysInMonth):daysInMonth;
   var nbManquants=dayOfMonth-nbReleves;
   var conformite=dayOfMonth>0?Math.round(nbReleves/dayOfMonth*100):100;
 
@@ -11527,7 +11547,7 @@ async function _rtEnergie(sid){
     if(_energieCurrentFluide)_renderEnergieChart(_energieCurrentFluide);
   },50);
 
-  return headerHtml+toPanelHtml+tilesHtml+kpiHtml+chartHtml+tblHtml;
+  return moisNavHtml+headerHtml+toPanelHtml+tilesHtml+kpiHtml+chartHtml+tblHtml;
 }
 
 /* ═══════════════════════════════════════════════════════
