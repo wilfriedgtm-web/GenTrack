@@ -8147,10 +8147,10 @@ async function _dtEnergie(sids,session){
     if(items.length)consoData[sid]=items;
   });
 
-  // Niveaux instantanés (butane, cuve gasoil) par site — exclure métriques sans capacité (Cos phi)
+  // Niveaux instantanés (butane, cuve gasoil, cos phi…) par site — tous les instantanés du RT
   var niveauxData={};
   sids.forEach(function(sid){
-    var ifls=(niveauxFluides||[]).filter(function(f){return f.site_id===sid&&f.capacite!=null;});
+    var ifls=(niveauxFluides||[]).filter(function(f){return f.site_id===sid;});
     if(!ifls.length)return;
     var last=(relevesBySite[sid]||[]).slice(-1)[0]||null;
     var _niv=[];
