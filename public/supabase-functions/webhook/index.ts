@@ -72,6 +72,7 @@ async function setSession(phone: string, state: string, data: any = {}) {
 
 // ── Dates ─────────────────────────────────────────────────────────────────────
 function getToday():          string { return new Date().toLocaleDateString('fr-CA', { timeZone: 'Africa/Dakar' }); }
+function getHier():           string { const d = new Date(); d.setDate(d.getDate() - 1); return d.toLocaleDateString('fr-CA', { timeZone: 'Africa/Dakar' }); }
 function getHeure():          string { return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Dakar' }); }
 function getStartOfWeek():    string {
   const d = new Date();
@@ -225,10 +226,11 @@ async function getFrequencesDisponibles(site: any): Promise<string[]> {
   return freqs;
 }
 
-// Vérifie si le relevé énergie a déjà été saisi aujourd'hui pour ce site
+// Vérifie si le relevé énergie d'hier a déjà été saisi pour ce site
+// (le bot enregistre la consommation de la veille, d'où getHier())
 async function releveEnergieFaitAujourdhui(siteId: string): Promise<boolean> {
   const rows = await db('releves_energie', {
-    query: `&site_id=eq.${siteId}&date_releve=eq.${getToday()}&limit=1`,
+    query: `&site_id=eq.${siteId}&date_releve=eq.${getHier()}&limit=1`,
     select: 'id'
   });
   return Array.isArray(rows) && rows.length > 0;
@@ -320,7 +322,7 @@ function fmtFluidQuestion(fluide: any, lastVal: any, idx: number, total: number)
   return txt;
 }
 function fmtRecapEnergie(fluides: any[], reponses: Record<string, number>, lastReleve: Record<string, any>, siteNom: string): string {
-  let txt = `⚡ *Récap relevé énergie*\n_${siteNom} · ${getToday()}_\n\n`;
+  let txt = `⚡ *Récap relevé énergie*\n_${siteNom} · consommation du ${getHier()}_\n\n`;
   for (const f of fluides) {
     const v = reponses[f.id];
     if (v == null) continue;
@@ -1223,11 +1225,12 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     if (v !== 'oui') return sendWA(phone, `Répondez *OUI* pour valider ou *NON* pour annuler.`);
 
     const valeurs = sd.reponses || {};
-    const today = getToday();
+    // Le relevé du matin représente la consommation de la veille → date_releve = hier
+    const dateReleve = getHier();
 
     // Upsert dans releves_energie (un seul relevé par jour)
     const existingRow = await db('releves_energie', {
-      query: `&site_id=eq.${sd.site_id}&date_releve=eq.${today}&limit=1`,
+      query: `&site_id=eq.${sd.site_id}&date_releve=eq.${dateReleve}&limit=1`,
       select: 'id'
     });
     if (Array.isArray(existingRow) && existingRow.length > 0) {
@@ -1239,7 +1242,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     } else {
       await db('releves_energie', {
         method: 'POST',
-        body: { site_id: sd.site_id, date_releve: today, valeurs, saisi_par: contact.nom }
+        body: { site_id: sd.site_id, date_releve: dateReleve, valeurs, saisi_par: contact.nom }
       });
     }
     await setSession(phone, 'idle', {});
@@ -1259,18 +1262,18 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
         const em = (f.seuil_alerte_bas != null && val < f.seuil_alerte_bas) ? '⚠️' : '✅';
         return `${em} ${f.nom} : *${val}${f.unite ? ' ' + f.unite : ''}*${delta}`;
       }).filter(Boolean).join('\n');
-      const notifMsg = `⚡ *Relevé énergie — ${siteNom}*\n_${today} · ${getHeure()}_\n\n${lines}\n\n_Saisi par ${contact.nom}_`;
+      const notifMsg = `⚡ *Relevé énergie — ${siteNom}*\n_Consommation du ${dateReleve} · saisi à ${getHeure()}_\n\n${lines}\n\n_Saisi par ${contact.nom}_`;
       for (const r of responsables) if (r.whatsapp) sendWA(r.whatsapp, notifMsg).catch(() => {});
     }).catch(() => {});
 
     // Si lancé depuis une ronde, retour à la liste des équipements restants
     if (sd.ronde_context?.ronde_id) {
-      await sendWA(phone, `✅ *Relevé énergie validé !*\n_${today} · ${siteNom}_`);
+      await sendWA(phone, `✅ *Relevé énergie validé !*\n_Consommation du ${dateReleve} · ${siteNom}_`);
       const siteRaw = await db('sites', { query: `&id=eq.${sd.ronde_context.site_id}&limit=1` });
       const siteObj = Array.isArray(siteRaw) ? siteRaw[0] : null;
       return continuerRonde(phone, sd.ronde_context, contact, siteObj);
     }
-    return sendWA(phone, `✅ *Relevé énergie validé !*\n_${today} · ${siteNom}_\n\n_Responsable notifié 📲_`);
+    return sendWA(phone, `✅ *Relevé énergie validé !*\n_Consommation du ${dateReleve} · ${siteNom}_\n\n_Responsable notifié 📲_`);
   }
 
   // ── Affectation interactive : choix du tech ──────────────────────────────
