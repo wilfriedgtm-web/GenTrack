@@ -11178,6 +11178,7 @@ async function _rtEnergie(sid){
   var _toToday=(releveByDate[today]&&releveByDate[today].to_percent!=null)?parseFloat(releveByDate[today].to_percent):null;
   var _toPct=_toMoy!=null?_toMoy:(_toToday!=null?_toToday:null);
   var chambresOcc=nbChambres&&_toPct?Math.round(nbChambres*_toPct/100):null;
+  var coutTotalMois=0; var hasCoutData=false; var coutFluideNoms=[];
 
   // ── TILES ──
 
@@ -11225,6 +11226,7 @@ async function _rtEnergie(sid){
     var coutReel=consoAffichee!=null&&consoAffichee>0&&tarif?Math.round(consoAffichee*tarif):null;
     var pct=obj&&consoAffichee!=null&&consoAffichee>0?consoAffichee/obj:null;
     var deltaCout=budget&&coutReel?coutReel-budget:null;
+    if(coutReel!=null&&coutReel>0){coutTotalMois+=coutReel;hasCoutData=true;coutFluideNoms.push(f.nom);}
     // Alerte seuil : pour cuves comparer en L, sinon comparer brut
     var _compVal=isInstant&&cap!=null?lastValL:lastVal;
     var alerte=f.seuil_alerte_bas!=null&&_compVal!=null&&_compVal<f.seuil_alerte_bas;
@@ -11321,9 +11323,9 @@ async function _rtEnergie(sid){
   var todayReleve=releveByDate[today];
   var toPctToday=todayReleve&&todayReleve.to_percent!=null?parseFloat(todayReleve.to_percent):null;
 
-  // KPI tiles (kWh/chambre, m³/chambre) — only if nb_chambres and TO% known
+  // KPI tiles (kWh/chambre, m³/chambre, coûts FCFA)
   var kpiHtml='';
-  if(nbChambres&&(hasKwhData||hasM3Data)){
+  if((nbChambres&&(hasKwhData||hasM3Data))||hasCoutData){
     var toForKpi=toMoyenPct!=null?toMoyenPct:(toPctToday!=null?toPctToday:null);
     var chambresOcc=toForKpi!=null?Math.round(nbChambres*toForKpi/100):null;
     kpiHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:20px">';
@@ -11351,6 +11353,33 @@ async function _rtEnergie(sid){
           (chambresOcc?chambresOcc+' ch. occ.'+' (TO '+toForKpi+'%)':
            (nbChambres?nbChambres+' ch. · TO% non saisi':''))+
         '</div>'+
+      '</div>';
+    }
+    if(hasCoutData){
+      var _coutFmt=coutTotalMois>=1000000?(Math.round(coutTotalMois/100000)/10).toLocaleString('fr-FR')+'M':Math.round(coutTotalMois/1000).toLocaleString('fr-FR')+'k';
+      kpiHtml+='<div style="background:white;border:1.5px solid #fef3c7;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px">'+
+        '<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px">💰 Coût total mensuel</div>'+
+        '<div style="font-size:28px;font-weight:800;color:var(--dark)">'+_coutFmt+
+          '<span style="font-size:13px;font-weight:500;color:var(--text3);margin-left:3px">XOF</span>'+
+        '</div>'+
+        '<div style="font-size:10px;color:var(--text2)">'+coutFluideNoms.join(' · ')+'</div>'+
+      '</div>';
+    }
+    if(hasCoutData&&chambresOcc){
+      var _fcfaCh=Math.round(coutTotalMois/chambresOcc);
+      var _bpcTotal=(function(){var s=0;var h=false;fluides.forEach(function(f){if(f.budget_par_chambre){s+=parseFloat(f.budget_par_chambre);h=true;}});return h?s:null;})();
+      var _ecartBpc=_bpcTotal?Math.round((_fcfaCh-_bpcTotal)/_bpcTotal*1000)/10:null;
+      kpiHtml+='<div style="background:white;border:1.5px solid #fef3c7;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px">'+
+        '<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px">💰 FCFA / chambre occupée</div>'+
+        '<div style="font-size:28px;font-weight:800;color:var(--dark)">'+_fcfaCh.toLocaleString('fr-FR')+
+          '<span style="font-size:13px;font-weight:500;color:var(--text3);margin-left:3px">XOF/ch</span>'+
+        '</div>'+
+        '<div style="font-size:10px;color:var(--text2)">'+chambresOcc+' ch occ. · TO '+toForKpi+'%'+
+          (_bpcTotal?' · budget '+Math.round(_bpcTotal).toLocaleString('fr-FR')+' XOF/ch':'')+
+        '</div>'+
+        (_ecartBpc!=null?'<div style="font-size:10px;font-weight:700;color:'+(_ecartBpc>5?'#E8841A':_ecartBpc<-5?'var(--vert)':'var(--text3)')+'">'+
+          (_ecartBpc>0?'↑ +':_ecartBpc<0?'↓ ':'')+Math.abs(_ecartBpc)+'% vs budget/ch'+
+        '</div>':'')+
       '</div>';
     }
     kpiHtml+='</div>';
