@@ -955,7 +955,7 @@ async function _fetchGasoilNiveauBySite(sidStr){
   var lastBySite={};
   releves.forEach(function(r){if(!lastBySite[r.site_id]||r.date_releve>lastBySite[r.site_id].date_releve)lastBySite[r.site_id]=r;});
   var map={};
-  gfs.forEach(function(gf){
+  gfs.filter(function(gf){var n=(gf.nom||'').toLowerCase();return n.indexOf('gasoil')>=0||n.indexOf('cuve')>=0;}).forEach(function(gf){
     var lr=lastBySite[gf.site_id];if(!lr)return;
     var rawVal=lr.valeurs&&lr.valeurs[gf.id]!=null?parseFloat(lr.valeurs[gf.id]):null;
     if(rawVal==null)return;
