@@ -6856,7 +6856,7 @@ async function _dtAccueil(session,sids,cid){
     ifls.forEach(function(f){
       var val=lastR&&lastR.valeurs&&lastR.valeurs[f.id]!=null?parseFloat(lastR.valeurs[f.id]):null;
       var cap=f.capacite!=null?parseFloat(f.capacite):null;
-      var pct=val!=null&&cap&&cap>0?Math.round(val/cap*100):val!=null&&f.unite==='%'?Math.round(val):null;
+      var pct=val!=null&&cap&&cap>0?(val>100?Math.round(val/cap*100):Math.round(val)):val!=null&&f.unite==='%'?Math.round(val):null;
       _ni.push({nom:f.nom,unite:f.unite||'',val:val,pct:pct,date:lastR?lastR.date_releve:null});
     });if(_ni.length)niveauxAccBySite[sid]=_ni;
   });
@@ -8158,7 +8158,7 @@ async function _dtEnergie(sids,session){
     ifls.forEach(function(f){
       var val=last&&last.valeurs&&last.valeurs[f.id]!=null?parseFloat(last.valeurs[f.id]):null;
       var cap=f.capacite!=null?parseFloat(f.capacite):null;
-      var pct=val!=null&&cap&&cap>0?Math.round(val/cap*100):val!=null&&f.unite==='%'?Math.round(val):null;
+      var pct=val!=null&&cap&&cap>0?(val>100?Math.round(val/cap*100):Math.round(val)):val!=null&&f.unite==='%'?Math.round(val):null;
       _niv.push({nom:f.nom,unite:f.unite||'',val:val,pct:pct,date:last?last.date_releve:null});
     });
     if(_niv.length)niveauxData[sid]=_niv;
