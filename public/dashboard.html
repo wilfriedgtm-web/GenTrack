@@ -1844,14 +1844,24 @@ async function _openRondeDetail(rondeId,dateStr,freq){
   }
 
   var reIds=rondesEq.map(function(re){return re.id;});
-  var reps=await supaGet('reponses',
-    'ronde_equipement_id=in.('+reIds.join(',')+')'+'&select=valeur,ronde_equipement_id,questions(texte,unite,seuil_min,seuil_max)'
-  );
+  var[reps,anos]=await Promise.all([
+    supaGet('reponses',
+      'ronde_equipement_id=in.('+reIds.join(',')+')'+'&select=valeur,ronde_equipement_id,questions(texte,unite,seuil_min,seuil_max)'
+    ),
+    supaGet('anomalies',
+      'ronde_equipement_id=in.('+reIds.join(',')+')'+'&select=ronde_equipement_id,description,created_at&order=created_at.asc'
+    )
+  ]);
 
   var repByRe={};
   reps.forEach(function(r){
     if(!repByRe[r.ronde_equipement_id])repByRe[r.ronde_equipement_id]=[];
     repByRe[r.ronde_equipement_id].push(r);
+  });
+  var anoByRe={};
+  anos.forEach(function(a){
+    if(!anoByRe[a.ronde_equipement_id])anoByRe[a.ronde_equipement_id]=[];
+    anoByRe[a.ronde_equipement_id].push(a);
   });
 
   var html='';
@@ -1864,11 +1874,19 @@ async function _openRondeDetail(rondeId,dateStr,freq){
     var rowsHtml=rows.length?
       rows.map(function(r){return _dpValRow(r.questions,r.valeur);}).join(''):
       '<div class="dp-q-row"><span class="dp-q-label" style="color:var(--text3)">Aucune réponse enregistrée</span></div>';
+    var anoList=(anoByRe[re.id]||[]);
+    var anoHtml=anoList.map(function(a){
+      return '<div style="display:flex;align-items:flex-start;gap:8px;margin-top:6px;padding:7px 10px;background:#fff8f0;border-left:3px solid #f59e0b;border-radius:0 6px 6px 0">'+
+        '<span style="font-size:11px;font-weight:700;color:#b45309;white-space:nowrap;padding-top:1px">⚠ Anomalie</span>'+
+        '<span style="font-size:12px;color:var(--dark)">'+escape_html(a.description)+'</span>'+
+      '</div>';
+    }).join('');
     html+='<div class="dp-eq-card">'+
       '<div class="dp-eq-hdr">'+icon+' '+escape_html(nom)+
         '<span class="dp-ronde-status '+(ok?'ok':'nok')+'">'+(ok?'✅ Validé':'⏳ En attente')+'</span>'+
       '</div>'+
       rowsHtml+
+      anoHtml+
     '</div>';
   });
 
@@ -7897,7 +7915,7 @@ async function _dtRapport(sids,session){
     supaGet('signalements','groupe_id=in.('+sidStr+')&type=eq.panne&created_at=gte.'+cutoff+'&select=id,groupe_id,statut,cout_intervention'),
     supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+cutoff+'&select=id,site_id,date_ronde'),
     supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id,nom,unite,type_valeur,objectif_mensuel&order=ordre.asc'),
-    supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+cutoff+'&select=site_id,date_releve,valeurs,to_percent&order=date_releve.asc&limit=500')
+    supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+cutoff+'&select=site_id,date_releve,valeurs,to_percent,nb_couverts&order=date_releve.asc&limit=500')
   ]);
   var siteMap={};var nbChambresMapR={};
   sites.forEach(function(s){siteMap[s.id]=s.nom;nbChambresMapR[s.id]=s.nb_chambres?parseInt(s.nb_chambres):null;});
@@ -7912,6 +7930,8 @@ async function _dtRapport(sids,session){
     var vals=toMoyenRapBySite[sid];
     toMoyenRapBySite[sid]=Math.round(vals.reduce(function(a,b){return a+b;},0)/vals.length*10)/10;
   });
+  var couvertsTotalRapBySite={};
+  (rapRels||[]).forEach(function(r){if(r.nb_couverts!=null)couvertsTotalRapBySite[r.site_id]=(couvertsTotalRapBySite[r.site_id]||0)+parseInt(r.nb_couverts);});
   var periodOpts=[7,14,30,60,90].map(function(n){
     return '<button onclick="_dtSetRapportPeriod('+n+')" style="padding:6px 14px;border-radius:20px;border:1.5px solid '+(period===n?'var(--amber)':'var(--border)')+';background:'+(period===n?'var(--amber-pale)':'white')+';font-size:12px;font-weight:'+(period===n?'700':'500')+';color:'+(period===n?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+n+' jours</button>';
   }).join('');
@@ -7998,6 +8018,8 @@ async function _dtRapport(sids,session){
         var _nbCR=nbChambresMapR[sid];
         var toChipR=_toR!=null?'<span style="font-size:10px;font-weight:700;color:#1e40af;background:#dbeafe;border-radius:6px;padding:1px 6px;margin-left:6px">TO moy. '+_toR+'%</span>':
           (_nbCR?'<span style="font-size:10px;color:var(--rouge);margin-left:6px">⚠ TO% non saisi</span>':'');
+        var _covR=couvertsTotalRapBySite[sid];
+        var covChipR=_covR!=null?'<span style="font-size:10px;font-weight:700;color:#7c3aed;background:#f5f3ff;border-radius:6px;padding:1px 6px;margin-left:4px">🍽 '+_covR.toLocaleString('fr-FR')+' cvts</span>':'';
         var rows=ef.map(function(f){
           var col=f.pct!=null?(f.pct>100?'var(--rouge)':f.pct>85?'var(--orange)':'var(--vert)'):'var(--text3)';
           var barW=f.pct!=null?Math.min(100,f.pct):0;
@@ -8016,7 +8038,7 @@ async function _dtRapport(sids,session){
           '</div>';
         }).join('');
         return '<div style="margin-top:14px;padding-top:12px;border-top:1.5px solid var(--border)">'+
-          '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;display:flex;align-items:center">⚡ Énergie sur la période'+toChipR+'</div>'+
+          '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;display:flex;align-items:center">⚡ Énergie sur la période'+toChipR+covChipR+'</div>'+
           rows+
         '</div>';
       })()+
@@ -8066,13 +8088,26 @@ async function _dtEnergie(sids,session){
   var moisLabel=tgt.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
   moisLabel=moisLabel.charAt(0).toUpperCase()+moisLabel.slice(1);
 
-  var[sites,fluides,releves,objs,niveauxFluides]=await Promise.all([
+  var[sites,fluides,releves,objs,niveauxFluides,budgetsMensuels]=await Promise.all([
     supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres&order=nom.asc'),
     supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,devise,tarif,budget_par_chambre&order=ordre.asc'),
-    supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=site_id,date_releve,valeurs,to_percent&order=date_releve.asc&limit=600'),
+    supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=site_id,date_releve,valeurs,to_percent,nb_couverts&order=date_releve.asc&limit=600'),
     supaGet('objectifs_energie','site_id=in.('+sidStr+')&select=fluide_id,valeur,date_debut,date_fin&order=date_debut.desc&limit=400'),
-    supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=eq.instantane&select=id,site_id,nom,unite,capacite&order=ordre.asc')
+    supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=eq.instantane&select=id,site_id,nom,unite,capacite&order=ordre.asc'),
+    supaGet('energie_budget_mensuel','site_id=in.('+sidStr+')&annee=eq.'+tgt.getFullYear()+'&mois=eq.'+(tgt.getMonth()+1)+'&select=id,site_id,nb_couverts_budget')
   ]);
+  var _budgetMIds=(budgetsMensuels||[]).map(function(b){return b.id;});
+  var budgetsFluides=_budgetMIds.length?await supaGet('energie_budget_fluide','budget_id=in.('+_budgetMIds.join(',')+')'+'&select=budget_id,fluide_id,cout_budget_jour')||[]:[];
+  var _bmBySite={};(budgetsMensuels||[]).forEach(function(b){_bmBySite[b.site_id]=b;});
+  var _bfBySiteFluide={};
+  (budgetsFluides||[]).forEach(function(bf){
+    var bm=(budgetsMensuels||[]).find(function(b){return b.id===bf.budget_id;});
+    if(!bm)return;
+    if(!_bfBySiteFluide[bm.site_id])_bfBySiteFluide[bm.site_id]={};
+    _bfBySiteFluide[bm.site_id][bf.fluide_id]=bf.cout_budget_jour!=null?parseFloat(bf.cout_budget_jour):null;
+  });
+  var couvertsBySite={};
+  (releves||[]).forEach(function(r){if(r.nb_couverts!=null)couvertsBySite[r.site_id]=(couvertsBySite[r.site_id]||0)+parseInt(r.nb_couverts);});
 
   var siteMap={};var nbChambresMap={};
   (sites||[]).forEach(function(s){siteMap[s.id]=s.nom;nbChambresMap[s.id]=s.nb_chambres?parseInt(s.nb_chambres):null;});
@@ -8142,7 +8177,8 @@ async function _dtEnergie(sids,session){
       var _tE=f.tarif!=null?parseFloat(f.tarif):null;
       var _bpcE=f.budget_par_chambre!=null?parseFloat(f.budget_par_chambre):null;
       var _coutE=conso!=null&&_tE?Math.round(conso*_tE):null;
-      var _budgetE=_bpcE&&_chOccE?Math.round(_bpcE*_chOccE*daysElapsed):obj!=null&&_tE?Math.round(obj*_tE*daysElapsed/daysInMonth):null;
+      var _bfCoutJ=_bfBySiteFluide[sid]&&_bfBySiteFluide[sid][f.id]!=null?_bfBySiteFluide[sid][f.id]:null;
+      var _budgetE=_bfCoutJ!=null?Math.round(_bfCoutJ*daysElapsed):(_bpcE&&_chOccE?Math.round(_bpcE*_chOccE*daysElapsed):(obj!=null&&_tE?Math.round(obj*_tE*daysElapsed/daysInMonth):null));
       items.push({id:f.id,nom:f.nom,unite:f.unite||'',conso:conso!=null?Math.round(conso):null,obj:obj!=null?Math.round(obj):null,objRef:objRef,pct:pct,col:col,devise:f.devise||'',tarif:_tE||0,kwhParChambre:kwhParChambre,cout:_coutE,budget:_budgetE});
     });
     if(items.length)consoData[sid]=items;
@@ -8267,9 +8303,11 @@ async function _dtEnergie(sids,session){
     var _nbCSite=nbChambresMap[sid];
     var toChip=_toSite!=null?'<span style="font-size:10px;font-weight:700;color:#1e40af;background:#dbeafe;border-radius:8px;padding:2px 7px;margin-left:6px">TO '+_toSite+'%</span>':
       (_nbCSite?'<span style="font-size:10px;color:var(--text3);margin-left:6px">TO% non saisi</span>':'');
+    var _covSite=couvertsBySite[sid];
+    var covChip=_covSite!=null?'<span style="font-size:10px;font-weight:700;color:#7c3aed;background:#f5f3ff;border-radius:8px;padding:2px 7px;margin-left:4px">🍽 '+_covSite.toLocaleString('fr-FR')+' cvts</span>':'';
     siteCardsHtml+='<div style="background:white;border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:12px">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
-        '<div style="font-size:14px;font-weight:700;color:var(--dark);display:flex;align-items:center">🏨 '+escape_html(sNom)+toChip+'</div>'+
+        '<div style="font-size:14px;font-weight:700;color:var(--dark);display:flex;align-items:center">🏨 '+escape_html(sNom)+toChip+covChip+'</div>'+
         '<span style="font-size:10px;font-weight:700;color:'+badgeCol+';background:'+badgeBg+';padding:3px 9px;border-radius:10px;border:1px solid '+badgeCol+'">'+badgeTxt+'</span>'+
       '</div>'+
       '<div style="font-size:10px;font-weight:600;color:var(--text3);display:grid;grid-template-columns:100px 1fr 68px 42px 58px 58px 58px;gap:6px;padding-bottom:4px;text-transform:uppercase;letter-spacing:.5px">'+
@@ -9546,19 +9584,24 @@ async function _openRapportDT(period){
     var periodeStr=dateDebut.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})+' – '+dateFin.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
     var sidStr=sids.join(',');
 
-    var[sites,pleins,maintenances,signalements,rondes,energieFluidesDT,relevesEnergieDT]=await Promise.all([
-      supaGet('sites','id=in.('+sidStr+')&select=id,nom'),
+    var _now=new Date();
+    var[sites,pleins,maintenances,signalements,rondes,energieFluidesDT,relevesEnergieDT,budgetsMensuels]=await Promise.all([
+      supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres'),
       supaGet('pleins','site_id=in.('+sidStr+')&date=gte.'+cutoff+'&select=id,site_id,litres_ajoutes,cout,date&order=date.asc'),
       supaGet('maintenances','groupe_id=in.('+sidStr+')&date_intervention=gte.'+cutoff+'&select=id,groupe_id,type,titre,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=200'),
       supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+cutoff+'T00:00:00&select=id,groupe_id,type,description,statut,signale_par,cout_intervention,created_at,resolved_at,equipement_id,equipement_zone_id,lieu,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=200'),
       supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+cutoff+'&select=id,site_id,date_ronde,frequence&order=date_ronde.asc&limit=500'),
-      supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id,nom,unite,type_valeur,objectif_mensuel&order=ordre.asc'),
-      supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+cutoff+'&select=site_id,date_releve,valeurs&order=date_releve.asc&limit=500')
+      supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,tarif,budget_par_chambre,capacite,seuil_alerte_bas,devise&order=ordre.asc'),
+      supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+cutoff+'&select=site_id,date_releve,valeurs,to_percent,nb_couverts&order=date_releve.asc&limit=500'),
+      supaGet('energie_budget_mensuel','site_id=in.('+sidStr+')&annee=eq.'+_now.getFullYear()+'&mois=eq.'+(_now.getMonth()+1)+'&select=id,site_id,nb_couverts_budget,to_pct')
     ]);
+    var _bmIdsDT=(budgetsMensuels||[]).map(function(b){return b.id;});
+    var budgetsFluidesDT=_bmIdsDT.length?await supaGet('energie_budget_fluide','budget_id=in.('+_bmIdsDT.join(',')+')'+'&select=budget_id,fluide_id,cout_budget_jour')||[]:[];
+    var nbChambresMap={};(sites||[]).forEach(function(s){nbChambresMap[s.id]=s.nb_chambres?parseInt(s.nb_chambres):null;});
     var rIds=rondes.map(function(r){return r.id;});
     var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,equipement_id,statut'):[];
 
-    var html=_buildRapportDirTech(period,periodeStr,_session,sites,pleins,maintenances,signalements,rondes,rondesEq,energieFluidesDT||[],relevesEnergieDT||[]);
+    var html=_buildRapportDirTech(period,periodeStr,_session,sites,pleins,maintenances,signalements,rondes,rondesEq,energieFluidesDT||[],relevesEnergieDT||[],budgetsMensuels||[],budgetsFluidesDT||[],nbChambresMap);
     var w=window.open('','_blank');
     if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
     w.document.write(html);w.document.close();
@@ -9566,7 +9609,8 @@ async function _openRapportDT(period){
   finally{if(btn){btn.disabled=false;btn.textContent='📊 Rapport ▾';}}
 }
 
-function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenances,signalements,rondes,rondesEq,energieFluidesDT,relevesEnergieDT){
+function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenances,signalements,rondes,rondesEq,energieFluidesDT,relevesEnergieDT,budgetsMensuels,budgetsFluidesDT,nbChambresMap){
+  budgetsMensuels=budgetsMensuels||[];budgetsFluidesDT=budgetsFluidesDT||[];nbChambresMap=nbChambresMap||{};
   var HCOLS=['#C49A1C','#2D7A4F','#3498DB','#D4761E','#8E44AD','#E74C3C'];
   var HCOLS_PALE=['#FDF3E3','#E8F5EE','#EBF5FB','#FDF0E6','#F5EEF8','#FDEDEC'];
   var dirNom=(session.contact&&session.contact.nom)||'Directeur technique';
@@ -9575,13 +9619,15 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
 
   // ── Agrégation par site ──
   var siteData={};
-  sites.forEach(function(s){siteData[s.id]={nom:s.nom,litres:0,coutCarb:0,pannes:0,pannesTot:0,panneCout:0,mntCout:0,mntCount:0,rondes:0,rondesVal:0,rondesTot:0,mttrH:[],mttr:null};});
+  sites.forEach(function(s){siteData[s.id]={nom:s.nom,litres:0,coutCarb:0,pannes:0,pannesTot:0,panneCout:0,mntCout:0,mntCount:0,rondes:0,rondesVal:0,rondesTot:0,mttrH:[],mttr:null,toVals:[],toMoy:null,couvertsTotal:null};});
   pleins.forEach(function(p){if(siteData[p.site_id]){siteData[p.site_id].litres+=Number(p.litres_ajoutes)||0;siteData[p.site_id].coutCarb+=Number(p.cout)||0;}});
   maintenances.forEach(function(m){if(siteData[m.groupe_id]){if(m.type!=='ravitaillement')siteData[m.groupe_id].mntCout+=Number(m.cout)||0;siteData[m.groupe_id].mntCount++;}});
   signalements.forEach(function(s){if(siteData[s.groupe_id]){siteData[s.groupe_id].pannesTot++;if(s.statut!=='resolu')siteData[s.groupe_id].pannes++;siteData[s.groupe_id].panneCout+=Number(s.cout_intervention)||0;if(s.statut==='resolu'&&s.created_at&&s.resolved_at){var ttr=(new Date(s.resolved_at)-new Date(s.created_at))/3600000;if(ttr>=0)siteData[s.groupe_id].mttrH.push(ttr);}}});
   var reByRonde={};rondesEq.forEach(function(re){if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];reByRonde[re.ronde_id].push(re);});
   rondes.forEach(function(r){if(siteData[r.site_id]){siteData[r.site_id].rondes++;var eq=reByRonde[r.id]||[];siteData[r.site_id].rondesTot+=eq.length;siteData[r.site_id].rondesVal+=eq.filter(function(re){return re.statut==='valide';}).length;}});
   Object.values(siteData).forEach(function(d){d.mttr=d.mttrH.length?d.mttrH.reduce(function(a,b){return a+b;},0)/d.mttrH.length:null;});
+  (relevesEnergieDT||[]).forEach(function(r){if(!siteData[r.site_id])return;if(r.to_percent!=null)siteData[r.site_id].toVals.push(parseFloat(r.to_percent));if(r.nb_couverts!=null)siteData[r.site_id].couvertsTotal=(siteData[r.site_id].couvertsTotal||0)+parseInt(r.nb_couverts);});
+  Object.values(siteData).forEach(function(d){d.toMoy=d.toVals.length?Math.round(d.toVals.reduce(function(a,b){return a+b;},0)/d.toVals.length):null;});
 
   // ── KPI globaux ──
   var totLitres=0,totCarb=0,totPannes=0,totMnt=0,totMntCout=0,totRVal=0,totRTot=0;
@@ -9591,6 +9637,41 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   var avgMttr=allTtrs.length?allTtrs.reduce(function(a,b){return a+b;},0)/allTtrs.length:null;
   function fmtDur(h){if(h===null||h===undefined)return'—';if(h<1)return Math.round(h*60)+'min';if(h<48)return h.toFixed(1)+'h';return(h/24).toFixed(1)+'j';}
   function kpiCol(val,s1,s2,inv){if(val===null||val===undefined)return'#888';if(inv)return val<=s1?'#2D7A4F':val<=s2?'#C49A1C':'#C0392B';return val>=s2?'#2D7A4F':val>=s1?'#C49A1C':'#C0392B';}
+  function fmtCout(v,devise){if(v==null||isNaN(v))return'—';var d=devise||'XOF';var abs=Math.abs(v),s=v<0?'-':'';if(abs>=1000000)return s+(abs/1000000).toFixed(1).replace('.',',')+' M '+d;if(abs>=1000)return s+Math.round(abs/1000).toLocaleString('fr-FR')+' k '+d;return s+Math.round(abs).toLocaleString('fr-FR')+' '+d;}
+  function _svgMultiChartDT(indexItems){
+    if(!indexItems.length||!indexItems.some(function(d){return d.pts.length>=2;}))return'';
+    var COLORS=['#2D7A4F','#1E6FA0','#C49A1C','#C0392B','#7B4EA6'];
+    var W=600,H=90,PL=10,PR=10,PT=12,PB=20;
+    var allDates=[];
+    indexItems.forEach(function(it){it.pts.forEach(function(p){if(allDates.indexOf(p.date)<0)allDates.push(p.date);});});
+    allDates.sort();if(allDates.length<2)return'';
+    var xMin=new Date(allDates[0]+'T12:00:00').getTime();var xMax=new Date(allDates[allDates.length-1]+'T12:00:00').getTime();var xR=xMax-xMin||1;
+    function pxx(date){return PL+(new Date(date+'T12:00:00').getTime()-xMin)/xR*(W-PL-PR);}
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-height:100px;margin:6px 0 2px" xmlns="http://www.w3.org/2000/svg">';
+    var step=Math.max(1,Math.ceil(allDates.length/6));var dLabeledIdx=[];for(var di=0;di<allDates.length;di+=step){dLabeledIdx.push(di);}
+    var dLastIdx=allDates.length-1;if(dLabeledIdx.indexOf(dLastIdx)<0){var prevX2=pxx(allDates[dLabeledIdx[dLabeledIdx.length-1]]);var lastX2=pxx(allDates[dLastIdx]);if(lastX2-prevX2>(W-PL-PR)*0.08)dLabeledIdx.push(dLastIdx);}
+    dLabeledIdx.forEach(function(di){var xp=pxx(allDates[di]);svg+='<text x="'+xp.toFixed(1)+'" y="'+(H-4)+'" font-size="8" fill="#A8957E" font-family="Inter,sans-serif" text-anchor="middle">'+new Date(allDates[di]+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</text>';});
+    var lx=PL;
+    indexItems.forEach(function(it,ci){
+      if(it.pts.length<2)return;var col=COLORS[ci%COLORS.length];
+      var minV=Math.min.apply(null,it.pts.map(function(p){return p.val;}));var maxV=Math.max.apply(null,it.pts.map(function(p){return p.val;}));var range=maxV-minV||1;
+      var pts2=it.pts.map(function(p){return pxx(p.date).toFixed(1)+','+(PT+(1-(p.val-minV)/range)*(H-PT-PB)).toFixed(1);});
+      svg+='<polyline points="'+pts2.join(' ')+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+      svg+='<rect x="'+lx+'" y="'+(PT-2)+'" width="10" height="3" fill="'+col+'" rx="1"/>'+
+           '<text x="'+(lx+13)+'" y="'+PT+'" font-size="8.5" fill="#6B5E4A" font-family="Inter,sans-serif">'+escape_html(it.f.nom)+'</text>';
+      lx+=escape_html(it.f.nom).length*5+28;
+    });
+    return svg+'</svg>';
+  }
+
+  // ── Budget lookup ──
+  var _bmBySiteDT={};budgetsMensuels.forEach(function(b){_bmBySiteDT[b.site_id]=b;});
+  var _bfBySiteFluide={};
+  budgetsFluidesDT.forEach(function(bf){
+    var bm=budgetsMensuels.find(function(b){return b.id===bf.budget_id;});if(!bm)return;
+    if(!_bfBySiteFluide[bm.site_id])_bfBySiteFluide[bm.site_id]={};
+    _bfBySiteFluide[bm.site_id][bf.fluide_id]=bf.cout_budget_jour!=null?parseFloat(bf.cout_budget_jour):null;
+  });
 
   // ── Énergie : conso sur la période par site/fluide ──
   var _efBySite={};
@@ -9602,19 +9683,38 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
     var fls=_efBySite[site.id]||[];if(!fls.length)return;
     var rels=(_relBySite[site.id]||[]).slice().sort(function(a,b){return a.date_releve.localeCompare(b.date_releve);});
     var first=rels.length?rels[0]:null,last=rels.length?rels[rels.length-1]:null;
+    var nbCh=nbChambresMap[site.id]||null;
+    var toVals=rels.filter(function(r){return r.to_percent!=null;}).map(function(r){return parseFloat(r.to_percent);});
+    var toMoyS=toVals.length?toVals.reduce(function(a,b){return a+b;},0)/toVals.length:null;
+    var chambresOcc=nbCh&&toMoyS?Math.round(nbCh*toMoyS/100):null;
     var items=fls.map(function(f){
-      var conso=null;
-      if(f.type_valeur==='index'){
-        var vf=first&&first.valeurs&&first.valeurs[f.id];
-        var vl=last&&last.valeurs&&last.valeurs[f.id];
-        conso=(vf!=null&&vl!=null)?Math.max(0,parseFloat(vl)-parseFloat(vf)):null;
-      }else{var vl2=last&&last.valeurs&&last.valeurs[f.id];conso=vl2!=null?parseFloat(vl2):null;}
-      var objPeriode=f.objectif_mensuel!=null?Math.round(parseFloat(f.objectif_mensuel)*period/30):null;
+      var isInstant=f.type_valeur==='instantane';
+      var tarif=f.tarif!=null?parseFloat(f.tarif):null;
+      var obj=f.objectif_mensuel!=null?parseFloat(f.objectif_mensuel):null;
+      var cap=f.capacite!=null?parseFloat(f.capacite):null;
+      var bpcF=f.budget_par_chambre!=null?parseFloat(f.budget_par_chambre):null;
+      var pts=rels.map(function(r){var v=r.valeurs&&r.valeurs[f.id]!=null?parseFloat(r.valeurs[f.id]):null;return{date:r.date_releve,val:v};}).filter(function(p){return p.val!=null&&!isNaN(p.val);});
+      var conso=null,lastVal=pts.length?pts[pts.length-1].val:null,restants=null,lastValPct=null;
+      if(isInstant&&cap!=null&&pts.length>=2){
+        var drops=0,_prev=null;
+        pts.forEach(function(p){if(_prev!=null){var dL=p.val>100?p.val:p.val/100*cap,pL=_prev>100?_prev:_prev/100*cap;if(dL<pL)drops+=(pL-dL);}_prev=p.val;});
+        conso=Math.round(drops);
+        if(lastVal!=null){var lL=lastVal>100?lastVal:Math.round(lastVal/100*cap);restants=lL;lastValPct=cap?Math.min(100,Math.round(lL/cap*100)):null;}
+      }else if(!isInstant&&pts.length>=2){conso=Math.round(pts[pts.length-1].val-pts[0].val);}
+      var cout=conso!=null&&tarif!=null?Math.round(conso*tarif):null;
+      var objPeriode=obj!=null?Math.round(obj*period/30):null;
       var pct=conso!=null&&objPeriode?Math.round(conso/objPeriode*100):null;
-      var consoFmt=conso!=null?(f.type_valeur==='instantane'?conso:Math.round(conso)):null;
-      return{nom:f.nom,unite:f.unite||'',conso:consoFmt,isInstant:f.type_valeur==='instantane',obj:objPeriode,pct:pct};
+      var bfCoutJ=_bfBySiteFluide[site.id]&&_bfBySiteFluide[site.id][f.id]!=null?_bfBySiteFluide[site.id][f.id]:null;
+      var budget=bfCoutJ!=null?Math.round(bfCoutJ*period):(bpcF&&chambresOcc?Math.round(bpcF*chambresOcc*period):(obj!=null&&tarif!=null?Math.round(obj*tarif*period/30):null));
+      var vs=cout!=null&&budget!=null?cout-budget:null;
+      return{f:f,pts:pts,isInstant:isInstant,cap:cap,tarif:tarif,obj:obj,lastVal:lastVal,lastValPct:lastValPct,conso:conso,cout:cout,restants:restants,budget:budget,vs:vs,pct:pct,unite:f.unite||''};
     });
-    energieBySite[site.id]=items;
+    var totalCout=items.some(function(it){return it.cout!=null;})?items.reduce(function(a,it){return a+(it.cout||0);},0):null;
+    var totalBudget=items.some(function(it){return it.budget!=null;})?items.reduce(function(a,it){return a+(it.budget||0);},0):null;
+    var totalVs=totalCout!=null&&totalBudget!=null?totalCout-totalBudget:null;
+    var chOccPeriode=chambresOcc?chambresOcc*period:null;
+    var fcfaPerCh=totalCout&&chOccPeriode?Math.round(totalCout/chOccPeriode):null;
+    energieBySite[site.id]={items:items,totalCout:totalCout,totalBudget:totalBudget,totalVs:totalVs,toMoy:toMoyS?Math.round(toMoyS):null,chambresOcc:chambresOcc,fcfaPerCh:fcfaPerCh,nbCh:nbCh};
   });
 
   // ── Top signalements (groupés eq/zone/lieu/description) ──
@@ -9674,6 +9774,8 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
 
   // ── Tableau comparatif ──
   var hasEnergie=Object.keys(energieBySite).length>0;
+  var hasTO=sites.some(function(s){return siteData[s.id]&&siteData[s.id].toMoy!=null;});
+  var hasCouv=sites.some(function(s){return siteData[s.id]&&siteData[s.id].couvertsTotal!=null;});
   h+='<h2>Comparatif par hôtel</h2>'+
     '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px"><thead><tr>'+
       '<th>Hôtel</th>'+
@@ -9683,6 +9785,8 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
       '<th style="text-align:center">Carburant</th>'+
       '<th style="text-align:center">Coût total</th>'+
       (hasEnergie?'<th style="text-align:center">Énergie</th>':'')+
+      (hasTO?'<th style="text-align:center">TO%</th>':'')+
+      (hasCouv?'<th style="text-align:center">Couverts</th>':'')+
       '<th style="text-align:center">Statut</th>'+
     '</tr></thead><tbody>'+
     sites.map(function(site,i){
@@ -9698,7 +9802,8 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
       var col=HCOLS[i%HCOLS.length];
       var rBarW=sConf!=null?Math.min(100,sConf):0;
       var rBarCol=kpiCol(sConf,70,90,false);
-      var efItems=energieBySite[site.id]||[];
+      var efData=energieBySite[site.id]||null;
+      var efItems=efData?efData.items:[];
       var efWithPct=efItems.filter(function(f){return f.pct!=null;});
       var efAvgPct=efWithPct.length?Math.round(efWithPct.reduce(function(a,f){return a+f.pct;},0)/efWithPct.length):null;
       var efCol=efAvgPct==null?'#888':efAvgPct>100?'#C0392B':efAvgPct>85?'#C49A1C':'#2D7A4F';
@@ -9711,38 +9816,65 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
         '<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</td>'+
         '<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+(total>0?total.toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
         (hasEnergie?'<td style="text-align:center;padding:9px 11px;font-weight:600;color:'+efCol+'">'+efLabel+'</td>':'')+
+        (hasTO?'<td style="text-align:center;padding:9px 11px;font-weight:600;color:'+kpiCol(d.toMoy,60,80,false)+'">'+(d.toMoy!=null?d.toMoy+'%':'—')+'</td>':'')+
+        (hasCouv?'<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+(d.couvertsTotal!=null?d.couvertsTotal.toLocaleString('fr-FR'):'—')+'</td>':'')+
         '<td style="text-align:center;padding:9px 11px"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:'+scoreBg+';color:'+scoreCol+'">'+scoreLabel+'</span></td>'+
       '</tr>';
     }).join('')+
     '</tbody></table>';
 
   // ── Section Énergie ──
-  var efSitesList=sites.filter(function(s){return energieBySite[s.id]&&energieBySite[s.id].length;});
+  var efSitesList=sites.filter(function(s){return energieBySite[s.id]&&energieBySite[s.id].items.length;});
   if(efSitesList.length){
-    h+='<h2>Énergie — consommation vs objectif</h2>'+
-      '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px">';
+    h+='<h2>Énergie — consommation · coût · budget</h2>';
     efSitesList.forEach(function(site){
-      var si=sites.indexOf(site);
-      var col=HCOLS[si%HCOLS.length];
-      var items=energieBySite[site.id];
-      h+='<div style="flex:1;min-width:150px;background:#F9F6F0;border:1px solid var(--border);border-radius:8px;padding:14px 16px;page-break-inside:avoid">'+
-        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">'+
-          '<div style="width:8px;height:8px;border-radius:50%;background:'+col+'"></div>'+
-          '<div style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px">'+escape_html(site.nom)+'</div>'+
+      var si=sites.indexOf(site);var col=HCOLS[si%HCOLS.length];
+      var ef=energieBySite[site.id];var items=ef.items;
+      var indexItems=items.filter(function(it){return !it.isInstant&&it.pts.length>=2;});
+      h+='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;page-break-inside:avoid">'+
+        '<div style="background:'+col+'18;border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:8px">'+
+          '<div style="width:10px;height:10px;border-radius:50%;background:'+col+'"></div>'+
+          '<div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(site.nom)+'</div>'+
+          (ef.totalCout!=null?'<div style="margin-left:auto;font-size:11px;color:var(--text2)">Coût : <strong>'+fmtCout(ef.totalCout,'XOF')+'</strong>'+(ef.totalBudget!=null?' / Budget : '+fmtCout(ef.totalBudget,'XOF'):'')+
+            (ef.totalVs!=null?' <span style="color:'+(ef.totalVs>0?'#C0392B':'#2D7A4F')+';font-weight:700">'+(ef.totalVs>0?'+':'')+fmtCout(ef.totalVs,'XOF')+'</span>':'')+'</div>':'')+
         '</div>'+
-        items.map(function(f){
-          var col2=f.pct!=null?(f.pct>100?'#C0392B':f.pct>85?'#C49A1C':'#2D7A4F'):'#888';
-          return '<div style="margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)">'+
-            '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">'+
-              '<span style="color:var(--text2)">'+escape_html(f.nom)+'</span>'+
-              '<span style="font-weight:600;color:'+col2+'">'+(f.conso!=null?f.conso.toLocaleString('fr-FR')+' '+f.unite:'—')+'</span>'+
-            '</div>'+
-            (f.pct!=null?'<div style="height:4px;background:#EDE5D8;border-radius:2px;overflow:hidden"><div style="width:'+Math.min(100,f.pct)+'%;height:100%;border-radius:2px;background:'+col2+'"></div></div><div style="font-size:10px;color:'+col2+';text-align:right;margin-top:2px">'+f.pct+'% de l\'objectif</div>':'')+
-          '</div>';
-        }).join('')+
+        '<div style="padding:12px 16px">'+
+          (indexItems.length?_svgMultiChartDT(indexItems):'')+
+          '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'+
+            '<th style="text-align:left;padding:5px 8px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Fluide</th>'+
+            '<th style="text-align:right;padding:5px 8px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Conso</th>'+
+            '<th style="text-align:right;padding:5px 8px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Coût réel</th>'+
+            '<th style="text-align:right;padding:5px 8px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Budget</th>'+
+            '<th style="text-align:right;padding:5px 8px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Écart</th>'+
+          '</tr></thead><tbody>'+
+          items.map(function(it,ii){
+            var pctCol=it.pct!=null?(it.pct>100?'#C0392B':it.pct>85?'#C49A1C':'#2D7A4F'):'#888';
+            var vsCol=it.vs==null?'#888':it.vs>0?'#C0392B':'#2D7A4F';
+            var _consoUnit=it.isInstant&&it.cap!=null?'L':(it.unite||'');
+            var consoStr=it.conso!=null?(it.conso.toLocaleString('fr-FR')+(_consoUnit?' '+_consoUnit:'')):'—';
+            var sub=it.isInstant&&it.restants!=null?'<div style="font-size:10px;color:var(--text3)">Niveau : '+it.restants.toLocaleString('fr-FR')+' L'+(it.lastValPct!=null?' ('+it.lastValPct+'%)':'')+'</div>':'';
+            return '<tr style="background:'+(ii%2?'#FAFAF8':'white')+';border-bottom:1px solid #EDE5D8">'+
+              '<td style="padding:7px 8px"><span style="font-weight:500">'+escape_html(it.f.nom)+'</span>'+sub+'</td>'+
+              '<td style="text-align:right;padding:7px 8px;color:'+pctCol+'">'+consoStr+(it.pct!=null?' <span style="font-size:10px">('+it.pct+'%)</span>':'')+'</td>'+
+              '<td style="text-align:right;padding:7px 8px;font-weight:600">'+(it.cout!=null?fmtCout(it.cout,'XOF'):'—')+'</td>'+
+              '<td style="text-align:right;padding:7px 8px;color:var(--text3)">'+(it.budget!=null?fmtCout(it.budget,'XOF'):'—')+'</td>'+
+              '<td style="text-align:right;padding:7px 8px;font-weight:600;color:'+vsCol+'">'+(it.vs!=null?(it.vs>0?'+':'')+fmtCout(it.vs,'XOF'):'—')+'</td>'+
+            '</tr>';
+          }).join('')+
+          '</tbody></table>'+
+          (ef.totalCout!=null||ef.totalBudget!=null?
+            '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
+              (ef.totalCout!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Coût total énergie</div><div style="font-size:16px;font-weight:700;color:'+col+'">'+fmtCout(ef.totalCout,'XOF')+'</div></div>':'')+
+              (ef.totalBudget!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Budget pro-rata '+period+'j</div><div style="font-size:16px;font-weight:700;color:var(--text2)">'+fmtCout(ef.totalBudget,'XOF')+'</div></div>':'')+
+              (ef.totalVs!=null?
+                (function(){var vCol=ef.totalVs>0?'#C0392B':'#2D7A4F';var vPct=ef.totalBudget?Math.round(ef.totalVs/ef.totalBudget*100):null;return'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Écart vs budget</div><div style="font-size:16px;font-weight:700;color:'+vCol+'">'+(vPct!=null?(vPct>0?'+':'')+vPct+'%':'—')+'</div><div style="font-size:10px;color:'+vCol+'">'+(ef.totalVs>0?'+':'')+fmtCout(ef.totalVs,'XOF')+'</div></div>';})()
+              :'')+
+              (ef.fcfaPerCh!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">FCFA / ch. occ. / nuit</div><div style="font-size:16px;font-weight:700">'+ef.fcfaPerCh.toLocaleString('fr-FR')+'</div>'+(ef.toMoy!=null?'<div style="font-size:10px;color:var(--text3)">'+ef.chambresOcc+' ch.occ./j · TO '+ef.toMoy+'%</div>':'')+'</div>':'')+
+            '</div>'
+          :'')+
+        '</div>'+
       '</div>';
     });
-    h+='</div>';
   }
 
   // ── Top signalements ──
@@ -9801,6 +9933,8 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
           '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="font-size:20px;color:'+kpiCol(d.pannes,1,3,true)+'">'+d.pannes+'</div><div class="kpi-sub">'+d.pannesTot+' total période</div></div>'+
           '<div class="kpi"><div class="kpi-label">MTTR moyen</div><div class="kpi-value" style="font-size:20px;color:'+(d.mttr===null?'#888':d.mttr<=2?'#2D7A4F':d.mttr<=8?'#C49A1C':'#C0392B')+'">'+fmtDur(d.mttr)+'</div><div class="kpi-sub">temps résolution</div></div>'+
           '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value" style="font-size:20px">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
+          (d.toMoy!=null?'<div class="kpi"><div class="kpi-label">TO moyen</div><div class="kpi-value" style="font-size:20px;color:'+kpiCol(d.toMoy,60,80,false)+'">'+d.toMoy+'%</div><div class="kpi-sub">taux d\'occupation</div></div>':'')+
+          (d.couvertsTotal!=null?'<div class="kpi"><div class="kpi-label">Couverts</div><div class="kpi-value" style="font-size:20px">'+d.couvertsTotal.toLocaleString('fr-FR')+'</div><div class="kpi-sub">servis sur la période</div></div>':'')+
           (total>0?'<div class="kpi" style="border-color:'+col+'55;background:'+pale+'"><div class="kpi-label">Coût total</div><div class="kpi-value" style="font-size:20px;color:'+col+'">'+total.toLocaleString('fr-FR')+'</div><div class="kpi-sub">FCFA</div></div>':'')+
         '</div>'+
         '<div class="edit-hint">Observations (modifiable)</div>'+
@@ -10018,14 +10152,18 @@ async function _openRapportHebdo(period){
     }
 
     // Énergie
-    var[energieFluides,relevesEnergiePeriode,pleinsPeriode]=await Promise.all([
+    var _now2=new Date();var _anneeR=_now2.getFullYear();var _moisR=_now2.getMonth()+1;
+    var[energieFluides,relevesEnergiePeriode,pleinsPeriode,budgetMensuelArr]=await Promise.all([
       supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,budget_par_chambre,objectif_mensuel,capacite,devise&order=ordre.asc'),
-      supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+cutoff+'&select=date_releve,valeurs,saisi_par,to_percent&order=date_releve.asc&limit=100'),
-      supaGet('pleins','site_id=eq.'+sid+'&date=gte.'+cutoff+'&select=date,litres_ajoutes&order=date.asc&limit=50')
+      supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+cutoff+'&select=date_releve,valeurs,saisi_par,to_percent,nb_couverts&order=date_releve.asc&limit=100'),
+      supaGet('pleins','site_id=eq.'+sid+'&date=gte.'+cutoff+'&select=date,litres_ajoutes&order=date.asc&limit=50'),
+      supaGet('energie_budget_mensuel','site_id=eq.'+sid+'&annee=eq.'+_anneeR+'&mois=eq.'+_moisR+'&limit=1')
     ]);
-
+    var _budgetMensuel=budgetMensuelArr&&budgetMensuelArr.length?budgetMensuelArr[0]:null;
+    var _budgetFluides=[];
+    if(_budgetMensuel&&_budgetMensuel.id){_budgetFluides=await supaGet('energie_budget_fluide','budget_id=eq.'+_budgetMensuel.id+'&select=fluide_id,quantite_budget_jour,cout_budget_jour')||[];}
     var _nbCh=siteRow.length&&siteRow[0].nb_chambres?parseInt(siteRow[0].nb_chambres):null;
-    var html=_buildRapportPro(siteNom,periodeStr,period,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[],_nbCh);
+    var html=_buildRapportPro(siteNom,periodeStr,period,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[],_nbCh,_budgetMensuel,_budgetFluides);
     var w=window.open('','_blank');
     if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
     w.document.write(html);w.document.close();
@@ -10156,7 +10294,7 @@ function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,relev
   return h;
 }
 
-function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides,relevesEnergie,pleinsSite,nbChambres){
+function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides,relevesEnergie,pleinsSite,nbChambres,budgetMensuel,budgetFluides){
   var respNom=(session.contact&&session.contact.nom)||'Responsable technique';
   var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -10278,12 +10416,15 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   }
 
   // ── Énergie : calculs ──
-  energieFluides=energieFluides||[];relevesEnergie=relevesEnergie||[];
+  energieFluides=energieFluides||[];relevesEnergie=relevesEnergie||[];budgetFluides=budgetFluides||[];
   var energieData=[];
   pleinsSite=pleinsSite||[];
   var _toValsP=relevesEnergie.map(function(r){return r.to_percent!=null?parseFloat(r.to_percent):null;}).filter(function(v){return v!=null;});
   var _toMoyP=_toValsP.length?_toValsP.reduce(function(a,b){return a+b;},0)/_toValsP.length:null;
   var chambresOccP=nbChambres&&_toMoyP?Math.round(nbChambres*_toMoyP/100):null;
+  var _couvertsVals=relevesEnergie.map(function(r){return r.nb_couverts!=null?parseInt(r.nb_couverts):null;}).filter(function(v){return v!=null;});
+  var _couvertsTotal=_couvertsVals.length?_couvertsVals.reduce(function(a,b){return a+b;},0):null;
+  var _couvertsBudget=budgetMensuel&&budgetMensuel.nb_couverts_budget?Math.round(parseFloat(budgetMensuel.nb_couverts_budget)*period):null;
   if(energieFluides.length&&relevesEnergie.length){
     energieFluides.forEach(function(f){
       var pts=relevesEnergie.map(function(r){
@@ -10315,7 +10456,10 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
       var restants=isInstant&&cap!=null&&lastVal!=null?(_rLastIsL?Math.round(lastVal):Math.round(lastVal/100*cap)):null;
       var lastValPctR=isInstant&&cap!=null&&lastVal!=null?(_rLastIsL?Math.min(100,Math.round(lastVal/cap*100)):Math.min(100,Math.round(lastVal))):null;
       var bpcF=f.budget_par_chambre!=null?parseFloat(f.budget_par_chambre):null;
-      var budget=bpcF&&chambresOccP?Math.round(bpcF*chambresOccP*period):obj!=null&&tarif!=null?Math.round(obj*tarif*period/30):null;
+      var bfEntry=budgetFluides.find(function(b){return b.fluide_id===f.id;});
+      var budget=bfEntry&&bfEntry.cout_budget_jour!=null?Math.round(parseFloat(bfEntry.cout_budget_jour)*period)
+        :(bpcF&&chambresOccP?Math.round(bpcF*chambresOccP*period)
+        :(obj!=null&&tarif!=null?Math.round(obj*tarif*period/30):null));
       var vs=cout!=null&&budget!=null?cout-budget:null;
       energieData.push({f:f,pts:pts,isInstant:isInstant,cap:cap,tarif:tarif,obj:obj,lastVal:lastVal,lastValPct:lastValPctR,conso:conso,cout:cout,restants:restants,budget:budget,vs:vs,pleins:isInstant?pleinsSite:[]});
     });
@@ -10618,8 +10762,8 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     if(_hcR){
       var _eR=_bR?_cR-_bR:null;
       var _epR=_eR!=null&&_bR?Math.round(_eR/_bR*100):null;
-      var _fpChR=chambresOccP?Math.round(_cR/chambresOccP):null;
-      var _fbChR=chambresOccP&&_bR?Math.round(_bR/chambresOccP):null;
+      var _fpChR=chambresOccP&&period?Math.round(_cR/(chambresOccP*period)):null;
+      var _fbChR=chambresOccP&&_bR&&period?Math.round(_bR/(chambresOccP*period)):null;
       function _pColR(p){return p==null?'var(--text3)':p<=0?'var(--vert)':p<=10?'#C49A1C':'var(--rouge)';}
       function _fPctR(p){return p==null?'—':(p>0?'+':'')+p+'%';}
       h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0 20px">';
@@ -10635,10 +10779,19 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
         }
       }
       if(_fpChR){
-        h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">FCFA / ch. occ.</div>';
+        h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">FCFA / ch. occ. / nuit</div>';
         h+='<div style="font-size:17px;font-weight:700">'+_fpChR.toLocaleString('fr-FR')+'</div>';
         h+=(_fbChR?'<div style="font-size:10px;color:var(--text3);margin-top:2px">Budget : '+_fbChR.toLocaleString('fr-FR')+'</div>':'');
-        h+='<div style="font-size:10px;color:var(--text3);margin-top:1px">'+chambresOccP+' ch. occ. · TO '+Math.round(_toMoyP)+'%</div></div>';
+        h+='<div style="font-size:10px;color:var(--text3);margin-top:1px">'+chambresOccP+' ch. occ./j · TO '+Math.round(_toMoyP)+'%</div></div>';
+      }
+      if(_couvertsTotal!=null){
+        var _cvE=_couvertsBudget!=null?_couvertsTotal-_couvertsBudget:null;
+        var _cvEp=_cvE!=null&&_couvertsBudget?Math.round(_cvE/_couvertsBudget*100):null;
+        h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Couverts servis</div>';
+        h+='<div style="font-size:17px;font-weight:700">'+_couvertsTotal.toLocaleString('fr-FR')+'</div>';
+        if(_couvertsBudget!=null)h+='<div style="font-size:10px;color:var(--text3);margin-top:2px">Budget : '+_couvertsBudget.toLocaleString('fr-FR')+'</div>';
+        if(_cvEp!=null)h+='<div style="font-size:10px;color:'+_pColR(_cvEp)+';margin-top:1px">'+(_cvE>0?'+':'')+_cvEp+'%</div>';
+        h+='</div>';
       }
       h+='</div>';
     }
@@ -11351,6 +11504,59 @@ function _fluidIcon(f){
 /* ═══════════════════════════════════════════════════════
    ⚡ ÉNERGIE — Vue principale resp_tech
    ═══════════════════════════════════════════════════════ */
+// ── Vue énergie : état et helpers ──────────────────────────
+var _rtEnergieView='today';
+var _rtEnergieBudgetData=null;
+var _rtEnergieBudgetFluides=[];
+
+function _rtEnergieShowView(v){
+  _rtEnergieView=v;
+  ['today','budget','historique','config'].forEach(function(n){
+    var el=document.getElementById('ev-'+n);
+    if(el)el.style.display=(n===v?'block':'none');
+    var btn=document.getElementById('evtab-'+n);
+    if(btn){
+      var on=n===v;
+      btn.style.borderColor=on?'var(--amber)':'var(--border)';
+      btn.style.background=on?'var(--amber)':'white';
+      btn.style.color=on?'white':'var(--text2)';
+      btn.style.fontWeight=on?'700':'500';
+    }
+  });
+  if(v==='historique'&&window._energieCurrentFluide)_renderEnergieChart(window._energieCurrentFluide);
+}
+
+async function _energieSaveDayEntry(sid){
+  var dateInp=document.getElementById('ev-today-date');
+  var toInp=document.getElementById('ev-today-to');
+  var couvertsInp=document.getElementById('ev-today-couverts');
+  var msgEl=document.getElementById('ev-today-msg');
+  var dateVal=dateInp?dateInp.value:'';
+  var toVal=toInp&&toInp.value!==''?parseFloat(toInp.value):null;
+  var covVal=couvertsInp&&couvertsInp.value!==''?parseInt(couvertsInp.value):null;
+  function showMsg(ok,txt){if(msgEl){msgEl.textContent=txt;msgEl.style.color=ok?'var(--vert)':'var(--rouge)';msgEl.style.display='inline';}}
+  if(!dateVal)return showMsg(false,'Date requise');
+  if(toVal==null&&covVal==null)return showMsg(false,'Saisir TO% ou nb couverts');
+  var btn=document.getElementById('ev-today-save-btn');
+  if(btn){btn.disabled=true;btn.textContent='...';}
+  var existing=await supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=eq.'+dateVal+'&select=id&limit=1');
+  var body={};
+  if(toVal!=null&&!isNaN(toVal))body.to_percent=toVal;
+  if(covVal!=null&&!isNaN(covVal))body.nb_couverts=covVal;
+  var ok=false;
+  try{
+    if(existing&&existing.length){
+      await supaPatch('releves_energie',existing[0].id,body);ok=true;
+    }else{
+      body.site_id=sid;body.date_releve=dateVal;body.saisi_par='Dashboard';
+      var nr=await supaPost('releves_energie',body);ok=!!(nr&&nr.length);
+    }
+  }catch(e){}
+  if(btn){btn.disabled=false;btn.textContent='Enregistrer';}
+  showMsg(ok,ok?'✓ Sauvegardé':'Erreur sauvegarde');
+  if(ok)setTimeout(function(){_loadTab('energie',sid);},1000);
+}
+
 async function _rtEnergie(sid){
   var dc=document.getElementById('dash-content-main');
   if(dc){dc.style.padding='24px';dc.style.maxWidth='980px';}
@@ -11363,15 +11569,30 @@ async function _rtEnergie(sid){
   var moisFin=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).toISOString().split('T')[0];
   var daysInMonth=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).getDate();
   var since60=dateNJours(60);
+  var moisLabel=tgt.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  moisLabel=moisLabel.charAt(0).toUpperCase()+moisLabel.slice(1);
 
   _energieSidGlobal=sid;
 
-  var[fluides,relevesRows,siteRows,objsRows]=await Promise.all([
+  var[fluides,relevesRows,siteRows,objsRows,budgetRows]=await Promise.all([
     supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,budget_par_chambre,seuil_alerte_bas,objectif_mensuel,capacite,ordre,devise&order=ordre.asc'),
-    supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=id,date_releve,valeurs,saisi_par,note,to_percent&order=date_releve.asc&limit=62'),
+    supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=id,date_releve,valeurs,saisi_par,note,to_percent,nb_couverts&order=date_releve.asc&limit=62'),
     supaGet('sites','id=eq.'+sid+'&select=nom,nb_chambres&limit=1'),
-    supaGet('objectifs_energie','site_id=eq.'+sid+'&select=id,fluide_id,valeur,date_debut,date_fin,note&order=date_debut.desc&limit=200')
+    supaGet('objectifs_energie','site_id=eq.'+sid+'&select=id,fluide_id,valeur,date_debut,date_fin,note&order=date_debut.desc&limit=200'),
+    supaGet('energie_budget_mensuel','site_id=eq.'+sid+'&annee=eq.'+tgt.getFullYear()+'&mois=eq.'+(tgt.getMonth()+1)+'&limit=1')
   ]);
+
+  // Fetch budget_fluide si budget mensuel trouvé
+  var budgetMensuel=budgetRows&&budgetRows.length?budgetRows[0]:null;
+  var budgetFluidesRows=[];
+  if(budgetMensuel){
+    budgetFluidesRows=await supaGet('energie_budget_fluide','budget_id=eq.'+budgetMensuel.id+'&select=fluide_id,quantite_budget_jour,quantite_budget_mois,cout_budget_jour,cout_budget_mois')||[];
+  }
+  _rtEnergieBudgetData=budgetMensuel;
+  _rtEnergieBudgetFluides=budgetFluidesRows;
+  // Index budget par fluide
+  var _budgetByFluide={};
+  budgetFluidesRows.forEach(function(b){_budgetByFluide[b.fluide_id]=b;});
 
   // Index objectifs actifs par fluide (le plus récent dont date_debut <= aujourd'hui et non expiré avant ce mois)
   var _objActif={};
@@ -11390,6 +11611,10 @@ async function _rtEnergie(sid){
 
   var siteNom=siteRows&&siteRows.length?siteRows[0].nom:'';
   var nbChambres=siteRows&&siteRows.length&&siteRows[0].nb_chambres?parseInt(siteRows[0].nb_chambres):null;
+  window._energieSiteNbChambres=nbChambres;
+  window._energieBudgetAnnee=tgt.getFullYear();
+  window._energieBudgetMois=tgt.getMonth()+1;
+  window._energieSidGlobal2=sid;
   _energieFluides=fluides||[];
   _energieReleves=(relevesRows||[]);
 
@@ -11463,6 +11688,12 @@ async function _rtEnergie(sid){
   var _toPct=_toMoy!=null?_toMoy:(_toToday!=null?_toToday:null);
   var chambresOcc=nbChambres&&_toPct?Math.round(nbChambres*_toPct/100):null;
   var coutTotalMois=0; var hasCoutData=false; var coutFluideNoms=[];
+
+  // ── Hier (pour panneau saisie Aujourd'hui) ──
+  var hierDate=(function(){var d=new Date();d.setDate(d.getDate()-1);return d.toISOString().split('T')[0];})();
+  var hierReleve=releveByDate[hierDate];
+  var hierToStr=hierReleve&&hierReleve.to_percent!=null?String(parseFloat(hierReleve.to_percent)):'';
+  var hierCovStr=hierReleve&&hierReleve.nb_couverts!=null?String(hierReleve.nb_couverts):'';
 
   // ── TILES ──
 
@@ -11546,8 +11777,8 @@ async function _rtEnergie(sid){
         '</div>'+
         // Sous-titre
         (isInstant&&cap!=null?
-          '<div style="font-size:10px;color:var(--text2);margin-top:3px">'+
-            niveauPct+'% · citerne '+cap.toLocaleString('fr-FR')+' L'+
+          '<div style="font-size:11px;font-weight:600;color:var(--text2);margin-top:3px">'+
+            niveauPct+'%'+
           '</div>':
           (!isInstant&&consoMois!=null?
             '<div style="font-size:10px;color:var(--text2);margin-top:3px">ce mois · dernier relevé : '+(lastVal!=null?lastVal.toLocaleString('fr-FR')+(f.unite?' '+f.unite:''):'—')+'</div>':
@@ -11669,23 +11900,39 @@ async function _rtEnergie(sid){
     kpiHtml+='</div>';
   }
 
-  // ── TO% quick-entry panel ──
-  var toPanelHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">'+
-    '<div style="font-size:13px;font-weight:700;color:var(--dark);white-space:nowrap">🏨 Taux d\'occupation</div>'+
-    '<div style="display:flex;align-items:center;gap:8px;flex:1;min-width:220px;flex-wrap:wrap">'+
-      '<label style="font-size:11px;color:var(--text2);white-space:nowrap">Date</label>'+
-      '<input id="to-date-inp" type="date" value="'+today+'" '+
-        'style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px"/>'+
-      '<label style="font-size:11px;color:var(--text2);white-space:nowrap">TO%</label>'+
-      '<input id="to-pct-inp" type="number" min="0" max="100" step="0.1" placeholder="ex: 72.5" '+
-        'value="'+(toPctToday!=null?toPctToday:'')+'" '+
-        'style="border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;width:90px"/>'+
-      '<button onclick="_energieSaveToPct(\''+sid+'\')" '+
-        'style="background:var(--amber);color:white;border:none;border-radius:7px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">Enregistrer</button>'+
-      '<span id="to-save-msg" style="font-size:11px;color:var(--vert);display:none">✓ Sauvegardé</span>'+
+  // ── Panneau saisie jour (vue Aujourd'hui) ──
+  var hierLong=new Date(hierDate+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+  var toPanelHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">'+
+      '<div>'+
+        '<div style="font-size:13px;font-weight:700;color:var(--dark)">📋 Saisie du jour</div>'+
+        '<div style="font-size:10px;color:var(--text3)">Données de la nuit précédente</div>'+
+      '</div>'+
+      (toMoyenPct!=null?'<div style="font-size:11px;color:var(--text3)">Moy. mois : <strong style="color:var(--dark)">'+toMoyenPct+'%</strong></div>':'')+
     '</div>'+
-    (toMoyenPct!=null?'<div style="font-size:11px;color:var(--text3);white-space:nowrap">Moy. mois : <strong style="color:var(--dark)">'+toMoyenPct+'%</strong></div>':
-     '<div style="font-size:11px;color:var(--text3)">Aucun TO% saisi ce mois</div>')+
+    '<div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">'+
+      '<div>'+
+        '<div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Date</div>'+
+        '<input id="ev-today-date" type="date" value="'+hierDate+'" '+
+          'style="border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;width:150px"/>'+
+      '</div>'+
+      '<div>'+
+        '<div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">TO%</div>'+
+        '<input id="ev-today-to" type="number" min="0" max="100" step="0.1" placeholder="ex: 72.5" '+
+          'value="'+hierToStr+'" '+
+          'style="border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100px"/>'+
+      '</div>'+
+      (nbChambres?
+      '<div>'+
+        '<div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Couverts</div>'+
+        '<input id="ev-today-couverts" type="number" min="0" step="1" placeholder="ex: 80" '+
+          'value="'+hierCovStr+'" '+
+          'style="border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100px"/>'+
+      '</div>':'<input id="ev-today-couverts" type="hidden" value=""/>')+
+      '<button id="ev-today-save-btn" onclick="_energieSaveDayEntry(\''+sid+'\')" '+
+        'style="background:var(--amber);color:white;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">Enregistrer</button>'+
+      '<span id="ev-today-msg" style="font-size:11px;display:none"></span>'+
+    '</div>'+
   '</div>';
 
   // ── BAR CHART + PANEL OBJECTIFS (2 colonnes) ──
@@ -11697,110 +11944,171 @@ async function _rtEnergie(sid){
     '</button>';
   }).join('');
 
-  var moisLabel=tgt.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
-  moisLabel=moisLabel.charAt(0).toUpperCase()+moisLabel.slice(1);
   var nextMois=new Date(tgt.getFullYear(),tgt.getMonth()+1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
 
-  // ── Sélecteur de mois ──
+  // ── Sélecteur de mois (partagé Historique/Budget) ──
   var moisNavBtns=[-5,-4,-3,-2,-1,0].map(function(n){
     var lbl=new Date(now.getFullYear(),now.getMonth()+n,1).toLocaleDateString('fr-FR',{month:'short',year:'2-digit'});
     lbl=lbl.charAt(0).toUpperCase()+lbl.slice(1);
     var on=(offset===n);
     return '<button onclick="_rtSetEnergieMois('+n+')" style="padding:5px 11px;border-radius:20px;border:1.5px solid '+(on?'var(--amber)':'var(--border)')+';background:'+(on?'var(--amber-pale)':'white')+';font-size:11px;font-weight:'+(on?'700':'500')+';color:'+(on?'var(--amber-dark)':'var(--text2)')+';cursor:pointer;white-space:nowrap">'+lbl+(n===0?' ●':'')+'</button>';
   }).join('');
-  var moisNavHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;align-items:center">'+
+  var moisNavHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;align-items:center">'+
     '<span style="font-size:11px;color:var(--text3);margin-right:2px">Mois :</span>'+
     moisNavBtns+
   '</div>';
 
-  var objPanelHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px;height:fit-content">'+
-    '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:2px">Objectifs &amp; tarifs</div>'+
-    '<div style="font-size:10px;color:var(--text3);margin-bottom:14px">'+escape_html(moisLabel.charAt(0).toUpperCase()+moisLabel.slice(1))+'</div>'+
-    fluides.map(function(f){
-      var fDevise=f.devise||'XOF';
-      var activeObj=_objActif[f.id];
-      var objVal=activeObj&&activeObj.valeur!=null?parseFloat(activeObj.valeur):null;
-      var budget=f.tarif!=null&&objVal!=null?Math.round(f.tarif*objVal):null;
-      var objLabel=objVal!=null?objVal.toLocaleString('fr-FR')+' '+(f.unite||'u')+'/mois':'Non défini';
-      var objSince=activeObj&&activeObj.date_debut?'depuis '+new Date(activeObj.date_debut+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'';
-      return '<div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)">'+
-        '<div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:8px;display:flex;align-items:center;gap:5px">'+
-          '<span>'+_fluidIcon(f)+'</span><span style="text-transform:uppercase;letter-spacing:.4px">'+escape_html(f.nom)+'</span>'+
-        '</div>'+
-        // Objectif versionné (lecture seule + bouton modifier)
-        '<div style="font-size:9px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Objectif mensuel</div>'+
-        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'+
-          '<span style="font-size:12px;font-weight:600;color:var(--dark)">'+objLabel+'</span>'+
-          '<button onclick="_energieModifierObjModal(\''+f.id+'\',\''+sid+'\')" '+
-            'style="font-size:10px;padding:2px 8px;border:1px solid var(--border);border-radius:5px;background:white;cursor:pointer;color:var(--text2);white-space:nowrap">Modifier</button>'+
-        '</div>'+
-        (objSince?'<div style="font-size:9px;color:var(--text3);margin-bottom:8px">'+escape_html(objSince)+'</div>':'<div style="margin-bottom:8px"></div>')+
-        // Tarif
-        '<div style="font-size:9px;color:var(--text3);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em">Tarif unitaire</div>'+
-        '<div style="display:flex;gap:5px;align-items:center;margin-bottom:6px">'+
-          '<input id="etarif-inp-'+f.id+'" type="number" value="'+(f.tarif!=null?f.tarif:'')+'" placeholder="—" '+
-            'style="flex:1;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;width:0;box-sizing:border-box" />'+
-          '<span style="font-size:10px;color:var(--text3);white-space:nowrap">'+escape_html(fDevise)+'/'+(f.unite?escape_html(f.unite):'u')+'</span>'+
-        '</div>'+
-        // Budget / chambre / jour
-        '<div style="font-size:9px;color:var(--text3);margin-bottom:3px;text-transform:uppercase;letter-spacing:.04em">Budget / chambre / jour</div>'+
-        '<div style="display:flex;gap:5px;align-items:center;margin-bottom:6px">'+
-          '<input id="ebpc-inp-'+f.id+'" type="number" value="'+(f.budget_par_chambre!=null?f.budget_par_chambre:'')+'" placeholder="—" '+
-            'style="flex:1;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;width:0;box-sizing:border-box" />'+
-          '<span style="font-size:10px;color:var(--text3);white-space:nowrap">'+escape_html(fDevise)+'/ch/j</span>'+
-        '</div>'+
-        (function(){var bpc=f.budget_par_chambre?parseFloat(f.budget_par_chambre):null;var bdyn=bpc&&chambresOcc?Math.round(bpc*chambresOcc*daysInMonth):null;var bshow=bdyn||budget;if(!bshow)return '';var lbl=bdyn?'Budget dyn.':'Budget obj.';return '<div style="font-size:10px;color:var(--amber-dark);font-weight:600">'+lbl+' : '+bshow.toLocaleString('fr-FR')+' '+escape_html(fDevise)+(bdyn&&chambresOcc?' <span style="font-size:8px;font-weight:400;color:var(--text3)">('+chambresOcc+' ch occ.)</span>':'')+'</div>';})()+
-      '</div>';
-    }).join('')+
-    '<button id="energie-obj-btn" onclick="_energieSaveObjectifs(\''+sid+'\')" '+
-      'style="width:100%;background:var(--amber);color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;margin-top:4px">'+
-      '💾 Enregistrer les tarifs'+
-    '</button>'+
-  '</div>';
+  // ── VUE AUJOURD'HUI : mini table 5 derniers jours ──
+  var miniHistHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-top:20px">'+
+    '<div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--dark)">Derniers relevés</div>'+
+    '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'+
+    '<thead><tr style="background:var(--bg2)">'+
+      '<th style="padding:7px 10px;text-align:left;color:var(--text2);font-weight:600">Date</th>'+
+      '<th style="padding:7px 10px;text-align:right;color:var(--text2);font-weight:600">TO%</th>'+
+      (nbChambres?'<th style="padding:7px 10px;text-align:right;color:var(--text2);font-weight:600">Couverts</th>':'')+
+      fluides.slice(0,3).map(function(f){return '<th style="padding:7px 10px;text-align:right;color:var(--text2);font-weight:600">'+_fluidIcon(f)+' '+(f.unite?'('+f.unite+')':'')+'</th>';}).join('')+
+    '</tr></thead><tbody>';
+  var miniRows=relevesDesc.slice(0,5);
+  if(!miniRows.length){
+    miniHistHtml+='<tr><td colspan="10" style="padding:16px;text-align:center;color:var(--text3)">Aucun relevé ce mois</td></tr>';
+  }
+  miniRows.forEach(function(r){
+    var isHier=r.date_releve===hierDate;
+    var dateStr=new Date(r.date_releve+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
+    miniHistHtml+='<tr style="border-top:1px solid var(--border);background:'+(isHier?'#FFFEF5':'white')+'">'+
+      '<td style="padding:7px 10px;color:var(--dark);white-space:nowrap">'+dateStr+(isHier?' <span style="font-size:8px;color:var(--amber-dark);font-weight:700;background:var(--amber-pale);border-radius:4px;padding:1px 4px">HIER</span>':'')+'</td>'+
+      '<td style="padding:7px 10px;text-align:right;color:'+(r.to_percent!=null?'var(--dark)':'var(--text3)')+'">'+
+        (r.to_percent!=null?parseFloat(r.to_percent).toLocaleString('fr-FR')+'%':'—')+'</td>'+
+      (nbChambres?'<td style="padding:7px 10px;text-align:right;color:'+(r.nb_couverts!=null?'var(--dark)':'var(--text3)')+'">'+
+        (r.nb_couverts!=null?r.nb_couverts.toLocaleString('fr-FR'):'—')+'</td>':'')+
+      fluides.slice(0,3).map(function(f){
+        var v=r.valeurs&&r.valeurs[f.id];
+        return '<td style="padding:7px 10px;text-align:right;color:'+(v!=null?'var(--dark)':'var(--text3)')+'">'+
+          (v!=null?parseFloat(v).toLocaleString('fr-FR'):'—')+'</td>';
+      }).join('')+
+    '</tr>';
+  });
+  miniHistHtml+='</tbody></table></div></div>';
 
-  var chartHtml='<div style="display:grid;grid-template-columns:1fr 240px;gap:16px;margin-bottom:20px;align-items:start">'+
-    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px">'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">'+
-        '<div style="font-size:12px;font-weight:700;color:var(--dark)">📈 '+escape_html(moisLabel.charAt(0).toUpperCase()+moisLabel.slice(1))+'</div>'+
-        '<div style="display:flex;gap:6px;flex-wrap:wrap">'+chartTabsHtml+'</div>'+
-      '</div>'+
-      '<div id="energie-chart-svg" style="min-height:80px"></div>'+
-      '<div id="energie-chart-legend" style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap"></div>'+
+  // ── VUE BUDGET ──
+  var budgetKpiHtml='';
+  if(budgetMensuel){
+    var toReal=toMoyenPct;
+    var toBudg=budgetMensuel.to_pct!=null?parseFloat(budgetMensuel.to_pct):null;
+    var covReal=(function(){var s=0;var n=0;relevesAsc.forEach(function(r){if(r.nb_couverts!=null){s+=r.nb_couverts;n++;}});return n?Math.round(s/n):null;})();
+    var covBudg=budgetMensuel.nb_couverts_budget;
+    var budgetKpiCards=[
+      {lbl:'TO% réalisé',val:toReal!=null?toReal+'%':'—',sub:toBudg!=null?'Budget : '+toBudg+'%':null,ok:toReal!=null&&toBudg!=null?toReal>=toBudg:null,icon:'🏨'},
+      {lbl:'Couverts/j',val:covReal!=null?covReal:'—',sub:covBudg!=null?'Budget : '+covBudg+'/j':null,ok:covReal!=null&&covBudg!=null?covReal>=covBudg:null,icon:'🍽'},
+      {lbl:'Budget énergie mois',val:budgetMensuel.budget_energie_mois!=null?Math.round(budgetMensuel.budget_energie_mois).toLocaleString('fr-FR')+' XOF':'—',sub:budgetMensuel.budget_energie_jour!=null?Math.round(budgetMensuel.budget_energie_jour).toLocaleString('fr-FR')+' XOF/j':null,ok:null,icon:'💰'}
+    ];
+    budgetKpiHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px">'+
+      budgetKpiCards.map(function(c){
+        var borderColor=c.ok===true?'var(--vert)':c.ok===false?'var(--rouge)':'var(--border)';
+        return '<div style="background:white;border:1.5px solid '+borderColor+';border-radius:12px;padding:14px">'+
+          '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">'+c.icon+' '+c.lbl+'</div>'+
+          '<div style="font-size:24px;font-weight:800;color:var(--dark)">'+c.val+'</div>'+
+          (c.sub?'<div style="font-size:10px;color:var(--text3);margin-top:4px">'+c.sub+'</div>':'')+
+        '</div>';
+      }).join('')+
     '</div>'+
-    objPanelHtml+
-  '</div>';
+    // Barres par fluide
+    (budgetFluidesRows.length?
+    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px">'+
+      '<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:14px">Consommation vs budget par fluide</div>'+
+      fluides.map(function(f){
+        var bf=_budgetByFluide[f.id];
+        if(!bf)return '';
+        var real=consoMoisByFluide[f.id];
+        var budg=bf.quantite_budget_mois?parseFloat(bf.quantite_budget_mois):null;
+        if(budg==null)return '';
+        var pctBar=real!=null?Math.min(120,Math.round(real/budg*100)):0;
+        var barC=pctBar>105?'var(--rouge)':pctBar>90?'#f59e0b':'var(--vert)';
+        return '<div style="margin-bottom:12px">'+
+          '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">'+
+            '<span style="font-weight:600;color:var(--dark)">'+_fluidIcon(f)+' '+escape_html(f.nom)+'</span>'+
+            '<span style="color:var(--text3)">'+(real!=null?Math.round(real).toLocaleString('fr-FR'):'—')+(f.unite?' '+f.unite:'')+
+              ' <span style="color:var(--text3)">/ '+Math.round(budg).toLocaleString('fr-FR')+(f.unite?' '+f.unite:'')+'</span>'+
+            '</span>'+
+          '</div>'+
+          '<div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">'+
+            '<div style="height:6px;background:'+barC+';border-radius:3px;width:'+Math.min(100,pctBar)+'%;transition:width .3s"></div>'+
+          '</div>'+
+          (pctBar>0?'<div style="font-size:9px;color:'+(pctBar>105?'var(--rouge)':'var(--text3)')+';margin-top:2px">'+pctBar+'% du budget mois</div>':'')+
+        '</div>';
+      }).join('')+
+    '</div>':'')
+    ;
+  }else{
+    budgetKpiHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:32px;text-align:center;margin-bottom:20px">'+
+      '<div style="font-size:28px;margin-bottom:8px">📊</div>'+
+      '<div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:6px">Aucun budget configuré pour '+moisLabel+'</div>'+
+      '<div style="font-size:11px;color:var(--text3);margin-bottom:16px">Configurez un budget mensuel pour comparer vos réalisations.</div>'+
+      '<button onclick="_energieBudgetModal(\''+sid+'\','+tgt.getFullYear()+','+(tgt.getMonth()+1)+')" style="background:var(--amber);color:white;border:none;border-radius:8px;padding:10px 20px;font-size:12px;font-weight:700;cursor:pointer">Configurer le budget →</button>'+
+    '</div>';
+  }
 
-  // ── TABLEAU ──
-  var todayReleve=offset===0?releveByDate[today]:null;
+  // ── VUE HISTORIQUE : tableau complet ──
   var nbReleves=relevesAsc.length;
   var dayOfMonth=offset===0?Math.min(now.getDate(),daysInMonth):daysInMonth;
   var nbManquants=dayOfMonth-nbReleves;
   var conformite=dayOfMonth>0?Math.round(nbReleves/dayOfMonth*100):100;
 
-  var tblHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden">'+
-    '<div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'+
-      '<div>'+
-        '<div style="font-size:12px;font-weight:700;color:var(--dark)">Relevés quotidiens — '+escape_html(moisLabel)+'</div>'+
-        '<div style="font-size:10px;color:var(--text3)">Toutes les saisies du mois</div>'+
+  var objPanelHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px;height:fit-content">'+
+    '<div style="font-size:11px;font-weight:700;color:var(--dark);margin-bottom:10px">Objectifs &amp; tarifs — '+escape_html(moisLabel)+'</div>'+
+    fluides.map(function(f){
+      var fDevise=f.devise||'XOF';
+      var activeObj=_objActif[f.id];
+      var objVal=activeObj&&activeObj.valeur!=null?parseFloat(activeObj.valeur):null;
+      var objLabel=objVal!=null?objVal.toLocaleString('fr-FR')+' '+(f.unite||'u')+'/mois':'Non défini';
+      return '<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">'+
+        '<div style="font-size:9px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:4px">'+_fluidIcon(f)+' '+escape_html(f.nom)+'</div>'+
+        '<div style="font-size:11px;color:var(--dark)">'+objLabel+'</div>'+
+        '<div style="display:flex;gap:4px;align-items:center;margin-top:4px">'+
+          '<input id="etarif-inp-'+f.id+'" type="number" value="'+(f.tarif!=null?f.tarif:'')+'" placeholder="tarif" '+
+            'style="flex:1;border:1px solid var(--border);border-radius:5px;padding:4px 6px;font-size:11px;width:0;box-sizing:border-box"/>'+
+          '<span style="font-size:9px;color:var(--text3);white-space:nowrap">'+escape_html(fDevise)+'/'+(f.unite?escape_html(f.unite):'u')+'</span>'+
+        '</div>'+
+        '<input id="ebpc-inp-'+f.id+'" type="hidden" value="'+(f.budget_par_chambre!=null?f.budget_par_chambre:'')+'"/>'+
+      '</div>';
+    }).join('')+
+    '<button id="energie-obj-btn" onclick="_energieSaveObjectifs(\''+sid+'\')" style="width:100%;background:var(--amber);color:white;border:none;border-radius:7px;padding:8px;font-size:11px;font-weight:700;cursor:pointer">💾 Enregistrer tarifs</button>'+
+  '</div>';
+
+  var chartHtml='<div style="display:grid;grid-template-columns:1fr 220px;gap:14px;margin-bottom:16px;align-items:start">'+
+    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">'+
+        '<div style="font-size:11px;font-weight:700;color:var(--dark)">📈 '+escape_html(moisLabel)+'</div>'+
+        '<div style="display:flex;gap:5px;flex-wrap:wrap">'+chartTabsHtml+'</div>'+
       '</div>'+
-      '<button onclick="_exportEnergieCSV()" style="font-size:11px;padding:5px 12px;border:1px solid var(--border);border-radius:8px;background:white;cursor:pointer;color:var(--text2)">Export CSV</button>'+
+      '<div id="energie-chart-svg" style="min-height:80px"></div>'+
+      '<div id="energie-chart-legend" style="display:flex;gap:14px;margin-top:6px;flex-wrap:wrap"></div>'+
+    '</div>'+
+    objPanelHtml+
+  '</div>';
+
+  var tblHtml='<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden">'+
+    '<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'+
+      '<div>'+
+        '<div style="font-size:11px;font-weight:700;color:var(--dark)">Relevés — '+escape_html(moisLabel)+'</div>'+
+        '<div style="font-size:10px;color:var(--text3)">'+nbReleves+' relevé'+(nbReleves!==1?'s':'')+
+          (nbManquants>0?' · <span style="color:var(--rouge);font-weight:700">'+nbManquants+' manquant'+(nbManquants>1?'s':'')+'</span>':' · <span style="color:var(--vert);font-weight:700">complet</span>')+
+        '</div>'+
+      '</div>'+
+      '<button onclick="_exportEnergieCSV()" style="font-size:11px;padding:5px 10px;border:1px solid var(--border);border-radius:7px;background:white;cursor:pointer;color:var(--text2)">Export CSV</button>'+
     '</div>'+
     '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">'+
     '<thead><tr style="background:var(--bg2)">'+
-      '<th style="padding:8px 12px;text-align:left;color:var(--text2);font-weight:600;white-space:nowrap">Date</th>'+
-      fluides.map(function(f){
-        return '<th style="padding:8px 10px;text-align:right;color:var(--text2);font-weight:600;white-space:nowrap">'+
-          _fluidIcon(f)+' '+escape_html(f.nom)+(f.unite?' ('+escape_html(f.unite)+')':'')+
-        '</th>';
-      }).join('')+
-      '<th style="padding:8px 10px;text-align:right;color:var(--text2);font-weight:600;white-space:nowrap">TO%</th>'+
-      '<th style="padding:8px 10px;text-align:left;color:var(--text2);font-weight:600;white-space:nowrap">Saisie par</th>'+
-      '<th style="padding:8px 10px;text-align:left;color:var(--text2);font-weight:600;white-space:nowrap">Note</th>'+
-      '<th style="padding:8px 10px;text-align:center;color:var(--text2);font-weight:600;white-space:nowrap">Statut</th>'+
+      '<th style="padding:7px 10px;text-align:left;color:var(--text2);font-weight:600;white-space:nowrap">Date</th>'+
+      fluides.map(function(f){return '<th style="padding:7px 9px;text-align:right;color:var(--text2);font-weight:600;white-space:nowrap">'+_fluidIcon(f)+' '+escape_html(f.nom)+(f.unite?' ('+escape_html(f.unite)+')':'')+'</th>';}).join('')+
+      '<th style="padding:7px 9px;text-align:right;color:var(--text2);font-weight:600;white-space:nowrap">TO%</th>'+
+      '<th style="padding:7px 9px;text-align:right;color:var(--text2);font-weight:600;white-space:nowrap">Couverts</th>'+
+      '<th style="padding:7px 9px;text-align:left;color:var(--text2);font-weight:600;white-space:nowrap">Note</th>'+
+      '<th style="padding:7px 9px;text-align:center;color:var(--text2);font-weight:600;white-space:nowrap">Statut</th>'+
     '</tr></thead><tbody>';
 
   if(!relevesDesc.length){
-    tblHtml+='<tr><td colspan="'+(3+fluides.length+3)+'" style="padding:24px;text-align:center;color:var(--text3)">Aucun relevé ce mois</td></tr>';
+    tblHtml+='<tr><td colspan="'+(4+fluides.length+2)+'" style="padding:20px;text-align:center;color:var(--text3)">Aucun relevé ce mois</td></tr>';
   }
   relevesDesc.forEach(function(r,ri){
     var isToday=r.date_releve===today;
@@ -11808,14 +12116,11 @@ async function _rtEnergie(sid){
     var statut=_calcEnergieStatut(r,fluides,prevR);
     var dateLabel=isToday?'<strong>'+new Date(r.date_releve+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</strong> <span style="font-size:9px;color:var(--vert);font-weight:700">Auj.</span>':
       new Date(r.date_releve+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
-
     tblHtml+='<tr style="border-top:1px solid var(--border);background:'+(isToday?'#FFFEF5':'white')+'">'+
-      '<td style="padding:8px 12px;white-space:nowrap;color:var(--dark)">'+dateLabel+'</td>'+
+      '<td style="padding:7px 10px;white-space:nowrap;color:var(--dark)">'+dateLabel+'</td>'+
       fluides.map(function(f,fi){
-        var v=r.valeurs&&r.valeurs[f.id];
-        var vNum=v!=null?parseFloat(v):null;
+        var v=r.valeurs&&r.valeurs[f.id];var vNum=v!=null?parseFloat(v):null;
         var delta=deltasByFluide[f.id][relevesAsc.indexOf(r)];
-        // Normaliser pour seuil : cuves → L
         var _fCap=f.capacite?parseFloat(f.capacite):null;
         var _vCmp=vNum!=null&&f.type_valeur==='instantane'&&_fCap!=null?(vNum>100?vNum:Math.round(vNum/100*_fCap)):vNum;
         var alerte=f.seuil_alerte_bas!=null&&_vCmp!=null&&_vCmp<f.seuil_alerte_bas;
@@ -11825,60 +12130,266 @@ async function _rtEnergie(sid){
           var over=objJ&&delta>objJ*1.05;
           deltaStr='<div style="font-size:9px;color:'+(over?'#E8841A':'var(--text3)')+'">'+delta.toLocaleString('fr-FR')+(f.unite?' '+f.unite:'')+'/j</div>';
         }
-        return '<td style="padding:8px 10px;text-align:right;color:'+(alerte?'var(--rouge)':vNum!=null?'var(--dark)':'var(--text3)')+'">'+
-          (vNum!=null?(alerte?'⚠️ ':'')+vNum.toLocaleString('fr-FR'):'—')+
-          deltaStr+
-        '</td>';
+        return '<td style="padding:7px 9px;text-align:right;color:'+(alerte?'var(--rouge)':vNum!=null?'var(--dark)':'var(--text3)')+'">'+
+          (vNum!=null?(alerte?'⚠️ ':'')+vNum.toLocaleString('fr-FR'):'—')+deltaStr+'</td>';
       }).join('')+
-      '<td id="eto-cell-'+r.id+'" style="padding:8px 10px;text-align:right">'+
+      '<td id="eto-cell-'+r.id+'" style="padding:7px 9px;text-align:right">'+
         '<span id="eto-span-'+r.id+'" onclick="_energieEditToPct(\''+r.id+'\','+(r.to_percent!=null?parseFloat(r.to_percent):'null')+')" '+
-          'style="cursor:pointer;color:'+(r.to_percent!=null?'var(--dark)':'var(--text3)')+';font-size:12px" title="Cliquer pour saisir le TO%">'+
-          (r.to_percent!=null?parseFloat(r.to_percent).toLocaleString('fr-FR')+'%':'—')+
-        '</span>'+
+          'style="cursor:pointer;color:'+(r.to_percent!=null?'var(--dark)':'var(--text3)')+';font-size:11px" title="Cliquer pour modifier">'+
+          (r.to_percent!=null?parseFloat(r.to_percent).toLocaleString('fr-FR')+'%':'—')+'</span>'+
       '</td>'+
-      '<td style="padding:8px 10px;color:var(--text2);white-space:nowrap;font-size:10px">'+(r.saisi_par?escape_html(r.saisi_par):'—')+'</td>'+
-      '<td id="enote-cell-'+r.id+'" style="padding:8px 10px;min-width:100px">'+
+      '<td style="padding:7px 9px;text-align:right;color:'+(r.nb_couverts!=null?'var(--dark)':'var(--text3)')+'">'+
+        (r.nb_couverts!=null?r.nb_couverts.toLocaleString('fr-FR'):'—')+'</td>'+
+      '<td id="enote-cell-'+r.id+'" style="padding:7px 9px;min-width:80px">'+
         '<span id="enote-span-'+r.id+'" onclick="_energieEditNote(\''+r.id+'\',\''+escape_html(r.note||'')+'\''+')" '+
           'style="cursor:pointer;color:'+(r.note?'var(--dark)':'var(--text3)')+';font-size:10px">'+(r.note?escape_html(r.note):'+ Note')+'</span>'+
       '</td>'+
-      '<td style="padding:8px 10px;text-align:center">'+_statutBadge(statut)+'</td>'+
+      '<td style="padding:7px 9px;text-align:center">'+_statutBadge(statut)+'</td>'+
     '</tr>';
   });
-
   tblHtml+='</tbody></table></div>'+
-    '<div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--text3)">'+
-      '<span>'+nbReleves+' relevé'+(nbReleves>1?'s':'')+' ce mois'+
-        (nbManquants>0?' · <span style="color:var(--rouge);font-weight:700">'+nbManquants+' manquant'+(nbManquants>1?'s':'')+'</span>':' · <span style="color:var(--vert);font-weight:700">0 manquant</span>')+
-      '</span>'+
+    '<div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;font-size:11px">'+
       '<span style="font-weight:700;color:'+(conformite>=95?'var(--vert)':conformite>=70?'var(--amber-dark)':'var(--rouge)')+'">'+
         (conformite>=95?'✓ ':'')+'Conformité '+conformite+'%'+
       '</span>'+
     '</div>'+
   '</div>';
 
-  // ── HEADER ──
-  var dernierSaisi=lastReleve?lastReleve.date_releve===''+today?'Aujourd\'hui à '+(lastReleve.saisi_par||''):
-    new Date(lastReleve.date_releve+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+' · '+(lastReleve.saisi_par||''):null;
-
-  var headerHtml='<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">'+
-    '<div>'+
-      '<div style="font-size:18px;font-weight:800;color:var(--dark)">Énergie</div>'+
-      '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+
-        escape_html(now.toLocaleDateString('fr-FR',{month:'long',year:'numeric'}))+
-        (siteNom?' · '+escape_html(siteNom):'')+
-      '</div>'+
-      (dernierSaisi?'<div style="font-size:11px;color:var(--text2);margin-top:4px">Relevé du jour : <strong>'+escape_html(dernierSaisi)+'</strong></div>':
-        '<div style="font-size:11px;color:var(--amber-dark);font-weight:600;margin-top:4px">⏳ Relevé du jour non saisi</div>')+
+  // ── VUE CONFIG ──
+  var saisieUrl=window.location.origin+'/saisie.html?site='+sid;
+  var configHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">'+
+    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:18px">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:6px">⚡ Fluides &amp; tarifs</div>'+
+      '<div style="font-size:11px;color:var(--text3);margin-bottom:14px">Ajouter/modifier les fluides, unités, tarifs et seuils d\'alerte</div>'+
+      '<button onclick="_switchConfigTab(\'energie\')" style="background:var(--amber);color:white;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer">Configurer les fluides →</button>'+
+    '</div>'+
+    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:18px">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:6px">📊 Budget mensuel</div>'+
+      '<div style="font-size:11px;color:var(--text3);margin-bottom:14px">Définir TO%, couverts, et budgets par fluide pour chaque mois</div>'+
+      '<button onclick="_energieBudgetModal(\''+sid+'\','+tgt.getFullYear()+','+(tgt.getMonth()+1)+')" style="background:var(--dark);color:white;border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer">Configurer le budget →</button>'+
+    '</div>'+
+    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:18px">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:6px">📱 Lien saisie mobile</div>'+
+      '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">Lien à épingler dans WhatsApp pour la saisie quotidienne TO%/couverts</div>'+
+      '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-size:10px;font-family:monospace;word-break:break-all;margin-bottom:10px;color:var(--dark)">'+escape_html(saisieUrl)+'</div>'+
+      '<button onclick="navigator.clipboard.writeText(\''+escape_html(saisieUrl)+'\').then(function(){var el=document.getElementById(\'ev-copy-ok\');if(el){el.style.display=\'inline\';setTimeout(function(){el.style.display=\'none\';},2000);}})" '+
+        'style="background:white;border:1.5px solid var(--border);border-radius:8px;padding:8px 14px;font-size:11px;font-weight:600;cursor:pointer;color:var(--dark)">Copier le lien 📋</button>'+
+      ' <span id="ev-copy-ok" style="display:none;font-size:11px;color:var(--vert);font-weight:700">✓ Copié</span>'+
     '</div>'+
   '</div>';
 
-  // Init chart après rendu
+  // ── HEADER ──
+  var hierMissing=!hierReleve;
+  var headerHtml='<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">'+
+    '<div>'+
+      '<div style="font-size:18px;font-weight:800;color:var(--dark)">Énergie</div>'+
+      '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+escape_html(moisLabel)+(siteNom?' · '+escape_html(siteNom):'')+'</div>'+
+    '</div>'+
+    (hierMissing?'<div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:8px 14px;font-size:11px;font-weight:700;color:#c2410c">'+
+      '⚠ Saisie hier manquante</div>':'<div style="font-size:11px;color:var(--vert);font-weight:600">✓ Hier saisi</div>')+
+  '</div>';
+
+  // ── SUB-NAV ──
+  var navBtnStyle=function(v){
+    return 'id="evtab-'+v+'" onclick="_rtEnergieShowView(\''+v+'\')" '+
+      'style="padding:7px 16px;border-radius:20px;border:1.5px solid var(--border);background:white;color:var(--text2);font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap"';
+  };
+  var subNavHtml='<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">'+
+    '<button '+navBtnStyle('today')+'>📋 Aujourd\'hui</button>'+
+    '<button '+navBtnStyle('budget')+'>📊 Budget</button>'+
+    '<button '+navBtnStyle('historique')+'>📅 Historique</button>'+
+    '<button '+navBtnStyle('config')+'>⚙️ Configuration</button>'+
+  '</div>';
+
+  // ── ASSEMBLAGE 4 VUES ──
+  var view_today='<div id="ev-today" style="display:none">'+toPanelHtml+tilesHtml+kpiHtml+miniHistHtml+'</div>';
+  var view_budget='<div id="ev-budget" style="display:none">'+moisNavHtml+budgetKpiHtml+'</div>';
+  var view_historique='<div id="ev-historique" style="display:none">'+moisNavHtml+chartHtml+tblHtml+'</div>';
+  var view_config='<div id="ev-config" style="display:none">'+configHtml+'</div>';
+
+  // Init après rendu : montrer vue today, activer tab
   setTimeout(function(){
     _energieCurrentFluide=fluides[0]?fluides[0].id:null;
-    if(_energieCurrentFluide)_renderEnergieChart(_energieCurrentFluide);
-  },50);
+    _rtEnergieShowView(_rtEnergieView||'today');
+  },30);
 
-  return moisNavHtml+headerHtml+toPanelHtml+tilesHtml+kpiHtml+chartHtml+tblHtml;
+  return headerHtml+subNavHtml+view_today+view_budget+view_historique+view_config;
+}
+
+/* ═══════════════════════════════════════════════════════
+   📊 ÉNERGIE BUDGET — Modal création/édition
+   ═══════════════════════════════════════════════════════ */
+
+function _ebmField(id,label,value,placeholder,unit){
+  return '<div>'+
+    '<div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">'+label+'</div>'+
+    '<div style="display:flex;align-items:center;gap:6px">'+
+      '<input id="'+id+'" type="number" step="any" value="'+value+'" placeholder="'+placeholder+'" '+
+        'style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-size:12px;box-sizing:border-box;width:0"/>'+
+      '<span style="font-size:10px;color:var(--text3);white-space:nowrap">'+unit+'</span>'+
+    '</div>'+
+  '</div>';
+}
+
+function _energieBudgetModal(sid,annee,mois){
+  var old=document.getElementById('ebm-modal');
+  if(old)old.remove();
+  var fluides=_energieFluides||[];
+  var bm=_rtEnergieBudgetData;
+  var bfMap={};
+  (_rtEnergieBudgetFluides||[]).forEach(function(b){bfMap[b.fluide_id]=b;});
+  var mL=new Date(annee,mois-1,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  mL=mL.charAt(0).toUpperCase()+mL.slice(1);
+  var nbJ=new Date(annee,mois,0).getDate();
+  var nbCh=window._energieSiteNbChambres||null;
+
+  var h='<div id="ebm-modal" onclick="if(event.target===this)this.remove()" '+
+    'style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box">';
+  h+='<div style="background:white;border-radius:16px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)">';
+
+  // Header
+  h+='<div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:white;z-index:1">'+
+    '<div>'+
+      '<div style="font-size:15px;font-weight:800;color:var(--dark)">📊 Budget '+escape_html(mL)+'</div>'+
+      '<div style="font-size:10px;color:var(--text3)">'+(bm?'Modifier le budget existant':'Nouveau budget')+' · '+nbJ+' jours</div>'+
+    '</div>'+
+    '<button onclick="document.getElementById(\'ebm-modal\').remove()" '+
+      'style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text3);line-height:1;padding:4px 8px">✕</button>'+
+  '</div>';
+
+  h+='<div style="padding:20px">';
+
+  // ── Section Exploitation ──
+  h+='<div style="font-size:10px;font-weight:700;color:var(--amber-dark);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">🏨 Exploitation budgétée</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px">';
+  h+=_ebmField('ebm-to','TO% cible',bm&&bm.to_pct!=null?bm.to_pct:'','ex: 65','%');
+  h+=_ebmField('ebm-couverts','Couverts / jour',bm&&bm.nb_couverts_budget!=null?bm.nb_couverts_budget:'','ex: 80','cvts/j');
+  h+=_ebmField('ebm-prix-chambre','Prix moy. chambre',bm&&bm.prix_moyen_chambre!=null?bm.prix_moyen_chambre:'','ex: 45 000','XOF');
+  h+=_ebmField('ebm-prix-couvert','Prix moy. couvert',bm&&bm.prix_moyen_couvert!=null?bm.prix_moyen_couvert:'','ex: 8 000','XOF');
+  h+='</div>';
+  if(nbCh){
+    h+='<div id="ebm-ca-preview" style="font-size:10px;color:var(--text3);margin-bottom:18px;background:var(--bg2);border-radius:7px;padding:8px 10px">'+
+      'CA chambres/jour = TO% × '+nbCh+' ch. × prix chambre · CA couverts/jour = nb couverts × prix couvert</div>';
+  }else{
+    h+='<div style="margin-bottom:18px"></div>';
+  }
+
+  // ── Section Budget par fluide ──
+  if(fluides.length){
+    h+='<div style="font-size:10px;font-weight:700;color:var(--amber-dark);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">⚡ Budget par fluide</div>';
+    h+='<div style="background:var(--bg2);border-radius:10px;padding:14px;margin-bottom:20px">';
+    h+='<div style="font-size:10px;color:var(--text3);margin-bottom:12px">Les coûts/mois sont calculés automatiquement (valeur/j × '+nbJ+' jours).</div>';
+    fluides.forEach(function(f){
+      var bf=bfMap[f.id];
+      var qJ=bf&&bf.quantite_budget_jour!=null?bf.quantite_budget_jour:'';
+      var cJ=bf&&bf.cout_budget_jour!=null?bf.cout_budget_jour:'';
+      var dev=f.devise||'XOF';
+      h+='<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)">'+
+        '<div style="font-size:11px;font-weight:700;color:var(--dark);margin-bottom:8px">'+_fluidIcon(f)+' '+escape_html(f.nom)+(f.unite?' <span style="font-size:9px;color:var(--text3)">('+escape_html(f.unite)+')</span>':'')+'</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+
+          _ebmField('ebf-q-'+f.id,'Quantité / jour',qJ,'—',f.unite||'u')+
+          _ebmField('ebf-c-'+f.id,'Coût / jour',cJ,'—',dev+'/j')+
+        '</div>'+
+        '<div id="ebf-preview-'+f.id+'" style="font-size:10px;color:var(--text3);margin-top:4px">'+
+          (cJ!==''&&cJ!=null?'Budget mois : '+(Math.round(parseFloat(cJ)*nbJ)).toLocaleString('fr-FR')+' '+dev:'—')+
+        '</div>'+
+      '</div>';
+    });
+    h+='</div>';
+  }
+
+  // ── Ligne budget total + Enregistrer ──
+  h+='<div id="ebm-total-line" style="background:var(--amber-pale);border:1.5px solid var(--amber);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:12px;font-weight:700;color:var(--amber-dark)">'+
+    'Budget énergie total : <span id="ebm-total-val">'+(bm&&bm.budget_energie_mois!=null?Math.round(bm.budget_energie_mois).toLocaleString('fr-FR')+' XOF':'à calculer')+'</span>'+
+  '</div>';
+  h+='<div style="display:flex;align-items:center;gap:10px">'+
+    '<button id="ebm-save-btn" onclick="_energieBudgetSave(\''+sid+'\','+annee+','+mois+')" '+
+      'style="flex:1;background:var(--amber);color:white;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;cursor:pointer">Enregistrer le budget</button>'+
+    '<span id="ebm-msg" style="font-size:11px;display:none"></span>'+
+  '</div>';
+
+  h+='</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend',h);
+
+  // Listeners pour preview budget total en temps réel
+  var allCostInputs=fluides.map(function(f){return 'ebf-c-'+f.id;});
+  function _ebmUpdateTotal(){
+    var total=0;var has=false;
+    fluides.forEach(function(f){
+      var inp=document.getElementById('ebf-c-'+f.id);
+      var cJ=inp&&inp.value!==''?parseFloat(inp.value):null;
+      var prv=document.getElementById('ebf-preview-'+f.id);
+      if(cJ!=null&&!isNaN(cJ)){
+        total+=cJ*nbJ;has=true;
+        if(prv)prv.textContent='Budget mois : '+(Math.round(cJ*nbJ)).toLocaleString('fr-FR')+' '+(f.devise||'XOF');
+      }else{
+        if(prv)prv.textContent='—';
+      }
+    });
+    var tv=document.getElementById('ebm-total-val');
+    if(tv)tv.textContent=has?Math.round(total).toLocaleString('fr-FR')+' XOF':'à calculer';
+  }
+  setTimeout(function(){
+    fluides.forEach(function(f){
+      var inp=document.getElementById('ebf-c-'+f.id);
+      if(inp)inp.addEventListener('input',_ebmUpdateTotal);
+    });
+  },50);
+}
+
+async function _energieBudgetSave(sid,annee,mois){
+  var btn=document.getElementById('ebm-save-btn');
+  var msgEl=document.getElementById('ebm-msg');
+  function showMsg(ok,txt){if(msgEl){msgEl.textContent=txt;msgEl.style.color=ok?'var(--vert)':'var(--rouge)';msgEl.style.display='inline';}}
+  if(btn){btn.disabled=true;btn.textContent='...';}
+  function v(id){var el=document.getElementById(id);return el&&el.value!==''?parseFloat(el.value):null;}
+  var fluides=_energieFluides||[];
+  var nbJ=new Date(annee,mois,0).getDate();
+  var nbCh=window._energieSiteNbChambres||null;
+  var toP=v('ebm-to');
+  var covJ=v('ebm-couverts');
+  var pCh=v('ebm-prix-chambre');
+  var pCov=v('ebm-prix-couvert');
+  // Calcul total budget énergie = somme des coûts/j × nbJ
+  var totalMois=0;var hasFl=false;
+  fluides.forEach(function(f){var cJ=v('ebf-c-'+f.id);if(cJ!=null){totalMois+=cJ*nbJ;hasFl=true;}});
+  var body={site_id:sid,annee:annee,mois:mois,nb_jours:nbJ};
+  if(toP!=null)body.to_pct=toP;
+  if(covJ!=null)body.nb_couverts_budget=covJ;
+  if(pCh!=null)body.prix_moyen_chambre=pCh;
+  if(pCov!=null)body.prix_moyen_couvert=pCov;
+  if(nbCh&&toP!=null&&pCh!=null)body.ca_chambres_budget_jour=Math.round(nbCh*(toP/100)*pCh);
+  if(covJ!=null&&pCov!=null)body.ca_couverts_budget_jour=Math.round(covJ*pCov);
+  if(hasFl){body.budget_energie_mois=Math.round(totalMois);body.budget_energie_jour=Math.round(totalMois/nbJ);}
+  var ok=false;var budgetId=null;
+  try{
+    var bm=_rtEnergieBudgetData;
+    if(bm){
+      var pok=await supaPatch('energie_budget_mensuel',bm.id,body);
+      if(pok){budgetId=bm.id;ok=true;}
+    }else{
+      var nr=await supaPost('energie_budget_mensuel',body);
+      if(nr&&nr.id){budgetId=nr.id;ok=true;}
+    }
+    if(ok&&budgetId){
+      var bfMap={};(_rtEnergieBudgetFluides||[]).forEach(function(b){bfMap[b.fluide_id]=b;});
+      for(var i=0;i<fluides.length;i++){
+        var f=fluides[i];
+        var qJ=v('ebf-q-'+f.id);
+        var cJ=v('ebf-c-'+f.id);
+        if(qJ==null&&cJ==null)continue;
+        var bfBody={budget_id:budgetId,fluide_id:f.id};
+        if(qJ!=null){bfBody.quantite_budget_jour=qJ;bfBody.quantite_budget_mois=Math.round(qJ*nbJ);}
+        if(cJ!=null){bfBody.cout_budget_jour=cJ;bfBody.cout_budget_mois=Math.round(cJ*nbJ);}
+        var ex=bfMap[f.id];
+        if(ex&&ex.id){await supaPatch('energie_budget_fluide',ex.id,bfBody);}
+        else{await supaPost('energie_budget_fluide',bfBody);}
+      }
+    }
+  }catch(e){console.error('[energieBudgetSave]',e);}
+  if(btn){btn.disabled=false;btn.textContent='Enregistrer le budget';}
+  showMsg(ok,ok?'✓ Budget enregistré':'Erreur — voir console');
+  if(ok)setTimeout(function(){var m=document.getElementById('ebm-modal');if(m)m.remove();_loadTab('energie',sid);},900);
 }
 
 /* ═══════════════════════════════════════════════════════

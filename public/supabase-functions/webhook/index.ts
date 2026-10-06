@@ -161,7 +161,8 @@ async function getEquipementsRestants(rondeId: string, siteId: string, frequence
   if (frequence === 'journalier') {
     const hasConfig = await db('energie_config', { query: `&site_id=eq.${siteId}&actif=eq.true&limit=1`, select: 'id' });
     if (Array.isArray(hasConfig) && hasConfig.length > 0) {
-      restants.push({ id: '__releve_energie__', nom: '⚡ Relevé énergie' });
+      const dejaSaisi = await releveEnergieFaitAujourdhui(siteId);
+      if (!dejaSaisi) restants.push({ id: '__releve_energie__', nom: '⚡ Relevé énergie' });
     }
   }
   return restants;
@@ -211,10 +212,13 @@ async function getFrequencesDisponibles(site: any): Promise<string[]> {
     if (Array.isArray(equipsReleve) && equipsReleve.length > 0) freqs.push('releve_horaire');
   }
 
-  // Relevé énergie — toujours disponible si config existe (upsert gère les doublons)
+  // Relevé énergie — disponible si config existe ET pas encore saisi aujourd'hui
   if (site.energie_actif !== false) {
     const hasConfig = await db('energie_config', { query: `&site_id=eq.${site.id}&actif=eq.true&limit=1`, select: 'id' });
-    if (Array.isArray(hasConfig) && hasConfig.length > 0) freqs.push('releve_energie');
+    if (Array.isArray(hasConfig) && hasConfig.length > 0) {
+      const dejaSaisi = await releveEnergieFaitAujourdhui(site.id);
+      if (!dejaSaisi) freqs.push('releve_energie');
+    }
   }
 
   return freqs;
@@ -882,6 +886,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     // Créer un signalement → remonte dans le dashboard
     await db('signalements', { method: 'POST', body: {
       groupe_id: sd.site_id,
+      site_id: sd.site_id,
       equipement_id: sd.equip_id || null,
       type: 'anomalie',
       description: desc,
@@ -1104,18 +1109,14 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     const { pct, autoJ, col } = calcCuve(niveauL, cap, sd.conso_theorique || 65);
     const coutTxt = cout > 0 ? `\n💰 Coût : *${cout.toLocaleString('fr-FR')} FCFA*` : '';
 
-    // Enregistrer le relevé dans reponses
+    // Enregistrer le relevé dans reponses — uniquement si une ronde journalière existe déjà
+    // (on ne crée PAS de ronde fantôme depuis le flow plein, ça polluerait la ronde formelle)
     if (sd.question_niveau_id) {
       const rondeRows = await db('rondes', { query: `&site_id=eq.${sd.site_id}&date_ronde=eq.${today}&frequence=eq.journalier&limit=1` });
-      let rondeId: string;
       if (Array.isArray(rondeRows) && rondeRows[0]) {
-        rondeId = rondeRows[0].id;
-      } else {
-        const newRonde = await db('rondes', { method: 'POST', body: { site_id: sd.site_id, date_ronde: today, frequence: 'journalier' } });
-        rondeId = Array.isArray(newRonde) ? newRonde[0].id : newRonde.id;
+        const reId = await getOrCreateRondeEquipement(rondeRows[0].id, sd.cuve_id);
+        await db('reponses', { method: 'POST', body: { ronde_equipement_id: reId, question_id: sd.question_niveau_id, valeur: String(niveauL) } });
       }
-      const reId = await getOrCreateRondeEquipement(rondeId, sd.cuve_id);
-      await db('reponses', { method: 'POST', body: { ronde_equipement_id: reId, question_id: sd.question_niveau_id, valeur: String(niveauL) } });
     }
 
     // Enregistrer dans l'historique pleins
@@ -1214,6 +1215,13 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     const v = msg.toLowerCase();
     if (v === 'non') {
       await setSession(phone, 'idle', {});
+      // Si lancé depuis une ronde, y retourner plutôt que laisser le tech en plan
+      if (sd.ronde_context?.ronde_id) {
+        const siteRaw = await db('sites', { query: `&id=eq.${sd.ronde_context.site_id}&limit=1` });
+        const siteObj = Array.isArray(siteRaw) ? siteRaw[0] : null;
+        await sendWA(phone, `❌ Relevé annulé.`);
+        return continuerRonde(phone, sd.ronde_context, contact, siteObj);
+      }
       return sendWA(phone, `❌ Relevé annulé.\n\nTapez *saisie* pour recommencer.`);
     }
     if (v !== 'oui') return sendWA(phone, `Répondez *OUI* pour valider ou *NON* pour annuler.`);
