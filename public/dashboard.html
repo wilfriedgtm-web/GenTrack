@@ -639,10 +639,16 @@ function buildLayout(session,activeNav,contentHtml){
   var exportBtn='<div style="display:flex;align-items:center;gap:8px">'+
     (session.role==='resp_tech'?
       '<button id="rapport-btn" onclick="_toggleRapportMenu()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">📄&#8239;Rapport ▾</button>'+
-      '<div id="rapport-menu" style="display:none;position:absolute;right:40px;top:60px;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:200;padding:6px;min-width:180px">'+
-        [7,14,30].map(function(n){return '<button onclick="_openRapportHebdo('+n+')" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">📋&#8239;'+n+' derniers jours</button>';}).join('')+
-        '<div style="height:1px;background:var(--border);margin:4px 8px"></div>'+
-        '<button onclick="_openAfficheBotRT()" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">📋&#8239;Affiche bot WhatsApp</button>'+
+      '<div id="rapport-menu" style="display:none;position:absolute;right:40px;top:60px;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:200;padding:6px;min-width:210px">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;gap:6px">'+
+          '<button onclick="_rtNavRapportMois(-1)" style="width:28px;height:28px;border:1px solid var(--border);background:none;border-radius:6px;font-size:14px;cursor:pointer;color:var(--text2);display:flex;align-items:center;justify-content:center;flex-shrink:0">←</button>'+
+          '<span id="rapport-rt-mois-lbl" style="font-size:12px;font-weight:700;color:var(--dark);text-align:center;flex:1"></span>'+
+          '<button id="rapport-rt-mois-next" onclick="_rtNavRapportMois(1)" style="width:28px;height:28px;border:1px solid var(--border);background:none;border-radius:6px;font-size:14px;cursor:pointer;color:var(--text2);display:flex;align-items:center;justify-content:center;flex-shrink:0">→</button>'+
+        '</div>'+
+        '<div style="height:1px;background:var(--border);margin:4px 0"></div>'+
+        '<button onclick="_openRapportHebdoMois(_rtRapportMoisOffset)" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">📋&#8239;Générer rapport PDF</button>'+
+        '<div style="height:1px;background:var(--border);margin:4px 0"></div>'+
+        '<button onclick="_openAfficheBotRT()" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">📲&#8239;Affiche bot WhatsApp</button>'+
       '</div>':
     session.role==='dir_tech'?
       '<button id="rapport-btn-dt" onclick="_toggleRapportMenuDT()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">📊&#8239;Rapport ▾</button>'+
@@ -10043,15 +10049,30 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
 }
 
 // ── Rapport hebdomadaire professionnel (resp_tech) ─────────────────────────────
+var _rtRapportMoisOffset=0;
 function _toggleRapportMenu(){
   var m=document.getElementById('rapport-menu');
   if(!m)return;
   var open=m.style.display==='none';
   m.style.display=open?'block':'none';
   if(open){
+    _rtUpdateRapportMoisLabel();
     var close=function(e){if(!m.contains(e.target)&&e.target.id!=='rapport-btn'){m.style.display='none';document.removeEventListener('click',close);}};
     setTimeout(function(){document.addEventListener('click',close);},0);
   }
+}
+function _rtUpdateRapportMoisLabel(){
+  var now=new Date();
+  var tgt=new Date(now.getFullYear(),now.getMonth()+_rtRapportMoisOffset,1);
+  var ml=tgt.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  var lbl=document.getElementById('rapport-rt-mois-lbl');
+  if(lbl)lbl.textContent=ml.charAt(0).toUpperCase()+ml.slice(1);
+  var nxt=document.getElementById('rapport-rt-mois-next');
+  if(nxt){nxt.disabled=_rtRapportMoisOffset>=0;nxt.style.opacity=_rtRapportMoisOffset>=0?'0.3':'1';}
+}
+function _rtNavRapportMois(d){
+  _rtRapportMoisOffset=Math.min(0,_rtRapportMoisOffset+d);
+  _rtUpdateRapportMoisLabel();
 }
 
 function _openAfficheBotRT(){
@@ -10227,6 +10248,83 @@ async function _openRapportHebdo(period){
   finally{if(btn){btn.disabled=false;btn.textContent='📄 Rapport ▾';}}
 }
 
+async function _openRapportHebdoMois(offset){
+  var now=new Date();
+  var tgt=new Date(now.getFullYear(),now.getMonth()+(offset||0),1);
+  var moisDebut=tgt.toISOString().split('T')[0];
+  var moisFin=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).toISOString().split('T')[0];
+  var ml=tgt.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  var periodeStr=ml.charAt(0).toUpperCase()+ml.slice(1);
+  var daysInMonth=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).getDate();
+  var m=document.getElementById('rapport-menu');if(m)m.style.display='none';
+  var btn=document.getElementById('rapport-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Chargement...';}
+  try{
+    var sid=_session.site_ids&&_session.site_ids[0];
+    if(!sid){alert('Aucun site configuré.');return;}
+    var[siteRow,equips,rondes,signalements,maintenances]=await Promise.all([
+      supaGet('sites','id=eq.'+sid+'&select=nom,nb_chambres&limit=1'),
+      supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,capacite_litres,conso_theorique_lh,types_equipements(nom)&order=ordre_ronde.asc'),
+      supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+moisDebut+'&date_ronde=lte.'+moisFin+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=200'),
+      supaGet('signalements','groupe_id=eq.'+sid+'&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'T23:59:59&select=id,type,description,statut,signale_par,equipement_id,equipement_zone_id,cout_intervention,created_at,resolved_at,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=60'),
+      supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+moisDebut+'&date_intervention=lte.'+moisFin+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=40')
+    ]);
+    var siteNom=siteRow.length?siteRow[0].nom:'Mon site';
+    var rIds=rondes.map(function(r){return r.id;});
+    var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=id,ronde_id,equipement_id,statut'):[];
+    var eqIds=equips.map(function(e){return e.id;});
+    var questions=eqIds.length?await supaGet('questions','equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&select=id,equipement_id,texte,unite'):[];
+    var qMap={};questions.forEach(function(q){qMap[q.id]=q;});
+    var eqMap={};equips.forEach(function(e){eqMap[e.id]=e;});
+    // dernières réponses rondes
+    var lastRepsByEq={};
+    if(eqIds.length){
+      var allLastRE=await supaGet('rondes_equipements','equipement_id=in.('+eqIds.join(',')+')'+'&statut=eq.valide&valide_at=not.is.null&select=id,equipement_id,valide_at&order=valide_at.desc&limit='+eqIds.length*5);
+      var seenEq=new Set();var topREIds=[];
+      allLastRE.forEach(function(re){if(!seenEq.has(re.equipement_id)){seenEq.add(re.equipement_id);topREIds.push(re.id);lastRepsByEq[re.equipement_id]={valide_at:re.valide_at,re_id:re.id,vals:[]};}});
+      if(topREIds.length){
+        var repsRonde=await supaGet('reponses','ronde_equipement_id=in.('+topREIds.join(',')+')'+'&select=ronde_equipement_id,question_id,valeur');
+        repsRonde.forEach(function(r){var q=qMap[r.question_id];if(!q)return;var eqId=q.equipement_id;if(!lastRepsByEq[eqId]||lastRepsByEq[eqId].re_id!==r.ronde_equipement_id)return;lastRepsByEq[eqId].vals.push({texte:q.texte,valeur:r.valeur,unite:q.unite||''});});
+      }
+    }
+    var cuveHistory={};var rondeExportRows=[];var releveExportRows=[];
+    var relevesH=await supaGet('releves_horaires','site_id=eq.'+sid+'&created_at=gte.'+moisDebut+'T00:00:00&created_at=lte.'+moisFin+'T23:59:59&select=id,created_at&order=created_at.asc&limit=500');
+    if(relevesH.length){
+      var relDateMap={};relevesH.forEach(function(r){relDateMap[r.id]=r.created_at;});
+      var relIds=relevesH.map(function(r){return r.id;});
+      var repsReleve=await supaGet('reponses','releve_id=in.('+relIds.join(',')+')'+'&select=releve_id,question_id,valeur,created_at&order=created_at.asc');
+      var latestRelByEq={};
+      repsReleve.forEach(function(r){var q=qMap[r.question_id];if(!q)return;var eqId=q.equipement_id;if(!eqId)return;var ts=relDateMap[r.releve_id]||r.created_at||'';if(!latestRelByEq[eqId]||ts>(relDateMap[latestRelByEq[eqId]]||'')){latestRelByEq[eqId]=r.releve_id;}});
+      var releveVals={};
+      repsReleve.forEach(function(r){var q=qMap[r.question_id];if(!q)return;var eqId=q.equipement_id;if(!eqId)return;if(r.releve_id!==latestRelByEq[eqId])return;if(!releveVals[eqId])releveVals[eqId]=[];releveVals[eqId].push({texte:q.texte,valeur:r.valeur,unite:q.unite||''});});
+      Object.keys(latestRelByEq).forEach(function(eqId){var ts=relDateMap[latestRelByEq[eqId]]||'';if(!lastRepsByEq[eqId]||(ts&&ts>(lastRepsByEq[eqId].valide_at||''))){lastRepsByEq[eqId]={valide_at:ts,vals:releveVals[eqId]||[]};}});
+    }
+    // rondeExportRows
+    var reIds2=rondesEq.map(function(re){return re.id;}).filter(Boolean);
+    if(reIds2.length){
+      var rondeMap={};rondes.forEach(function(ro){rondeMap[ro.id]=ro;});var reMap={};rondesEq.forEach(function(re){reMap[re.id]=re;});
+      var repsRondeExp=await supaGet('reponses','ronde_equipement_id=in.('+reIds2.join(',')+')'+'&select=ronde_equipement_id,question_id,valeur&order=ronde_equipement_id.asc');
+      repsRondeExp.forEach(function(r){var re=reMap[r.ronde_equipement_id];if(!re)return;var ro=rondeMap[re.ronde_id];if(!ro)return;var q=qMap[r.question_id];if(!q)return;var eq=eqMap[re.equipement_id];rondeExportRows.push([ro.date_ronde,_FREQ_LABELS&&_FREQ_LABELS[ro.frequence]||ro.frequence,eq?eq.nom:'',q.texte,r.valeur,q.unite||'',re.statut||'']);if(eq&&eq.capacite_litres&&q.texte.toLowerCase().indexOf('niveau')>=0){var niv=parseFloat(r.valeur);if(!isNaN(niv)){var eqId2=re.equipement_id;if(!cuveHistory[eqId2])cuveHistory[eqId2]={nom:eq.nom,cap:parseFloat(eq.capacite_litres),points:[]};if(!cuveHistory[eqId2].points.some(function(p){return p.t.startsWith(ro.date_ronde);}))cuveHistory[eqId2].points.push({t:ro.date_ronde+'T06:00:00Z',v:niv});}}});
+      Object.values(cuveHistory).forEach(function(h){h.points.sort(function(a,b){return a.t<b.t?-1:1;});});
+    }
+    // énergie
+    var[energieFluides,relevesEnergiePeriode,pleinsPeriode,budgetMensuelArr]=await Promise.all([
+      supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,budget_par_chambre,objectif_mensuel,capacite,devise&order=ordre.asc'),
+      supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=date_releve,valeurs,saisi_par,to_percent,nb_couverts&order=date_releve.asc&limit=100'),
+      supaGet('pleins','site_id=eq.'+sid+'&date=gte.'+moisDebut+'&date=lte.'+moisFin+'&select=date,litres_ajoutes&order=date.asc&limit=50'),
+      supaGet('energie_budget_mensuel','site_id=eq.'+sid+'&annee=eq.'+tgt.getFullYear()+'&mois=eq.'+(tgt.getMonth()+1)+'&limit=1')
+    ]);
+    var _budgetMensuel=budgetMensuelArr&&budgetMensuelArr.length?budgetMensuelArr[0]:null;
+    var _budgetFluides=[];
+    if(_budgetMensuel&&_budgetMensuel.id){_budgetFluides=await supaGet('energie_budget_fluide','budget_id=eq.'+_budgetMensuel.id+'&select=fluide_id,quantite_budget_jour,cout_budget_jour')||[];}
+    var _nbCh=siteRow.length&&siteRow[0].nb_chambres?parseInt(siteRow[0].nb_chambres):null;
+    var html=_buildRapportPro(siteNom,periodeStr,daysInMonth,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[],_nbCh,_budgetMensuel,_budgetFluides);
+    var w=window.open('','_blank');
+    if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
+    w.document.write(html);w.document.close();
+  }catch(e){console.error(e);alert('Erreur : '+(e.message||e));}
+  finally{if(btn){btn.disabled=false;btn.textContent='📄 Rapport ▾';}}
+}
 
 function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,releves,siteRow){
   var siteNom=siteRow?siteRow.nom:'';
