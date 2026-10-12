@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Saisie journalière — GenTrack</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --dark:#111110;--amber:#C49A1C;--amber-pale:rgba(196,154,28,0.12);
+  --amber-dark:#9A780E;--creme:#F5F0E8;--border:#DDD0BC;
+  --text:#1A1A18;--text2:#6B5E4A;--text3:#A8957E;--surface:#FDFAF5;
+  --vert:#2D6A4F;--vert-pale:rgba(45,106,79,0.10);--vert-border:rgba(45,106,79,0.25);
+  --rouge:#C0392B;--rouge-pale:rgba(192,57,43,0.07);--rouge-border:rgba(192,57,43,0.22);
+  --orange:#E07B2A;--orange-pale:rgba(224,123,42,0.08);--orange-border:rgba(224,123,42,0.25);
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--creme);color:var(--text);min-height:100vh;padding-bottom:40px}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+/* ── HEADER ── */
+.header{background:var(--dark);padding:16px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+.header-logo{font-size:17px;font-weight:700;letter-spacing:.06em;color:white}
+.header-logo span{color:var(--amber)}
+.header-site{font-size:12px;color:rgba(255,255,255,0.45);margin-top:1px}
+
+/* ── WRAP ── */
+.wrap{max-width:480px;margin:0 auto;padding:20px 16px}
+
+/* ── CARDS ── */
+.card{background:white;border:1.5px solid var(--border);border-radius:14px;padding:18px;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+
+/* ── NUIT LABEL ── */
+.nuit-label{background:var(--amber-pale);border:1.5px solid rgba(196,154,28,0.3);border-radius:10px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.nuit-label-text{font-size:13px;font-weight:600;color:var(--dark)}
+.nuit-label-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.badge-hier{background:var(--amber);color:white;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap}
+
+/* ── DATE PICKER ── */
+.date-row{display:flex;align-items:center;gap:8px;margin-bottom:16px;padding:9px 12px;background:var(--creme);border-radius:8px;border:1px solid var(--border)}
+.date-row label{font-size:11px;color:var(--text2);white-space:nowrap}
+.date-row input[type=date]{border:none;background:transparent;font-size:12px;font-weight:600;color:var(--text);flex:1;min-width:0;outline:none}
+
+/* ── INPUTS ── */
+.fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.field-group label{font-size:11px;font-weight:500;color:var(--text2);display:block;margin-bottom:6px}
+.field-group .budget-hint{font-size:10px;color:var(--text3);margin-top:4px;text-align:center}
+.field-wrap{display:flex;align-items:center;gap:6px}
+.big-input{flex:1;font-size:24px;font-weight:600;text-align:center;padding:12px 8px;border:1.5px solid var(--border);border-radius:10px;background:var(--surface);color:var(--dark);outline:none;-moz-appearance:textfield;appearance:textfield;min-width:0;transition:border-color .15s}
+.big-input::-webkit-inner-spin-button,.big-input::-webkit-outer-spin-button{-webkit-appearance:none}
+.big-input:focus{border-color:var(--amber)}
+.big-input.filled{border-color:var(--amber);background:var(--amber-pale)}
+.field-unit{font-size:15px;color:var(--text2);font-weight:500;flex-shrink:0}
+.chambres-calc{font-size:10px;color:var(--text3);text-align:center;margin-top:4px;min-height:14px}
+
+/* ── BTN ── */
+.btn-save{width:100%;padding:15px;background:var(--dark);color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .15s}
+.btn-save:hover{opacity:.88}
+.btn-save:disabled{opacity:.45;cursor:default}
+.btn-save .spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── MESSAGES ── */
+.msg{padding:12px 14px;border-radius:8px;font-size:13px;font-weight:500;margin-bottom:14px;display:none}
+.msg.success{background:var(--vert-pale);border:1px solid var(--vert-border);color:var(--vert)}
+.msg.error{background:var(--rouge-pale);border:1px solid var(--rouge-border);color:var(--rouge)}
+.msg.show{display:block}
+
+/* ── HISTORIQUE ── */
+.hist-header{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+.hist-table{width:100%;border-collapse:collapse}
+.hist-table th{font-size:10px;font-weight:500;color:var(--text3);padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)}
+.hist-table th:not(:first-child){text-align:center}
+.hist-table td{font-size:12px;padding:9px 8px;border-bottom:1px solid rgba(221,208,188,0.5);vertical-align:middle}
+.hist-table td:not(:first-child){text-align:center}
+.hist-table tr:last-child td{border-bottom:none}
+.hist-date{font-weight:500;color:var(--text)}
+.hist-date.today-row{color:var(--amber-dark)}
+.hist-val{color:var(--dark);font-weight:600}
+.hist-empty{color:var(--text3)}
+.badge-manq{font-size:10px;background:var(--rouge-pale);color:var(--rouge);border:1px solid var(--rouge-border);padding:2px 7px;border-radius:10px}
+.badge-ok{font-size:10px;background:var(--vert-pale);color:var(--vert);border:1px solid var(--vert-border);padding:2px 7px;border-radius:10px}
+.badge-saved{font-size:10px;background:var(--amber-pale);color:var(--amber-dark);border:1px solid rgba(196,154,28,0.3);padding:2px 7px;border-radius:10px}
+.edit-link{font-size:11px;color:var(--amber-dark);cursor:pointer;text-decoration:underline;background:none;border:none;padding:0}
+
+/* ── LOADER / ERROR ── */
+.page-loader{display:flex;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:12px}
+.page-loader .sp{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin .7s linear infinite}
+.page-loader p{font-size:13px;color:var(--text2)}
+.page-error{text-align:center;padding:40px 20px}
+.page-error h2{font-size:18px;font-weight:700;color:var(--rouge);margin-bottom:8px}
+.page-error p{font-size:13px;color:var(--text2)}
+
+/* ── FOOTER ── */
+.footer{text-align:center;font-size:10px;color:var(--text3);letter-spacing:.5px;margin-top:24px;text-transform:uppercase}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-logo">Gen<span>Track</span></div>
+    <div class="header-site" id="header-site">Chargement…</div>
+  </div>
+</div>
+
+<div class="wrap" id="main-wrap">
+  <div class="page-loader" id="loader">
+    <div class="sp"></div>
+    <p>Chargement…</p>
+  </div>
+</div>
+
+<script>
+var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+
+/* ── HELPERS ── */
+function todayStr(){return new Date().toISOString().split('T')[0];}
+function hierStr(){var d=new Date();d.setDate(d.getDate()-1);return d.toISOString().split('T')[0];}
+function fmtDate(s){
+  if(!s)return'';
+  var p=s.split('-');
+  var mois=['jan.','fév.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+  return parseInt(p[2],10)+' '+mois[parseInt(p[1],10)-1];
+}
+function fmtDateLong(s){
+  if(!s)return'';
+  var p=s.split('-');
+  var mois=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  return parseInt(p[2],10)+' '+mois[parseInt(p[1],10)-1]+' '+p[0];
+}
+
+async function supaGet(table,qs){
+  try{
+    var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+qs,{
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Accept':'application/json'},
+      cache:'no-store'
+    });
+    if(!r.ok){console.error('[supaGet]',table,r.status);return[];}
+    return await r.json();
+  }catch(e){console.error('[supaGet]',e);return[];}
+}
+async function supaPatch(table,id,data){
+  try{
+    var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(data)
+    });
+    return r.ok;
+  }catch(e){console.error('[supaPatch]',e);return false;}
+}
+async function supaPost(table,data){
+  try{
+    var r=await fetch(SUPA_URL+'/rest/v1/'+table,{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(data)
+    });
+    var payload=await r.json();
+    if(!r.ok){console.error('[supaPost]',table,r.status,payload);return null;}
+    return Array.isArray(payload)?payload[0]:payload;
+  }catch(e){console.error('[supaPost]',e);return null;}
+}
+
+/* ── STATE ── */
+var _sid=null;
+var _site=null;
+var _releves=[];
+var _budget=null;
+var _savedDate=null; // dernière date sauvegardée dans ce chargement
+
+/* ── INIT ── */
+window.addEventListener('DOMContentLoaded',function(){
+  var params=new URLSearchParams(window.location.search);
+  _sid=params.get('site');
+  if(!_sid){showError('Paramètre site manquant','Ajoutez ?site=ID dans l\'URL.');return;}
+  load();
+});
+
+async function load(){
+  var hier=hierStr();
+  var since8j=new Date();since8j.setDate(since8j.getDate()-8);
+  var since8jStr=since8j.toISOString().split('T')[0];
+
+  var now=new Date();
+  var moisDebut=now.getFullYear()+'-'+(String(now.getMonth()+1).padStart(2,'0'))+'-01';
+
+  var[siteRows,relRows,budgetRows]=await Promise.all([
+    supaGet('sites','id=eq.'+_sid+'&select=nom,nb_chambres&limit=1'),
+    supaGet('releves_energie','site_id=eq.'+_sid+'&date_releve=gte.'+since8jStr+'&select=id,date_releve,to_percent,nb_couverts&order=date_releve.desc&limit=9'),
+    supaGet('energie_budget_mensuel','site_id=eq.'+_sid+'&annee=eq.'+now.getFullYear()+'&mois=eq.'+(now.getMonth()+1)+'&select=to_pct,nb_couverts_budget,nb_chambres_budget&limit=1')
+  ]);
+
+  if(!siteRows||!siteRows.length){showError('Site introuvable','L\'identifiant site est invalide.');return;}
+  _site=siteRows[0];
+  _releves=relRows||[];
+  _budget=(budgetRows&&budgetRows.length)?budgetRows[0]:null;
+
+  document.getElementById('header-site').textContent=_site.nom||'';
+  renderForm();
+}
+
+function renderForm(){
+  var hier=hierStr();
+  var today=todayStr();
+  var nb=_site.nb_chambres?parseInt(_site.nb_chambres):null;
+
+  // Trouver le relevé d'hier s'il existe
+  var hierReleve=_releves.find(function(r){return r.date_releve===hier;});
+  var toVal=hierReleve&&hierReleve.to_percent!=null?hierReleve.to_percent:'';
+  var cvtVal=hierReleve&&hierReleve.nb_couverts!=null?hierReleve.nb_couverts:'';
+
+  // Budget hints
+  var budgetToPct=_budget&&_budget.to_pct!=null?_budget.to_pct:null;
+  var budgetCvt=_budget&&_budget.nb_couverts_budget!=null?_budget.nb_couverts_budget:null;
+
+  var html='';
+
+  // Message succès/erreur
+  html+='<div class="msg success" id="msg-ok">✓ Enregistré</div>';
+  html+='<div class="msg error" id="msg-err">Erreur lors de l\'enregistrement.</div>';
+
+  // Card saisie principale
+  html+='<div class="card">';
+  html+='<div class="card-title">🌙 Saisie de la nuit</div>';
+
+  // Nuit label
+  html+='<div class="nuit-label">';
+  html+='<div><div class="nuit-label-text">Nuit du '+fmtDateLong(hier)+'</div>';
+  html+='<div class="nuit-label-sub">D\'après le rapport de nuit</div></div>';
+  html+='<span class="badge-hier">Hier</span>';
+  html+='</div>';
+
+  // Date (modifiable)
+  html+='<div class="date-row">';
+  html+='<label>Date concernée</label>';
+  html+='<input type="date" id="saisie-date" value="'+hier+'" max="'+today+'" onchange="onDateChange()">';
+  html+='</div>';
+
+  // Champs TO% + Couverts
+  html+='<div class="fields-grid">';
+
+  // TO%
+  html+='<div class="field-group">';
+  html+='<label>TO% <span style="font-weight:400;color:var(--text3)">(0–100)</span></label>';
+  html+='<div class="field-wrap"><input class="big-input'+(toVal!==''?' filled':'')+'" type="number" id="inp-to" min="0" max="100" step="1" placeholder="—" value="'+toVal+'" oninput="onToInput(this)"><span class="field-unit">%</span></div>';
+  html+='<div class="chambres-calc" id="calc-chambres">'+calcChambresText(toVal,nb)+'</div>';
+  if(budgetToPct!=null) html+='<div style="font-size:10px;color:var(--text3);text-align:center;margin-top:2px">Budget : '+budgetToPct+'%</div>';
+  html+='</div>';
+
+  // Couverts
+  html+='<div class="field-group">';
+  html+='<label>Couverts servis</label>';
+  html+='<div class="field-wrap"><input class="big-input'+(cvtVal!==''?' filled':'')+'" type="number" id="inp-cvt" min="0" step="1" placeholder="—" value="'+cvtVal+'" oninput="this.classList.toggle(\'filled\',this.value!==\'\')"></div>';
+  if(budgetCvt!=null) html+='<div style="font-size:10px;color:var(--text3);text-align:center;margin-top:6px">Budget : '+budgetCvt+' cvt</div>';
+  html+='</div>';
+
+  html+='</div>'; // fields-grid
+
+  // Bouton
+  html+='<button class="btn-save" id="btn-save" onclick="save()">Enregistrer la nuit du '+fmtDate(hier)+'</button>';
+  html+='</div>'; // card
+
+  // Historique
+  html+='<div class="card">';
+  html+='<div class="card-title">📋 7 dernières nuits</div>';
+  html+=renderHist(nb);
+  html+='</div>';
+
+  html+='<div class="footer">GenTrack · Saisie journalière</div>';
+
+  document.getElementById('main-wrap').innerHTML=html;
+}
+
+function calcChambresText(val,nb){
+  if(val===''||val==null||!nb)return'';
+  var pct=parseFloat(val);
+  if(isNaN(pct))return'';
+  var ch=Math.round(nb*pct/100);
+  return '= '+ch+' ch / '+nb;
+}
+
+function onToInput(inp){
+  inp.classList.toggle('filled',inp.value!=='');
+  var nb=_site.nb_chambres?parseInt(_site.nb_chambres):null;
+  var el=document.getElementById('calc-chambres');
+  if(el)el.textContent=calcChambresText(inp.value,nb);
+}
+
+function onDateChange(){
+  var dateEl=document.getElementById('saisie-date');
+  if(!dateEl)return;
+  var d=dateEl.value;
+  var releve=_releves.find(function(r){return r.date_releve===d;});
+  var toInp=document.getElementById('inp-to');
+  var cvtInp=document.getElementById('inp-cvt');
+  var btnSave=document.getElementById('btn-save');
+  if(toInp){
+    toInp.value=releve&&releve.to_percent!=null?releve.to_percent:'';
+    toInp.classList.toggle('filled',toInp.value!=='');
+  }
+  if(cvtInp){
+    cvtInp.value=releve&&releve.nb_couverts!=null?releve.nb_couverts:'';
+    cvtInp.classList.toggle('filled',cvtInp.value!=='');
+  }
+  if(btnSave)btnSave.textContent='Enregistrer la nuit du '+fmtDate(d);
+  var nb=_site.nb_chambres?parseInt(_site.nb_chambres):null;
+  var el=document.getElementById('calc-chambres');
+  if(el&&toInp)el.textContent=calcChambresText(toInp.value,nb);
+}
+
+function renderHist(nb){
+  if(!_releves.length&&!true){return'<div style="font-size:12px;color:var(--text3);text-align:center;padding:16px">Aucun relevé ce mois</div>';}
+
+  // Générer les 7 dernières dates (hier inclus)
+  var dates=[];
+  for(var i=1;i<=7;i++){var d=new Date();d.setDate(d.getDate()-i);dates.push(d.toISOString().split('T')[0]);}
+
+  var releveMap={};
+  _releves.forEach(function(r){releveMap[r.date_releve]=r;});
+
+  var html='<table class="hist-table">';
+  html+='<thead><tr><th>Nuit</th><th>TO%</th><th>Couverts</th><th></th></tr></thead>';
+  html+='<tbody>';
+
+  dates.forEach(function(d){
+    var r=releveMap[d];
+    var hasSaisie=r&&(r.to_percent!=null||r.nb_couverts!=null);
+    var isJustSaved=(_savedDate===d);
+    html+='<tr>';
+    html+='<td><span class="hist-date">'+fmtDate(d)+'</span></td>';
+    if(hasSaisie){
+      html+='<td class="hist-val">'+(r.to_percent!=null?r.to_percent+'%':'<span class="hist-empty">—</span>')+'</td>';
+      html+='<td class="hist-val">'+(r.nb_couverts!=null?r.nb_couverts:'<span class="hist-empty">—</span>')+'</td>';
+      html+='<td>'+(isJustSaved?'<span class="badge-saved">Sauvegardé</span>':'<button class="edit-link" onclick="editDate(\''+d+'\')">Modifier</button>')+'</td>';
+    }else{
+      html+='<td class="hist-empty">—</td><td class="hist-empty">—</td>';
+      html+='<td><span class="badge-manq">Manquant</span></td>';
+    }
+    html+='</tr>';
+  });
+
+  html+='</tbody></table>';
+  return html;
+}
+
+function editDate(d){
+  var dateEl=document.getElementById('saisie-date');
+  if(dateEl){dateEl.value=d;onDateChange();}
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function save(){
+  var dateEl=document.getElementById('saisie-date');
+  var toEl=document.getElementById('inp-to');
+  var cvtEl=document.getElementById('inp-cvt');
+  var btn=document.getElementById('btn-save');
+  var msgOk=document.getElementById('msg-ok');
+  var msgErr=document.getElementById('msg-err');
+
+  if(!dateEl||!toEl||!cvtEl)return;
+  var dateVal=dateEl.value;
+  var toRaw=toEl.value.trim();
+  var cvtRaw=cvtEl.value.trim();
+
+  // Validation
+  if(toRaw===''&&cvtRaw===''){
+    showMsg('err','Saisissez au moins le TO% ou le nombre de couverts.');return;
+  }
+  var toNum=toRaw!==''?parseFloat(toRaw):null;
+  var cvtNum=cvtRaw!==''?parseInt(cvtRaw,10):null;
+  if(toNum!=null&&(toNum<0||toNum>100)){showMsg('err','Le TO% doit être entre 0 et 100.');return;}
+  if(cvtNum!=null&&cvtNum<0){showMsg('err','Le nombre de couverts ne peut pas être négatif.');return;}
+
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span>Enregistrement…';
+
+  // Chercher relevé existant pour cette date
+  var existing=await supaGet('releves_energie','site_id=eq.'+_sid+'&date_releve=eq.'+dateVal+'&select=id,to_percent,nb_couverts&limit=1');
+  var ok=false;
+  var data={updated_at:new Date().toISOString()};
+  if(toNum!=null)data.to_percent=toNum;
+  if(cvtNum!=null)data.nb_couverts=cvtNum;
+
+  if(existing&&existing.length){
+    ok=await supaPatch('releves_energie',existing[0].id,data);
+    // Mettre à jour le cache local
+    var idx=_releves.findIndex(function(r){return r.id===existing[0].id;});
+    if(idx>=0){_releves[idx]=Object.assign(_releves[idx],data,{date_releve:dateVal});}
+    else{_releves.push(Object.assign({id:existing[0].id,date_releve:dateVal},data));}
+  }else{
+    var row=await supaPost('releves_energie',Object.assign({site_id:_sid,date_releve:dateVal,valeurs:{}},data));
+    ok=!!row;
+    if(row)_releves.push(row);
+  }
+
+  btn.disabled=false;
+  btn.textContent='Enregistrer la nuit du '+fmtDate(dateVal);
+
+  if(ok){
+    _savedDate=dateVal;
+    showMsg('ok','✓ Nuit du '+fmtDateLong(dateVal)+' enregistrée.');
+    // Rafraîchir l'historique
+    var nb=_site.nb_chambres?parseInt(_site.nb_chambres):null;
+    var histEl=document.querySelector('.card:last-of-type .hist-table');
+    if(histEl){histEl.parentNode.innerHTML=renderHist(nb);}
+  }else{
+    showMsg('err','Erreur lors de l\'enregistrement. Vérifiez la connexion.');
+  }
+}
+
+function showMsg(type,text){
+  var okEl=document.getElementById('msg-ok');
+  var errEl=document.getElementById('msg-err');
+  if(!okEl||!errEl)return;
+  okEl.classList.remove('show');errEl.classList.remove('show');
+  var el=type==='ok'?okEl:errEl;
+  el.textContent=text;
+  el.classList.add('show');
+  if(type==='ok')setTimeout(function(){el.classList.remove('show');},4000);
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function showError(title,sub){
+  document.getElementById('main-wrap').innerHTML=
+    '<div class="page-error"><h2>'+title+'</h2><p>'+sub+'</p></div>';
+}
+</script>
+</body>
+</html>
