@@ -646,8 +646,16 @@ function buildLayout(session,activeNav,contentHtml){
       '</div>':
     session.role==='dir_tech'?
       '<button id="rapport-btn-dt" onclick="_toggleRapportMenuDT()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">📊&#8239;Rapport ▾</button>'+
-      '<div id="rapport-menu-dt" style="display:none;position:absolute;right:40px;top:60px;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:200;padding:6px;min-width:180px">'+
-        [7,14,30].map(function(n){return '<button onclick="_openRapportDT('+n+')" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">📋&#8239;'+n+' derniers jours</button>';}).join('')+
+      '<div id="rapport-menu-dt" style="display:none;position:absolute;right:40px;top:60px;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:200;padding:6px;min-width:210px">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;gap:6px">'+
+          '<button onclick="_dtNavRapportMois(-1)" style="width:28px;height:28px;border:1px solid var(--border);background:none;border-radius:6px;font-size:14px;cursor:pointer;color:var(--text2);display:flex;align-items:center;justify-content:center;flex-shrink:0">←</button>'+
+          '<span id="rapport-mois-lbl" style="font-size:12px;font-weight:700;color:var(--dark);text-align:center;flex:1"></span>'+
+          '<button id="rapport-mois-next" onclick="_dtNavRapportMois(1)" style="width:28px;height:28px;border:1px solid var(--border);background:none;border-radius:6px;font-size:14px;cursor:pointer;color:var(--text2);display:flex;align-items:center;justify-content:center;flex-shrink:0">→</button>'+
+        '</div>'+
+        '<div style="height:1px;background:var(--border);margin:4px 0"></div>'+
+        '<button onclick="_openRapportDTMois(_dtRapportMoisOffset)" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">📋&#8239;Générer rapport PDF</button>'+
+        '<div style="height:1px;background:var(--border);margin:4px 0"></div>'+
+        '<button onclick="_openAfficheBotRT()" style="display:block;width:100%;padding:9px 14px;text-align:left;background:none;border:none;font-size:12px;color:var(--text);cursor:pointer;border-radius:6px;white-space:nowrap">📲&#8239;Affiche bot WhatsApp</button>'+
       '</div>':
       '<button id="export-btn-trigger" onclick="_toggleExportMenu()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--dark);color:white;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;flex-shrink:0" onmouseover="this.style.opacity=\'0.75\'" onmouseout="this.style.opacity=\'1\'">⬇&#8239;Exporter</button>'+
       '<div id="export-menu" style="display:none;position:absolute;right:40px;top:60px;background:white;border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.1);z-index:200;padding:6px;min-width:180px">'+
@@ -8051,18 +8059,7 @@ async function _dtRapport(sids,session){
       })()+
     '</div>';
   }).join('');
-  // Bouton génération rapport complet
-  var genBtn='<div style="background:linear-gradient(135deg,#1A1411 0%,#2D2520 100%);border-radius:14px;padding:24px 28px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">'+
-    '<div>'+
-      '<div style="font-size:14px;font-weight:700;color:white;margin-bottom:4px">📊 Rapport complet de direction</div>'+
-      '<div style="font-size:12px;color:rgba(255,255,255,0.6)">Rapport PDF avec graphiques, editables, tableaux détaillés et signature — s\'ouvre dans un nouvel onglet</div>'+
-    '</div>'+
-    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-      '<button onclick="_openRapportDTMois(_dtRapportMoisOffset)" style="padding:8px 20px;background:white;color:#1A1411;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">📋 '+moisLabel+'</button>'+
-    '</div>'+
-  '</div>';
   return '<div>'+
-    genBtn+
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:20px">'+periodOpts+'</div>'+
     kpis+
     '<div class="section-title">Aperçu par hôtel</div>'+
@@ -9609,9 +9606,24 @@ function _toggleRapportMenuDT(){
   var open=m.style.display==='none';
   m.style.display=open?'block':'none';
   if(open){
+    _dtUpdateRapportMoisLabel();
     var close=function(e){if(!m.contains(e.target)&&e.target.id!=='rapport-btn-dt'){m.style.display='none';document.removeEventListener('click',close);}};
     setTimeout(function(){document.addEventListener('click',close);},0);
   }
+}
+function _dtUpdateRapportMoisLabel(){
+  var now=new Date();
+  var tgt=new Date(now.getFullYear(),now.getMonth()+_dtRapportMoisOffset,1);
+  var ml=tgt.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  var lbl=document.getElementById('rapport-mois-lbl');
+  if(lbl)lbl.textContent=ml.charAt(0).toUpperCase()+ml.slice(1);
+  var nxt=document.getElementById('rapport-mois-next');
+  if(nxt){nxt.disabled=_dtRapportMoisOffset>=0;nxt.style.opacity=_dtRapportMoisOffset>=0?'0.3':'1';}
+}
+function _dtNavRapportMois(d){
+  _dtRapportMoisOffset=Math.min(0,_dtRapportMoisOffset+d);
+  _dtUpdateRapportMoisLabel();
+  if(_session&&_currentNav==='rapport')renderDirTech(_session,'rapport');
 }
 
 async function _openRapportDT(period){
