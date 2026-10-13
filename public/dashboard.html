@@ -203,6 +203,13 @@ body{font-family:'Inter',sans-serif;background:var(--creme);color:var(--text);mi
 .config-add-eq-btn:hover{border-color:var(--amber);color:var(--amber);background:var(--amber-pale)}
 .config-add-q-btn{background:none;border:1px dashed var(--border);border-radius:6px;padding:5px 10px;font-size:11px;color:var(--text2);cursor:pointer;transition:all .15s;margin-top:6px;width:100%;text-align:center}
 .config-add-q-btn:hover{border-color:var(--amber);color:var(--amber)}
+.admin-toggle{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0}
+.admin-toggle input{opacity:0;width:0;height:0;position:absolute}
+.admin-toggle-slider{position:absolute;cursor:pointer;inset:0;background:#ddd;border-radius:24px;transition:.2s}
+.admin-toggle-slider:before{content:'';position:absolute;width:18px;height:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.admin-toggle input:checked+.admin-toggle-slider{background:var(--amber)}
+.admin-toggle input:checked+.admin-toggle-slider:before{transform:translateX(20px)}
+.admin-toggle.disabled .admin-toggle-slider{cursor:default;opacity:.6}
 .config-q-actions{display:flex;gap:4px;flex-shrink:0}
 .config-q-act{background:none;border:none;cursor:pointer;padding:2px 4px;font-size:12px;opacity:.4;transition:opacity .15s;line-height:1}
 .config-q-act:hover{opacity:1}
@@ -346,7 +353,7 @@ function _updateAlertPill(n){
   badges.forEach(function(b){b.style.display=n>0?'block':'none';});
 }
 function roleName(r){var m={dir_ops:'Directeur des opérations',dir_tech:'Directeur technique',resp_tech:'Responsable technique',technicien:'Technicien'};return m[r]||r;}
-function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',releves:'Relevés horaires',signalements:'Signalements',maintenances:'Maintenance',config:'Configuration',rapport:'Rapport conso',commandes:'Commandes',energie:'Énergie'};return m[id]||'Accueil';}
+function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',releves:'Relevés horaires',signalements:'Signalements',maintenances:'Maintenance',config:'Configuration',rapport:'Rapport conso',commandes:'Commandes',energie:'Énergie',admin:'Admin — Modules'};return m[id]||'Accueil';}
 function saveSession(s){_session=s;try{localStorage.setItem('gt_session',JSON.stringify(s));}catch(e){}}
 function loadStored(){try{return JSON.parse(localStorage.getItem('gt_session'));}catch(e){return null;}}
 function clearSession(){_session=null;try{localStorage.removeItem('gt_session');}catch(e){}}
@@ -543,6 +550,7 @@ function buildNavItems(role){
     items.push({id:'equipe',icon:'group',label:'Mon équipe'});
     items.push({id:'releves',icon:'schedule',label:'Relevés'});
     items.push({id:'config',icon:'settings',label:'Config'});
+    items.push({id:'admin',icon:'manage_accounts',label:'Admin'});
   }
   if(role==='dir_tech'){
     items.push({id:'comparaison',icon:'compare_arrows',label:'Comparaison'});
@@ -723,6 +731,7 @@ async function _loadRT(session,nav){
     else if(nav==='commandes')html=await _rtCommandes(sid,session);
     else if(nav==='equipe')html=await _rtMonEquipe(sid,session);
     else if(nav==='config')html=await _rtConfig(sid);
+    else if(nav==='admin')html=await _rtAdmin();
     el.innerHTML=html;
     if(nav==='signalements'){_sgSelected=null;_sgRenderKanban(sid);}
   }catch(e){
@@ -5622,6 +5631,131 @@ async function _eqRondeHandleFile(file,sid){
     s.onload=function(){doparse(window.XLSX);};
     s.onerror=function(){setStatus('Impossible de charger SheetJS. Vérifiez votre connexion.');};
     document.head.appendChild(s);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// PAGE ADMIN — MODULES PAR SITE
+// ══════════════════════════════════════════════════════════════
+
+var _adminModulesCache={}; // siteId → modules array (état local pour toggles rapides)
+
+async function _rtAdmin(){
+  var sites=await supaGet('sites','select=id,nom,modules&order=nom');
+  if(!sites||!sites.length)return '<div style="padding:40px;text-align:center;color:var(--text3)">Aucun site trouvé.</div>';
+
+  // Initialiser le cache local
+  _adminModulesCache={};
+  sites.forEach(function(s){
+    _adminModulesCache[s.id]=Array.isArray(s.modules)?s.modules:['general'];
+  });
+
+  var MODULES=[
+    {key:'maintenance',label:'Maintenance',icon:'🔧',desc:'Énergie, consommation carburant, rapports techniques'},
+    {key:'residence',  label:'Résidence+',  icon:'🏢',desc:'Rondes de zones, blocs résidentiels, saisie mobile'}
+  ];
+
+  var cardsHtml=sites.map(function(site){
+    var mods=_adminModulesCache[site.id];
+    var isLegacy=mods.indexOf('general')>=0;
+    var sid=site.id;
+
+    var legacyBadge=isLegacy
+      ? '<div style="display:inline-flex;align-items:center;gap:4px;background:#FFF3CD;border:1px solid #F5A623;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;color:#8B6A00;margin-top:2px">⚠️ Mode legacy — accès complet</div>'
+      : '';
+
+    var activeCount=isLegacy?MODULES.length:mods.filter(function(m){return m!=='general';}).length;
+    var countBadge='<span style="font-size:11px;font-weight:700;background:'+(activeCount>0?'var(--amber-pale)':'#f5f5f5')+';color:'+(activeCount>0?'var(--amber-dark)':'var(--text3)')+';padding:2px 8px;border-radius:10px">'+activeCount+'/'+MODULES.length+' module'+(MODULES.length!==1?'s':'')+' actif'+(activeCount>1?'s':'')+'</span>';
+
+    var togglesHtml=MODULES.map(function(m){
+      var checked=isLegacy||mods.indexOf(m.key)>=0;
+      var disabled=isLegacy;
+      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">'+
+        '<div style="font-size:20px;width:28px;text-align:center">'+m.icon+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:13px;font-weight:600;color:var(--dark)">'+m.label+'</div>'+
+          '<div style="font-size:11px;color:var(--text3);margin-top:1px">'+m.desc+'</div>'+
+        '</div>'+
+        '<label class="admin-toggle'+(disabled?' disabled':'')+'">'+
+          '<input type="checkbox"'+(checked?' checked':'')+' '+(disabled?'disabled':'')+
+            ' onchange="_adminToggleModule(\''+sid+'\',\''+m.key+'\',this.checked)">'+
+          '<span class="admin-toggle-slider"></span>'+
+        '</label>'+
+      '</div>';
+    }).join('');
+
+    var migrateBtn=isLegacy
+      ? '<button onclick="_adminMigrateToExplicit(\''+sid+'\')" style="margin-top:10px;width:100%;padding:8px;border:1.5px solid var(--amber);border-radius:8px;background:var(--amber-pale);color:var(--amber-dark);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">Passer en modules explicites →</button>'
+      : '';
+
+    return '<div id="admin-card-'+sid+'" style="background:white;border:1.5px solid var(--border);border-radius:14px;padding:18px 20px;transition:border-color .15s">'+
+      '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px">'+
+        '<div style="width:38px;height:38px;background:var(--amber-pale);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🏨</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:14px;font-weight:700;color:var(--dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escape_html(site.nom)+'</div>'+
+          legacyBadge+
+        '</div>'+
+        countBadge+
+      '</div>'+
+      togglesHtml+
+      migrateBtn+
+      '<div id="admin-status-'+sid+'" style="font-size:11px;color:var(--text3);min-height:16px;margin-top:6px;text-align:center"></div>'+
+    '</div>';
+  }).join('');
+
+  return '<div style="padding:24px">'+
+    '<div style="font-size:20px;font-weight:800;color:var(--dark);margin-bottom:4px">⚙️ Admin — Modules</div>'+
+    '<div style="font-size:13px;color:var(--text2);margin-bottom:20px">Activez ou désactivez les modules par site. Les changements sont immédiats.</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px">'+
+    cardsHtml+
+    '</div>'+
+  '</div>';
+}
+
+async function _adminToggleModule(siteId,mod,enabled){
+  var statusEl=document.getElementById('admin-status-'+siteId);
+  function setStatus(msg,color){if(statusEl){statusEl.textContent=msg;statusEl.style.color=color||'var(--text3)';}}
+  setStatus('Sauvegarde…');
+
+  // Mettre à jour le cache local
+  var mods=(_adminModulesCache[siteId]||[]).filter(function(m){return m!=='general'&&m!==mod;});
+  if(enabled)mods.push(mod);
+  _adminModulesCache[siteId]=mods;
+
+  var ok=await supaPatch('sites',siteId,{modules:mods});
+  if(ok){
+    setStatus('✓ Sauvegardé','var(--vert)');
+    setTimeout(function(){setStatus('');},2000);
+    // Mettre à jour le badge count
+    var card=document.getElementById('admin-card-'+siteId);
+    if(card){
+      var badge=card.querySelector('span[style*="border-radius:10px"]');
+      if(badge){
+        var activeCount=mods.filter(function(m){return m!=='general';}).length;
+        badge.textContent=activeCount+'/2 module'+(2!==1?'s':'')+' actif'+(activeCount>1?'s':'');
+        badge.style.background=activeCount>0?'var(--amber-pale)':'#f5f5f5';
+        badge.style.color=activeCount>0?'var(--amber-dark)':'var(--text3)';
+      }
+    }
+  }else{
+    setStatus('Erreur — réessayez','var(--rouge)');
+  }
+}
+
+async function _adminMigrateToExplicit(siteId){
+  if(!confirm('Passer ce site en modules explicites ? Le mode "accès complet legacy" sera désactivé.\n\nActivez manuellement les modules souhaités après la migration.'))return;
+  var statusEl=document.getElementById('admin-status-'+siteId);
+  function setStatus(msg,color){if(statusEl){statusEl.textContent=msg;statusEl.style.color=color||'var(--text3)';}}
+  setStatus('Migration…');
+  // Par défaut on active maintenance (base) mais pas residence
+  var newMods=['maintenance'];
+  _adminModulesCache[siteId]=newMods;
+  var ok=await supaPatch('sites',siteId,{modules:newMods});
+  if(ok){
+    setStatus('✓ Migré','var(--vert)');
+    setTimeout(function(){if(_session)renderRespTech(_session,'admin');},800);
+  }else{
+    setStatus('Erreur','var(--rouge)');
   }
 }
 
