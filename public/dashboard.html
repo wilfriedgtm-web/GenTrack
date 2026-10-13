@@ -496,8 +496,16 @@ function renderInvalidLink(){
 }
 
 /* ── ROUTING ── */
-function renderDashboard(s){
+async function renderDashboard(s){
   if(!s){renderInvalidLink();return;}
+  // Pré-charger les modules du site avant de construire le nav (sinon hasModule() retourne toujours true)
+  var sid=s.site_ids&&s.site_ids[0];
+  if(sid){
+    try{
+      var siteArr=await supaGet('sites','select=modules&id=eq.'+sid);
+      _siteModules=(siteArr&&siteArr[0]&&Array.isArray(siteArr[0].modules))?siteArr[0].modules:['general'];
+    }catch(e){ _siteModules=['general']; }
+  }
   if(s.role==='resp_tech')renderRespTech(s,'accueil');
   else if(s.role==='dir_tech')renderDirTech(s,'accueil');
   else if(s.role==='dir_ops')renderDirOps(s,'accueil');
@@ -545,8 +553,10 @@ function buildNavItems(role){
   if(role==='resp_tech'){
     items.push({id:'signalements',icon:'location_on',label:'Signalements'});
     items.push({id:'maintenances',icon:'build',label:'Maintenance'});
-    items.push({id:'energie',icon:'bolt',label:'Énergie'});
-    items.push({id:'commandes',icon:'shopping_cart',label:'Commandes'});
+    if(hasModule('maintenance')){
+      items.push({id:'energie',icon:'bolt',label:'Énergie'});
+      items.push({id:'commandes',icon:'shopping_cart',label:'Commandes'});
+    }
     items.push({id:'equipe',icon:'group',label:'Mon équipe'});
     items.push({id:'releves',icon:'schedule',label:'Relevés'});
     items.push({id:'config',icon:'settings',label:'Config'});
@@ -557,9 +567,11 @@ function buildNavItems(role){
     items.push({id:'maintenances',icon:'build',label:'Maintenance'});
     items.push({id:'fiabilite',icon:'analytics',label:'Fiabilité'});
     items.push({id:'equipe',icon:'group',label:'Équipe'});
-    items.push({id:'commandes',icon:'shopping_cart',label:'Commandes'});
-    items.push({id:'energie',icon:'bolt',label:'Énergie'});
-    items.push({id:'rapport',icon:'summarize',label:'Rapport conso'});
+    if(hasModule('maintenance')){
+      items.push({id:'commandes',icon:'shopping_cart',label:'Commandes'});
+      items.push({id:'energie',icon:'bolt',label:'Énergie'});
+      items.push({id:'rapport',icon:'summarize',label:'Rapport conso'});
+    }
   }
   return items;
 }
