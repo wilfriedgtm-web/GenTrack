@@ -445,7 +445,7 @@ async function supaPostBulk(table,dataArr){
       body:JSON.stringify(dataArr)
     });
     var payload=await r.json();
-    if(!r.ok){console.error('[supaPostBulk] '+table+' HTTP '+r.status,payload);return null;}
+    if(!r.ok){console.error('[supaPostBulk] '+table+' HTTP '+r.status+' '+JSON.stringify(payload));return null;}
     return Array.isArray(payload)?payload:[payload];
   }catch(e){console.error('[supaPostBulk]',e);return null;}
 }
@@ -6187,6 +6187,9 @@ async function _resGenerate(sid){
         type:'salle',categorie:sp.nom,etage:null,type_zone:'special',batiment:null,frequence_passage:30,ordre:0});
     });
 
+    console.log('[resGenerate] zoneBatch first:', JSON.stringify(zoneBatch[0]));
+    console.log('[resGenerate] zoneBatch last:', JSON.stringify(zoneBatch[zoneBatch.length-1]));
+    console.log('[resGenerate] zoneBatch total:', zoneBatch.length);
     var createdZones=await supaPostBulk('zones',zoneBatch);
     if(!createdZones||!createdZones.length)throw new Error('Échec création zones');
 
