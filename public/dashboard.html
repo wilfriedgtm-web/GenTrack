@@ -4189,16 +4189,11 @@ async function _buildZonesConfigTab(sid){
     // Wizard import équipements en masse (step > 0)
     if(_eqImportStep>0){return _eqImportRenderStep(existingZones,sid);}
 
-    // Compter zones résidentielles pour afficher/masquer le toggle
+    // Si module residence actif : cacher les zones résidentielles ici (gérées par Résidence+)
     var RES_TYPES=['chambre','commun_etage','special'];
-    var hasResZones=existingZones.some(function(z){return z.type_zone&&RES_TYPES.indexOf(z.type_zone)>=0;});
-    // Appliquer le filtre
-    var displayZones=existingZones;
-    if(_zonesViewFilter==='maintenance'){
-      displayZones=existingZones.filter(function(z){return !z.type_zone||RES_TYPES.indexOf(z.type_zone)<0;});
-    }else if(_zonesViewFilter==='residence'){
-      displayZones=existingZones.filter(function(z){return z.type_zone&&RES_TYPES.indexOf(z.type_zone)>=0;});
-    }
+    var displayZones=hasModule('residence')
+      ? existingZones.filter(function(z){return !z.type_zone||RES_TYPES.indexOf(z.type_zone)<0;})
+      : existingZones;
 
     // Stats
     var totalEq=zoneEquipsSalle.length;
@@ -4226,20 +4221,7 @@ async function _buildZonesConfigTab(sid){
     }
 
     // === Header stats ===
-    var filterBar='';
-    if(hasResZones){
-      var fOpts=[{v:'maintenance',l:'🔧 Maintenance'},{v:'residence',l:'🏢 Résidentiel'},{v:'all',l:'Tout'}];
-      filterBar='<div style="display:flex;gap:4px;background:var(--bg2,#f4f4f4);border-radius:8px;padding:3px;margin-bottom:12px">';
-      fOpts.forEach(function(fo){
-        var a=_zonesViewFilter===fo.v;
-        filterBar+='<button onclick="_zonesViewFilter=\''+fo.v+'\';if(_session)renderRespTech(_session,\'config\')" '+
-          'style="flex:1;padding:6px 10px;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;'+
-          'background:'+(a?'white':'none')+';color:'+(a?'var(--dark)':'var(--text3)')+';'+
-          'box-shadow:'+(a?'0 1px 3px rgba(0,0,0,.1)':'none')+'">'+fo.l+'</button>';
-      });
-      filterBar+='</div>';
-    }
-    var headerHtml=filterBar+
+    var headerHtml=
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">'+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-size:16px;font-weight:800;color:var(--dark)">Zones &amp; Lieux</div>'+
@@ -5876,12 +5858,18 @@ function _resEnsureEq(k){if(!_resZoneEq[k])_resZoneEq[k]={sel:[],nw:[]};}
 function _resSwitchSubTab(t){_resSubTab=t;if(_session)renderRespTech(_session,'config');}
 
 async function _buildResidenceConfigTab(sid){
+  // Charger suggestions équipements (noms propres depuis le site)
   if(!_resExistingEqLoaded){
     var rawEqZ=await supaGet('equipements_zone','site_id=eq.'+sid+'&actif=eq.true&select=nom,zones(type_zone)&order=nom')||[];
     var nameSet={};
     rawEqZ.forEach(function(e){var tz=e.zones&&e.zones.type_zone;if(tz!=='chambre'&&tz!=='commun_etage'&&tz!=='special')nameSet[e.nom]=1;});
     _resExistingEq=Object.keys(nameSet).sort();
     _resExistingEqLoaded=true;
+  }
+  // Détecter si des zones résidentielles existent déjà → passer directement au planning
+  if(_resSubTab==='config'&&_resWizStep===0){
+    var existingResZones=await supaGet('zones','site_id=eq.'+sid+'&type_zone=in.(chambre,commun_etage,special)&actif=eq.true&select=id&limit=1')||[];
+    if(existingResZones.length)_resSubTab='planning';
   }
   if(!_resWizEtages.length&&_resWizBats.length)_resWizEtages=[{bat:0,etage:'18',debut:1801,fin:1812}];
   var subBar='<div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:20px">'+
@@ -5890,6 +5878,21 @@ async function _buildResidenceConfigTab(sid){
       return '<button onclick="_resSwitchSubTab(\''+x.t+'\')" style="padding:10px 18px;border:none;background:none;font-family:inherit;font-size:13px;font-weight:'+(a?'600':'500')+';cursor:pointer;color:'+(a?'var(--amber-dark)':'var(--text2)')+';border-bottom:2px solid '+(a?'var(--amber)':'transparent')+'">'+x.l+'</button>';
     }).join('')+'</div>';
   if(_resSubTab==='planning')return subBar+(await _buildResPlanningHtml(sid));
+  // Onglet Configuration : si zones existent déjà → message + bouton reset
+  var checkExist=await supaGet('zones','site_id=eq.'+sid+'&type_zone=in.(chambre,commun_etage,special)&actif=eq.true&select=id&limit=1')||[];
+  if(checkExist.length&&_resWizStep===0){
+    var cntZones=await supaGet('zones','site_id=eq.'+sid+'&type_zone=in.(chambre,commun_etage,special)&actif=eq.true&select=id')||[];
+    return subBar+
+      '<div style="background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:12px;padding:20px 24px;margin-bottom:16px">'+
+        '<div style="font-size:14px;font-weight:700;color:var(--amber-dark);margin-bottom:6px">✓ '+cntZones.length+' unités déjà configurées</div>'+
+        '<div style="font-size:13px;color:var(--amber-dark);opacity:.8">Les zones résidentielles ont déjà été générées. Consultez le Planning de passage pour le suivi quotidien.</div>'+
+      '</div>'+
+      '<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:14px 16px">'+
+        '<div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Reconfigurer depuis zéro</div>'+
+        '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">Attention : les zones existantes ne seront pas supprimées automatiquement. Supprimez-les d\'abord manuellement dans Zones &amp; Lieux (filtre Résidentiel) si nécessaire.</div>'+
+        '<button onclick="_resWizStep=1;if(_session)renderRespTech(_session,\'config\')" class="cfg-btn cfg-btn-cancel" style="font-size:12px">Relancer le wizard</button>'+
+      '</div>';
+  }
   return subBar+_buildResWizHtml(sid);
 }
 
@@ -6176,12 +6179,12 @@ async function _resGenerate(sid){
     _RES_SPEC.forEach(function(sp){
       if(!_resSpeciales[sp.key])return;
       zoneBatch.push({site_id:sid,nom:sp.nom,actif:true,
-        type:'salle',categorie:sp.nom,type_zone:'special',frequence_passage:30,ordre:0});
+        type:'salle',categorie:sp.nom,etage:null,type_zone:'special',batiment:null,frequence_passage:30,ordre:0});
     });
     // Zones spéciales custom
     _resCustomSpeciales.forEach(function(sp){
       zoneBatch.push({site_id:sid,nom:sp.nom,actif:true,
-        type:'salle',categorie:sp.nom,type_zone:'special',frequence_passage:30,ordre:0});
+        type:'salle',categorie:sp.nom,etage:null,type_zone:'special',batiment:null,frequence_passage:30,ordre:0});
     });
 
     var createdZones=await supaPostBulk('zones',zoneBatch);
