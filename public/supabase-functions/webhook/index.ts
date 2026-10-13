@@ -1458,7 +1458,10 @@ async function handleMessage(from: string, bodyText: string) {
         const liste = sites.map((s: any, i: number) => `*${i + 1}* — ${s.nom}`).join('\n');
         return sendWA(phone, `Répondez avec un numéro entre 1 et ${sites.length}.\n\n${liste}`);
       }
-      site = sites[n - 1];
+      const siteShort = sites[n - 1];
+      // Recharger le site complet depuis la DB (la session ne stocke que id+nom)
+      const siteFullRaw = await db('sites', { query: `&id=eq.${siteShort.id}&actif=eq.true&limit=1` });
+      site = (Array.isArray(siteFullRaw) && siteFullRaw[0]) ? siteFullRaw[0] : siteShort;
       const pendingMsg = sd.pending_msg || '';
       await setSession(phone, 'idle', { active_site_id: site.id });
       // Re-dispatcher la commande originale
