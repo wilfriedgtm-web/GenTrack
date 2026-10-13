@@ -1,5 +1,6 @@
 // supabase/functions/notify-signalement/index.ts
-// GenTrack — Notification signalement v2
+// GenTrack — Notification signalement v3
+// Fix EarlyDrop : waitUntil + timeout 10s sur fetch Twilio
 // Notifie : resp_tech + dir_tech (toujours) + demandeur connu (contact.whatsapp) + résident (numéro libre + lien suivi)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -23,22 +24,35 @@ async function db(table: string, opts: { query?: string; select?: string } = {})
   return JSON.parse(text);
 }
 
-// ── WhatsApp ──────────────────────────────────────────────────────────────────
+// ── WhatsApp — avec timeout 10s pour éviter les blocages ─────────────────────
 async function sendWA(to: string, body: string) {
-  if (!TWILIO_SID || !TWILIO_TOK) return;
+  if (!TWILIO_SID || !TWILIO_TOK) {
+    console.error('sendWA: credentials manquants');
+    return;
+  }
   const toFmt = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
-  const res = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${btoa(`${TWILIO_SID}:${TWILIO_TOK}`)}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({ From: TWILIO_FROM, To: toFmt, Body: body }).toString(),
-    }
-  );
-  if (!res.ok) console.error('Twilio error:', await res.text());
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${btoa(`${TWILIO_SID}:${TWILIO_TOK}`)}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ From: TWILIO_FROM, To: toFmt, Body: body }).toString(),
+        signal: controller.signal,
+      }
+    );
+    if (!res.ok) console.error('Twilio error:', await res.text());
+    else console.log(`sendWA OK → ${toFmt.slice(0, 16)}...`);
+  } catch (e: any) {
+    console.error('sendWA error:', e?.name, e?.message);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ── Labels ────────────────────────────────────────────────────────────────────
@@ -58,6 +72,91 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ── Logique notifications (séparée pour waitUntil) ────────────────────────────
+async function sendNotifications(payload: any) {
+  const {
+    site_id,
+    type,
+    description,
+    signale_par,
+    equipement_nom,
+    lieu,
+    ref_code,
+    signaleur_contact_id,
+    signaleur_whatsapp,
+  } = payload;
+
+  const typeLabel  = TYPE_LABELS[type] || type || 'Signalement';
+  const heure      = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Dakar' });
+  const suiviUrl   = ref_code ? `${BASE_URL}/suivi-signalement.html?ref=${encodeURIComponent(ref_code)}` : null;
+  const dejaEnvoyes = new Set<string>();
+
+  console.log(`notify: site=${site_id} ref=${ref_code} type=${type}`);
+
+  // ── 1. Resp_tech + dir_tech ───────────────────────────────────────────────
+  const responsables = await db('contacts', {
+    query: `&site_id=eq.${site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true`,
+    select: 'whatsapp',
+  });
+
+  const msgResp =
+    `🚨 *Nouveau signalement — GenTrack*\n\n` +
+    `${typeLabel}${equipement_nom ? ' — ' + equipement_nom : ''}` +
+    `${lieu ? '\n📍 ' + lieu : ''}` +
+    `${signale_par ? '\n👤 ' + signale_par : ''}` +
+    `\n\n📝 ${description}` +
+    `${ref_code ? '\n\n_Réf : ' + ref_code + '_\n_Répondre *OK ' + ref_code + '* pour PEC_' : ''}` +
+    `\n_${heure}_`;
+
+  if (Array.isArray(responsables)) {
+    for (const r of responsables) {
+      if (r.whatsapp && !dejaEnvoyes.has(r.whatsapp)) {
+        dejaEnvoyes.add(r.whatsapp);
+        await sendWA(r.whatsapp, msgResp);
+      }
+    }
+  }
+  console.log(`notify: ${responsables?.length ?? 0} responsables → ${dejaEnvoyes.size} envoyés`);
+
+  // ── 2. Demandeur connu (manager/gouvernant avec compte) ───────────────────
+  if (signaleur_contact_id) {
+    const contacts = await db('contacts', {
+      query: `&id=eq.${signaleur_contact_id}&actif=eq.true`,
+      select: 'whatsapp,nom',
+    });
+    const demandeur = Array.isArray(contacts) ? contacts[0] : null;
+    if (demandeur?.whatsapp && !dejaEnvoyes.has(demandeur.whatsapp)) {
+      dejaEnvoyes.add(demandeur.whatsapp);
+      const msgDemandeur =
+        `✅ *Votre signalement a bien été reçu*\n\n` +
+        `📋 Référence : *${ref_code || '—'}*\n` +
+        `📝 ${description}` +
+        `${lieu ? '\n📍 ' + lieu : ''}` +
+        `\n\nL'équipe technique a été notifiée et va traiter votre demande.` +
+        `\n\n_Conservez votre référence pour le suivi._`;
+      await sendWA(demandeur.whatsapp, msgDemandeur);
+      console.log(`notify: demandeur envoyé`);
+    }
+  }
+
+  // ── 3. Résident (numéro libre) — lien de suivi ────────────────────────────
+  if (signaleur_whatsapp && !dejaEnvoyes.has(signaleur_whatsapp)) {
+    dejaEnvoyes.add(signaleur_whatsapp);
+    const msgResident =
+      `✅ *Votre signalement a bien été enregistré*\n\n` +
+      `📋 Référence : *${ref_code || '—'}*\n` +
+      `📝 ${description}` +
+      `${lieu ? '\n📍 ' + lieu : ''}` +
+      `\n\nL'équipe technique a été notifiée.` +
+      `${suiviUrl ? `\n\n🔗 Suivez l'avancement de votre demande :\n${suiviUrl}` : ''}` +
+      `\n\n_Merci d'avoir utilisé GenTrack._`;
+    await sendWA(signaleur_whatsapp, msgResident);
+    console.log(`notify: résident envoyé → ${signaleur_whatsapp.slice(0,8)}...`);
+  }
+
+  console.log(`notify: DONE — total=${dejaEnvoyes.size}`);
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { status: 200, headers: CORS });
@@ -65,90 +164,18 @@ serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const {
-      site_id,
-      type,
-      description,
-      signale_par,
-      equipement_nom,
-      lieu,
-      ref_code,
-      signalement_id,
-      signaleur_contact_id,
-      signaleur_whatsapp,
-    } = payload;
 
-    const typeLabel  = TYPE_LABELS[type] || type || 'Signalement';
-    const heure      = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Dakar' });
-    const suiviUrl   = ref_code ? `${BASE_URL}/suivi-signalement.html?ref=${encodeURIComponent(ref_code)}` : null;
-    const dejaEnvoyes = new Set<string>();
+    // Lancer les notifications en arrière-plan — retourner HTTP 200 immédiatement
+    // waitUntil empêche l'EarlyDrop de tuer la fonction avant la fin des envois
+    const work = sendNotifications(payload).catch((e) => console.error('notify error:', e));
+    (globalThis as any).EdgeRuntime?.waitUntil(work);
 
-    // ── 1. Resp_tech + dir_tech ───────────────────────────────────────────────
-    const responsables = await db('contacts', {
-      query: `&site_id=eq.${site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true`,
-      select: 'whatsapp',
-    });
-
-    const msgResp =
-      `🚨 *Nouveau signalement — GenTrack*\n\n` +
-      `${typeLabel}${equipement_nom ? ' — ' + equipement_nom : ''}` +
-      `${lieu ? '\n📍 ' + lieu : ''}` +
-      `${signale_par ? '\n👤 ' + signale_par : ''}` +
-      `\n\n📝 ${description}` +
-      `${ref_code ? '\n\n_Réf : ' + ref_code + '_\n_Répondre *OK ' + ref_code + '* pour PEC_' : ''}` +
-      `\n_${heure}_`;
-
-    if (Array.isArray(responsables)) {
-      for (const r of responsables) {
-        if (r.whatsapp && !dejaEnvoyes.has(r.whatsapp)) {
-          dejaEnvoyes.add(r.whatsapp);
-          await sendWA(r.whatsapp, msgResp).catch((e) => console.error('sendWA resp_tech error:', e));
-        }
-      }
-    }
-    console.log(`notify-signalement: ${responsables?.length ?? 0} responsables, ${dejaEnvoyes.size} envoyés`);
-
-    // ── 2. Demandeur connu (manager/gouvernant avec compte) ───────────────────
-    if (signaleur_contact_id) {
-      const contacts = await db('contacts', {
-        query: `&id=eq.${signaleur_contact_id}&actif=eq.true`,
-        select: 'whatsapp,nom',
-      });
-      const demandeur = Array.isArray(contacts) ? contacts[0] : null;
-      if (demandeur?.whatsapp && !dejaEnvoyes.has(demandeur.whatsapp)) {
-        dejaEnvoyes.add(demandeur.whatsapp);
-        const msgDemandeur =
-          `✅ *Votre signalement a bien été reçu*\n\n` +
-          `📋 Référence : *${ref_code || '—'}*\n` +
-          `📝 ${description}` +
-          `${lieu ? '\n📍 ' + lieu : ''}` +
-          `\n\nL'équipe technique a été notifiée et va traiter votre demande.` +
-          `\n\n_Conservez votre référence pour le suivi._`;
-        await sendWA(demandeur.whatsapp, msgDemandeur).catch((e) => console.error('sendWA demandeur error:', e));
-      }
-    }
-
-    // ── 3. Résident (numéro libre) — lien de suivi ────────────────────────────
-    if (signaleur_whatsapp && !dejaEnvoyes.has(signaleur_whatsapp)) {
-      dejaEnvoyes.add(signaleur_whatsapp);
-      const msgResident =
-        `✅ *Votre signalement a bien été enregistré*\n\n` +
-        `📋 Référence : *${ref_code || '—'}*\n` +
-        `📝 ${description}` +
-        `${lieu ? '\n📍 ' + lieu : ''}` +
-        `\n\nL'équipe technique a été notifiée.` +
-        `${suiviUrl ? `\n\n🔗 Suivez l'avancement de votre demande :\n${suiviUrl}` : ''}` +
-        `\n\n_Merci d'avoir utilisé GenTrack._`;
-      await sendWA(signaleur_whatsapp, msgResident).catch((e) => console.error('sendWA résident error:', e));
-    }
-
-    console.log(`notify-signalement: total envoyés = ${dejaEnvoyes.size}`);
-    return new Response(JSON.stringify({ ok: true, notified: dejaEnvoyes.size }), {
+    return new Response(JSON.stringify({ ok: true }), {
       headers: { 'Content-Type': 'application/json', ...CORS },
     });
 
   } catch (err) {
-    console.error('notify-signalement error:', err);
+    console.error('notify-signalement parse error:', err);
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', ...CORS },
