@@ -337,6 +337,7 @@ var _resWizStep=0;
 var _resWizBats=[{nom:'Tour A'}];
 var _resWizEtages=[{bat:0,etage:'18',debut:1801,fin:1812}];
 var _resSpeciales={local_tech:false,restaurant:false,reception:false,parking:false,piscine:false,salle_sport:false,toiture:false};
+var _resCustomSpeciales=[]; // [{key,icon,nom}]
 var _resZoneEq={};
 var _resExistingEq=[];
 var _resExistingEqLoaded=false;
@@ -562,7 +563,7 @@ function _goToSignalement(sgId){
 
 function navTo(id){
   if(!_session)return;
-  if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;_zonesWizardStep=0;_eqImportStep=0;_energieCfgWizardStep=0;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];_resWizStep=0;_resSubTab='config';_resExistingEqLoaded=false;}
+  if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;_zonesWizardStep=0;_zonesViewFilter='maintenance';_eqImportStep=0;_energieCfgWizardStep=0;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];_resWizStep=0;_resSubTab='config';_resExistingEqLoaded=false;}
   if(_session.role==='resp_tech')renderRespTech(_session,id);
   else if(_session.role==='dir_tech'){
     if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,id);
@@ -4030,6 +4031,7 @@ async function _mntCreerSubmit(sid){
 /* ══════════════════════════════════════
    ZONES CONFIG — WIZARD IMPORT
 ══════════════════════════════════════ */
+var _zonesViewFilter='maintenance'; // 'maintenance'|'residence'|'all'
 var _zonesWizardStep=0; // 0=liste 1=preview 2=equipements 3=confirm
 var _zonesWizardData=[]; // [{nom,etage,categorie,type,erreur}]
 var _zonesWizardEqSel={}; // {categorie:[nom_eq,...]}
@@ -4151,7 +4153,7 @@ async function _buildZonesConfigTab(sid){
   if(_zonesWizardStep===0){
     // Fetch zones, équipements techniques, équipements de salle, signalements ouverts
     var [existingZones,zoneEquips,zoneEquipsSalle,sgOpen]=await Promise.all([
-      supaGet('zones','site_id=eq.'+sid+'&order=categorie.asc,etage.asc,nom.asc&select=id,nom,etage,categorie,type,actif'),
+      supaGet('zones','site_id=eq.'+sid+'&order=categorie.asc,etage.asc,nom.asc&select=id,nom,etage,categorie,type,actif,type_zone'),
       supaGet('equipements','site_id=eq.'+sid+'&zone_id=not.is.null&actif=eq.true&select=id,nom,zone_id,actif_ronde,actif_releve&order=nom.asc'),
       supaGetAll('equipements_zone','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,zone_id&order=nom.asc'),
       supaGet('signalements','site_id=eq.'+sid+'&statut=neq.resolu&select=zone_id&limit=500')
@@ -4187,10 +4189,21 @@ async function _buildZonesConfigTab(sid){
     // Wizard import équipements en masse (step > 0)
     if(_eqImportStep>0){return _eqImportRenderStep(existingZones,sid);}
 
+    // Compter zones résidentielles pour afficher/masquer le toggle
+    var RES_TYPES=['chambre','commun_etage','special'];
+    var hasResZones=existingZones.some(function(z){return z.type_zone&&RES_TYPES.indexOf(z.type_zone)>=0;});
+    // Appliquer le filtre
+    var displayZones=existingZones;
+    if(_zonesViewFilter==='maintenance'){
+      displayZones=existingZones.filter(function(z){return !z.type_zone||RES_TYPES.indexOf(z.type_zone)<0;});
+    }else if(_zonesViewFilter==='residence'){
+      displayZones=existingZones.filter(function(z){return z.type_zone&&RES_TYPES.indexOf(z.type_zone)>=0;});
+    }
+
     // Stats
     var totalEq=zoneEquipsSalle.length;
     var bycat={};
-    existingZones.forEach(function(z){var c=z.categorie||'Autre';if(!bycat[c])bycat[c]=[];bycat[c].push(z);});
+    displayZones.forEach(function(z){var c=z.categorie||'Autre';if(!bycat[c])bycat[c]=[];bycat[c].push(z);});
     var catKeys=Object.keys(bycat).sort();
 
     if(!existingZones.length){
@@ -4213,11 +4226,24 @@ async function _buildZonesConfigTab(sid){
     }
 
     // === Header stats ===
-    var headerHtml=
+    var filterBar='';
+    if(hasResZones){
+      var fOpts=[{v:'maintenance',l:'🔧 Maintenance'},{v:'residence',l:'🏢 Résidentiel'},{v:'all',l:'Tout'}];
+      filterBar='<div style="display:flex;gap:4px;background:var(--bg2,#f4f4f4);border-radius:8px;padding:3px;margin-bottom:12px">';
+      fOpts.forEach(function(fo){
+        var a=_zonesViewFilter===fo.v;
+        filterBar+='<button onclick="_zonesViewFilter=\''+fo.v+'\';if(_session)renderRespTech(_session,\'config\')" '+
+          'style="flex:1;padding:6px 10px;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;'+
+          'background:'+(a?'white':'none')+';color:'+(a?'var(--dark)':'var(--text3)')+';'+
+          'box-shadow:'+(a?'0 1px 3px rgba(0,0,0,.1)':'none')+'">'+fo.l+'</button>';
+      });
+      filterBar+='</div>';
+    }
+    var headerHtml=filterBar+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">'+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-size:16px;font-weight:800;color:var(--dark)">Zones &amp; Lieux</div>'+
-          '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+existingZones.length+' zones · '+totalEq+' équipements</div>'+
+          '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+displayZones.length+' zones · '+totalEq+' équipements</div>'+
         '</div>'+
         // Bouton ajouter zone
         '<button onclick="_zonesAddZoneModal(\''+sid+'\')" '+
@@ -4251,7 +4277,7 @@ async function _buildZonesConfigTab(sid){
       '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">'+
         '<button class="zones-cat-filter-btn" data-cat="" onclick="_zonesSetCatFilter(\'\')" '+
           'style="padding:5px 12px;border:1.5px solid var(--amber);border-radius:20px;background:var(--amber);color:white;font-size:11px;font-weight:700;cursor:pointer">'+
-          'Toutes ('+existingZones.length+')'+
+          'Toutes ('+displayZones.length+')'+
         '</button>'+
         catKeys.map(function(cat){
           return '<button class="zones-cat-filter-btn" data-cat="'+escape_html(cat)+'" onclick="_zonesSetCatFilter(\''+cat.replace(/'/g,"\\'")+'\')" '+
@@ -4262,7 +4288,7 @@ async function _buildZonesConfigTab(sid){
       '</div>';
 
     // === Grille de cards ===
-    var cardsHtml=existingZones.map(function(z){
+    var cardsHtml=displayZones.map(function(z){
       var eqsTech=eqByZone[z.id]||[];
       var eqsSalle=eqSalleByZone[z.id]||[];
       var sgCount=sgByZone[z.id]||0;
@@ -5964,15 +5990,46 @@ function _resStep2(){
       '<div style="width:20px;height:20px;border-radius:50%;background:'+(on?'var(--amber)':'var(--border)')+';color:white;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">'+(on?'✓':'')+'</div>'+
       '</div>';
   });
-  h+='<div style="font-size:11px;color:var(--text3);margin-top:6px">Cliquez pour sélectionner. Les équipements se configurent à l\'étape suivante.</div>';
+  // Zones custom déjà ajoutées
+  _resCustomSpeciales.forEach(function(sp,i){
+    h+='<div style="background:white;border:1.5px solid var(--amber);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:6px">'+
+      '<span style="font-size:20px;width:28px;text-align:center">'+sp.icon+'</span>'+
+      '<span style="flex:1;font-size:13px;font-weight:500;color:var(--amber-dark)">'+escape_html(sp.nom)+'</span>'+
+      '<button onclick="_resRemCustomSpecial('+i+')" style="background:none;border:none;font-size:16px;cursor:pointer;color:var(--text3)">✕</button>'+
+      '</div>';
+  });
+  // Formulaire ajout custom
+  h+='<div style="display:flex;gap:6px;margin-top:8px">'+
+    '<input class="cfg-form-input" style="font-size:12px" id="res-spec-inp" placeholder="Ex: Salle de conférence, Spa…" onkeydown="if(event.key===\'Enter\')_resAddCustomSpecial()">'+
+    '<button class="cfg-btn cfg-btn-cancel" style="white-space:nowrap;font-size:12px;padding:8px 12px" onclick="_resAddCustomSpecial()">+ Ajouter</button>'+
+    '</div>';
+  h+='<div style="font-size:11px;color:var(--text3);margin-top:8px">Cliquez pour sélectionner. Les équipements se configurent à l\'étape suivante.</div>';
   return h;
+}
+
+function _resAddCustomSpecial(){
+  var el=document.getElementById('res-spec-inp');
+  if(!el||!el.value.trim())return;
+  var nom=el.value.trim();
+  var key='custom_'+Date.now();
+  _resCustomSpeciales.push({key:key,icon:'📍',nom:nom});
+  _resEnsureEq(key);
+  el.value='';
+  if(_session)renderRespTech(_session,'config');
+}
+function _resRemCustomSpecial(i){
+  _resCustomSpeciales.splice(i,1);
+  if(_session)renderRespTech(_session,'config');
 }
 
 function _resEqSection(key,label){
   _resEnsureEq(key);
   var sel=_resZoneEq[key].sel,nw=_resZoneEq[key].nw;
   var allSugs=[].concat(_RES_COMMON_EQ);
-  _resExistingEq.forEach(function(n){if(allSugs.indexOf(n)<0)allSugs.push(n);});
+  // Ajouter les noms existants propres (sans codes "ABAJOUR — 012")
+  _resExistingEq.forEach(function(n){
+    if(allSugs.indexOf(n)<0&&n.length>=4&&n.indexOf(' — ')<0&&n.indexOf(' - ')<0)allSugs.push(n);
+  });
   var h='<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">'+
     '<div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:10px">'+label+'</div>'+
     '<div style="min-height:28px;margin-bottom:8px">';
@@ -6009,6 +6066,7 @@ function _resStep3(){
   h+=_resEqSection('chambre','🛏️ Chambres / Appartements');
   h+=_resEqSection('commun','🚪 Parties communes (par étage)');
   _RES_SPEC.forEach(function(sp){if(_resSpeciales[sp.key])h+=_resEqSection(sp.key,sp.icon+' '+sp.nom);});
+  _resCustomSpeciales.forEach(function(sp){h+=_resEqSection(sp.key,'📍 '+sp.nom);});
   return h;
 }
 
@@ -6016,7 +6074,7 @@ function _resStep4(sid){
   var totalUnits=_resWizEtages.reduce(function(a,f){return a+(f.fin-f.debut+1);},0);
   _resEnsureEq('chambre');
   var chamEqCnt=(_resZoneEq.chambre.sel.length+_resZoneEq.chambre.nw.length);
-  var specSel=_RES_SPEC.filter(function(s){return _resSpeciales[s.key];});
+  var specSel=_RES_SPEC.filter(function(s){return _resSpeciales[s.key];}).concat(_resCustomSpeciales);
   var h='<div style="font-size:16px;font-weight:600;margin-bottom:4px">Récapitulatif</div>'+
     '<div style="font-size:13px;color:var(--text2);margin-bottom:16px">Vérifiez avant de générer les zones.</div>';
   h+='<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">'+
@@ -6098,7 +6156,7 @@ async function _resGenerate(sid){
     _resWizEtages.forEach(function(f){
       var bat=(_resWizBats[f.bat]&&_resWizBats[f.bat].nom)||'';
       for(var n=f.debut;n<=f.fin;n++){
-        zoneBatch.push({site_id:sid,groupe_id:sid,nom:'Chambre '+n,actif:true,
+        zoneBatch.push({site_id:sid,nom:'Chambre '+n,actif:true,
           type:'salle',categorie:'Chambre',etage:String(f.etage),
           type_zone:'chambre',batiment:bat,frequence_passage:30,ordre:n});
       }
@@ -6110,36 +6168,45 @@ async function _resGenerate(sid){
       var ck=bat+'|'+f.etage;
       if(!doneCommun[ck]&&(_resZoneEq.commun.sel.length+_resZoneEq.commun.nw.length>0)){
         doneCommun[ck]=1;
-        zoneBatch.push({site_id:sid,groupe_id:sid,nom:'Communs Ét.'+f.etage+(bat?' '+bat:''),
+        zoneBatch.push({site_id:sid,nom:'Communs Ét.'+f.etage+(bat?' '+bat:''),
           actif:true,type:'salle',categorie:'Partie commune',etage:String(f.etage),
           type_zone:'commun_etage',batiment:bat,frequence_passage:7,ordre:0});
       }
     });
     _RES_SPEC.forEach(function(sp){
       if(!_resSpeciales[sp.key])return;
-      zoneBatch.push({site_id:sid,groupe_id:sid,nom:sp.nom,actif:true,
+      zoneBatch.push({site_id:sid,nom:sp.nom,actif:true,
+        type:'salle',categorie:sp.nom,type_zone:'special',frequence_passage:30,ordre:0});
+    });
+    // Zones spéciales custom
+    _resCustomSpeciales.forEach(function(sp){
+      zoneBatch.push({site_id:sid,nom:sp.nom,actif:true,
         type:'salle',categorie:sp.nom,type_zone:'special',frequence_passage:30,ordre:0});
     });
 
     var createdZones=await supaPostBulk('zones',zoneBatch);
     if(!createdZones||!createdZones.length)throw new Error('Échec création zones');
 
-    // Batch equipements_zone
+    // Batch equipements_zone (sans groupe_id — colonne inexistante)
     var eqBatch=[];
     _resEnsureEq('chambre');
     var chamEqs=_resZoneEq.chambre.sel.concat(_resZoneEq.chambre.nw);
     _resEnsureEq('commun');
     var communEqs=_resZoneEq.commun.sel.concat(_resZoneEq.commun.nw);
+    // Construire map nom→key pour les zones spéciales
+    var specKeyByNom={};
+    _RES_SPEC.forEach(function(sp){if(_resSpeciales[sp.key])specKeyByNom[sp.nom]=sp.key;});
+    _resCustomSpeciales.forEach(function(sp){specKeyByNom[sp.nom]=sp.key;});
     createdZones.forEach(function(z){
       var eqs=[];
       if(z.type_zone==='chambre')eqs=chamEqs;
       else if(z.type_zone==='commun_etage')eqs=communEqs;
       else if(z.type_zone==='special'){
-        var sp=_RES_SPEC.find(function(s){return s.nom===z.nom;});
-        if(sp){_resEnsureEq(sp.key);eqs=_resZoneEq[sp.key].sel.concat(_resZoneEq[sp.key].nw);}
+        var k=specKeyByNom[z.nom];
+        if(k){_resEnsureEq(k);eqs=_resZoneEq[k].sel.concat(_resZoneEq[k].nw);}
       }
       eqs.forEach(function(eqNom,i){
-        eqBatch.push({site_id:sid,groupe_id:sid,zone_id:z.id,nom:eqNom,
+        eqBatch.push({site_id:sid,zone_id:z.id,nom:eqNom,
           actif:true,actif_ronde:true,actif_releve:false,photo_requise:false,ordre_ronde:i+1});
       });
     });
@@ -6149,7 +6216,7 @@ async function _resGenerate(sid){
     _resWizStep=0;_resWizBats=[{nom:'Tour A'}];
     _resWizEtages=[{bat:0,etage:'18',debut:1801,fin:1812}];
     Object.keys(_resSpeciales).forEach(function(k){_resSpeciales[k]=false;});
-    _resZoneEq={};_resExistingEqLoaded=false;_resSubTab='planning';
+    _resCustomSpeciales=[];_resZoneEq={};_resExistingEqLoaded=false;_resSubTab='planning';
     if(_session)renderRespTech(_session,'config');
   }catch(e){
     console.error('[resGenerate]',e);
