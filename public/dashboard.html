@@ -792,7 +792,7 @@ async function _rtAccueil(session,sid,cid){
     supaGet('rondes','site_id=eq.'+sid+'&date_ronde=eq.'+today+'&select=id,frequence,date_ronde'),
     supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&or=(actif_ronde.eq.true,actif_releve.eq.true)&select=id,nom,ordre_ronde,type_id,actif_ronde,actif_releve,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,date_dernier_vidange,type_compteur_heures,types_equipements(nom)&order=ordre_ronde.asc'),
     supaGet('alertes','groupe_id=eq.'+sid+'&resolue=eq.false&select=id,type,severite,type_alerte,message,created_at&order=created_at.desc&limit=20'),
-    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&statut=neq.resolu&select=id,type,description,created_at,equipement_id,equipements(nom)&order=created_at.desc&limit=20'),
+    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&statut=neq.resolu&select=id,type,description,created_at,equipement_id,equipement_zone_id,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=20'),
     _fetchRecoEquipements(sid),
     supaGet('vue_statut_equipements','site_id=eq.'+sid+'&select=equipement_id,statut_couleur,statut_label'),
     supaGet('releves_horaires','site_id=eq.'+sid+'&created_at=gte.'+todayStart+'&select=id,statut,validated_at,nb_valeurs,nb_alertes,created_at&order=created_at.desc')
@@ -1010,7 +1010,8 @@ async function _rtAccueil(session,sid,cid){
       '</div>';
     });
     pannes.forEach(function(sg){
-      var eqNom=sg.equipements&&sg.equipements.nom?' · '+sg.equipements.nom:'';
+      var eqNom=(sg.equipements&&sg.equipements.nom)||(sg.equipements_zone&&sg.equipements_zone.nom)||'';
+      if(eqNom)eqNom=' · '+eqNom;
       alertesHtml+='<div class="alerte-card clickable" style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-left:3px solid var(--rouge)" onclick="_goToSignalement(\''+sg.id+'\')">'+
         '<span style="font-size:15px">🔴</span>'+
         '<div style="flex:1"><div class="alerte-card-titre" style="color:var(--rouge)">Panne'+escape_html(eqNom)+'</div>'+
@@ -1484,8 +1485,8 @@ async function _rtAlertes(sid,cid){
   var[actives,historique,anomalies,pannesActives]=await Promise.all([
     supaGet('alertes','groupe_id=eq.'+sid+'&resolue=eq.false&select=id,type,severite,type_alerte,message,created_at&order=created_at.desc&limit=50'),
     supaGet('alertes','groupe_id=eq.'+sid+'&resolue=eq.true&created_at=gte.'+cutoff30+'T00:00:00&select=id,type,severite,type_alerte,message,created_at&order=created_at.desc&limit=30'),
-    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.anomalie&statut=neq.resolu&select=id,description,equipement_id,created_at,ref_code,statut,pris_en_charge_par,assigne_a,equipements(nom)&order=created_at.desc&limit=20'),
-    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&statut=neq.resolu&select=id,description,equipement_id,created_at,ref_code,statut,pris_en_charge_par,assigne_a,equipements(nom)&order=created_at.desc&limit=20')
+    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.anomalie&statut=neq.resolu&select=id,description,equipement_id,equipement_zone_id,created_at,ref_code,statut,pris_en_charge_par,assigne_a,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=20'),
+    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&statut=neq.resolu&select=id,description,equipement_id,equipement_zone_id,created_at,ref_code,statut,pris_en_charge_par,assigne_a,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=20')
   ]);
 
   // marquer toutes les alertes actives comme lues
@@ -1537,7 +1538,7 @@ async function _rtAlertes(sid,cid){
       '</div>';
     });
     pannesActives.forEach(function(sg){
-      var eqNom=sg.equipements&&sg.equipements.nom?sg.equipements.nom:'';
+      var eqNom=(sg.equipements&&sg.equipements.nom)||(sg.equipements_zone&&sg.equipements_zone.nom)||'';
       var ts=sg.created_at?_relativeTime(sg.created_at):'';
       var ref=sg.ref_code||'';
       var enCours=sg.statut==='en_cours';
@@ -1558,7 +1559,7 @@ async function _rtAlertes(sid,cid){
       '</div>';
     });
     anomalies.forEach(function(sg){
-      var eqNom=sg.equipements&&sg.equipements.nom?sg.equipements.nom:'';
+      var eqNom=(sg.equipements&&sg.equipements.nom)||(sg.equipements_zone&&sg.equipements_zone.nom)||'';
       var ts=sg.created_at?_relativeTime(sg.created_at):'';
       var ref=sg.ref_code||'';
       var enCours=sg.statut==='en_cours';
@@ -2755,7 +2756,7 @@ function _sgAffecter(id){
   };
   if(r){_doAffecter(r);}
   else{
-    supaGet('signalements','id=eq.'+id+'&select=id,groupe_id,type,description,statut,photo_url,equipement_id,equipements(nom)').then(function(rows){
+    supaGet('signalements','id=eq.'+id+'&select=id,groupe_id,type,description,statut,photo_url,equipement_id,equipement_zone_id,equipements(nom),equipements_zone(nom)').then(function(rows){
       if(!rows||!rows.length)return;
       if(!window._sgRows)window._sgRows={};
       window._sgRows[id]=rows[0];

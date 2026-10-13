@@ -52,10 +52,16 @@ const TYPE_LABELS: Record<string, string> = {
   anomalie_zone: '⚠️ Anomalie zone',
 };
 
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*' } });
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+  if (req.method === 'OPTIONS') return new Response('ok', { status: 200, headers: CORS });
+  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: CORS });
 
   try {
     const payload = await req.json();
@@ -136,14 +142,14 @@ serve(async (req) => {
     }
 
     return new Response(JSON.stringify({ ok: true, notified: dejaEnvoyes.size }), {
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'application/json', ...CORS },
     });
 
   } catch (err) {
     console.error('notify-signalement error:', err);
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...CORS },
     });
   }
 });
