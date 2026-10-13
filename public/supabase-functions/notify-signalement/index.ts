@@ -107,7 +107,7 @@ async function sendNotifications(payload: any) {
     `${signale_par ? '\n👤 ' + signale_par : ''}` +
     `${signaleur_whatsapp ? '\n📞 ' + signaleur_whatsapp : ''}` +
     `\n\n📝 ${description}` +
-    `${ref_code ? '\n\n_Réf : ' + ref_code + '_\n_Répondre *OK ' + ref_code + '* pour PEC_' : ''}` +
+    `${ref_code ? '\n\n_Réf : ' + ref_code + '_\n_Répondre *OK ' + ref_code + '* pour PEC · ou *AFFECTER ' + ref_code + ' NomTech* pour assigner._' : ''}` +
     `\n_${heure}_`;
 
   if (Array.isArray(responsables)) {
