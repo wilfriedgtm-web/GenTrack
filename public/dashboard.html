@@ -322,6 +322,12 @@ var _histPeriod=30;
 var _configSelectedEqId=null;
 var _configCurrentTab='equipements';
 var _configEquipCache={}; // id → equip object, évite les problèmes d'échappement dans onclick
+var _siteModules=['general']; // modules actifs du site courant, mis à jour dans _rtConfig
+
+function hasModule(mod){
+  if(_siteModules.indexOf('general')>=0)return true; // Azalai et anciens clients voient tout
+  return _siteModules.indexOf(mod)>=0;
+}
 var _configSecondaryCollapsed=true; // section équipements sans suivi, réduite par défaut
 var _energieCfgWizardStep=0; // 0=choix template 1=personnalisation
 var _energieCfgWizardTemplate=null; // '1_index'|'2_jour_nuit'|'3_hc_hp_pointe'|'aucun'
@@ -5436,24 +5442,47 @@ function _eqImportHandleFile(file,sid){
 
 async function _rtConfig(sid){
   _configCurrentSid=sid;
-  var types=await supaGet('types_equipements','select=id,nom&order=nom');
-  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,actif_ronde,actif_releve,ordre_ronde,type_id,zone_id,puissance_kva,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,prix_litre,type_compteur_heures,types_equipements(nom)&order=ordre_ronde.asc');
+  // Charger modules du site + données pour le setup guidé en parallèle
+  var [siteArr,types,equips,zonesArr,contactsArr]=await Promise.all([
+    supaGet('sites','id=eq.'+sid+'&select=modules&limit=1'),
+    supaGet('types_equipements','select=id,nom&order=nom'),
+    supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,actif_ronde,actif_releve,ordre_ronde,type_id,zone_id,puissance_kva,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,prix_litre,type_compteur_heures,types_equipements(nom)&order=ordre_ronde.asc'),
+    supaGet('zones','site_id=eq.'+sid+'&actif=eq.true&select=id&limit=1'),
+    supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&select=id&limit=1')
+  ]);
+  // Mettre à jour les modules actifs pour hasModule()
+  _siteModules=(siteArr&&siteArr[0]&&Array.isArray(siteArr[0].modules))?siteArr[0].modules:['general'];
   // Populate cache for safe onclick lookup (évite l'échappement multi-niveau)
   _configEquipCache={};
   equips.forEach(function(e){_configEquipCache[e.id]=e;});
+
+  // Détecter site nouveau (pas encore configuré)
+  var isNewSite=(equips.filter(function(e){return e.actif_ronde||e.actif_releve;}).length===0);
+  // Si nouveau site et qu'on arrive sur l'onglet par défaut → pointer sur setup
+  if(isNewSite&&_configCurrentTab==='equipements')_configCurrentTab='setup';
+
+  // Tabs dynamiques selon modules + état du site
   var tabs=[
-    {key:'equipements',label:'⚙️ Équipements & Rondes'},
-    {key:'planning',label:'📅 Planning rondes'},
-    {key:'seuils',label:'🎯 Seuils d\'alerte'},
-    {key:'contacts',label:'👥 Contacts & Alertes'},
-    {key:'releves',label:'📋 Relevés horaires'},
-    {key:'energie',label:'⚡ Énergie'},
-    {key:'zones',label:'📍 Zones & Lieux'}
-  ];
+    {key:'setup',    label:'🚀 Démarrage',          show:isNewSite},
+    {key:'zones',    label:'📍 Zones & Lieux',       show:true},
+    {key:'equipements',label:'⚙️ Équipements & Rondes',show:true},
+    {key:'planning', label:'📅 Planning rondes',     show:true},
+    {key:'seuils',   label:'🎯 Seuils d\'alerte',    show:true},
+    {key:'contacts', label:'👥 Contacts & Alertes',  show:true},
+    {key:'releves',  label:'📋 Relevés horaires',    show:true},
+    {key:'energie',  label:'⚡ Énergie',             show:hasModule('maintenance')},
+    {key:'residence',label:'🏢 Résidence+',          show:hasModule('residence')}
+  ].filter(function(t){return t.show;});
   var tabHtml=tabs.map(function(t){
     return '<button class="config-tab'+(_configCurrentTab===t.key?' active':'')+'" onclick="_switchConfigTab(\''+t.key+'\')">'+t.label+'</button>';
   }).join('');
 
+  if(_configCurrentTab==='setup'){
+    var dc2s=document.getElementById('dash-content-main');
+    if(dc2s){dc2s.style.padding='24px';dc2s.style.maxWidth='680px';}
+    var setupHtml=await _buildSetupTab(sid,equips,zonesArr||[],contactsArr||[]);
+    return '<div class="config-tabs">'+tabHtml+'</div>'+setupHtml;
+  }
   if(_configCurrentTab==='planning'){
     var dc2p=document.getElementById('dash-content-main');
     if(dc2p){dc2p.style.padding='24px';dc2p.style.maxWidth='none';}
@@ -5489,6 +5518,11 @@ async function _rtConfig(sid){
     if(dc2z){dc2z.style.padding='24px';dc2z.style.maxWidth='960px';}
     var zonesCfgHtml=await _buildZonesConfigTab(sid);
     return '<div class="config-tabs">'+tabHtml+'</div>'+zonesCfgHtml;
+  }
+  if(_configCurrentTab==='residence'){
+    var dc2r=document.getElementById('dash-content-main');
+    if(dc2r){dc2r.style.padding='24px';dc2r.style.maxWidth='680px';}
+    return '<div class="config-tabs">'+tabHtml+'</div><div style="padding:40px;text-align:center;color:var(--text3);font-size:13px"><div style="font-size:32px;margin-bottom:12px;opacity:.3">🏢</div>Configuration Résidence+ — à venir dans la prochaine version</div>';
   }
 
   // Default selection — priorité aux équipements avec suivi
@@ -5557,6 +5591,79 @@ async function _rtConfig(sid){
   if(dc){dc.style.padding='0';dc.style.maxWidth='none';}
   return '<div class="config-tabs">'+tabHtml+'</div>'+
     '<div class="config-layout">'+listHtml+panelHtml+'</div>';
+}
+
+async function _buildSetupTab(sid,equips,zonesArr,contactsArr){
+  // Compter les éléments configurés
+  var nbEquips=equips.filter(function(e){return e.actif_ronde||e.actif_releve;}).length;
+  var nbZones=zonesArr.length;
+  var nbContacts=contactsArr.length;
+  // Récupérer relevés énergie configurés
+  var relevesCfg=await supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id&limit=1');
+  var nbReleves=(relevesCfg&&relevesCfg.length)?relevesCfg.length:0;
+
+  var steps=[
+    {key:'zones',    icon:'📍', label:'Zones & Lieux',
+     desc:'Importez vos zones (Excel) ou ajoutez-les manuellement. Nécessaire pour localiser les équipements et les signalements.',
+     done:nbZones>0, count:nbZones, unit:'zone'},
+    {key:'equipements', icon:'⚙️', label:'Équipements & Rondes',
+     desc:'Ajoutez vos équipements critiques (GE, groupes froids, clim…) et configurez les questions de ronde.',
+     done:nbEquips>0, count:nbEquips, unit:'équipement'},
+    {key:'contacts', icon:'👥', label:'Contacts & WhatsApp',
+     desc:'Ajoutez le numéro WhatsApp du technicien. Il recevra les alertes et pourra faire les rondes via bot.',
+     done:nbContacts>0, count:nbContacts, unit:'contact'},
+    {key:'releves',  icon:'📋', label:'Relevés horaires',
+     desc:'Configurez les compteurs à relever chaque jour (électricité, eau, gasoil…). Optionnel.',
+     done:nbReleves>0, count:nbReleves, unit:'relevé', optional:true},
+    {key:'seuils',   icon:'🎯', label:'Seuils d\'alerte',
+     desc:'Définissez les seuils min/max pour déclencher des alertes automatiques. Optionnel mais recommandé.',
+     done:false, count:0, unit:'seuil', optional:true}
+  ];
+
+  var required=steps.filter(function(s){return !s.optional;});
+  var nbDone=required.filter(function(s){return s.done;}).length;
+  var pct=Math.round((nbDone/required.length)*100);
+  var allDone=(nbDone===required.length);
+
+  var html='<div style="max-width:620px">';
+
+  // Bannière de progression
+  html+='<div style="background:'+(allDone?'var(--vert-light)':'var(--amber-pale)')+';border:1.5px solid '+(allDone?'var(--vert-border)':'var(--amber-border)')+';border-radius:14px;padding:18px 20px;margin-bottom:20px">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
+      '<div>'+
+        '<div style="font-size:15px;font-weight:700;color:var(--dark)">'+(allDone?'✅ Site prêt à utiliser !':'🚀 Configurez votre site')+'</div>'+
+        '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+(allDone?'Toutes les étapes essentielles sont complètes.':nbDone+'/'+required.length+' étapes essentielles complétées')+'</div>'+
+      '</div>'+
+      '<div style="font-size:22px;font-weight:800;color:'+(allDone?'var(--vert)':'var(--amber-dark)')+'">'+pct+'%</div>'+
+    '</div>'+
+    '<div style="height:8px;background:rgba(0,0,0,.08);border-radius:4px;overflow:hidden">'+
+      '<div style="width:'+pct+'%;height:100%;background:'+(allDone?'var(--vert)':'var(--amber)')+';border-radius:4px;transition:width .3s"></div>'+
+    '</div>'+
+  '</div>';
+
+  // Étapes
+  steps.forEach(function(step){
+    var statusColor=step.done?'var(--vert)':'var(--text3)';
+    var statusBg=step.done?'var(--vert-light)':'var(--creme)';
+    var statusBorder=step.done?'var(--vert-border)':'var(--border)';
+    html+='<div style="border:1.5px solid '+statusBorder+';border-radius:12px;padding:14px 16px;margin-bottom:10px;background:'+(step.done?statusBg:'white')+';display:flex;align-items:flex-start;gap:14px">'+
+      '<div style="font-size:22px;flex-shrink:0;margin-top:1px">'+step.icon+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+          '<span style="font-size:13px;font-weight:600;color:var(--dark)">'+step.label+'</span>'+
+          (step.optional?'<span style="font-size:10px;font-weight:600;color:var(--text3);background:var(--creme);border:1px solid var(--border);padding:1px 6px;border-radius:8px">Optionnel</span>':'')+
+        '</div>'+
+        '<div style="font-size:12px;color:var(--text2);margin-top:3px;line-height:1.5">'+step.desc+'</div>'+
+        (step.done?'<div style="font-size:11px;font-weight:600;color:var(--vert);margin-top:5px">✓ '+step.count+' '+step.unit+(step.count>1&&step.unit.slice(-1)!=='s'?'s':'')+' configuré'+(step.count>1?'s':'')+'</div>':'')+
+      '</div>'+
+      '<button onclick="_switchConfigTab(\''+step.key+'\')" style="flex-shrink:0;padding:7px 14px;border:1.5px solid '+(step.done?'var(--vert-border)':'var(--amber-border)')+';border-radius:8px;background:'+(step.done?'var(--vert-light)':'var(--amber-pale)')+';color:'+(step.done?'var(--vert)':'var(--amber-dark)')+';font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">'+
+        (step.done?'Modifier →':'Configurer →')+
+      '</button>'+
+    '</div>';
+  });
+
+  html+='</div>';
+  return html;
 }
 
 async function _buildContactsTab(sid){
