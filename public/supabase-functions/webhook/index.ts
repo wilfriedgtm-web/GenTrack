@@ -189,11 +189,17 @@ async function getEquipementsRestants(rondeId: string, siteId: string, frequence
     if (Array.isArray(qs) && qs.length > 0) restants.push(e);
   }
   // Ajouter "Relevé énergie" comme équipement spécial pour la ronde journalière
+  // — uniquement si le site a le module "general" (pas uniquement "residence")
   if (frequence === 'journalier') {
-    const hasConfig = await db('energie_config', { query: `&site_id=eq.${siteId}&actif=eq.true&limit=1`, select: 'id' });
-    if (Array.isArray(hasConfig) && hasConfig.length > 0) {
-      const dejaSaisi = await releveEnergieFaitAujourdhui(siteId);
-      if (!dejaSaisi) restants.push({ id: '__releve_energie__', nom: '⚡ Relevé énergie' });
+    const siteRaw = await db('sites', { query: `&id=eq.${siteId}&limit=1`, select: 'modules' });
+    const siteMods: string[] = Array.isArray(siteRaw) && siteRaw[0] && Array.isArray(siteRaw[0].modules) ? siteRaw[0].modules : [];
+    const hasEnergieModule = siteMods.length === 0 || siteMods.includes('general');
+    if (hasEnergieModule) {
+      const hasConfig = await db('energie_config', { query: `&site_id=eq.${siteId}&actif=eq.true&limit=1`, select: 'id' });
+      if (Array.isArray(hasConfig) && hasConfig.length > 0) {
+        const dejaSaisi = await releveEnergieFaitAujourdhui(siteId);
+        if (!dejaSaisi) restants.push({ id: '__releve_energie__', nom: '⚡ Relevé énergie' });
+      }
     }
   }
   return restants;
@@ -245,8 +251,11 @@ async function getFrequencesDisponibles(site: any): Promise<string[]> {
     if (Array.isArray(equipsReleve) && equipsReleve.length > 0) freqs.push('releve_horaire');
   }
 
-  // Relevé énergie — disponible uniquement si explicitement activé (opt-in) + config existe + pas encore saisi
-  if (site.energie_actif === true) {
+  // Relevé énergie — disponible si le site a le module "general" (ou pas de module restrictif)
+  // + une energie_config active existe + pas encore saisi aujourd'hui
+  const mods: string[] = Array.isArray(site.modules) ? site.modules : [];
+  const hasEnergieModule = mods.length === 0 || mods.includes('general');
+  if (hasEnergieModule) {
     const hasConfig = await db('energie_config', { query: `&site_id=eq.${site.id}&actif=eq.true&limit=1`, select: 'id' });
     if (Array.isArray(hasConfig) && hasConfig.length > 0) {
       const dejaSaisi = await releveEnergieFaitAujourdhui(site.id);
