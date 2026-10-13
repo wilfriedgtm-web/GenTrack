@@ -5463,10 +5463,8 @@ async function _rtConfig(sid){
   _configEquipCache={};
   equips.forEach(function(e){_configEquipCache[e.id]=e;});
 
-  // Détecter site nouveau (pas encore configuré)
+  // Détecter site nouveau (pas encore configuré) — uniquement pour afficher l'onglet Démarrage
   var isNewSite=(equips.filter(function(e){return e.actif_ronde||e.actif_releve;}).length===0);
-  // Si nouveau site et qu'on arrive sur l'onglet par défaut → pointer sur setup
-  if(isNewSite&&_configCurrentTab==='equipements')_configCurrentTab='setup';
 
   // Tabs dynamiques selon modules + état du site
   var tabs=[
