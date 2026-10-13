@@ -2670,6 +2670,25 @@ function _sgCreerManuel(sid){
   });
 }
 
+// Notifie l'équipe via WhatsApp après création d'un signalement depuis le dashboard
+async function _notifySignalement(siteId,sg){
+  if(!sg||!siteId)return;
+  try{
+    fetch(SUPA_URL+'/functions/v1/notify-signalement',{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({
+        site_id:siteId,
+        type:sg.type,
+        description:sg.description,
+        signale_par:sg.signale_par||null,
+        ref_code:sg.ref_code||null,
+        equipement_nom:sg.equipement_nom||null,
+      })
+    }).catch(function(){});
+  }catch(e){}
+}
+
 async function _sgCreerManuelSubmit(sid){
   var desc=(document.getElementById('sg-m-desc').value||'').trim();
   var type=document.getElementById('sg-m-type').value;
@@ -2679,7 +2698,8 @@ async function _sgCreerManuelSubmit(sid){
   else if(rawVal.startsWith('zone::'))equipZoneId=rawVal.slice(6);
   var par=(document.getElementById('sg-m-par').value||'').trim()||null;
   if(!desc)return;
-  await supaPost('signalements',{groupe_id:sid,equipement_id:equipId,equipement_zone_id:equipZoneId,type:type,description:desc,signale_par:par,statut:'ouvert',source:'manuel'});
+  var sg=await supaPost('signalements',{groupe_id:sid,equipement_id:equipId,equipement_zone_id:equipZoneId,type:type,description:desc,signale_par:par,statut:'ouvert',source:'manuel'});
+  _notifySignalement(sid,sg);
   _closeCfgModal();
   if(_session)renderRespTech(_session,'signalements');
 }
@@ -2724,10 +2744,11 @@ async function _sgCreerDepuisAlerteSubmit(sid,alerteId){
   else if(rawVal.startsWith('zone::'))equipZoneId=rawVal.slice(6);
   var par=(document.getElementById('sg-a-par').value||'').trim()||null;
   if(!desc)return;
-  await Promise.all([
+  var [sg]=await Promise.all([
     supaPost('signalements',{groupe_id:sid,equipement_id:equipId,equipement_zone_id:equipZoneId,type:type,description:desc,signale_par:par,statut:'ouvert',source:'alerte'}),
     supaPatch('alertes',alerteId,{resolue:true})
   ]);
+  _notifySignalement(sid,sg);
   _closeCfgModal();
   if(_session)renderRespTech(_session,'signalements');
 }
@@ -10596,7 +10617,8 @@ function _buildRecoTag(reco,eqId,eqNom,sid){
 
 async function _recoSignaler(cacheKey){
   var d=_recoCache[cacheKey];if(!d)return;
-  await supaPost('signalements',{groupe_id:d.sid,equipement_id:d.eqId,type:'panne',description:d.reco.message,signale_par:(_session&&_session.contact&&_session.contact.nom)||null,statut:'ouvert',source:'manuel'});
+  var sg=await supaPost('signalements',{groupe_id:d.sid,equipement_id:d.eqId,type:'panne',description:d.reco.message,signale_par:(_session&&_session.contact&&_session.contact.nom)||null,statut:'ouvert',source:'manuel'});
+  _notifySignalement(d.sid,sg);
   navTo('signalements');
 }
 
@@ -10610,7 +10632,8 @@ async function _recoPlanifier(cacheKey){
 
 async function _recoVetuste(cacheKey){
   var d=_recoCache[cacheKey];if(!d)return;
-  await supaPost('signalements',{groupe_id:d.sid,equipement_id:d.eqId,type:'autre',description:'Vétusté — '+d.reco.message,signale_par:(_session&&_session.contact&&_session.contact.nom)||null,statut:'ouvert',source:'manuel'});
+  var sg=await supaPost('signalements',{groupe_id:d.sid,equipement_id:d.eqId,type:'autre',description:'Vétusté — '+d.reco.message,signale_par:(_session&&_session.contact&&_session.contact.nom)||null,statut:'ouvert',source:'manuel'});
+  _notifySignalement(d.sid,sg);
   navTo('signalements');
 }
 

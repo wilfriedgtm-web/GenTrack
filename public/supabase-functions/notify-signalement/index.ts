@@ -94,9 +94,9 @@ async function sendNotifications(payload: any) {
 
   console.log(`notify: site=${site_id} ref=${ref_code} type=${type}`);
 
-  // ── 1. Resp_tech + dir_tech ───────────────────────────────────────────────
+  // ── 1. Resp_tech + dir_tech + technicien ────────────────────────────────
   const responsables = await db('contacts', {
-    query: `&site_id=eq.${site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true`,
+    query: `&site_id=eq.${site_id}&role=in.(resp_tech,dir_tech,technicien)&actif=eq.true`,
     select: 'whatsapp',
   });
 
@@ -118,7 +118,7 @@ async function sendNotifications(payload: any) {
       }
     }
   }
-  console.log(`notify: ${responsables?.length ?? 0} responsables → ${dejaEnvoyes.size} envoyés`);
+  console.log(`notify: ${responsables?.length ?? 0} contacts → ${dejaEnvoyes.size} envoyés`);
 
   // ── 2. Signaleur — confirmation + lien de suivi ──────────────────────────
   // Le formulaire pré-remplit sg-wa-input avec le WA du contact connu si disponible.
