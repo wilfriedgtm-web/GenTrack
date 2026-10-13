@@ -309,13 +309,12 @@ async function init(){
   var results=await Promise.all([
     supa('zones','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,etage,categorie&order=ordre.asc'),
     supa('equipements','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id,types_equipements(nom)&order=ordre_ronde.asc'),
-    supa('equipements_zone','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id,zones!inner(type_zone)&zones.type_zone=in.(chambre,commun_etage,special)&order=nom.asc'),
     supa('contacts','site_id=eq.'+siteId+'&actif=eq.true&'+ROLES_DEMANDEUR+'&select=id,nom,role,whatsapp&order=nom.asc')
   ]);
   _zones=results[0]||[];
   _equips=results[1]||[];
-  _equipZones=results[2]||[];
-  _demandeurs=results[3]||[];
+  _equipZones=[]; // chargé à la volée selon la zone sélectionnée
+  _demandeurs=results[2]||[];
   _buildWhoPicker();
   // Si aucun demandeur connu → afficher le champ WA d'emblée
   if(!_demandeurs.length){
@@ -340,7 +339,8 @@ async function init(){
       document.getElementById('sg-zone-locked').style.display='flex';
       document.getElementById('sg-zone-name-locked').textContent=foundZone.nom+(foundZone.etage?' ('+foundZone.etage+')':'');
       document.getElementById('sg-zone-select-wrap').style.display='none';
-      // Filtrer équipements sur cette zone
+      // Charger et filtrer équipements sur cette zone précise
+      _equipZones=await supa('equipements_zone','zone_id=eq.'+zoneParam+'&actif=eq.true&select=id,nom,zone_id&order=nom.asc');
       _renderEquipOptions([zoneParam]);
     }
   }
@@ -408,9 +408,13 @@ function _selectCat(tileEl,catKey,info){
   var chipLabel=document.getElementById('sg-zone-chips-label');
   chipsEl.innerHTML='';
   if(info.zones.length===1){
-    // Une seule zone → auto-select
+    // Une seule zone → auto-select + charger équipements à la volée
     _selectedZoneId=info.zones[0].id;
     wrap.style.display='none';
+    supa('equipements_zone','zone_id=eq.'+info.zones[0].id+'&actif=eq.true&select=id,nom,zone_id&order=nom.asc').then(function(res){
+      _equipZones=res||[];
+      _renderEquipOptions([info.zones[0].id]);
+    });
   } else {
     chipLabel.textContent=info.label+' — sélectionnez la salle';
     var chipSearch=document.getElementById('sg-chip-search');
@@ -419,18 +423,20 @@ function _selectCat(tileEl,catKey,info){
       var chip=document.createElement('span');
       chip.className='zone-chip';
       chip.textContent=z.nom+(z.etage?' ('+z.etage+')':'');
-      chip.addEventListener('click',function(){
+      chip.addEventListener('click',async function(){
         document.querySelectorAll('.zone-chip').forEach(function(c){c.classList.remove('sel');});
         chip.classList.add('sel');
         _selectedZoneId=z.id;
-        // Filtrer équips sur cette zone précise
+        // Charger équipements à la volée pour cette zone précise
+        _equipZones=await supa('equipements_zone','zone_id=eq.'+z.id+'&actif=eq.true&select=id,nom,zone_id&order=nom.asc');
         _renderEquipOptions([z.id]);
       });
       chipsEl.appendChild(chip);
     });
     wrap.style.display='block';
   }
-  // Filtrer équips sur toute la catégorie
+  // Réinitialiser équipements_zone (sera rechargé si une zone précise est choisie)
+  _equipZones=[];
   _renderEquipOptions(_selectedCatZoneIds);
 }
 
@@ -605,9 +611,15 @@ function _getSignaleurInfo(){
   return {prenom:prenom||null,contactId:_selectedDemandeurId||null};
 }
 
-function _onZoneChange(zoneId){
+async function _onZoneChange(zoneId){
   _selectedZoneId=zoneId||null;
-  _renderEquipOptions(_selectedZoneId?[_selectedZoneId]:null);
+  if(zoneId){
+    _equipZones=await supa('equipements_zone','zone_id=eq.'+zoneId+'&actif=eq.true&select=id,nom,zone_id&order=nom.asc');
+    _renderEquipOptions([zoneId]);
+  } else {
+    _equipZones=[];
+    _renderEquipOptions(null);
+  }
 }
 
 function _showInvalid(){
@@ -803,6 +815,7 @@ function _reset(){
     document.querySelectorAll('.zone-tile').forEach(function(t){t.classList.remove('sel');});
     document.querySelectorAll('.zone-chip').forEach(function(c){c.classList.remove('sel');});
     document.getElementById('sg-zone-chips-wrap').style.display='none';
+    _equipZones=[];
     _renderEquipOptions(null);
   }else{
     _renderEquipOptions([_lockedZoneId]);
