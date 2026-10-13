@@ -440,11 +440,19 @@ function _renderEquipOptions(zoneIds){
       _equipComboItems.push({val:'eq:'+e.id,label:label});
     });
   } else {
-    // Mode normal : uniquement les équipements de salle, filtrés par zone si besoin
-    var list=zoneIds&&zoneIds.length>0
+    // Mode normal : équipements de salle + équipements techniques liés à la zone
+    var listZone=zoneIds&&zoneIds.length>0
       ?_equipZones.filter(function(e){return zoneIds.indexOf(e.zone_id)!==-1;})
       :_equipZones;
-    list.forEach(function(e){_equipComboItems.push({val:'ez:'+e.id,label:e.nom});});
+    listZone.forEach(function(e){_equipComboItems.push({val:'ez:'+e.id,label:e.nom});});
+    // Ajouter aussi les équipements techniques (equipements) qui ont un zone_id dans la sélection
+    var listEquip=zoneIds&&zoneIds.length>0
+      ?_equips.filter(function(e){return e.zone_id&&zoneIds.indexOf(e.zone_id)!==-1;})
+      :[];
+    listEquip.forEach(function(e){
+      var label=(e.types_equipements&&e.types_equipements.nom?e.types_equipements.nom+' — ':'')+e.nom;
+      _equipComboItems.push({val:'eq:'+e.id,label:label});
+    });
   }
 
   if(prevVal&&!_equipComboItems.find(function(i){return i.val===prevVal;})){
