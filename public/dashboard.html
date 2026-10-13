@@ -374,7 +374,7 @@ function _updateAlertPill(n){
   badges.forEach(function(b){b.style.display=n>0?'block':'none';});
 }
 function roleName(r){var m={dir_ops:'Directeur des opérations',dir_tech:'Directeur technique',resp_tech:'Responsable technique',technicien:'Technicien'};return m[r]||r;}
-function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',releves:'Relevés horaires',signalements:'Signalements',maintenances:'Maintenance',config:'Configuration',rapport:'Rapport conso',commandes:'Commandes',energie:'Énergie'};return m[id]||'Accueil';}
+function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',releves:'Relevés horaires',signalements:'Signalements',maintenances:'Maintenance',config:'Configuration',rapport:'Rapport conso',commandes:'Commandes',energie:'Énergie',planning:'Planning rondes'};return m[id]||'Accueil';}
 function saveSession(s){_session=s;try{localStorage.setItem('gt_session',JSON.stringify(s));}catch(e){}}
 function loadStored(){try{return JSON.parse(localStorage.getItem('gt_session'));}catch(e){return null;}}
 function clearSession(){_session=null;try{localStorage.removeItem('gt_session');}catch(e){}}
@@ -593,6 +593,7 @@ function buildNavItems(role){
     }
     items.push({id:'equipe',icon:'group',label:'Mon équipe'});
     items.push({id:'releves',icon:'schedule',label:'Relevés'});
+    items.push({id:'planning',icon:'calendar_month',label:'Planning'});
     items.push({id:'config',icon:'settings',label:'Config'});
   }
   if(role==='dir_tech'){
@@ -650,7 +651,7 @@ function buildMobileNav(role,activeNav,alerteBadge){
       {id:'signalements',icon:'location_on',label:'Signalements'},
       {id:'__plus__',icon:'apps',label:'Plus'}
     ];
-    plusIds=['maintenances','energie','commandes','equipe','releves','historique','config'];
+    plusIds=['maintenances','energie','commandes','equipe','releves','planning','historique','config'];
   }
   var plusItems=allItems.filter(function(it){return plusIds.indexOf(it.id)!==-1;});
   var plusActive=plusItems.some(function(it){return it.id===activeNav;});
@@ -775,6 +776,7 @@ async function _loadRT(session,nav){
     else if(nav==='energie')html=await _rtEnergie(sid);
     else if(nav==='commandes')html=await _rtCommandes(sid,session);
     else if(nav==='equipe')html=await _rtMonEquipe(sid,session);
+    else if(nav==='planning')html=await _buildPlanningTab(sid);
     else if(nav==='config')html=await _rtConfig(sid);
     el.innerHTML=html;
     if(nav==='signalements'){_sgSelected=null;_sgRenderKanban(sid);}
@@ -5718,7 +5720,6 @@ async function _rtConfig(sid){
     {key:'setup',    label:'🚀 Démarrage',          show:isNewSite},
     {key:'zones',    label:'📍 Zones & Lieux',       show:true},
     {key:'equipements',label:'⚙️ Équipements & Rondes',show:true},
-    {key:'planning', label:'📅 Planning rondes',     show:true},
     {key:'seuils',   label:'🎯 Seuils d\'alerte',    show:true},
     {key:'contacts', label:'👥 Contacts & Alertes',  show:true},
     {key:'releves',  label:'📋 Relevés horaires',    show:true},
@@ -5734,12 +5735,6 @@ async function _rtConfig(sid){
     if(dc2s){dc2s.style.padding='24px';dc2s.style.maxWidth='680px';}
     var setupHtml=await _buildSetupTab(sid,equips,zonesArr||[],contactsArr||[]);
     return '<div class="config-tabs">'+tabHtml+'</div>'+setupHtml;
-  }
-  if(_configCurrentTab==='planning'){
-    var dc2p=document.getElementById('dash-content-main');
-    if(dc2p){dc2p.style.padding='24px';dc2p.style.maxWidth='none';}
-    var planningHtml=await _buildPlanningTab(sid);
-    return '<div class="config-tabs">'+tabHtml+'</div>'+planningHtml;
   }
   if(_configCurrentTab==='seuils'){
     var dc2=document.getElementById('dash-content-main');
