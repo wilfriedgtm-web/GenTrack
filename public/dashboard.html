@@ -5442,16 +5442,23 @@ function _eqImportHandleFile(file,sid){
 
 async function _rtConfig(sid){
   _configCurrentSid=sid;
-  // Charger modules du site + données pour le setup guidé en parallèle
-  var [siteArr,types,equips,zonesArr,contactsArr]=await Promise.all([
-    supaGet('sites','id=eq.'+sid+'&select=modules&limit=1'),
-    supaGet('types_equipements','select=id,nom&order=nom'),
-    supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,actif_ronde,actif_releve,ordre_ronde,type_id,zone_id,puissance_kva,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,prix_litre,type_compteur_heures,types_equipements(nom)&order=ordre_ronde.asc'),
-    supaGet('zones','site_id=eq.'+sid+'&actif=eq.true&select=id&limit=1'),
-    supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&select=id&limit=1')
-  ]);
-  // Mettre à jour les modules actifs pour hasModule()
+  // Charger équipements + types (critique), modules + counts (non-bloquant)
+  var types=await supaGet('types_equipements','select=id,nom&order=nom');
+  var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,actif_ronde,actif_releve,ordre_ronde,type_id,zone_id,puissance_kva,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,prix_litre,type_compteur_heures,types_equipements(nom)&order=ordre_ronde.asc');
+  equips=equips||[];
+  // Charger modules du site (non-bloquant — fallback 'general' si colonne absente)
+  var siteArr=null;
+  try{siteArr=await supaGet('sites','id=eq.'+sid+'&select=modules&limit=1');}catch(e){}
   _siteModules=(siteArr&&siteArr[0]&&Array.isArray(siteArr[0].modules))?siteArr[0].modules:['general'];
+  // Comptes rapides pour le setup (non-bloquant)
+  var zonesArr=[],contactsArr=[];
+  try{
+    var _zc=await Promise.all([
+      supaGet('zones','site_id=eq.'+sid+'&actif=eq.true&select=id&limit=1'),
+      supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&select=id&limit=1')
+    ]);
+    zonesArr=_zc[0]||[];contactsArr=_zc[1]||[];
+  }catch(e){}
   // Populate cache for safe onclick lookup (évite l'échappement multi-niveau)
   _configEquipCache={};
   equips.forEach(function(e){_configEquipCache[e.id]=e;});
