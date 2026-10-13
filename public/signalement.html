@@ -305,7 +305,7 @@ async function init(){
     supa('zones','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,etage,categorie&order=ordre.asc'),
     supa('equipements','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id,types_equipements(nom)&order=ordre_ronde.asc'),
     supa('equipements_zone','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id&order=nom.asc'),
-    supa('contacts','site_id=eq.'+siteId+'&actif=eq.true&'+ROLES_DEMANDEUR+'&select=id,nom,role&order=nom.asc')
+    supa('contacts','site_id=eq.'+siteId+'&actif=eq.true&'+ROLES_DEMANDEUR+'&select=id,nom,role,whatsapp&order=nom.asc')
   ]);
   _zones=results[0]||[];
   _equips=results[1]||[];
@@ -573,7 +573,7 @@ function _selectDemandeur(id,btn){
   if(_selectedDemandeurId===id){
     _selectedDemandeurId=null;
     document.getElementById('sg-prenom').value='';
-    _toggleWaSection();
+    document.getElementById('sg-wa-input').value='';
     return;
   }
   _selectedDemandeurId=id;
@@ -581,14 +581,17 @@ function _selectDemandeur(id,btn){
   btn.style.borderColor='var(--amber-border)';
   btn.style.color='var(--amber-dark)';
   var d=_demandeurs.find(function(x){return x.id===id;});
-  if(d)document.getElementById('sg-prenom').value=d.nom;
-  _toggleWaSection();
+  if(d){
+    document.getElementById('sg-prenom').value=d.nom;
+    // Pré-remplir le numéro WA si le contact en a un
+    if(d.whatsapp)document.getElementById('sg-wa-input').value=d.whatsapp;
+  }
 }
 
 function _toggleWaSection(){
-  // Afficher le champ WA seulement si pas de contact connu sélectionné
+  // La section WA est toujours visible — le demandeur choisit de laisser son numéro pour le suivi
   var waSection=document.getElementById('sg-wa-section');
-  if(waSection)waSection.style.display=_selectedDemandeurId?'none':'block';
+  if(waSection)waSection.style.display='block';
 }
 
 function _getSignaleurInfo(){

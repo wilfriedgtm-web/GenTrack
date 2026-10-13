@@ -1,7 +1,7 @@
 // supabase/functions/notify-signalement/index.ts
-// GenTrack — Notification signalement v3
-// Fix EarlyDrop : waitUntil + timeout 10s sur fetch Twilio
-// Notifie : resp_tech + dir_tech (toujours) + demandeur connu (contact.whatsapp) + résident (numéro libre + lien suivi)
+// GenTrack — Notification signalement v4
+// Fix EarlyDrop : waitUntil + Promise.race timeout 8s
+// Notifie : 1) resp_tech + dir_tech  2) signaleur (confirmation + lien suivi) si signaleur_whatsapp fourni
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -81,16 +81,14 @@ async function sendNotifications(payload: any) {
     equipement_nom,
     lieu,
     ref_code,
-    signaleur_contact_id,
     signaleur_whatsapp,
   } = payload;
 
   const typeLabel  = TYPE_LABELS[type] || type || 'Signalement';
   const heure      = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Dakar' });
   const suiviUrl   = ref_code ? `${BASE_URL}/suivi-signalement.html?ref=${encodeURIComponent(ref_code)}` : null;
-  // dejaEnvoyes = anti-doublon pour les alertes équipe (étape 1)
-  // dejaConfirms = anti-doublon pour les confirmations signaleur (étapes 2+3)
-  // Les deux sets sont INDÉPENDANTS : un resp_tech qui est aussi signaleur reçoit les deux messages
+  // dejaEnvoyes = anti-doublon alertes équipe
+  // dejaConfirms = indépendant : un resp_tech signaleur reçoit bien les deux messages
   const dejaEnvoyes = new Set<string>();
   const dejaConfirms = new Set<string>();
 
@@ -121,28 +119,9 @@ async function sendNotifications(payload: any) {
   }
   console.log(`notify: ${responsables?.length ?? 0} responsables → ${dejaEnvoyes.size} envoyés`);
 
-  // ── 2. Demandeur connu (manager/gouvernant avec compte) ───────────────────
-  if (signaleur_contact_id) {
-    const contacts = await db('contacts', {
-      query: `&id=eq.${signaleur_contact_id}&actif=eq.true`,
-      select: 'whatsapp,nom',
-    });
-    const demandeur = Array.isArray(contacts) ? contacts[0] : null;
-    if (demandeur?.whatsapp && !dejaConfirms.has(demandeur.whatsapp)) {
-      dejaConfirms.add(demandeur.whatsapp);
-      const msgDemandeur =
-        `✅ *Votre signalement a bien été reçu*\n\n` +
-        `📋 Référence : *${ref_code || '—'}*\n` +
-        `📝 ${description}` +
-        `${lieu ? '\n📍 ' + lieu : ''}` +
-        `\n\nL'équipe technique a été notifiée et va traiter votre demande.` +
-        `\n\n_Conservez votre référence pour le suivi._`;
-      await sendWA(demandeur.whatsapp, msgDemandeur);
-      console.log(`notify: demandeur envoyé`);
-    }
-  }
-
-  // ── 3. Résident (numéro libre) — lien de suivi ────────────────────────────
+  // ── 2. Signaleur — confirmation + lien de suivi ──────────────────────────
+  // Le formulaire pré-remplit sg-wa-input avec le WA du contact connu si disponible.
+  // Tout passe par signaleur_whatsapp — pas besoin de lookup séparé par contact_id.
   if (signaleur_whatsapp && !dejaConfirms.has(signaleur_whatsapp)) {
     dejaConfirms.add(signaleur_whatsapp);
     const msgResident =
@@ -157,7 +136,7 @@ async function sendNotifications(payload: any) {
     console.log(`notify: résident envoyé → ${signaleur_whatsapp.slice(0,8)}...`);
   }
 
-  console.log(`notify: DONE — total=${dejaEnvoyes.size}`);
+  console.log(`notify: DONE — resp=${dejaEnvoyes.size} confirms=${dejaConfirms.size}`);
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
