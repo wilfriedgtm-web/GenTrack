@@ -278,7 +278,7 @@ async function alerterSeuilsEnArrierePlan(equip: any, questions: any[], reponses
     for (const d of dests) {
       if (d.type_contact === 'whatsapp' && !dejaEnvoyes.has(d.contact)) {
         dejaEnvoyes.add(d.contact);
-        sendWA(d.contact, msg).catch(() => {});
+        await sendWA(d.contact, msg).catch(() => {});
       }
     }
   }
@@ -288,7 +288,7 @@ async function alerterSeuilsEnArrierePlan(equip: any, questions: any[], reponses
     for (const r of responsables) {
       if (r.whatsapp && !dejaEnvoyes.has(r.whatsapp)) {
         dejaEnvoyes.add(r.whatsapp);
-        sendWA(r.whatsapp, msg).catch(() => {});
+        await sendWA(r.whatsapp, msg).catch(() => {});
       }
     }
   }
@@ -934,12 +934,12 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       source: 'ronde',
       ronde_id: sd.ronde_id || null,
     }}).catch(() => {});
-    // Notifier resp_tech (non bloquant)
-    db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` }).then((responsables: any[]) => {
-      if (!Array.isArray(responsables)) return;
+    // Notifier resp_tech
+    const responsablesAno = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` }).catch(() => []);
+    if (Array.isArray(responsablesAno)) {
       const alertMsg = `⚠️ *Anomalie signalée — ${sd.equip_nom}*\n_${siteNom}_\n\n"${desc}"\n\n_Signalé par ${contact.nom} · ${getHeure()}_`;
-      for (const r of responsables) if (r.whatsapp) sendWA(r.whatsapp, alertMsg).catch(() => {});
-    }).catch(() => {});
+      for (const r of responsablesAno) if (r.whatsapp) await sendWA(r.whatsapp, alertMsg).catch(() => {});
+    }
 
     await sendWA(phone, `✅ Anomalie enregistrée. Responsable notifié.`);
     return continuerRonde(phone, sd, contact, site); // continue la ronde sans bloquer
@@ -1077,14 +1077,14 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       for (const r of responsables) if (r.whatsapp && r.whatsapp !== phone) await sendWA(r.whatsapp, notifMsg);
     }
 
-    // Notifier le demandeur (contact connu ou résident) — non bloquant
-    db('signalements', {
+    // Notifier le demandeur (contact connu ou résident)
+    const sgRows = await db('signalements', {
       query: `&id=eq.${sd.sg_id}&limit=1`,
       select: 'signaleur_contact_id,signaleur_whatsapp,ref_code,description',
-    }).then(async (sgRows: any[]) => {
-      const sg = Array.isArray(sgRows) ? sgRows[0] : null;
-      if (!sg) return;
-      const refCode = sg.ref_code || '';
+    }).catch(() => []);
+    const sgRow = Array.isArray(sgRows) ? sgRows[0] : null;
+    if (sgRow) {
+      const refCode = sgRow.ref_code || '';
       const msgResolu =
         `✅ *Votre demande a été résolue — GenTrack*\n\n` +
         `📋 Référence : *${refCode || sd.sg_label}*\n` +
@@ -1092,19 +1092,19 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
         `${cout > 0 ? '💰 ' + cout.toLocaleString('fr-FR') + ' FCFA\n' : ''}` +
         `\n_Résolu le ${today}._`;
       // Contact connu (manager/gouvernant)
-      if (sg.signaleur_contact_id) {
+      if (sgRow.signaleur_contact_id) {
         const contacts = await db('contacts', {
-          query: `&id=eq.${sg.signaleur_contact_id}&actif=eq.true`,
+          query: `&id=eq.${sgRow.signaleur_contact_id}&actif=eq.true`,
           select: 'whatsapp',
-        });
+        }).catch(() => []);
         const c = Array.isArray(contacts) ? contacts[0] : null;
-        if (c?.whatsapp && c.whatsapp !== phone) sendWA(c.whatsapp, msgResolu).catch(() => {});
+        if (c?.whatsapp && c.whatsapp !== phone) await sendWA(c.whatsapp, msgResolu).catch(() => {});
       }
       // Résident (numéro libre)
-      if (sg.signaleur_whatsapp && sg.signaleur_whatsapp !== phone) {
-        sendWA(sg.signaleur_whatsapp, msgResolu).catch(() => {});
+      if (sgRow.signaleur_whatsapp && sgRow.signaleur_whatsapp !== phone) {
+        await sendWA(sgRow.signaleur_whatsapp, msgResolu).catch(() => {});
       }
-    }).catch(() => {});
+    }
 
     return sendWA(phone, `✅ *Clôturé !*\n\n${sd.sg_label}\n${sd.resolution_note ? '🔧 ' + sd.resolution_note + '\n' : ''}${cout > 0 ? '💰 ' + cout.toLocaleString('fr-FR') + ' FCFA\n' : ''}\n_Responsable notifié. 📲_`);
   }
@@ -1248,13 +1248,13 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
 
     const newReponses = { ...reponses, [f.id]: numVal };
 
-    // Alerte seuil bas — non bloquant
+    // Alerte seuil bas
     if (f.seuil_alerte_bas != null && numVal < f.seuil_alerte_bas) {
-      db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` }).then((responsables: any[]) => {
-        if (!Array.isArray(responsables)) return;
+      const responsablesSeuil = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` }).catch(() => []);
+      if (Array.isArray(responsablesSeuil)) {
         const alertMsg = `⚠️ *Alerte énergie — ${f.nom}*\n_${siteNom}_\n\nValeur : *${numVal}${f.unite ? ' ' + f.unite : ''}* (seuil : ${f.seuil_alerte_bas})\n\n_Relevé par ${contact.nom} · ${getHeure()}_`;
-        for (const r of responsables) if (r.whatsapp) sendWA(r.whatsapp, alertMsg).catch(() => {});
-      }).catch(() => {});
+        for (const r of responsablesSeuil) if (r.whatsapp) await sendWA(r.whatsapp, alertMsg).catch(() => {});
+      }
     }
 
     const next = idx + 1;
@@ -1318,11 +1318,11 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     }
     await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
 
-    // Notifier resp_tech — non bloquant
+    // Notifier resp_tech
     const fluides: any[] = sd.fluides || [];
     const lastReleve: Record<string, any> = sd.last_releve || {};
-    db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` }).then((responsables: any[]) => {
-      if (!Array.isArray(responsables)) return;
+    const responsablesEnergie = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` }).catch(() => []);
+    if (Array.isArray(responsablesEnergie)) {
       const lines = fluides.map((f: any) => {
         const val = valeurs[f.id];
         if (val == null) return null;
@@ -1334,8 +1334,8 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
         return `${em} ${f.nom} : *${val}${f.unite ? ' ' + f.unite : ''}*${delta}`;
       }).filter(Boolean).join('\n');
       const notifMsg = `⚡ *Relevé énergie — ${siteNom}*\n_Consommation du ${dateReleve} · saisi à ${getHeure()}_\n\n${lines}\n\n_Saisi par ${contact.nom}_`;
-      for (const r of responsables) if (r.whatsapp) sendWA(r.whatsapp, notifMsg).catch(() => {});
-    }).catch(() => {});
+      for (const r of responsablesEnergie) if (r.whatsapp) await sendWA(r.whatsapp, notifMsg).catch(() => {});
+    }
 
     // Si lancé depuis une ronde, retour à la liste des équipements restants
     if (sd.ronde_context?.ronde_id) {

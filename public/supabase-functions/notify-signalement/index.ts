@@ -102,10 +102,11 @@ serve(async (req) => {
       for (const r of responsables) {
         if (r.whatsapp && !dejaEnvoyes.has(r.whatsapp)) {
           dejaEnvoyes.add(r.whatsapp);
-          sendWA(r.whatsapp, msgResp).catch(() => {});
+          await sendWA(r.whatsapp, msgResp).catch((e) => console.error('sendWA resp_tech error:', e));
         }
       }
     }
+    console.log(`notify-signalement: ${responsables?.length ?? 0} responsables, ${dejaEnvoyes.size} envoyés`);
 
     // ── 2. Demandeur connu (manager/gouvernant avec compte) ───────────────────
     if (signaleur_contact_id) {
@@ -123,7 +124,7 @@ serve(async (req) => {
           `${lieu ? '\n📍 ' + lieu : ''}` +
           `\n\nL'équipe technique a été notifiée et va traiter votre demande.` +
           `\n\n_Conservez votre référence pour le suivi._`;
-        sendWA(demandeur.whatsapp, msgDemandeur).catch(() => {});
+        await sendWA(demandeur.whatsapp, msgDemandeur).catch((e) => console.error('sendWA demandeur error:', e));
       }
     }
 
@@ -138,9 +139,10 @@ serve(async (req) => {
         `\n\nL'équipe technique a été notifiée.` +
         `${suiviUrl ? `\n\n🔗 Suivez l'avancement de votre demande :\n${suiviUrl}` : ''}` +
         `\n\n_Merci d'avoir utilisé GenTrack._`;
-      sendWA(signaleur_whatsapp, msgResident).catch(() => {});
+      await sendWA(signaleur_whatsapp, msgResident).catch((e) => console.error('sendWA résident error:', e));
     }
 
+    console.log(`notify-signalement: total envoyés = ${dejaEnvoyes.size}`);
     return new Response(JSON.stringify({ ok: true, notified: dejaEnvoyes.size }), {
       headers: { 'Content-Type': 'application/json', ...CORS },
     });
