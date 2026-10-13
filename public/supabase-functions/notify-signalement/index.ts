@@ -24,34 +24,33 @@ async function db(table: string, opts: { query?: string; select?: string } = {})
   return JSON.parse(text);
 }
 
-// ── WhatsApp — avec timeout 10s pour éviter les blocages ─────────────────────
+// ── WhatsApp — timeout 8s via Promise.race (AbortController non fiable sur Supabase) ──
 async function sendWA(to: string, body: string) {
   if (!TWILIO_SID || !TWILIO_TOK) {
     console.error('sendWA: credentials manquants');
     return;
   }
   const toFmt = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  const fetchPromise = fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${btoa(`${TWILIO_SID}:${TWILIO_TOK}`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ From: TWILIO_FROM, To: toFmt, Body: body }).toString(),
+    }
+  );
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('sendWA timeout 8s')), 8000)
+  );
   try {
-    const res = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${btoa(`${TWILIO_SID}:${TWILIO_TOK}`)}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({ From: TWILIO_FROM, To: toFmt, Body: body }).toString(),
-        signal: controller.signal,
-      }
-    );
+    const res = await Promise.race([fetchPromise, timeoutPromise]);
     if (!res.ok) console.error('Twilio error:', await res.text());
     else console.log(`sendWA OK → ${toFmt.slice(0, 16)}...`);
   } catch (e: any) {
     console.error('sendWA error:', e?.name, e?.message);
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
