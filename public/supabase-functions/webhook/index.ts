@@ -201,6 +201,8 @@ async function getEquipementsRestants(rondeId: string, siteId: string, frequence
 
 // Vérifie si une ronde est complète sur une période donnée
 async function rondeCompleteDepuis(siteId: string, frequence: string, dateFrom: string, nbEquipements: number): Promise<boolean> {
+  // Si aucun équipement de ronde configuré, la ronde ne peut jamais être "complète"
+  if (nbEquipements === 0) return false;
   const rondes = await db('rondes', {
     query: `&site_id=eq.${siteId}&date_ronde=gte.${dateFrom}&frequence=eq.${frequence}`
   });
