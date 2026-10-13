@@ -10,143 +10,132 @@
   --dark:#12151E;--dark2:#1E2332;--dark3:#2A2F42;
   --text:#1A1D28;--text2:#5A5F78;--text3:#9AA0B8;
   --border:#E4E6EF;--bg:#F4F5FA;--white:#FFFFFF;
-  --amber:#E8A020;--amber-dark:#B87A10;--amber-pale:#FFF6E0;--amber-border:#F5D080;
+  --amber:#E8A020;--amber-pale:#FFF6E0;--amber-border:#F5D080;--amber-dark:#B87A10;
   --vert:#1B7A4A;--vert-pale:#E8F7EE;--vert-border:#A8DEC0;--vert-text:#155F39;
   --rouge:#C0392B;--rouge-pale:#FDF0EE;--rouge-border:#F0B8B2;--rouge-text:#9B2D22;
   --orange:#D46B0A;--orange-pale:#FEF3E5;--orange-border:#F5C87A;
-  --bleu:#2B5BA8;--bleu-pale:#EEF2FB;--bleu-border:#AFC7F0;
   --radius:16px;--radius-sm:10px;
-  --shadow:0 2px 12px rgba(18,21,30,.07);
 }
 body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;color:var(--text);min-height:100vh;overflow-x:hidden}
 
 /* ── HEADER ── */
-.rz-header{
-  background:linear-gradient(145deg,var(--dark) 0%,var(--dark2) 100%);
-  padding:calc(env(safe-area-inset-top,0px) + 18px) 20px 20px;
-  position:sticky;top:0;z-index:50;
-  box-shadow:0 2px 20px rgba(0,0,0,.25);
-}
-.rz-header-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.rz-header{background:linear-gradient(145deg,var(--dark) 0%,var(--dark2) 100%);padding:calc(env(safe-area-inset-top,0px) + 18px) 20px 18px;position:sticky;top:0;z-index:50;box-shadow:0 2px 20px rgba(0,0,0,.25)}
+.rz-header-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .rz-logo{font-size:10px;font-weight:800;letter-spacing:.2em;color:var(--amber);text-transform:uppercase}
-.rz-badge{
-  background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.35);
-  border-radius:20px;padding:4px 10px;
-  font-size:13px;font-weight:800;color:var(--amber);font-variant-numeric:tabular-nums;
-}
+.rz-badge{background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.35);border-radius:20px;padding:4px 10px;font-size:13px;font-weight:800;color:var(--amber)}
 .rz-title{font-size:20px;font-weight:800;color:#fff;letter-spacing:-.02em;margin-bottom:4px}
-.rz-meta-row{display:flex;justify-content:space-between;align-items:center}
-.rz-site-name{font-size:13px;color:rgba(255,255,255,.55);font-weight:500}
-.rz-contact-chip{
-  display:inline-flex;align-items:center;gap:5px;
-  background:rgba(255,255,255,.08);border-radius:20px;
-  padding:3px 10px;font-size:12px;color:rgba(255,255,255,.6);
-}
-.rz-progress-wrap{margin-top:14px}
-.rz-progress-labels{display:flex;justify-content:space-between;margin-bottom:5px}
-.rz-progress-label{font-size:11px;color:rgba(255,255,255,.4)}
-.rz-progress-label.active{color:rgba(255,255,255,.8);font-weight:700}
-.rz-progress{height:5px;background:rgba(255,255,255,.12);border-radius:3px;overflow:hidden}
-.rz-progress-bar{height:100%;background:linear-gradient(90deg,var(--amber),#F5C040);border-radius:3px;transition:width .4s cubic-bezier(.4,0,.2,1)}
+.rz-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.rz-site{font-size:13px;color:rgba(255,255,255,.5);font-weight:500}
+.rz-contact{font-size:12px;color:rgba(255,255,255,.5);background:rgba(255,255,255,.08);border-radius:20px;padding:3px 10px}
+.rz-prog-labels{display:flex;justify-content:space-between;margin-bottom:5px}
+.rz-prog-label{font-size:11px;color:rgba(255,255,255,.4)}
+.rz-prog-label.on{color:rgba(255,255,255,.8);font-weight:700}
+.rz-prog{height:5px;background:rgba(255,255,255,.12);border-radius:3px;overflow:hidden}
+.rz-prog-bar{height:100%;background:linear-gradient(90deg,var(--amber),#F5C040);border-radius:3px;transition:width .4s cubic-bezier(.4,0,.2,1)}
 
 /* ── CONTENT ── */
-.rz-content{padding:20px 16px 140px}
+.rz-content{padding:16px 14px 130px}
 
-/* ── GROUP BÂTIMENT ── */
-.rz-group{margin-bottom:28px}
-.rz-group-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;padding:0 4px;display:flex;align-items:center;gap:8px}
-.rz-group-title span{font-size:11px;font-weight:500;color:var(--text3)}
+/* ── ÉTAGE GROUP ── */
+.rz-group{margin-bottom:20px}
+.rz-group-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px}
+.rz-group-label{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)}
+.rz-btn-all{padding:4px 11px;border-radius:7px;border:1px solid var(--vert-border);background:var(--vert-pale);color:var(--vert-text);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
+.rz-btn-all:active{transform:scale(.97)}
+.rz-btn-all.done{background:var(--vert);border-color:var(--vert);color:#fff}
 
-/* ── ÉTAGE ── */
-.rz-etage{margin-bottom:10px}
-.rz-etage-label{
-  font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
-  color:var(--text3);margin-bottom:6px;padding:0 2px;
-}
-
-/* ── ZONE CARD ── */
-.rz-zone-card{
-  background:var(--white);border:1.5px solid var(--border);border-radius:12px;
-  padding:12px 14px;margin-bottom:6px;
-  transition:border-color .2s,box-shadow .2s;
-}
-.rz-zone-card.ok{border-color:var(--vert-border);background:var(--vert-pale)}
-.rz-zone-card.incident{border-color:var(--rouge-border);background:var(--rouge-pale)}
-.rz-zone-top{display:flex;align-items:center;gap:10px}
-.rz-zone-icon{font-size:20px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:var(--bg);flex-shrink:0}
-.rz-zone-card.ok .rz-zone-icon{background:rgba(27,122,74,.12)}
-.rz-zone-card.incident .rz-zone-icon{background:rgba(192,57,43,.1)}
-.rz-zone-info{flex:1;min-width:0}
-.rz-zone-nom{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rz-zone-sub{font-size:11px;color:var(--text3);margin-top:1px}
-.rz-zone-btns{display:flex;gap:6px;flex-shrink:0}
-
-/* ── TOGGLE BUTTONS ── */
-.rz-btn{
-  height:34px;padding:0 12px;border-radius:8px;
-  font-size:12px;font-weight:700;cursor:pointer;
-  border:1.5px solid var(--border);background:var(--white);color:var(--text2);
-  transition:all .15s;white-space:nowrap;
-}
-.rz-btn-ok.active{background:var(--vert);border-color:var(--vert);color:#fff}
-.rz-btn-ok:not(.active):hover{border-color:var(--vert);color:var(--vert)}
-.rz-btn-incident.active{background:var(--rouge);border-color:var(--rouge);color:#fff}
-.rz-btn-incident:not(.active):hover{border-color:var(--rouge);color:var(--rouge)}
-
-/* ── ANOMALY INPUT ── */
-.rz-anomaly-wrap{overflow:hidden;max-height:0;transition:max-height .25s ease,margin-top .25s ease;margin-top:0}
-.rz-anomaly-wrap.open{max-height:120px;margin-top:10px}
-.rz-anomaly-inp{
-  width:100%;padding:9px 12px;font-size:13px;font-family:inherit;
-  border:1.5px solid var(--rouge-border);border-radius:8px;
-  background:var(--white);color:var(--text);resize:none;
-  outline:none;line-height:1.4;
-}
-.rz-anomaly-inp:focus{border-color:var(--rouge);box-shadow:0 0 0 3px rgba(192,57,43,.1)}
-.rz-anomaly-inp::placeholder{color:var(--text3)}
+/* ── ROOM GRID ── */
+.rz-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.rz-room{border-radius:9px;padding:7px 4px 6px;text-align:center;cursor:pointer;border:1.5px solid var(--border);background:var(--white);transition:border-color .15s,background .15s;position:relative;user-select:none}
+.rz-room:active{transform:scale(.95)}
+.rz-room.ok{background:var(--vert-pale);border-color:var(--vert-border)}
+.rz-room.incident{background:var(--rouge-pale);border-color:var(--rouge-border)}
+.rz-room.focus{box-shadow:0 0 0 2.5px #2B5BA8;border-color:#2B5BA8}
+.rz-room-num{font-size:12px;font-weight:700;color:var(--text);line-height:1}
+.rz-room.ok .rz-room-num{color:var(--vert-text)}
+.rz-room.incident .rz-room-num{color:var(--rouge-text)}
+.rz-room-dot{width:6px;height:6px;border-radius:50%;margin:4px auto 0}
+.rz-alert-badge{position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:var(--rouge);border:2px solid var(--bg)}
 
 /* ── FOOTER ── */
-.rz-footer{
-  position:fixed;bottom:0;left:0;right:0;
-  background:var(--white);border-top:1.5px solid var(--border);
-  padding:14px 16px calc(env(safe-area-inset-bottom,0px) + 14px);
-  box-shadow:0 -4px 24px rgba(18,21,30,.1);
-  z-index:40;
-}
-.rz-footer-info{font-size:12px;color:var(--text2);margin-bottom:10px;text-align:center;font-weight:500}
-.rz-submit{
-  width:100%;height:52px;border-radius:14px;
-  background:linear-gradient(135deg,#1B7A4A,#24A060);
-  border:none;color:#fff;font-size:16px;font-weight:800;
-  cursor:pointer;letter-spacing:-.01em;
-  box-shadow:0 4px 20px rgba(27,122,74,.35);
-  transition:opacity .15s,transform .1s;
-}
-.rz-submit:disabled{background:var(--dark3);box-shadow:none;opacity:.55;cursor:default}
-.rz-submit:not(:disabled):active{transform:scale(.98)}
+.rz-footer{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1.5px solid var(--border);padding:12px 16px calc(env(safe-area-inset-bottom,0px) + 12px);box-shadow:0 -4px 24px rgba(18,21,30,.1);z-index:40}
+.rz-footer-info{font-size:12px;color:var(--text2);text-align:center;margin-bottom:9px;font-weight:500}
+.rz-submit{width:100%;height:52px;border-radius:14px;background:var(--dark3);border:none;color:#fff;font-size:16px;font-weight:800;cursor:default;opacity:.45;letter-spacing:-.01em;transition:opacity .2s,background .2s}
+.rz-submit.ready{background:linear-gradient(135deg,var(--vert),#24A060);opacity:1;cursor:pointer;box-shadow:0 4px 20px rgba(27,122,74,.3)}
+.rz-submit:not(.ready):hover{cursor:default}
+.rz-submit.ready:active{transform:scale(.98)}
 
-/* ── EMPTY / STATE ── */
-.rz-state{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:60px 24px;text-align:center;
-}
+/* ── DETAIL PANEL ── */
+.rz-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:60;opacity:0;pointer-events:none;transition:opacity .25s}
+.rz-overlay.show{opacity:1;pointer-events:auto}
+.rz-panel{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-radius:20px 20px 0 0;z-index:70;transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);max-height:92vh;display:flex;flex-direction:column}
+.rz-panel.open{transform:translateY(0)}
+.rz-panel-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 0;flex-shrink:0}
+.rz-panel-head{padding:14px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0;position:relative}
+.rz-panel-close{position:absolute;top:12px;right:14px;width:28px;height:28px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;color:var(--text2)}
+.rz-panel-num{font-size:22px;font-weight:800;color:var(--text);letter-spacing:-.02em}
+.rz-panel-sub{font-size:12px;color:var(--text2);margin-top:2px}
+.rz-panel-body{overflow-y:auto;padding:14px 16px 24px;flex:1}
+.rz-section{margin-bottom:16px}
+.rz-section-title{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+
+/* ── LAST VISIT ── */
+.rz-lv{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;border:1px solid var(--border);background:var(--bg)}
+.rz-lv-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.rz-lv-text{font-size:13px;font-weight:600;color:var(--text)}
+.rz-lv-sub{font-size:11px;color:var(--text2);margin-top:1px}
+
+/* ── SIGNALEMENT ACTIF ── */
+.rz-sg-card{padding:11px 13px;border-radius:10px;border:1.5px solid var(--rouge-border);background:var(--rouge-pale)}
+.rz-sg-top{display:flex;gap:9px;align-items:flex-start;margin-bottom:8px}
+.rz-sg-dot{width:8px;height:8px;border-radius:50%;background:var(--rouge);flex-shrink:0;margin-top:3px}
+.rz-sg-ref{font-size:11px;font-weight:800;color:var(--rouge-text)}
+.rz-sg-desc{font-size:12px;color:#7A2A20;line-height:1.45;margin-top:2px}
+.rz-sg-date{font-size:10px;color:#B05040;margin-top:4px}
+.rz-sg-note{width:100%;padding:7px 10px;border:1px solid var(--rouge-border);border-radius:7px;font-size:12px;font-family:inherit;background:var(--white);color:var(--text);resize:none;outline:none;margin-bottom:7px;display:none}
+.rz-sg-note:focus{border-color:var(--rouge)}
+.rz-btn-resolu{width:100%;padding:9px;border-radius:8px;border:none;background:var(--vert);color:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s}
+.rz-btn-resolu:hover{background:var(--vert-text)}
+.rz-btn-resolu.done{background:#888;cursor:default}
+
+/* ── EQUIPMENT QUICK CHECKS ── */
+.rz-eq-list{display:flex;flex-direction:column;gap:6px}
+.rz-eq-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;border:1px solid var(--border);background:var(--bg)}
+.rz-eq-icon{font-size:16px;width:24px;text-align:center;flex-shrink:0}
+.rz-eq-nom{flex:1;font-size:13px;font-weight:500;color:var(--text)}
+.rz-eq-btns{display:flex;gap:5px;flex-shrink:0}
+.rz-eq-btn{width:32px;height:28px;border-radius:7px;border:1px solid var(--border);background:var(--white);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.rz-eq-btn.ok{background:var(--vert-pale);border-color:var(--vert-border)}
+.rz-eq-btn.ko{background:var(--rouge-pale);border-color:var(--rouge-border)}
+
+/* ── INCIDENT FORM ── */
+.rz-inc-form{display:none;margin-top:10px;padding:12px;border-radius:10px;border:1.5px solid var(--rouge-border);background:var(--rouge-pale)}
+.rz-inc-form.show{display:block}
+.rz-inc-form-title{font-size:11px;font-weight:700;color:var(--rouge-text);margin-bottom:10px}
+.rz-inc-equip-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.rz-inc-equip-chip{padding:5px 10px;border-radius:7px;border:1px solid var(--rouge-border);background:var(--white);font-size:12px;font-weight:600;color:var(--rouge-text);cursor:pointer;transition:all .15s}
+.rz-inc-equip-chip.sel{background:var(--rouge);border-color:var(--rouge);color:#fff}
+.rz-inc-inp{width:100%;padding:8px 11px;border:1px solid var(--rouge-border);border-radius:8px;font-size:13px;font-family:inherit;background:var(--white);color:var(--text);resize:none;outline:none;line-height:1.45}
+.rz-inc-inp:focus{border-color:var(--rouge);box-shadow:0 0 0 3px rgba(192,57,43,.1)}
+
+/* ── ROOM STATUS BTNS ── */
+.rz-status-btns{display:flex;gap:8px;margin-top:4px}
+.rz-status-btn{flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--white);font-size:13px;font-weight:700;cursor:pointer;color:var(--text2);transition:all .15s}
+.rz-status-btn.ok-on{background:var(--vert-pale);border-color:var(--vert-border);color:var(--vert-text)}
+.rz-status-btn.inc-on{background:var(--rouge-pale);border-color:var(--rouge-border);color:var(--rouge-text)}
+.rz-status-btn:active{transform:scale(.97)}
+
+/* ── STATE SCREENS ── */
+.rz-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;text-align:center}
 .rz-state-emoji{font-size:48px;margin-bottom:16px}
 .rz-state-title{font-size:20px;font-weight:800;margin-bottom:8px;letter-spacing:-.02em}
 .rz-state-sub{font-size:14px;color:var(--text2);line-height:1.5;max-width:280px}
-.rz-pill{
-  display:inline-block;border-radius:20px;padding:6px 16px;
-  font-size:13px;font-weight:700;margin-top:10px;
-}
+.rz-pill{display:inline-block;border-radius:20px;padding:6px 16px;font-size:13px;font-weight:700;margin-top:8px}
 .rz-pill-ok{background:var(--vert-pale);color:var(--vert-text);border:1px solid var(--vert-border)}
 .rz-pill-warn{background:var(--orange-pale);color:var(--orange);border:1px solid var(--orange-border)}
+.rz-pill-info{background:#EEF2FB;color:#2B5BA8;border:1px solid #AFC7F0}
 .rz-confirm-time{font-size:12px;color:var(--text3);margin-top:12px}
-
-/* ── SPINNER ── */
-.rz-spinner{
-  width:44px;height:44px;border:3px solid var(--border);
-  border-top-color:var(--amber);border-radius:50%;
-  animation:spin .7s linear infinite;margin-bottom:24px;
-}
+.rz-spinner{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:24px}
 @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
@@ -156,28 +145,64 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
 var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
 
-var _site=null,_contact=null,_zones=[],_checks={},_notes={};
+/* ── STATE ── */
+var _site=null,_contact=null;
+var _zones=[];           // zones actives filtrées
+var _lastReleves={};     // zone_id → dernier releve
+var _signalements={};    // zone_id → signalement ouvert
+var _equipements={};     // zone_id → [equipements_zone]
+var _checks={};          // zone_id → 'ok'|'incident'
+var _eqChecks={};        // equipement_zone_id → 'ok'|'ko'
+var _incDesc={};         // zone_id → texte incident
+var _incEquip={};        // zone_id → equipement_zone_id sélectionné
+var _resolus=[];         // ids de signalements marqués résolus
+var _resolusNotes={};    // sg_id → note résolution
+var _currentZone=null;
 
+/* ── HELPERS ── */
 function h(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
+function equipIcon(nom){
+  var n=(nom||'').toLowerCase();
+  if(n.includes('clim')||n.includes('froid')||n.includes('air'))return '❄️';
+  if(n.includes('chauf')||n.includes('chauff'))return '🔥';
+  if(n.includes('eau')||n.includes('plomb')||n.includes('fuite')||n.includes('douche')||n.includes('bain'))return '🚿';
+  if(n.includes('elec')||n.includes('prise')||n.includes('courant')||n.includes('lumière')||n.includes('lampe'))return '🔌';
+  if(n.includes('porte')||n.includes('fenêtre')||n.includes('serrure'))return '🚪';
+  if(n.includes('tv')||n.includes('télé'))return '📺';
+  if(n.includes('ventil'))return '💨';
+  return '🔧';
+}
+
 function zoneIcon(z){
-  var t=(z.type_zone||z.categorie||'').toLowerCase();
-  if(t.includes('chambre'))return '🛏️';
-  if(t.includes('salon')||t.includes('commun'))return '🛋️';
-  if(t.includes('piscine'))return '🏊';
-  if(t.includes('gym')||t.includes('sport'))return '🏋️';
-  if(t.includes('cuisine'))return '🍽️';
-  if(t.includes('parking'))return '🚗';
-  if(t.includes('bureau'))return '💼';
-  if(t.includes('hall')||t.includes('lobby'))return '🏛️';
-  if(t.includes('terrasse'))return '🌿';
+  var t=(z.type_zone||'').toLowerCase();
+  if(t==='chambre')return '🛏️';
+  if(t==='commun_etage')return '🛋️';
+  if(t==='special')return '⭐';
   return '📍';
 }
 
+function daysSince(dateStr){
+  if(!dateStr)return null;
+  return Math.floor((Date.now()-new Date(dateStr))/(86400000));
+}
+
+function lvInfo(z){
+  var lr=_lastReleves[z.id];
+  var freq=z.frequence_passage||7;
+  if(!lr)return {dot:'#C8CAD8',text:'Jamais inspecté',sub:'Fréquence '+freq+' j'};
+  var d=daysSince(lr.date);
+  var left=freq-d;
+  if(lr.statut==='incident'||lr.nb_anomalies>0)return {dot:'#C0392B',text:'Incident signalé',sub:'Il y a '+d+' j'};
+  if(left<=0)return {dot:'#C0392B',text:'En retard de '+Math.abs(left)+' j',sub:'Dernier passage il y a '+d+' j'};
+  if(left<=2)return {dot:'#D46B0A',text:'Dû dans '+left+' j',sub:'Dernier passage il y a '+d+' j'};
+  return {dot:'#1B7A4A',text:'OK (il y a '+d+' j)',sub:'Prochain dans '+left+' j'};
+}
+
+/* ── API ── */
 async function supaGet(table,filter){
-  var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+filter,{
-    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
-  });
+  var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+filter,{headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}});
+  if(!r.ok)return[];
   return r.json();
 }
 async function supaPost(table,data){
@@ -186,220 +211,455 @@ async function supaPost(table,data){
     headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
     body:JSON.stringify(data)
   });
-  if(!r.ok){var err=await r.text();throw new Error('POST /'+table+' → '+r.status+': '+err);}
-  var rows=await r.json();
-  return Array.isArray(rows)?rows[0]:rows;
+  if(!r.ok){var e=await r.text();throw new Error('POST /'+table+' '+r.status+': '+e);}
+  var rows=await r.json();return Array.isArray(rows)?rows[0]:rows;
+}
+async function supaPatch(table,id,data){
+  await fetch(SUPA_URL+'/rest/v1/'+table+'?id=eq.'+id,{
+    method:'PATCH',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify(data)
+  });
 }
 
+/* ── SCREENS ── */
 function showLoading(){
   document.getElementById('app').innerHTML=
     '<div class="rz-header"><div class="rz-header-top"><div class="rz-logo">GenTrack ✦</div></div></div>'+
     '<div class="rz-state"><div class="rz-spinner"></div><div class="rz-state-sub">Chargement des zones…</div></div>';
 }
-function showState(icon,title,sub,extra){
+function showError(msg){
   document.getElementById('app').innerHTML=
     '<div class="rz-header"><div class="rz-header-top"><div class="rz-logo">GenTrack ✦</div></div></div>'+
-    '<div class="rz-state">'+
-      '<div class="rz-state-emoji">'+icon+'</div>'+
-      '<div class="rz-state-title">'+title+'</div>'+
-      '<div class="rz-state-sub">'+sub+'</div>'+
-      (extra||'')+
-    '</div>';
+    '<div class="rz-state"><div class="rz-state-emoji">⚠️</div><div class="rz-state-title">Erreur</div><div class="rz-state-sub">'+h(msg)+'</div></div>';
 }
 
-function updateProgress(){
-  var total=_zones.length;
-  var done=Object.keys(_checks).filter(function(k){return _checks[k];}).length;
-  var pct=total>0?Math.round(done/total*100):0;
-  var bar=document.getElementById('rz-progress');if(bar)bar.style.width=pct+'%';
-  var lbl=document.getElementById('rz-prog-lbl');if(lbl)lbl.textContent=done+' / '+total+' zone'+(total>1?'s':'')+' contrôlée'+(done>1?'s':'');
-  var pctEl=document.getElementById('rz-prog-pct');if(pctEl){pctEl.textContent=pct+'%';pctEl.className='rz-progress-label'+(pct>0?' active':'');}
-  var fi=document.getElementById('rz-footer-info');if(fi)fi.textContent=done+' / '+total+' zone'+(total>1?'s':'')+' contrôlée'+(done>1?'s':'');
-  var btn=document.getElementById('rz-submit');if(btn)btn.disabled=done<total;
-  var badge=document.getElementById('rz-badge');if(badge)badge.textContent=pct+'%';
-}
-
-function setCheck(zoneId,val){
-  _checks[zoneId]=val;
-  var card=document.getElementById('zc-'+zoneId);
-  if(card){
-    card.className='rz-zone-card'+(val==='ok'?' ok':val==='incident'?' incident':'');
-  }
-  var btnOk=document.getElementById('bok-'+zoneId);
-  var btnInc=document.getElementById('binc-'+zoneId);
-  if(btnOk)btnOk.className='rz-btn rz-btn-ok'+(val==='ok'?' active':'');
-  if(btnInc)btnInc.className='rz-btn rz-btn-incident'+(val==='incident'?' active':'');
-  // Toggle anomaly field
-  var aw=document.getElementById('anom-'+zoneId);
-  if(aw)aw.className='rz-anomaly-wrap'+(val==='incident'?' open':'');
-  updateProgress();
-}
-
+/* ── RENDER ── */
 function renderRonde(){
-  var grouped={};
+  /* Group by batiment → étage */
+  var groups={};
   _zones.forEach(function(z){
     var bat=z.batiment||'Résidence';
     var et=z.etage||'—';
-    if(!grouped[bat])grouped[bat]={};
-    if(!grouped[bat][et])grouped[bat][et]=[];
-    grouped[bat][et].push(z);
+    var key=bat+'|||'+et;
+    if(!groups[key])groups[key]={bat:bat,et:et,zones:[]};
+    groups[key].zones.push(z);
   });
+  var groupKeys=Object.keys(groups).sort();
 
-  var html='<div class="rz-header">'+
-    '<div class="rz-header-top">'+
-      '<div class="rz-logo">GenTrack ✦</div>'+
-      '<div class="rz-badge" id="rz-badge">0%</div>'+
-    '</div>'+
-    '<div class="rz-title">🏠 Ronde de zones</div>'+
-    '<div class="rz-meta-row">'+
-      '<div class="rz-site-name">'+h(_site.nom)+'</div>'+
-      '<div class="rz-contact-chip">👤 '+h(_contact.nom)+'</div>'+
-    '</div>'+
-    '<div class="rz-progress-wrap">'+
-      '<div class="rz-progress-labels">'+
-        '<span class="rz-progress-label" id="rz-prog-lbl">0 / '+_zones.length+' zone'+(_zones.length>1?'s':'')+' contrôlée'+'</span>'+
-        '<span class="rz-progress-label" id="rz-prog-pct">0%</span>'+
+  var totalZones=_zones.length;
+  var html=
+    '<div class="rz-header">'+
+      '<div class="rz-header-top"><div class="rz-logo">GenTrack ✦</div><div class="rz-badge" id="rz-badge">0%</div></div>'+
+      '<div class="rz-title">🏠 Ronde de zones</div>'+
+      '<div class="rz-meta">'+
+        '<div class="rz-site">'+h(_site.nom)+'</div>'+
+        '<div class="rz-contact">👤 '+h(_contact.nom)+'</div>'+
       '</div>'+
-      '<div class="rz-progress"><div class="rz-progress-bar" id="rz-progress" style="width:0%"></div></div>'+
+      '<div class="rz-prog-labels">'+
+        '<span class="rz-prog-label" id="rz-prog-lbl">0 / '+totalZones+' zones</span>'+
+        '<span class="rz-prog-label" id="rz-prog-pct">0%</span>'+
+      '</div>'+
+      '<div class="rz-prog"><div class="rz-prog-bar" id="rz-prog-bar" style="width:0%"></div></div>'+
     '</div>'+
-  '</div>'+
-  '<div class="rz-content">';
+    '<div class="rz-content">';
 
-  Object.keys(grouped).sort().forEach(function(bat){
-    var bData=grouped[bat];
-    var batTotal=0;Object.keys(bData).forEach(function(e){batTotal+=bData[e].length;});
-    html+='<div class="rz-group">'+
-      '<div class="rz-group-title">🏢 '+h(bat)+' <span>'+batTotal+' zone'+(batTotal>1?'s':'')+'</span></div>';
-    Object.keys(bData).sort().forEach(function(et){
-      var zones=bData[et];
-      html+='<div class="rz-etage">'+
-        '<div class="rz-etage-label">Étage '+h(et)+'</div>';
-      zones.forEach(function(z){
-        var sub=(z.type_zone||'Zone');
-        html+='<div class="rz-zone-card" id="zc-'+h(z.id)+'">'+
-          '<div class="rz-zone-top">'+
-            '<div class="rz-zone-icon">'+zoneIcon(z)+'</div>'+
-            '<div class="rz-zone-info">'+
-              '<div class="rz-zone-nom">'+h(z.nom)+'</div>'+
-              '<div class="rz-zone-sub">'+h(sub)+'</div>'+
-            '</div>'+
-            '<div class="rz-zone-btns">'+
-              '<button class="rz-btn rz-btn-ok" id="bok-'+h(z.id)+'" onclick="setCheck(\''+h(z.id)+'\',\'ok\')">✅ OK</button>'+
-              '<button class="rz-btn rz-btn-incident" id="binc-'+h(z.id)+'" onclick="setCheck(\''+h(z.id)+'\',\'incident\')">⚠️ Incident</button>'+
-            '</div>'+
-          '</div>'+
-          '<div class="rz-anomaly-wrap" id="anom-'+h(z.id)+'">'+
-            '<textarea class="rz-anomaly-inp" id="note-'+h(z.id)+'" rows="2" placeholder="Décrivez l\'incident…" oninput="_notes[\''+h(z.id)+'\']=this.value"></textarea>'+
-          '</div>'+
+  groupKeys.forEach(function(gk){
+    var g=groups[gk];
+    html+=
+      '<div class="rz-group">'+
+        '<div class="rz-group-hdr">'+
+          '<span class="rz-group-label">'+h(g.bat)+' — Étage '+h(g.et)+'</span>'+
+          '<button class="rz-btn-all" id="tall-'+h(gk)+'" onclick="toutOk(\''+h(gk)+'\')">✓ Tout OK</button>'+
+        '</div>'+
+        '<div class="rz-grid" id="grid-'+h(gk)+'">';
+    g.zones.forEach(function(z){
+      var lv=lvInfo(z);
+      var hasSg=!!_signalements[z.id];
+      html+=
+        '<div class="rz-room" id="room-'+h(z.id)+'" onclick="openDetail(\''+h(z.id)+'\')">'+
+          '<div class="rz-room-num">'+h(z.nom)+'</div>'+
+          '<div class="rz-room-dot" style="background:'+lv.dot+'"></div>'+
+          (hasSg?'<div class="rz-alert-badge"></div>':'')+
         '</div>';
-      });
-      html+='</div>';
     });
-    html+='</div>';
+    html+='</div></div>';
   });
 
   html+='</div>';// rz-content
 
-  html+='<div class="rz-footer">'+
-    '<div class="rz-footer-info" id="rz-footer-info">0 / '+_zones.length+' zones contrôlées</div>'+
-    '<button class="rz-submit" id="rz-submit" disabled onclick="submitRonde()">Valider la ronde →</button>'+
-  '</div>';
+  html+=
+    '<div class="rz-overlay" id="rz-overlay" onclick="closeDetail()"></div>'+
+    '<div class="rz-panel" id="rz-panel">'+
+      '<div class="rz-panel-handle"></div>'+
+      '<div class="rz-panel-close" onclick="closeDetail()">✕</div>'+
+      '<div class="rz-panel-head">'+
+        '<div class="rz-panel-num" id="dp-num"></div>'+
+        '<div class="rz-panel-sub" id="dp-sub"></div>'+
+      '</div>'+
+      '<div class="rz-panel-body" id="dp-body"></div>'+
+    '</div>'+
+    '<div class="rz-footer">'+
+      '<div class="rz-footer-info" id="rz-footer-info">0 / '+totalZones+' zones contrôlées</div>'+
+      '<button class="rz-submit" id="rz-submit" onclick="submitRonde()">Valider la ronde →</button>'+
+    '</div>';
 
   document.getElementById('app').innerHTML=html;
 }
 
-async function submitRonde(){
+/* ── OPEN DETAIL ── */
+function openDetail(zoneId){
+  var z=_zones.find(function(x){return x.id===zoneId;});
+  if(!z)return;
+  _currentZone=z;
+
+  /* remove focus from previous */
+  document.querySelectorAll('.rz-room.focus').forEach(function(el){el.classList.remove('focus');});
+  var roomEl=document.getElementById('room-'+zoneId);
+  if(roomEl)roomEl.classList.add('focus');
+
+  /* header */
+  document.getElementById('dp-num').textContent=z.nom;
+  document.getElementById('dp-sub').textContent=(z.type_zone||'Zone')+(z.batiment?' · '+z.batiment:'')+' · Étage '+(z.etage||'—');
+
+  var body='';
+
+  /* Dernière visite */
+  var lv=lvInfo(z);
+  body+=
+    '<div class="rz-section">'+
+      '<div class="rz-section-title">Dernière visite</div>'+
+      '<div class="rz-lv">'+
+        '<div class="rz-lv-dot" style="background:'+lv.dot+'"></div>'+
+        '<div><div class="rz-lv-text">'+h(lv.text)+'</div><div class="rz-lv-sub">'+h(lv.sub)+'</div></div>'+
+      '</div>'+
+    '</div>';
+
+  /* Signalement actif */
+  var sg=_signalements[zoneId];
+  if(sg){
+    var daysAgo=daysSince(sg.created_at);
+    body+=
+      '<div class="rz-section" id="dp-sg-sec">'+
+        '<div class="rz-section-title">Signalement actif</div>'+
+        '<div class="rz-sg-card">'+
+          '<div class="rz-sg-top">'+
+            '<div class="rz-sg-dot"></div>'+
+            '<div>'+
+              '<div class="rz-sg-ref">'+h(sg.ref_code||'En cours')+'</div>'+
+              '<div class="rz-sg-desc">'+h(sg.description||'')+'</div>'+
+              '<div class="rz-sg-date">Signalé il y a '+daysAgo+' j</div>'+
+            '</div>'+
+          '</div>'+
+          '<textarea class="rz-sg-note" id="sg-note-'+h(zoneId)+'" rows="2" placeholder="Note de résolution (optionnel)…"></textarea>'+
+          '<button class="rz-btn-resolu" id="sg-btn-'+h(sg.id)+'" onclick="marquerResolu(\''+h(sg.id)+'\',\''+h(zoneId)+'\')">✅ Marquer comme résolu</button>'+
+        '</div>'+
+      '</div>';
+  }
+
+  /* Équipements */
+  var eqs=(_equipements[zoneId]||[]).slice(0,4);
+  if(eqs.length){
+    body+='<div class="rz-section"><div class="rz-section-title">Équipements</div><div class="rz-eq-list">';
+    eqs.forEach(function(eq){
+      var st=_eqChecks[eq.id]||null;
+      body+=
+        '<div class="rz-eq-row">'+
+          '<span class="rz-eq-icon">'+equipIcon(eq.nom)+'</span>'+
+          '<span class="rz-eq-nom">'+h(eq.nom)+'</span>'+
+          '<div class="rz-eq-btns">'+
+            '<button class="rz-eq-btn'+(st==='ok'?' ok':'')+'" onclick="setEqCheck(\''+h(eq.id)+'\',\'ok\',\''+h(zoneId)+'\')">✅</button>'+
+            '<button class="rz-eq-btn'+(st==='ko'?' ko':'')+'" onclick="setEqCheck(\''+h(eq.id)+'\',\'ko\',\''+h(zoneId)+'\')">⚠️</button>'+
+          '</div>'+
+        '</div>';
+    });
+    body+='</div></div>';
+  }
+
+  /* Statut de la zone */
+  var cur=_checks[zoneId]||null;
+  body+=
+    '<div class="rz-section">'+
+      '<div class="rz-section-title">Statut de la zone</div>'+
+      '<div class="rz-status-btns">'+
+        '<button class="rz-status-btn'+(cur==='ok'?' ok-on':'')+'" id="dp-ok" onclick="dpSetCheck(\'ok\')">✅ OK</button>'+
+        '<button class="rz-status-btn'+(cur==='incident'?' inc-on':'')+'" id="dp-inc" onclick="dpSetCheck(\'incident\')">⚠️ Incident</button>'+
+      '</div>'+
+
+      /* Incident form */
+      '<div class="rz-inc-form'+(cur==='incident'?' show':'')+'" id="dp-inc-form">'+
+        '<div class="rz-inc-form-title">Quel équipement est concerné ?</div>'+
+        '<div class="rz-inc-equip-list" id="dp-inc-chips">';
+
+  /* Chips équipements pour incident */
+  var allEqs=_equipements[zoneId]||[];
+  var selEq=_incEquip[zoneId]||null;
+  allEqs.forEach(function(eq){
+    body+='<button class="rz-inc-equip-chip'+(selEq===eq.id?' sel':'')+'" onclick="selIncEquip(\''+h(zoneId)+'\',\''+h(eq.id)+'\')">'+equipIcon(eq.nom)+' '+h(eq.nom)+'</button>';
+  });
+  if(!allEqs.length)body+='<span style="font-size:12px;color:var(--rouge-text)">Aucun équipement configuré</span>';
+
+  body+=
+        '</div>'+
+        '<textarea class="rz-inc-inp" id="dp-inc-desc" rows="2" placeholder="Décrivez le problème…" oninput="_incDesc[\''+h(zoneId)+'\']=this.value">'+h(_incDesc[zoneId]||'')+'</textarea>'+
+      '</div>'+
+    '</div>';
+
+  document.getElementById('dp-body').innerHTML=body;
+
+  /* Show note field if signalement already showing */
+  if(sg){
+    var noteEl=document.getElementById('sg-note-'+zoneId);
+    if(noteEl){noteEl.style.display='block';}
+  }
+
+  document.getElementById('rz-panel').classList.add('open');
+  document.getElementById('rz-overlay').classList.add('show');
+}
+
+function closeDetail(){
+  document.getElementById('rz-panel').classList.remove('open');
+  document.getElementById('rz-overlay').classList.remove('show');
+  document.querySelectorAll('.rz-room.focus').forEach(function(el){el.classList.remove('focus');});
+  _currentZone=null;
+}
+
+/* ── INTERACTIONS ── */
+function dpSetCheck(val){
+  if(!_currentZone)return;
+  var zoneId=_currentZone.id;
+  var prev=_checks[zoneId];
+  _checks[zoneId]=prev===val?null:val;
+  var cur=_checks[zoneId];
+
+  /* Update panel buttons */
+  var okBtn=document.getElementById('dp-ok');
+  var incBtn=document.getElementById('dp-inc');
+  var incForm=document.getElementById('dp-inc-form');
+  if(okBtn)okBtn.className='rz-status-btn'+(cur==='ok'?' ok-on':'');
+  if(incBtn)incBtn.className='rz-status-btn'+(cur==='incident'?' inc-on':'');
+  if(incForm)incForm.className='rz-inc-form'+(cur==='incident'?' show':'');
+
+  /* Update room tile */
+  var roomEl=document.getElementById('room-'+zoneId);
+  if(roomEl)roomEl.className='rz-room focus'+(cur?' '+cur:'');
+
+  updateProgress();
+}
+
+function setEqCheck(eqId,val,zoneId){
+  var prev=_eqChecks[eqId];
+  _eqChecks[eqId]=prev===val?null:val;
+  var cur=_eqChecks[eqId];
+  /* Update button visuals */
+  var row=document.querySelector('[onclick="setEqCheck(\''+eqId+'\',\'ok\',\''+zoneId+'\')"]');
+  var rowko=document.querySelector('[onclick="setEqCheck(\''+eqId+'\',\'ko\',\''+zoneId+'\')"]');
+  if(row)row.className='rz-eq-btn'+(cur==='ok'?' ok':'');
+  if(rowko)rowko.className='rz-eq-btn'+(cur==='ko'?' ko':'');
+  /* If ko, auto-set zone to incident + pre-select equipment */
+  if(cur==='ko'){
+    _checks[zoneId]='incident';
+    _incEquip[zoneId]=eqId;
+    var okBtn=document.getElementById('dp-ok');
+    var incBtn=document.getElementById('dp-inc');
+    var incForm=document.getElementById('dp-inc-form');
+    if(okBtn)okBtn.className='rz-status-btn';
+    if(incBtn)incBtn.className='rz-status-btn inc-on';
+    if(incForm)incForm.className='rz-inc-form show';
+    /* highlight chip */
+    document.querySelectorAll('.rz-inc-equip-chip').forEach(function(c){c.classList.remove('sel');});
+    var chip=document.querySelector('[onclick="selIncEquip(\''+zoneId+'\',\''+eqId+'\')"]');
+    if(chip)chip.classList.add('sel');
+    var roomEl=document.getElementById('room-'+zoneId);
+    if(roomEl)roomEl.className='rz-room focus incident';
+    updateProgress();
+  }
+}
+
+function selIncEquip(zoneId,eqId){
+  _incEquip[zoneId]=(_incEquip[zoneId]===eqId)?null:eqId;
+  var sel=_incEquip[zoneId];
+  document.querySelectorAll('.rz-inc-equip-chip').forEach(function(c){c.classList.remove('sel');});
+  if(sel){
+    var chip=document.querySelector('[onclick="selIncEquip(\''+zoneId+'\',\''+eqId+'\')"]');
+    if(chip)chip.classList.add('sel');
+  }
+}
+
+function marquerResolu(sgId,zoneId){
+  var btn=document.getElementById('sg-btn-'+sgId);
+  var noteEl=document.getElementById('sg-note-'+zoneId);
+  if(btn){btn.className='rz-btn-resolu done';btn.disabled=true;btn.textContent='✓ Résolu enregistré';}
+  if(!_resolus.includes(sgId))_resolus.push(sgId);
+  _resolusNotes[sgId]=(noteEl&&noteEl.value.trim())||'';
+  /* Hide alert badge on room tile */
+  var badge=document.querySelector('#room-'+zoneId+' .rz-alert-badge');
+  if(badge)badge.remove();
+  /* Update local data so re-open doesn't show it */
+  if(_signalements[zoneId])_signalements[zoneId]._resolved=true;
+}
+
+function toutOk(groupKey){
+  var grid=document.getElementById('grid-'+groupKey);
+  if(!grid)return;
+  grid.querySelectorAll('.rz-room').forEach(function(el){
+    var zoneId=el.id.replace('room-','');
+    _checks[zoneId]='ok';
+    el.className='rz-room ok';
+  });
+  var btn=document.getElementById('tall-'+groupKey);
+  if(btn){btn.className='rz-btn-all done';btn.textContent='✓ Tout OK';}
+  updateProgress();
+}
+
+function updateProgress(){
+  var total=_zones.length;
+  var done=_zones.filter(function(z){return _checks[z.id];}).length;
+  var pct=total>0?Math.round(done/total*100):0;
+  var bar=document.getElementById('rz-prog-bar');if(bar)bar.style.width=pct+'%';
+  var lbl=document.getElementById('rz-prog-lbl');if(lbl)lbl.textContent=done+' / '+total+' zones';
+  var pctEl=document.getElementById('rz-prog-pct');
+  if(pctEl){pctEl.textContent=pct+'%';pctEl.className='rz-prog-label'+(pct>0?' on':'');}
+  var badge=document.getElementById('rz-badge');if(badge)badge.textContent=pct+'%';
+  var fi=document.getElementById('rz-footer-info');if(fi)fi.textContent=done+' / '+total+' zones contrôlées';
   var btn=document.getElementById('rz-submit');
-  if(btn){btn.disabled=true;btn.textContent='Envoi en cours…';}
+  if(btn)btn.className='rz-submit'+(done>0?' ready':'');
+}
+
+/* ── SUBMIT ── */
+async function submitRonde(){
+  var done=_zones.filter(function(z){return _checks[z.id];});
+  if(!done.length)return;
+  var btn=document.getElementById('rz-submit');
+  if(btn){btn.classList.remove('ready');btn.textContent='Envoi en cours…';}
+  closeDetail();
+
   try{
     var today=new Date().toISOString().split('T')[0];
-    var incidents=_zones.filter(function(z){return _checks[z.id]==='incident';});
-    var posts=_zones.map(function(z){
+    var now=new Date().toISOString();
+
+    /* 1. releves_zones — une ligne par zone cochée */
+    var relevePosts=done.map(function(z){
       var isInc=_checks[z.id]==='incident';
       return supaPost('releves_zones',{
-        zone_id:z.id,
-        site_id:_site.id,
-        date:today,
+        zone_id:z.id,site_id:_site.id,date:today,
         technicien:_contact.nom,
         statut:isInc?'incident':'ok',
         nb_anomalies:isInc?1:0
       });
     });
-    await Promise.all(posts);
+    await Promise.all(relevePosts);
 
-    // Signalements pour les incidents
-    if(incidents.length){
-      var sigPosts=incidents.map(function(z){
-        var note=(_notes[z.id]||'').trim()||('Incident signalé lors de la ronde de zones : '+z.nom);
-        return supaPost('signalements',{
-          groupe_id:_site.id,
-          description:note,
-          signale_par:_contact.nom,
-          statut:'ouvert',
-          source:'ronde_zones',
-          type:'anomalie_zone'
+    /* 2. Résoudre les signalements marqués résolus */
+    if(_resolus.length){
+      await Promise.all(_resolus.map(function(sgId){
+        return supaPatch('signalements',sgId,{
+          statut:'resolu',
+          resolved_by:_contact.nom,
+          resolved_at:now,
+          note_resolution:_resolusNotes[sgId]||null
         });
-      });
-      await Promise.all(sigPosts);
+      }));
     }
 
-    // Confirmation
-    var now=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    /* 3. Nouveaux signalements pour les incidents */
+    var incidents=done.filter(function(z){return _checks[z.id]==='incident';});
+    if(incidents.length){
+      await Promise.all(incidents.map(function(z){
+        var desc=(_incDesc[z.id]||'').trim()||('Incident constaté lors de la ronde — '+z.nom);
+        return supaPost('signalements',{
+          groupe_id:_site.id,site_id:_site.id,
+          zone_id:z.id,
+          equipement_zone_id:_incEquip[z.id]||null,
+          description:desc,
+          signale_par:_contact.nom,
+          signaleur_contact_id:_contact.id,
+          statut:'ouvert',source:'ronde_zones',type:'anomalie_zone'
+        });
+      }));
+    }
+
+    /* Confirmation */
+    var nbResolu=_resolus.length;
+    var nbInc=incidents.length;
+    var t=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
     document.getElementById('app').innerHTML=
       '<div class="rz-header"><div class="rz-header-top"><div class="rz-logo">GenTrack ✦</div></div></div>'+
       '<div class="rz-state">'+
         '<div class="rz-state-emoji">🎉</div>'+
         '<div class="rz-state-title">Ronde terminée !</div>'+
-        '<div class="rz-state-sub">Toutes les zones ont bien été enregistrées.</div>'+
-        '<div class="rz-pill rz-pill-ok">✓ '+_zones.length+' zone'+(_zones.length>1?'s':'')+' validée'+(_zones.length>1?'s':'')+'</div>'+
-        (incidents.length>0?
-          '<div class="rz-pill rz-pill-warn">⚠️ '+incidents.length+' incident'+(incidents.length>1?'s':'')+' signalé'+(incidents.length>1?'s':'')+'</div>':
-          '<div class="rz-pill rz-pill-ok">✓ Aucun incident</div>'
-        )+
-        '<div class="rz-confirm-time">Validé à '+now+'</div>'+
+        '<div class="rz-state-sub">'+done.length+' zone'+(done.length>1?'s':'')+' enregistrée'+(done.length>1?'s':'')+' sur '+_zones.length+'.</div>'+
+        '<div class="rz-pill rz-pill-ok">✓ '+done.length+' zone'+(done.length>1?'s':'')+' validée'+(done.length>1?'s':'')+'</div>'+
+        (nbInc>0?'<div class="rz-pill rz-pill-warn">⚠️ '+nbInc+' incident'+(nbInc>1?'s':'')+' signalé'+(nbInc>1?'s':'')+'</div>':'<div class="rz-pill rz-pill-ok">✓ Aucun incident</div>')+
+        (nbResolu>0?'<div class="rz-pill rz-pill-info">✅ '+nbResolu+' signalement'+(nbResolu>1?'s':'')+' résolu'+(nbResolu>1?'s':'')+'</div>':'')+
+        '<div class="rz-confirm-time">Validé à '+t+'</div>'+
       '</div>';
 
   }catch(err){
     console.error('Submit error:',err);
-    if(btn){btn.disabled=false;btn.textContent='Valider la ronde →';}
-    var existing=document.getElementById('rz-err');if(existing)existing.remove();
-    var errDiv=document.createElement('div');
-    errDiv.id='rz-err';
-    errDiv.style.cssText='background:#FDF0EE;border:1.5px solid #F0B8B2;border-radius:10px;padding:10px 14px;margin:10px 16px;font-size:12px;color:#9B2D22;font-weight:600;line-height:1.5';
-    errDiv.textContent='❌ Erreur lors de l\'envoi. Vérifiez votre connexion. ('+String(err).slice(0,120)+')';
+    if(btn){btn.className='rz-submit ready';btn.textContent='Valider la ronde →';}
+    var errDiv=document.getElementById('rz-err');if(errDiv)errDiv.remove();
+    var d=document.createElement('div');d.id='rz-err';
+    d.style.cssText='background:var(--rouge-pale);border:1.5px solid var(--rouge-border);border-radius:10px;padding:10px 14px;margin:10px 16px;font-size:12px;color:var(--rouge-text);font-weight:600;line-height:1.5';
+    d.textContent='❌ Erreur lors de l\'envoi. Vérifiez votre connexion. ('+String(err).slice(0,120)+')';
     var footer=document.querySelector('.rz-footer');
-    if(footer)footer.parentNode.insertBefore(errDiv,footer);
+    if(footer)footer.parentNode.insertBefore(d,footer);
   }
 }
 
+/* ── INIT ── */
 async function init(){
   showLoading();
   try{
     var params=new URLSearchParams(window.location.search);
     var siteId=params.get('site');
     var contactId=params.get('contact');
-    if(!siteId||!contactId){
-      return showState('⚠️','Lien invalide','Paramètres manquants. Utilisez le lien envoyé par WhatsApp.');
-    }
+    if(!siteId||!contactId)return showError('Lien invalide. Utilisez le lien envoyé par WhatsApp.');
 
     var[sites,contacts,zones]=await Promise.all([
       supaGet('sites','id=eq.'+siteId+'&select=id,nom&limit=1'),
       supaGet('contacts','id=eq.'+contactId+'&select=id,nom&limit=1'),
-      supaGet('zones','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,etage,batiment,type_zone,categorie&order=batiment.asc,etage.asc,nom.asc')
+      supaGet('zones','site_id=eq.'+siteId+'&actif=eq.true&type_zone=in.(chambre,commun_etage,special)&select=id,nom,etage,batiment,type_zone,frequence_passage&order=batiment.asc,etage.asc,nom.asc')
     ]);
 
     _site=Array.isArray(sites)?sites[0]:null;
     _contact=Array.isArray(contacts)?contacts[0]:null;
     _zones=Array.isArray(zones)?zones:[];
 
-    if(!_site){return showState('🔒','Site introuvable','Ce site n\'existe pas ou n\'est plus actif.');}
-    if(!_contact){return showState('🔒','Accès refusé','Contact introuvable. Contactez votre responsable.');}
-    if(!_zones.length){return showState('📋','Aucune zone','Aucune zone active configurée pour ce site.');}
+    if(!_site)return showError('Site introuvable.');
+    if(!_contact)return showError('Contact introuvable. Contactez votre responsable.');
+    if(!_zones.length)return showError('Aucune zone active configurée pour ce site.');
+
+    var zoneIds=_zones.map(function(z){return z.id;});
+    var dateLimit=new Date(Date.now()-90*86400000).toISOString().split('T')[0];
+
+    var[releves,signalements,equipements]=await Promise.all([
+      supaGet('releves_zones','site_id=eq.'+siteId+'&zone_id=in.('+zoneIds.join(',')+')'+'&date=gte.'+dateLimit+'&select=zone_id,date,statut,nb_anomalies&order=zone_id.asc,date.desc'),
+      supaGet('signalements','site_id=eq.'+siteId+'&zone_id=in.('+zoneIds.join(',')+')'+'&statut=in.(ouvert,en_cours)&select=id,zone_id,description,ref_code,created_at,statut&order=created_at.desc'),
+      supaGet('equipements_zone','site_id=eq.'+siteId+'&zone_id=in.('+zoneIds.join(',')+')'+'&actif=eq.true&select=id,zone_id,nom&order=zone_id.asc,nom.asc')
+    ]);
+
+    /* Index derniers relevés */
+    var seen={};
+    (Array.isArray(releves)?releves:[]).forEach(function(r){
+      if(!seen[r.zone_id]){seen[r.zone_id]=true;_lastReleves[r.zone_id]=r;}
+    });
+
+    /* Index signalements (premier ouvert par zone) */
+    (Array.isArray(signalements)?signalements:[]).forEach(function(sg){
+      if(!_signalements[sg.zone_id])_signalements[sg.zone_id]=sg;
+    });
+
+    /* Index équipements par zone */
+    (Array.isArray(equipements)?equipements:[]).forEach(function(eq){
+      if(!_equipements[eq.zone_id])_equipements[eq.zone_id]=[];
+      _equipements[eq.zone_id].push(eq);
+    });
 
     renderRonde();
   }catch(err){
     console.error('Init error:',err);
-    showState('❌','Erreur de chargement','Vérifiez votre connexion et réessayez.<br><br><small>'+String(err).slice(0,120)+'</small>');
+    showError('Erreur de chargement : '+String(err).slice(0,120));
   }
 }
 
