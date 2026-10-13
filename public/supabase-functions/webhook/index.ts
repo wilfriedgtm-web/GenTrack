@@ -108,10 +108,12 @@ async function getReleveLink(siteId: string): Promise<string | null> {
 }
 
 // ── Multi-site ────────────────────────────────────────────────────────────────
-async function getSitesForContact(contactId: string, primarySiteId?: string): Promise<any[]> {
+async function getSitesForContact(contactId: string, primarySiteId?: string, extraSiteIds: string[] = []): Promise<any[]> {
   const userSites = await db('user_sites', { query: `&contact_id=eq.${contactId}`, select: 'site_id' });
   let siteIds: string[] = Array.isArray(userSites) ? userSites.map((us: any) => us.site_id) : [];
   if (primarySiteId && !siteIds.includes(primarySiteId)) siteIds.push(primarySiteId);
+  // Sites issus d'autres lignes contact avec le même numéro (multi-site sans user_sites)
+  for (const sid of extraSiteIds) if (sid && !siteIds.includes(sid)) siteIds.push(sid);
   if (!siteIds.length) return [];
   const sites = await db('sites', { query: `&id=in.(${siteIds.join(',')})&actif=eq.true&order=nom.asc` });
   return Array.isArray(sites) ? sites : [];
@@ -1405,8 +1407,12 @@ async function handleMessage(from: string, bodyText: string) {
   const phone = from.replace('whatsapp:', '');
   const msg = bodyText.trim().toLowerCase();
 
-  const contactRaw = await db('contacts', { query: `&whatsapp=eq.${encodeURIComponent(phone)}&actif=eq.true&limit=1` });
-  const contact = Array.isArray(contactRaw) ? contactRaw[0] || null : null;
+  // Récupérer TOUS les contacts avec ce numéro (cas multi-site avec 2 lignes contact)
+  const contactsRaw = await db('contacts', { query: `&whatsapp=eq.${encodeURIComponent(phone)}&actif=eq.true&order=created_at.asc` });
+  const allContactsForPhone: any[] = Array.isArray(contactsRaw) ? contactsRaw : [];
+  const contact = allContactsForPhone[0] || null;
+  // Tous les site_id liés à ce numéro (multi-ligne contact)
+  const phoneSiteIds: string[] = allContactsForPhone.map((c: any) => c.site_id).filter(Boolean);
 
   if (contact) {
     // ── Session — chargée en premier pour résolution du site actif ────────────
@@ -1424,9 +1430,9 @@ async function handleMessage(from: string, bodyText: string) {
       site = Array.isArray(siteRaw) ? siteRaw[0] || null : null;
     }
 
-    // 2. Si pas de site actif → résoudre via user_sites + contact.site_id
+    // 2. Si pas de site actif → résoudre via user_sites + toutes les lignes contact de ce numéro
     if (!site) {
-      const allSites = await getSitesForContact(contact.id, contact.site_id || undefined);
+      const allSites = await getSitesForContact(contact.id, contact.site_id || undefined, phoneSiteIds);
       if (allSites.length === 1) {
         site = allSites[0];
         // Stocker en session si on est idle
@@ -1466,6 +1472,14 @@ async function handleMessage(from: string, bodyText: string) {
 
     // ── Commandes toujours disponibles ────────────────────────────────────────
     if (msg === 'saisie' || msg === 'bonjour') {
+      // Multi-site : toujours proposer le choix du site à chaque "saisie"
+      const sitesForSaisie = await getSitesForContact(contact.id, contact.site_id || undefined, phoneSiteIds);
+      if (sitesForSaisie.length > 1) {
+        const liste = sitesForSaisie.map((s: any, i: number) => `*${i + 1}* — ${s.nom}${s.id === sd.active_site_id ? ' ✓' : ''}`).join('\n');
+        await setSession(phone, 'choix_site', { sites: sitesForSaisie.map((s: any) => ({ id: s.id, nom: s.nom })), pending_msg: 'saisie' });
+        return sendWA(phone, `📍 *Sur quel site travaillez-vous aujourd'hui ?*\n\n${liste}`);
+      }
+      if (!site && sitesForSaisie.length === 1) { site = sitesForSaisie[0]; }
       if (!site) return sendWA(phone, `⚠️ Votre compte n'est pas associé à un site. Contactez votre responsable.`);
       await setSession(phone, 'idle', { active_site_id: site.id });
       return demarrerSaisie(phone, contact, site);
@@ -1473,7 +1487,7 @@ async function handleMessage(from: string, bodyText: string) {
 
     // Changer de site manuellement
     if (msg === 'site' || msg === 'changer site') {
-      const allSites = await getSitesForContact(contact.id, contact.site_id || undefined);
+      const allSites = await getSitesForContact(contact.id, contact.site_id || undefined, phoneSiteIds);
       if (allSites.length <= 1) return sendWA(phone, `Vous n'avez qu'un seul site configuré.`);
       const liste = allSites.map((s: any, i: number) => `*${i + 1}* — ${s.nom}${s.id === (sd.active_site_id) ? ' ✓' : ''}`).join('\n');
       await setSession(phone, 'choix_site', { sites: allSites.map((s: any) => ({ id: s.id, nom: s.nom })), pending_msg: '' });
