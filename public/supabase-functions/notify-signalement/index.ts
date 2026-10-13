@@ -88,7 +88,11 @@ async function sendNotifications(payload: any) {
   const typeLabel  = TYPE_LABELS[type] || type || 'Signalement';
   const heure      = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Dakar' });
   const suiviUrl   = ref_code ? `${BASE_URL}/suivi-signalement.html?ref=${encodeURIComponent(ref_code)}` : null;
+  // dejaEnvoyes = anti-doublon pour les alertes équipe (étape 1)
+  // dejaConfirms = anti-doublon pour les confirmations signaleur (étapes 2+3)
+  // Les deux sets sont INDÉPENDANTS : un resp_tech qui est aussi signaleur reçoit les deux messages
   const dejaEnvoyes = new Set<string>();
+  const dejaConfirms = new Set<string>();
 
   console.log(`notify: site=${site_id} ref=${ref_code} type=${type}`);
 
@@ -124,8 +128,8 @@ async function sendNotifications(payload: any) {
       select: 'whatsapp,nom',
     });
     const demandeur = Array.isArray(contacts) ? contacts[0] : null;
-    if (demandeur?.whatsapp && !dejaEnvoyes.has(demandeur.whatsapp)) {
-      dejaEnvoyes.add(demandeur.whatsapp);
+    if (demandeur?.whatsapp && !dejaConfirms.has(demandeur.whatsapp)) {
+      dejaConfirms.add(demandeur.whatsapp);
       const msgDemandeur =
         `✅ *Votre signalement a bien été reçu*\n\n` +
         `📋 Référence : *${ref_code || '—'}*\n` +
@@ -139,8 +143,8 @@ async function sendNotifications(payload: any) {
   }
 
   // ── 3. Résident (numéro libre) — lien de suivi ────────────────────────────
-  if (signaleur_whatsapp && !dejaEnvoyes.has(signaleur_whatsapp)) {
-    dejaEnvoyes.add(signaleur_whatsapp);
+  if (signaleur_whatsapp && !dejaConfirms.has(signaleur_whatsapp)) {
+    dejaConfirms.add(signaleur_whatsapp);
     const msgResident =
       `✅ *Votre signalement a bien été enregistré*\n\n` +
       `📋 Référence : *${ref_code || '—'}*\n` +
