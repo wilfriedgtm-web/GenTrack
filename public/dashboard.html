@@ -331,6 +331,25 @@ var _configCurrentTab='equipements';
 var _configEquipCache={}; // id → equip object, évite les problèmes d'échappement dans onclick
 var _siteModules=['general']; // modules actifs du site courant, mis à jour dans _rtConfig
 var _configTypesCache=[]; // types_equipements, mis à jour dans _rtConfig pour le template import
+// ── Résidence+ wizard state ──────────────────────────────────────────────────
+var _resSubTab='config';
+var _resWizStep=0;
+var _resWizBats=[{nom:'Tour A'}];
+var _resWizEtages=[{bat:0,etage:'18',debut:1801,fin:1812}];
+var _resSpeciales={local_tech:false,restaurant:false,reception:false,parking:false,piscine:false,salle_sport:false,toiture:false};
+var _resZoneEq={};
+var _resExistingEq=[];
+var _resExistingEqLoaded=false;
+var _RES_SPEC=[
+  {key:'local_tech',icon:'⚙️',nom:'Local technique'},
+  {key:'restaurant',icon:'🍽️',nom:'Restaurant'},
+  {key:'reception',icon:'🛎️',nom:'Réception'},
+  {key:'parking',icon:'🚗',nom:'Parking'},
+  {key:'piscine',icon:'🏊',nom:'Piscine'},
+  {key:'salle_sport',icon:'🏋️',nom:'Salle de sport'},
+  {key:'toiture',icon:'🏠',nom:'Toiture'},
+];
+var _RES_COMMON_EQ=['Climatisation','Plomberie','Électricité','Serrure/porte'];
 
 function hasModule(mod){
   if(_siteModules.indexOf('general')>=0)return true; // Azalai et anciens clients voient tout
@@ -415,6 +434,19 @@ async function supaPost(table,data){
     }
     return Array.isArray(payload)?payload[0]:payload;
   }catch(e){console.error('[supaPost] network error',e);return null;}
+}
+async function supaPostBulk(table,dataArr){
+  if(!dataArr||!dataArr.length)return [];
+  try{
+    var r=await fetch(SUPA_URL+'/rest/v1/'+table,{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(dataArr)
+    });
+    var payload=await r.json();
+    if(!r.ok){console.error('[supaPostBulk] '+table+' HTTP '+r.status,payload);return null;}
+    return Array.isArray(payload)?payload:[payload];
+  }catch(e){console.error('[supaPostBulk]',e);return null;}
 }
 async function supaDelete(table,filter){
   try{
@@ -530,7 +562,7 @@ function _goToSignalement(sgId){
 
 function navTo(id){
   if(!_session)return;
-  if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;_zonesWizardStep=0;_eqImportStep=0;_energieCfgWizardStep=0;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];}
+  if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;_zonesWizardStep=0;_eqImportStep=0;_energieCfgWizardStep=0;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];_resWizStep=0;_resSubTab='config';_resExistingEqLoaded=false;}
   if(_session.role==='resp_tech')renderRespTech(_session,id);
   else if(_session.role==='dir_tech'){
     if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,id);
@@ -5731,8 +5763,9 @@ async function _rtConfig(sid){
   }
   if(_configCurrentTab==='residence'){
     var dc2r=document.getElementById('dash-content-main');
-    if(dc2r){dc2r.style.padding='24px';dc2r.style.maxWidth='680px';}
-    return '<div class="config-tabs">'+tabHtml+'</div><div style="padding:40px;text-align:center;color:var(--text3);font-size:13px"><div style="font-size:32px;margin-bottom:12px;opacity:.3">🏢</div>Configuration Résidence+ — à venir dans la prochaine version</div>';
+    if(dc2r){dc2r.style.padding='24px';dc2r.style.maxWidth='720px';}
+    var residenceCfgHtml=await _buildResidenceConfigTab(sid);
+    return '<div class="config-tabs">'+tabHtml+'</div>'+residenceCfgHtml;
   }
 
   // Default selection — priorité aux équipements avec suivi
@@ -5809,6 +5842,392 @@ async function _rtConfig(sid){
   if(dc){dc.style.padding='0';dc.style.maxWidth='none';}
   return '<div class="config-tabs">'+tabHtml+'</div>'+
     '<div class="config-layout">'+listHtml+panelHtml+'</div>';
+}
+
+// ── Résidence+ ────────────────────────────────────────────────────────────────
+
+function _resEnsureEq(k){if(!_resZoneEq[k])_resZoneEq[k]={sel:[],nw:[]};}
+function _resSwitchSubTab(t){_resSubTab=t;if(_session)renderRespTech(_session,'config');}
+
+async function _buildResidenceConfigTab(sid){
+  if(!_resExistingEqLoaded){
+    var rawEqZ=await supaGet('equipements_zone','site_id=eq.'+sid+'&actif=eq.true&select=nom,zones(type_zone)&order=nom')||[];
+    var nameSet={};
+    rawEqZ.forEach(function(e){var tz=e.zones&&e.zones.type_zone;if(tz!=='chambre'&&tz!=='commun_etage'&&tz!=='special')nameSet[e.nom]=1;});
+    _resExistingEq=Object.keys(nameSet).sort();
+    _resExistingEqLoaded=true;
+  }
+  if(!_resWizEtages.length&&_resWizBats.length)_resWizEtages=[{bat:0,etage:'18',debut:1801,fin:1812}];
+  var subBar='<div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:20px">'+
+    [{t:'config',l:'⚙️ Configuration'},{t:'planning',l:'📅 Planning de passage'}].map(function(x){
+      var a=_resSubTab===x.t;
+      return '<button onclick="_resSwitchSubTab(\''+x.t+'\')" style="padding:10px 18px;border:none;background:none;font-family:inherit;font-size:13px;font-weight:'+(a?'600':'500')+';cursor:pointer;color:'+(a?'var(--amber-dark)':'var(--text2)')+';border-bottom:2px solid '+(a?'var(--amber)':'transparent')+'">'+x.l+'</button>';
+    }).join('')+'</div>';
+  if(_resSubTab==='planning')return subBar+(await _buildResPlanningHtml(sid));
+  return subBar+_buildResWizHtml(sid);
+}
+
+function _buildResWizHtml(sid){
+  _resEnsureEq('chambre');_resEnsureEq('commun');
+  _RES_SPEC.forEach(function(s){if(_resSpeciales[s.key])_resEnsureEq(s.key);});
+  var LABS=['Bâtiments','Étages','Zones spéciales','Équipements','Récapitulatif'];
+  var bar='<div style="display:flex;align-items:center;margin-bottom:24px">';
+  LABS.forEach(function(l,i){
+    var done=i<_resWizStep,act=i===_resWizStep;
+    var bg=done||act?'var(--amber)':'white';
+    var bd=done||act?'var(--amber)':'var(--border)';
+    var cl=done||act?'white':'var(--text3)';
+    bar+='<div style="display:flex;flex-direction:column;align-items:center;gap:3px">'+
+      '<div style="width:24px;height:24px;border-radius:50%;background:'+bg+';border:1.5px solid '+bd+';color:'+cl+';font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">'+(done?'✓':(i+1))+'</div>'+
+      '<div style="font-size:9px;color:var(--text3);white-space:nowrap;text-align:center">'+l+'</div></div>';
+    if(i<LABS.length-1)bar+='<div style="flex:1;height:1.5px;background:'+(done?'var(--amber)':'var(--border)')+';margin-bottom:16px"></div>';
+  });
+  bar+='</div>';
+  var body='';
+  if(_resWizStep===0)body=_resStep0();
+  else if(_resWizStep===1)body=_resStep1();
+  else if(_resWizStep===2)body=_resStep2();
+  else if(_resWizStep===3)body=_resStep3();
+  else body=_resStep4(sid);
+  var nav='<div style="display:flex;justify-content:space-between;margin-top:20px">'+
+    (_resWizStep>0?'<button class="cfg-btn cfg-btn-cancel" onclick="_resWizBack()">← Retour</button>':'<span></span>')+
+    (_resWizStep<4?'<button class="cfg-btn-primary" onclick="_resWizNext(\''+sid+'\')">Continuer →</button>':'')+
+    '</div>';
+  return bar+body+nav;
+}
+
+function _resStep0(){
+  var h='<div style="font-size:16px;font-weight:600;margin-bottom:4px">Vos bâtiments</div>'+
+    '<div style="font-size:13px;color:var(--text2);margin-bottom:16px">Combien de bâtiments / tours votre résidence a-t-elle ?</div>';
+  _resWizBats.forEach(function(b,i){
+    h+='<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:14px;display:flex;gap:10px;align-items:flex-end;margin-bottom:8px">'+
+      '<div style="flex:1"><div style="font-size:11px;font-weight:500;color:var(--text2);margin-bottom:4px">Nom du bâtiment '+(i+1)+'</div>'+
+      '<input class="cfg-form-input" value="'+escape_html(b.nom)+'" oninput="_resWizBats['+i+'].nom=this.value" placeholder="ex. Tour A, Bâtiment principal…"></div>'+
+      (i>0?'<button onclick="_resRemoveBat('+i+')" class="cfg-btn-danger" style="padding:9px 12px;font-size:12px;border-radius:6px">✕</button>':'')+
+      '</div>';
+  });
+  h+='<button onclick="_resAddBat()" style="background:none;border:1.5px dashed var(--border);border-radius:8px;padding:9px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;width:100%;font-family:inherit;margin-top:4px">+ Ajouter un bâtiment</button>';
+  return h;
+}
+
+function _resPreviewStr(debut,fin){
+  debut=+debut||0;fin=+fin||0;var cnt=fin-debut+1;
+  if(cnt<=0||isNaN(cnt))return '';
+  if(cnt>500)return '→ '+cnt+' unités';
+  if(cnt<=6)return '→ '+Array.from({length:cnt},function(_,k){return debut+k;}).join(', ');
+  return '→ '+cnt+' unités : '+debut+', '+(debut+1)+', '+(debut+2)+' … '+fin;
+}
+function _resUpdatePrev(idx){
+  var f=_resWizEtages[idx];if(!f)return;
+  var el=document.getElementById('res-prev-'+idx);
+  if(el)el.textContent=_resPreviewStr(f.debut,f.fin);
+}
+
+function _resStep1(){
+  var h='<div style="font-size:16px;font-weight:600;margin-bottom:4px">Étages & numérotation</div>'+
+    '<div style="font-size:13px;color:var(--text2);margin-bottom:16px">Définissez les étages et la plage de numéros pour chaque bâtiment.</div>';
+  _resWizBats.forEach(function(b,bi){
+    var floors=_resWizEtages.filter(function(e){return e.bat===bi;});
+    h+='<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">'+
+      '<div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:10px">'+escape_html(b.nom)+'</div>'+
+      '<div style="display:grid;grid-template-columns:75px 1fr 1fr 28px;gap:6px;margin-bottom:4px">'+
+      '<span style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase">Étage</span>'+
+      '<span style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase">N° début</span>'+
+      '<span style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase">N° fin</span>'+
+      '<span></span></div>';
+    floors.forEach(function(f){
+      var idx=_resWizEtages.indexOf(f);
+      h+='<div style="margin-bottom:6px">'+
+        '<div style="display:grid;grid-template-columns:75px 1fr 1fr 28px;gap:6px;margin-bottom:2px">'+
+        '<input class="cfg-form-input" value="'+escape_html(String(f.etage||''))+'" oninput="_resWizEtages['+idx+'].etage=this.value" placeholder="18">'+
+        '<input class="cfg-form-input" type="number" value="'+f.debut+'" oninput="_resWizEtages['+idx+'].debut=+this.value;_resUpdatePrev('+idx+')" placeholder="1801">'+
+        '<input class="cfg-form-input" type="number" value="'+f.fin+'" oninput="_resWizEtages['+idx+'].fin=+this.value;_resUpdatePrev('+idx+')" placeholder="1812">'+
+        '<button onclick="_resRemoveFloor('+idx+')" class="cfg-btn-danger" style="padding:0;font-size:11px;border-radius:5px">✕</button>'+
+        '</div>'+
+        '<div id="res-prev-'+idx+'" style="font-size:11px;color:var(--text3);margin-bottom:4px">'+_resPreviewStr(f.debut,f.fin)+'</div>'+
+        '</div>';
+    });
+    h+='<button onclick="_resAddFloor('+bi+')" style="background:none;border:1.5px dashed var(--border);border-radius:6px;padding:7px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;width:100%;font-family:inherit">+ Ajouter un étage</button>';
+    h+='</div>';
+  });
+  return h;
+}
+
+function _resStep2(){
+  var h='<div style="font-size:16px;font-weight:600;margin-bottom:4px">Zones spéciales</div>'+
+    '<div style="font-size:13px;color:var(--text2);margin-bottom:14px">Quels autres espaces votre résidence contient-elle ?</div>';
+  _RES_SPEC.forEach(function(sp){
+    var on=_resSpeciales[sp.key];
+    h+='<div onclick="_resToggleSpecial(\''+sp.key+'\')" style="cursor:pointer;background:white;border:1.5px solid '+(on?'var(--amber)':'var(--border)')+';border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:6px">'+
+      '<span style="font-size:20px;width:28px;text-align:center">'+sp.icon+'</span>'+
+      '<span style="flex:1;font-size:13px;font-weight:500;color:'+(on?'var(--amber-dark)':'var(--text)')+'">'+sp.nom+'</span>'+
+      '<div style="width:20px;height:20px;border-radius:50%;background:'+(on?'var(--amber)':'var(--border)')+';color:white;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">'+(on?'✓':'')+'</div>'+
+      '</div>';
+  });
+  h+='<div style="font-size:11px;color:var(--text3);margin-top:6px">Cliquez pour sélectionner. Les équipements se configurent à l\'étape suivante.</div>';
+  return h;
+}
+
+function _resEqSection(key,label){
+  _resEnsureEq(key);
+  var sel=_resZoneEq[key].sel,nw=_resZoneEq[key].nw;
+  var allSugs=[].concat(_RES_COMMON_EQ);
+  _resExistingEq.forEach(function(n){if(allSugs.indexOf(n)<0)allSugs.push(n);});
+  var h='<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">'+
+    '<div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:10px">'+label+'</div>'+
+    '<div style="min-height:28px;margin-bottom:8px">';
+  if(!sel.length&&!nw.length){
+    h+='<span style="font-size:12px;color:var(--text3)">Aucun — cliquez sur les suggestions ou ajoutez manuellement</span>';
+  }else{
+    sel.forEach(function(name,i){
+      h+='<span onclick="_resRemSelEq(\''+key+'\','+i+')" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500;background:var(--amber-pale);border:1px solid var(--amber-border);color:var(--amber-dark);cursor:pointer;margin:2px">'+escape_html(name)+' ✕</span>';
+    });
+    nw.forEach(function(name,i){
+      h+='<span onclick="_resRemNewEq(\''+key+'\','+i+')" style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500;background:var(--vert-pale);border:1px solid var(--vert-border);color:var(--vert);cursor:pointer;margin:2px">'+escape_html(name)+' ✕</span>';
+    });
+  }
+  h+='</div>';
+  var remaining=allSugs.filter(function(n){return sel.indexOf(n)<0&&nw.indexOf(n)<0;});
+  if(remaining.length){
+    h+='<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Suggestions</div>'+
+      '<div style="margin-bottom:10px">';
+    remaining.forEach(function(n){
+      h+='<span onclick="_resAddSugEq(\''+key+'\',\''+n.replace(/'/g,'\\\'')+'\')" style="display:inline-flex;padding:4px 10px;border-radius:20px;font-size:12px;background:white;border:1px solid var(--border);color:var(--text2);cursor:pointer;margin:2px">+ '+escape_html(n)+'</span>';
+    });
+    h+='</div>';
+  }
+  h+='<div style="display:flex;gap:6px">'+
+    '<input class="cfg-form-input" style="font-size:12px" id="res-eq-inp-'+key+'" placeholder="Autre équipement…" onkeydown="if(event.key===\'Enter\')_resAddCustomEq(\''+key+'\')">'+
+    '<button class="cfg-btn cfg-btn-cancel" style="white-space:nowrap;font-size:12px;padding:8px 12px" onclick="_resAddCustomEq(\''+key+'\')">+ Ajouter</button>'+
+    '</div></div>';
+  return h;
+}
+
+function _resStep3(){
+  var h='<div style="font-size:16px;font-weight:600;margin-bottom:4px">Équipements par zone</div>'+
+    '<div style="font-size:13px;color:var(--text2);margin-bottom:16px">Quels équipements vérifier dans chaque type d\'espace ?</div>';
+  h+=_resEqSection('chambre','🛏️ Chambres / Appartements');
+  h+=_resEqSection('commun','🚪 Parties communes (par étage)');
+  _RES_SPEC.forEach(function(sp){if(_resSpeciales[sp.key])h+=_resEqSection(sp.key,sp.icon+' '+sp.nom);});
+  return h;
+}
+
+function _resStep4(sid){
+  var totalUnits=_resWizEtages.reduce(function(a,f){return a+(f.fin-f.debut+1);},0);
+  _resEnsureEq('chambre');
+  var chamEqCnt=(_resZoneEq.chambre.sel.length+_resZoneEq.chambre.nw.length);
+  var specSel=_RES_SPEC.filter(function(s){return _resSpeciales[s.key];});
+  var h='<div style="font-size:16px;font-weight:600;margin-bottom:4px">Récapitulatif</div>'+
+    '<div style="font-size:13px;color:var(--text2);margin-bottom:16px">Vérifiez avant de générer les zones.</div>';
+  h+='<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">'+
+    '<div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Structure résidentielle</div>';
+  _resWizBats.forEach(function(b,bi){
+    var fl=_resWizEtages.filter(function(e){return e.bat===bi;});
+    var u=fl.reduce(function(a,f){return a+(f.fin-f.debut+1);},0);
+    h+='<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px">'+
+      '<span><b>'+escape_html(b.nom)+'</b> · '+fl.length+' étage(s)</span>'+
+      '<span style="background:var(--vert-pale);border:1px solid var(--vert-border);color:var(--vert);border-radius:20px;padding:2px 8px;font-size:11px;font-weight:600">'+u+' unités</span></div>';
+    fl.forEach(function(f){
+      h+='<div style="display:flex;justify-content:space-between;padding:3px 0 3px 14px;font-size:12px;color:var(--text2)">'+
+        '<span>Étage '+escape_html(String(f.etage))+' · '+escape_html(b.nom)+'</span>'+
+        '<span>'+f.debut+' → '+f.fin+'</span></div>';
+    });
+  });
+  h+='<div style="display:flex;justify-content:space-between;padding:7px 0;font-size:13px;font-weight:700">'+
+    '<span>Total</span><span style="color:var(--amber-dark)">'+totalUnits+' zones</span></div></div>';
+  var chamEqs=_resZoneEq.chambre.sel.concat(_resZoneEq.chambre.nw);
+  h+='<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">'+
+    '<div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Équipements par chambre</div>'+
+    (chamEqs.length?chamEqs.map(function(n){return '<span style="display:inline-flex;padding:3px 9px;border-radius:20px;font-size:12px;background:var(--amber-pale);border:1px solid var(--amber-border);color:var(--amber-dark);margin:2px">'+escape_html(n)+'</span>';}).join(''):'<span style="font-size:12px;color:var(--text3)">Aucun équipement défini</span>')+
+    '<div style="font-size:11px;color:var(--text3);margin-top:6px">→ '+totalUnits*chamEqCnt+' équipements au total</div></div>';
+  if(specSel.length){
+    h+='<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px">'+
+      '<div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Zones spéciales</div>';
+    specSel.forEach(function(sp){
+      _resEnsureEq(sp.key);var cnt=_resZoneEq[sp.key].sel.length+_resZoneEq[sp.key].nw.length;
+      h+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:13px">'+
+        '<span>'+sp.icon+' '+sp.nom+'</span><span style="font-size:12px;color:var(--text2)">'+cnt+' équip.</span></div>';
+    });
+    h+='</div>';
+  }
+  h+='<div style="background:var(--vert-pale);border:1.5px solid var(--vert-border);border-radius:10px;padding:14px;margin-bottom:12px">'+
+    '<div style="font-size:13px;font-weight:600;color:var(--vert);margin-bottom:3px">✓ Prêt à générer</div>'+
+    '<div style="font-size:12px;color:var(--vert)">'+totalUnits+' zones résidentielles + '+specSel.length+' zones spéciales</div></div>';
+  h+='<button class="cfg-btn-primary" id="res-gen-btn" onclick="_resGenerate(\''+sid+'\')" style="width:100%;padding:12px;font-size:14px">🏗️ Générer toutes les zones</button>'+
+    '<button class="cfg-btn cfg-btn-cancel" onclick="_resWizBack()" style="width:100%;margin-top:8px">← Modifier</button>';
+  return h;
+}
+
+// Navigation wizard
+function _resWizBack(){if(_resWizStep>0){_resWizStep--;if(_session)renderRespTech(_session,'config');}}
+function _resWizNext(sid){_resWizStep=Math.min(4,_resWizStep+1);if(_session)renderRespTech(_session,'config');}
+function _resAddBat(){_resWizBats.push({nom:'Bâtiment '+(_resWizBats.length+1)});if(_session)renderRespTech(_session,'config');}
+function _resRemoveBat(i){
+  _resWizBats.splice(i,1);
+  _resWizEtages=_resWizEtages.filter(function(e){return e.bat!==i;}).map(function(e){return {bat:e.bat>i?e.bat-1:e.bat,etage:e.etage,debut:e.debut,fin:e.fin};});
+  if(_session)renderRespTech(_session,'config');
+}
+function _resAddFloor(bi){
+  var ex=_resWizEtages.filter(function(e){return e.bat===bi;});
+  var last=ex.length?ex[ex.length-1]:null;
+  _resWizEtages.push({bat:bi,etage:last?(parseInt(last.etage)||0)+1+'':'1',debut:last?last.fin+1:101,fin:last?last.fin+12:112});
+  if(_session)renderRespTech(_session,'config');
+}
+function _resRemoveFloor(i){_resWizEtages.splice(i,1);if(_session)renderRespTech(_session,'config');}
+function _resToggleSpecial(k){
+  _resSpeciales[k]=!_resSpeciales[k];
+  _resEnsureEq(k);
+  if(_session)renderRespTech(_session,'config');
+}
+function _resAddSugEq(key,name){_resEnsureEq(key);_resZoneEq[key].sel.push(name);if(_session)renderRespTech(_session,'config');}
+function _resRemSelEq(key,i){_resEnsureEq(key);_resZoneEq[key].sel.splice(i,1);if(_session)renderRespTech(_session,'config');}
+function _resAddCustomEq(key){
+  var el=document.getElementById('res-eq-inp-'+key);
+  if(!el||!el.value.trim())return;
+  _resEnsureEq(key);_resZoneEq[key].nw.push(el.value.trim());
+  el.value='';if(_session)renderRespTech(_session,'config');
+}
+function _resRemNewEq(key,i){_resEnsureEq(key);_resZoneEq[key].nw.splice(i,1);if(_session)renderRespTech(_session,'config');}
+
+async function _resGenerate(sid){
+  var btn=document.getElementById('res-gen-btn');
+  if(btn){btn.disabled=true;btn.textContent='Génération en cours…';}
+  try{
+    // Batch zones
+    var zoneBatch=[];
+    _resWizEtages.forEach(function(f){
+      var bat=(_resWizBats[f.bat]&&_resWizBats[f.bat].nom)||'';
+      for(var n=f.debut;n<=f.fin;n++){
+        zoneBatch.push({site_id:sid,groupe_id:sid,nom:'Chambre '+n,actif:true,
+          type:'salle',categorie:'Chambre',etage:String(f.etage),
+          type_zone:'chambre',batiment:bat,frequence_passage:30,ordre:n});
+      }
+    });
+    var doneCommun={};
+    _resEnsureEq('commun');
+    _resWizEtages.forEach(function(f){
+      var bat=(_resWizBats[f.bat]&&_resWizBats[f.bat].nom)||'';
+      var ck=bat+'|'+f.etage;
+      if(!doneCommun[ck]&&(_resZoneEq.commun.sel.length+_resZoneEq.commun.nw.length>0)){
+        doneCommun[ck]=1;
+        zoneBatch.push({site_id:sid,groupe_id:sid,nom:'Communs Ét.'+f.etage+(bat?' '+bat:''),
+          actif:true,type:'salle',categorie:'Partie commune',etage:String(f.etage),
+          type_zone:'commun_etage',batiment:bat,frequence_passage:7,ordre:0});
+      }
+    });
+    _RES_SPEC.forEach(function(sp){
+      if(!_resSpeciales[sp.key])return;
+      zoneBatch.push({site_id:sid,groupe_id:sid,nom:sp.nom,actif:true,
+        type:'salle',categorie:sp.nom,type_zone:'special',frequence_passage:30,ordre:0});
+    });
+
+    var createdZones=await supaPostBulk('zones',zoneBatch);
+    if(!createdZones||!createdZones.length)throw new Error('Échec création zones');
+
+    // Batch equipements_zone
+    var eqBatch=[];
+    _resEnsureEq('chambre');
+    var chamEqs=_resZoneEq.chambre.sel.concat(_resZoneEq.chambre.nw);
+    _resEnsureEq('commun');
+    var communEqs=_resZoneEq.commun.sel.concat(_resZoneEq.commun.nw);
+    createdZones.forEach(function(z){
+      var eqs=[];
+      if(z.type_zone==='chambre')eqs=chamEqs;
+      else if(z.type_zone==='commun_etage')eqs=communEqs;
+      else if(z.type_zone==='special'){
+        var sp=_RES_SPEC.find(function(s){return s.nom===z.nom;});
+        if(sp){_resEnsureEq(sp.key);eqs=_resZoneEq[sp.key].sel.concat(_resZoneEq[sp.key].nw);}
+      }
+      eqs.forEach(function(eqNom,i){
+        eqBatch.push({site_id:sid,groupe_id:sid,zone_id:z.id,nom:eqNom,
+          actif:true,actif_ronde:true,actif_releve:false,photo_requise:false,ordre_ronde:i+1});
+      });
+    });
+    if(eqBatch.length)await supaPostBulk('equipements_zone',eqBatch);
+
+    // Reset & afficher planning
+    _resWizStep=0;_resWizBats=[{nom:'Tour A'}];
+    _resWizEtages=[{bat:0,etage:'18',debut:1801,fin:1812}];
+    Object.keys(_resSpeciales).forEach(function(k){_resSpeciales[k]=false;});
+    _resZoneEq={};_resExistingEqLoaded=false;_resSubTab='planning';
+    if(_session)renderRespTech(_session,'config');
+  }catch(e){
+    console.error('[resGenerate]',e);
+    if(btn){btn.disabled=false;btn.textContent='🏗️ Générer toutes les zones';}
+    alert('Erreur lors de la génération : '+(e.message||e));
+  }
+}
+
+async function _buildResPlanningHtml(sid){
+  var zones=await supaGet('zones','site_id=eq.'+sid+'&type_zone=in.(chambre,commun_etage,special)&actif=eq.true&select=id,nom,etage,batiment,type_zone,frequence_passage&order=batiment.asc,etage.asc,nom.asc')||[];
+  if(!zones.length){
+    return '<div style="text-align:center;padding:40px;color:var(--text3)">'+
+      '<div style="font-size:36px;margin-bottom:12px">🏢</div>'+
+      '<div style="font-size:14px;font-weight:600;margin-bottom:6px">Aucune zone configurée</div>'+
+      '<div style="font-size:13px">Utilisez l\'onglet Configuration pour générer vos zones.</div></div>';
+  }
+  var zoneIds=zones.map(function(z){return z.id;});
+  var dateLimit=new Date(Date.now()-180*24*60*60*1000).toISOString().split('T')[0];
+  var releves=await supaGet('releves_zones','site_id=eq.'+sid+'&zone_id=in.('+zoneIds.join(',')+')'+'&date=gte.'+dateLimit+'&select=zone_id,date,technicien,statut,nb_anomalies&order=zone_id.asc,date.desc')||[];
+  var lastRel={};releves.forEach(function(r){if(!lastRel[r.zone_id])lastRel[r.zone_id]=r;});
+  var today=new Date();today.setHours(0,0,0,0);
+  function zStatus(z){
+    var lr=lastRel[z.id],freq=z.frequence_passage||30;
+    if(!lr)return {cls:'late',lbl:'Jamais passé'};
+    var days=Math.floor((today-new Date(lr.date))/(86400000));
+    var left=freq-days;
+    if(lr.statut==='incident'||lr.nb_anomalies>0)return {cls:'incident',lbl:'Incident signalé',days:days};
+    if(left<=0)return {cls:'late',lbl:'En retard (+'+(Math.abs(left))+'j)',days:days};
+    if(left<=3)return {cls:'warn',lbl:'Dû dans '+left+'j',days:days};
+    return {cls:'ok',lbl:'OK (il y a '+days+'j)',days:days};
+  }
+  var SS={ok:{bg:'var(--vert-pale)',bd:'var(--vert-border)',cl:'var(--vert)'},
+    warn:{bg:'var(--orange-pale)',bd:'var(--orange-border)',cl:'var(--orange)'},
+    late:{bg:'var(--rouge-pale)',bd:'var(--rouge-border)',cl:'var(--rouge)'},
+    incident:{bg:'var(--rouge-pale)',bd:'var(--rouge-border)',cl:'var(--rouge)'}};
+  var counts={ok:0,warn:0,late:0,incident:0};
+  zones.forEach(function(z){var s=zStatus(z);counts[s.cls]=(counts[s.cls]||0)+1;});
+  var h='<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
+  [{k:'ok',l:'OK'},{k:'warn',l:'Dû bientôt'},{k:'late',l:'En retard'},{k:'incident',l:'Incident'}].forEach(function(sc){
+    if(counts[sc.k])h+='<div style="background:'+SS[sc.k].bg+';border:1px solid '+SS[sc.k].bd+';border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;color:'+SS[sc.k].cl+'">'+counts[sc.k]+' '+sc.l+'</div>';
+  });
+  h+='</div>';
+  var byBat={};
+  zones.forEach(function(z){
+    var bat=z.batiment||'Résidence';var et=z.etage||'—';
+    if(!byBat[bat])byBat[bat]={};if(!byBat[bat][et])byBat[bat][et]=[];
+    byBat[bat][et].push(z);
+  });
+  Object.keys(byBat).forEach(function(bat){
+    h+='<div style="margin-bottom:20px"><div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">'+escape_html(bat)+'</div>';
+    Object.keys(byBat[bat]).sort().forEach(function(et){
+      h+='<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">'+
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px">Étage '+escape_html(et)+'</div>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:5px">';
+      byBat[bat][et].forEach(function(z){
+        var st=zStatus(z);var ss=SS[st.cls];
+        h+='<div title="'+escape_html(st.lbl)+'" style="background:'+ss.bg+';border:1px solid '+ss.bd+';border-radius:6px;padding:5px 8px;font-size:11px;font-weight:600;color:'+ss.cl+';min-width:48px;text-align:center;cursor:default">'+
+          escape_html(z.nom)+'<div style="font-size:9px;font-weight:400;opacity:.8;margin-top:1px">'+escape_html(st.lbl.split('(')[0].trim())+'</div></div>';
+      });
+      h+='</div></div>';
+    });
+    h+='</div>';
+  });
+  var prio=zones.filter(function(z){var s=zStatus(z);return s.cls==='late'||s.cls==='warn'||s.cls==='incident';});
+  if(prio.length){
+    h+='<div style="margin-top:4px"><div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">Priorités du jour ('+prio.length+')</div>'+
+      '<div style="background:white;border:1.5px solid var(--border);border-radius:10px;overflow:hidden">';
+    prio.slice(0,10).forEach(function(z,i){
+      var st=zStatus(z);var ss=SS[st.cls];
+      h+='<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:'+(i<Math.min(prio.length,10)-1?'1px solid var(--border)':'none')+'">'+
+        '<div style="width:8px;height:8px;border-radius:50%;background:'+ss.cl+';flex-shrink:0"></div>'+
+        '<div style="flex:1"><div style="font-size:13px;font-weight:500">'+escape_html(z.nom)+'</div>'+
+        '<div style="font-size:11px;color:var(--text2)">'+escape_html((z.batiment||'')+' · Étage '+(z.etage||'—'))+'</div></div>'+
+        '<span style="font-size:11px;font-weight:600;color:'+ss.cl+';background:'+ss.bg+';border:1px solid '+ss.bd+';padding:2px 8px;border-radius:20px">'+escape_html(st.lbl)+'</span></div>';
+    });
+    h+='</div></div>';
+  }
+  return h;
 }
 
 async function _buildSetupTab(sid,equips,zonesArr,contactsArr){
