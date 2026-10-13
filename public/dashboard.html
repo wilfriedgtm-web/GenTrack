@@ -651,6 +651,7 @@ function buildNavItems(role){
       items.push({id:'energie',icon:'bolt',label:'Énergie'});
       items.push({id:'rapport',icon:'summarize',label:'Rapport conso'});
     }
+    if(hasModule('residence'))items.push({id:'planning',icon:'calendar_month',label:'Planning'});
   }
   return items;
 }
@@ -7977,6 +7978,7 @@ async function _loadDT(session,nav){
     else if(nav==='commandes')html=await _dtCommandesDT(sids,session);
     else if(nav==='rapport')html=await _dtRapport(sids,session);
     else if(nav==='energie')html=await _dtEnergie(sids,session);
+    else if(nav==='planning')html=await _dtPlanning(sids,session);
     el.innerHTML=html;
   }catch(e){
     el.innerHTML='<div class="alert-banner" style="margin-top:12px"><div class="ab-icon">⚠️</div><div class="ab-body"><div class="ab-title">Erreur de chargement</div><div class="ab-sub">'+(e.message||'Vérifiez votre connexion')+'</div></div></div>';
@@ -10129,6 +10131,62 @@ async function _dtCommandesDT(sids,session){
     '</div>';
   });
   return h+'</div>';
+}
+
+/* ── DIR TECH : Planning zones (multi-site Résidence+) ── */
+async function _dtPlanning(sids,session){
+  // Filtrer les sites avec module résidence
+  var allSites=[];
+  try{allSites=await supaGet('sites','id=in.('+sids.join(',')+')'+'&select=id,nom,modules&order=nom.asc')||[];}catch(e){}
+  var resSites=allSites.filter(function(s){
+    var m=Array.isArray(s.modules)?s.modules:['general'];
+    return m.indexOf('general')>=0||m.indexOf('residence')>=0;
+  });
+  if(!resSites.length){
+    return '<div style="text-align:center;padding:60px;color:var(--text3)">'+
+      '<div style="font-size:36px;margin-bottom:12px">🏨</div>'+
+      '<div style="font-size:14px;font-weight:600;margin-bottom:6px">Aucun site avec le module Résidence+</div>'+
+      '</div>';
+  }
+
+  // ── Vue consolidée : KPIs globaux aujourd'hui ──────────────────────────────
+  var today=new Date().toISOString().split('T')[0];
+  var sidStr=resSites.map(function(s){return s.id;}).join(',');
+  var consolideTotalZones=0,consoleVisited=0,consoleIncidents=0;
+  try{
+    var allZones=await supaGet('zones','site_id=in.('+sidStr+')&type_zone=in.(chambre,commun_etage,special)&actif=eq.true&select=id,site_id')||[];
+    var allRels=await supaGet('releves_zones','site_id=in.('+sidStr+')&date=eq.'+today+'&select=site_id,zone_id,statut')||[];
+    consolideTotalZones=allZones.length;
+    consoleVisited=allRels.length;
+    consoleIncidents=allRels.filter(function(r){return r.statut==='incident';}).length;
+  }catch(e){}
+  var consPct=consolideTotalZones>0?Math.round(consoleVisited/consolideTotalZones*100):0;
+  var consCol=consoleIncidents>0?'var(--rouge)':consPct===100?'var(--vert)':consPct>0?'var(--amber)':'var(--text3)';
+
+  var h='<div class="section-title">Planning zones · Résidence+</div>';
+
+  // Bandeau consolidé
+  h+='<div style="background:white;border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:20px;display:flex;align-items:center;gap:16px">'+
+    '<div style="width:52px;height:52px;border-radius:50%;background:'+consCol+';display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:white;flex-shrink:0">'+consPct+'%</div>'+
+    '<div style="flex:1">'+
+      '<div style="font-size:15px;font-weight:700;color:var(--dark)">Rondes zones — aujourd\'hui</div>'+
+      '<div style="font-size:13px;color:var(--text2);margin-top:3px">'+
+        consoleVisited+'/'+consolideTotalZones+' zones visitées sur '+resSites.length+' site(s)'+
+        (consoleIncidents>0?' · <span style="color:var(--rouge);font-weight:600">⚠️ '+consoleIncidents+' incident(s)</span>':'')+'</div>'+
+    '</div>'+
+  '</div>';
+
+  // ── Vue par site ─────────────────────────────────────────────────────────────
+  for(var i=0;i<resSites.length;i++){
+    var site=resSites[i];
+    h+='<div style="background:white;border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:20px">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:14px;display:flex;align-items:center;gap:8px">'+
+        '<span style="font-size:16px">🏨</span>'+escape_html(site.nom)+
+      '</div>'+
+      (await _buildResPlanningHtml(site.id))+
+    '</div>';
+  }
+  return h;
 }
 
 /* ── DIR TECH : détail site ── */

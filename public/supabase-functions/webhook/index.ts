@@ -117,6 +117,25 @@ async function getSitesForContact(contactId: string, primarySiteId?: string): Pr
   return Array.isArray(sites) ? sites : [];
 }
 
+// Retourne tous les resp_tech/dir_tech qui gèrent ce site (contact.site_id + user_sites)
+async function getResponsablesForSite(siteId: string): Promise<any[]> {
+  const seen = new Set<string>();
+  const result: any[] = [];
+  // 1. Contact dont c'est le site principal
+  const direct = await db('contacts', { query: `&site_id=eq.${siteId}&role=in.(resp_tech,dir_tech)&actif=eq.true` });
+  if (Array.isArray(direct)) for (const c of direct) { if (!seen.has(c.id)) { seen.add(c.id); result.push(c); } }
+  // 2. Contacts liés via user_sites (multi-site resp_tech / dir_tech)
+  const us = await db('user_sites', { query: `&site_id=eq.${siteId}`, select: 'contact_id' }).catch(() => []);
+  if (Array.isArray(us) && us.length > 0) {
+    const cids = us.map((r: any) => r.contact_id).filter(Boolean);
+    if (cids.length) {
+      const linked = await db('contacts', { query: `&id=in.(${cids.join(',')})&role=in.(resp_tech,dir_tech)&actif=eq.true` }).catch(() => []);
+      if (Array.isArray(linked)) for (const c of linked) { if (!seen.has(c.id)) { seen.add(c.id); result.push(c); } }
+    }
+  }
+  return result;
+}
+
 // ── Équipements / questions ───────────────────────────────────────────────────
 async function getEquipementsTechnicien(siteId: string): Promise<any[]> {
   const raw = await db('equipements', { query: `&site_id=eq.${siteId}&actif=eq.true&actif_ronde=eq.true&order=ordre_ronde.asc` });
@@ -282,8 +301,8 @@ async function alerterSeuilsEnArrierePlan(equip: any, questions: any[], reponses
       }
     }
   }
-  // 2. Toujours notifier resp_tech + dir_tech du site (garantie)
-  const responsables = await db('contacts', { query: `&site_id=eq.${equip.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` });
+  // 2. Toujours notifier resp_tech + dir_tech du site (garantie, multi-site inclus)
+  const responsables = await getResponsablesForSite(equip.site_id);
   if (Array.isArray(responsables)) {
     for (const r of responsables) {
       if (r.whatsapp && !dejaEnvoyes.has(r.whatsapp)) {
@@ -477,9 +496,7 @@ async function sendRapportRonde(rondeId: string, phone: string, techNom: string,
 
   const dejaEnvoyes = new Set<string>([phone]);
   for (const m of messages) await sendWA(phone, m);
-  const responsables = await db('contacts', {
-    query: `&site_id=eq.${siteId}&role=in.(resp_tech,dir_tech)&actif=eq.true`
-  });
+  const responsables = await getResponsablesForSite(siteId);
   if (Array.isArray(responsables)) {
     for (const r of responsables) {
       if (!r.whatsapp || dejaEnvoyes.has(r.whatsapp)) continue;
@@ -935,7 +952,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       ronde_id: sd.ronde_id || null,
     }}).catch(() => {});
     // Notifier resp_tech
-    const responsablesAno = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` }).catch(() => []);
+    const responsablesAno = await getResponsablesForSite(sd.site_id).catch(() => []);
     if (Array.isArray(responsablesAno)) {
       const alertMsg = `⚠️ *Anomalie signalée — ${sd.equip_nom}*\n_${siteNom}_\n\n"${desc}"\n\n_Signalé par ${contact.nom} · ${getHeure()}_`;
       for (const r of responsablesAno) if (r.whatsapp) await sendWA(r.whatsapp, alertMsg).catch(() => {});
@@ -996,10 +1013,8 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     }}).catch(() => {});
     await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
 
-    // Notifier resp_tech + dir_tech
-    const responsables = await db('contacts', {
-      query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true`
-    });
+    // Notifier resp_tech + dir_tech (multi-site inclus)
+    const responsables = await getResponsablesForSite(sd.site_id);
     const refLine = refCode ? `\n\n_Répondre *OK ${refCode}* pour PEC · ou *AFFECTER ${refCode}* pour assigner à un tech._` : `\n\n_Tapez *resolu* pour clôturer._`;
     const alertMsg = `🚨 *PANNE SIGNALÉE — GenTrack*\n*${siteNom}*\n\n🔧 Équipement : *${sd.equip_nom}*\n⚠️ Type : *${sd.panne_type_label}*\n📝 Détail : ${desc}\n\n👤 Signalé par : ${contact.nom}\n🕐 ${today} ${getHeure()}${refLine}`;
     const dejaEnvoyes = new Set<string>([phone]);
@@ -1068,10 +1083,8 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     }}).catch(() => {});
     await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
 
-    // Notifier resp_tech
-    const responsables = await db('contacts', {
-      query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true`
-    });
+    // Notifier resp_tech (multi-site inclus)
+    const responsables = await getResponsablesForSite(sd.site_id);
     const notifMsg = `✅ *Panne résolue — GenTrack*\n*${siteNom}*\n\n📝 ${sd.sg_label}\n${sd.resolution_note ? '🔧 ' + sd.resolution_note + '\n' : ''}${sd.intervenant ? '👷 ' + sd.intervenant + '\n' : ''}${cout > 0 ? '💰 ' + cout.toLocaleString('fr-FR') + ' FCFA\n' : ''}\n_Résolu par ${contact.nom} · ${today}_`;
     if (Array.isArray(responsables)) {
       for (const r of responsables) if (r.whatsapp && r.whatsapp !== phone) await sendWA(r.whatsapp, notifMsg);
@@ -1137,7 +1150,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       intervenant: sd.intervenant || contact.nom
     }}).catch(() => {});
     await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
-    const responsables = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` });
+    const responsables = await getResponsablesForSite(sd.site_id);
     const vidangeMsg = `🔧 *Vidange effectuée*\n*${siteNom}*\n\n📝 ${sd.equip_nom}\n🕐 ${sd.heures_total}h\n👤 ${sd.intervenant || contact.nom}\n\n_Prochaine : ~${prochainSeuil}h_`;
     if (Array.isArray(responsables)) {
       for (const r of responsables) if (r.whatsapp && r.whatsapp !== phone) await sendWA(r.whatsapp, vidangeMsg);
@@ -1221,7 +1234,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
 
     const notifMsg = `⛽ *Ravitaillement effectué*\n*${siteNom}*\n\n🛢️ ${sd.cuve_nom}\n💧 *${sd.litres_ajoutes}L* ajoutés\n📊 Niveau : *${niveauL}L / ${cap}L* (${pct}%) ${col}${autoJ ? `\n⏱️ Autonomie : ~${autoJ}j` : ''}${coutTxt}\n👤 ${operateur}`;
-    const responsables = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` });
+    const responsables = await getResponsablesForSite(sd.site_id);
     if (Array.isArray(responsables)) {
       for (const r of responsables) if (r.whatsapp && r.whatsapp !== phone) await sendWA(r.whatsapp, notifMsg);
     }
@@ -1250,7 +1263,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
 
     // Alerte seuil bas
     if (f.seuil_alerte_bas != null && numVal < f.seuil_alerte_bas) {
-      const responsablesSeuil = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` }).catch(() => []);
+      const responsablesSeuil = await getResponsablesForSite(sd.site_id).catch(() => []);
       if (Array.isArray(responsablesSeuil)) {
         const alertMsg = `⚠️ *Alerte énergie — ${f.nom}*\n_${siteNom}_\n\nValeur : *${numVal}${f.unite ? ' ' + f.unite : ''}* (seuil : ${f.seuil_alerte_bas})\n\n_Relevé par ${contact.nom} · ${getHeure()}_`;
         for (const r of responsablesSeuil) if (r.whatsapp) await sendWA(r.whatsapp, alertMsg).catch(() => {});
@@ -1321,7 +1334,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     // Notifier resp_tech
     const fluides: any[] = sd.fluides || [];
     const lastReleve: Record<string, any> = sd.last_releve || {};
-    const responsablesEnergie = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=in.(resp_tech,dir_tech)&actif=eq.true` }).catch(() => []);
+    const responsablesEnergie = await getResponsablesForSite(sd.site_id).catch(() => []);
     if (Array.isArray(responsablesEnergie)) {
       const lines = fluides.map((f: any) => {
         const val = valeurs[f.id];
@@ -1491,7 +1504,7 @@ async function handleMessage(from: string, bodyText: string) {
       if (siteIdSig) {
         const siteRawSig = await db('sites', { query: `&id=eq.${siteIdSig}&limit=1`, select: 'nom' });
         siteNomSig = Array.isArray(siteRawSig) && siteRawSig[0] ? siteRawSig[0].nom : '';
-        const responsables = await db('contacts', { query: `&site_id=eq.${siteIdSig}&role=in.(resp_tech,dir_tech)&actif=eq.true` });
+        const responsables = await getResponsablesForSite(siteIdSig);
         const notifPec = `ℹ️ *Prise en charge — GenTrack*\n📍 *${siteNomSig}*\n\n📋 ${refCode}\n👷 *${preneurNom}* s'en occupe\n🕐 ${getHeure()}`;
         if (Array.isArray(responsables)) {
           for (const r of responsables) {
