@@ -323,6 +323,7 @@ var _configSelectedEqId=null;
 var _configCurrentTab='equipements';
 var _configEquipCache={}; // id → equip object, évite les problèmes d'échappement dans onclick
 var _siteModules=['general']; // modules actifs du site courant, mis à jour dans _rtConfig
+var _configTypesCache=[]; // types_equipements, mis à jour dans _rtConfig pour le template import
 
 function hasModule(mod){
   if(_siteModules.indexOf('general')>=0)return true; // Azalai et anciens clients voient tout
@@ -5440,10 +5441,195 @@ function _eqImportHandleFile(file,sid){
   }
 }
 
+// ══════════════════════════════════════════════════════════════
+// IMPORT EXCEL — ÉQUIPEMENTS DE RONDE (équipements techniques)
+// ══════════════════════════════════════════════════════════════
+
+function _eqRondeDownloadTemplate(){
+  var types=_configTypesCache.length?_configTypesCache:[
+    {nom:'Groupe électrogène'},{nom:'Cuve fioul'},{nom:'Chambre froide'},
+    {nom:'Groupe eau glacée'},{nom:'Climatisation centralisée'},{nom:'Ascenseur'},
+    {nom:'TGBT'},{nom:'Piscine'},{nom:'Bâche à eau'},{nom:'Chauffe-eau'},
+    {nom:'Onduleur / UPS'},{nom:'PAC / Pompe à chaleur'},{nom:'Chaufferie / Production ECS'},
+    {nom:'Extracteur / CTA'},{nom:'Spa / Hammam'},{nom:'Station d\'épuration'},{nom:'Compteur / Énergie'}
+  ];
+  function doDownload(XLSX){
+    var headers=['Nom équipement','Type','Zone / Lieu','Ronde (O/N)','Relevé (O/N)','Capacité (L)','Conso L/h','Seuil vidange (h)','Puissance kVA'];
+    var examples=[
+      ['Groupe électrogène principal','Groupe électrogène','Local technique','O','O','','12','250','100'],
+      ['Chambre froide cuisine 1','Chambre froide','Cuisine','O','N','','','',''],
+      ['Chambre froide poissonnerie','Chambre froide','Cuisine','O','N','','','',''],
+      ['GEG de secours','Groupe électrogène','Local technique','O','O','','8','300',''],
+      ['Cuve fioul principale','Cuve fioul','Local technique','O','O','5000','','',''],
+      ['TGBT principal','TGBT','Local technique','O','N','','','',''],
+      ['Ascenseur T1','Ascenseur','Couloir','O','N','','','',''],
+      ['Climatisation lobby','Climatisation centralisée','Hall','O','N','','','','']
+    ];
+    var typeList=types.map(function(t){return t.nom;});
+    var ws=XLSX.utils.aoa_to_sheet([headers].concat(examples));
+    ws['!cols']=[{wch:28},{wch:26},{wch:18},{wch:12},{wch:12},{wch:12},{wch:10},{wch:16},{wch:12}];
+    // Feuille types de référence
+    var ws2=XLSX.utils.aoa_to_sheet([['Types disponibles']].concat(typeList.map(function(t){return [t];})));
+    ws2['!cols']=[{wch:30}];
+    var wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Équipements ronde');
+    XLSX.utils.book_append_sheet(wb,ws2,'Types disponibles');
+    XLSX.writeFile(wb,'template-equipements-ronde-gentrack.xlsx');
+  }
+  if(window.XLSX){doDownload(window.XLSX);}
+  else{
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=function(){doDownload(window.XLSX);};
+    document.head.appendChild(s);
+  }
+}
+
+async function _eqRondeHandleFile(file,sid){
+  if(!file)return;
+  var statusEl=document.getElementById('eq-ronde-import-status');
+  function setStatus(msg,color){if(statusEl){statusEl.textContent=msg;statusEl.style.color=color||'var(--text3)';}}
+  setStatus('Chargement…');
+
+  // Normalise texte pour comparaison : retire accents, espaces, casse
+  function norm(v){
+    return (v+'').trim().toUpperCase()
+      .replace(/[ÉÈÊË]/g,'E').replace(/[ÀÂÄÁ]/g,'A').replace(/[ÙÛÜÚ]/g,'U')
+      .replace(/[ÎÏÍÌ]/g,'I').replace(/[ÔÖÓÒ]/g,'O').replace(/[Ç]/g,'C')
+      .replace(/[^A-Z0-9]/g,'');
+  }
+  function parseBool(v){var s=norm(v);return s==='O'||s==='OUI'||s==='1'||s==='YES'||s==='TRUE';}
+  function parseNum(v){var n=parseFloat((v+'').replace(',','.'));return isNaN(n)?null:n;}
+
+  // Construire map type_nom → type_id (depuis cache)
+  var typesMap={};
+  _configTypesCache.forEach(function(t){typesMap[norm(t.nom)]=t.id;});
+
+  // Parser Excel
+  function doparse(XLSX){
+    var reader=new FileReader();
+    reader.onload=async function(e){
+      try{
+        var wb=XLSX.read(e.target.result,{type:'array'});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+        if(!rows.length){setStatus('Fichier vide.');return;}
+
+        // Trouver ligne d'en-tête (5 premières lignes max)
+        var headerRow=-1,cols={nom:-1,type:-1,zone:-1,ronde:-1,releve:-1,capa:-1,conso:-1,seuil:-1,puissance:-1};
+        for(var ri=0;ri<Math.min(rows.length,5);ri++){
+          var found=false;
+          for(var ci=0;ci<rows[ri].length;ci++){
+            var cn=norm(rows[ri][ci]);
+            if(cn.indexOf('NOM')>=0||cn.indexOf('EQUIPEMENT')>=0)       {cols.nom=ci;found=true;}
+            if(cn.indexOf('TYPE')>=0&&cols.type<0)                       cols.type=ci;
+            if(cn.indexOf('ZONE')>=0||cn.indexOf('LIEU')>=0)             cols.zone=ci;
+            if(cn.indexOf('RONDE')>=0&&cn.indexOf('RELEVE')<0)           cols.ronde=ci;
+            if(cn.indexOf('RELEVE')>=0)                                  cols.releve=ci;
+            if(cn.indexOf('CAPAC')>=0||cn.indexOf('LITRE')>=0)           cols.capa=ci;
+            if(cn.indexOf('CONSO')>=0)                                   cols.conso=ci;
+            if(cn.indexOf('SEUIL')>=0||cn.indexOf('VIDANGE')>=0)         cols.seuil=ci;
+            if(cn.indexOf('PUISS')>=0||cn.indexOf('KVA')>=0)             cols.puissance=ci;
+          }
+          if(found){headerRow=ri;break;}
+        }
+        if(headerRow<0||cols.nom<0){setStatus('En-tête non trouvé. Vérifiez la colonne "Nom équipement".');return;}
+
+        // Charger existants (dédup) + zones du site
+        var [existingEquips, zonesArr] = await Promise.all([
+          supaGet('equipements','site_id=eq.'+sid+'&select=nom'),
+          supaGet('zones','site_id=eq.'+sid+'&actif=eq.true&select=id,nom')
+        ]);
+        var existingNames=new Set((existingEquips||[]).map(function(e){return norm(e.nom);}));
+        var zonesMap={};
+        (zonesArr||[]).forEach(function(z){zonesMap[norm(z.nom)]=z.id;});
+
+        // Cache modèles par type_id (fetch lazy)
+        var modelesCache={};
+        async function getModeleId(typeId){
+          if(!typeId)return null;
+          if(modelesCache.hasOwnProperty(typeId))return modelesCache[typeId];
+          var modeles=await supaGet('modeles_questions','type_equipement_id=eq.'+typeId+'&select=id&order=created_at.asc&limit=1');
+          modelesCache[typeId]=(modeles&&modeles[0])?modeles[0].id:null;
+          return modelesCache[typeId];
+        }
+
+        // Traiter chaque ligne de données
+        var parsed=[];
+        for(var di=headerRow+1;di<rows.length;di++){
+          var row=rows[di];
+          var nom=(row[cols.nom]+'').trim();
+          if(!nom||nom.indexOf('(')===0)continue; // skip vide ou commentaire
+          var typeNom=cols.type>=0?(row[cols.type]+'').trim():'';
+          var typeId=typesMap[norm(typeNom)]||null;
+          var zoneNom=cols.zone>=0?(row[cols.zone]+'').trim():'';
+          var zoneId=zoneNom?zonesMap[norm(zoneNom)]||null:null;
+          parsed.push({
+            nom:nom, typeId:typeId, typeNom:typeNom, zoneId:zoneId,
+            ronde:cols.ronde>=0?parseBool(row[cols.ronde]):true,
+            releve:cols.releve>=0?parseBool(row[cols.releve]):false,
+            capa:cols.capa>=0?parseNum(row[cols.capa]):null,
+            conso:cols.conso>=0?parseNum(row[cols.conso]):null,
+            seuil:cols.seuil>=0?parseNum(row[cols.seuil]):null,
+            puissance:cols.puissance>=0?parseNum(row[cols.puissance]):null
+          });
+        }
+
+        if(!parsed.length){setStatus('Aucun équipement trouvé dans le fichier.');return;}
+
+        var nbCreate=0,nbSkip=0,nbModele=0,errors=[];
+        setStatus('Import en cours (0/'+parsed.length+')…');
+
+        for(var i=0;i<parsed.length;i++){
+          var p=parsed[i];
+          setStatus('Import en cours ('+i+'/'+parsed.length+')…');
+          if(existingNames.has(norm(p.nom))){nbSkip++;continue;}
+          try{
+            var payload={
+              site_id:sid, nom:p.nom, actif:true,
+              actif_ronde:p.ronde, actif_releve:p.releve,
+              type_id:p.typeId||null, zone_id:p.zoneId||null,
+              capacite_litres:p.capa, conso_theorique_lh:p.conso,
+              seuil_vidange_heures:p.seuil, puissance_kva:p.puissance
+            };
+            // Retirer les null pour ne pas écraser valeurs par défaut
+            Object.keys(payload).forEach(function(k){if(payload[k]===null)delete payload[k];});
+            var created=await supaPost('equipements',payload);
+            nbCreate++;
+            existingNames.add(norm(p.nom));
+            if(created&&created.id&&p.typeId){
+              var modId=await getModeleId(p.typeId);
+              if(modId){await _applyModeleToEquip(created.id,modId);nbModele++;}
+            }
+          }catch(err){errors.push(p.nom+': '+err.message);}
+        }
+
+        var msg=nbCreate+' équipement'+(nbCreate!==1?'s':'')+' créé'+(nbCreate!==1?'s':'');
+        if(nbModele)msg+=' · '+nbModele+' modèle'+(nbModele!==1?'s':'')+' appliqué'+(nbModele!==1?'s':'');
+        if(nbSkip)msg+=' · '+nbSkip+' doublon'+(nbSkip!==1?'s':'')+' ignoré'+(nbSkip!==1?'s':'');
+        if(errors.length)msg+=' · '+errors.length+' erreur'+(errors.length!==1?'s':'');
+        setStatus(msg, nbCreate>0?'var(--vert)':'var(--orange)');
+        if(nbCreate>0&&_session)setTimeout(function(){renderRespTech(_session,'config');},800);
+
+      }catch(err){setStatus('Erreur: '+err.message);console.error('eq-ronde import error',err);}
+    };
+    reader.readAsArrayBuffer(file);
+  }
+  if(window.XLSX){doparse(window.XLSX);}
+  else{
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=function(){doparse(window.XLSX);};
+    s.onerror=function(){setStatus('Impossible de charger SheetJS. Vérifiez votre connexion.');};
+    document.head.appendChild(s);
+  }
+}
+
 async function _rtConfig(sid){
   _configCurrentSid=sid;
   // Charger équipements + types (critique), modules + counts (non-bloquant)
   var types=await supaGet('types_equipements','select=id,nom&order=nom');
+  _configTypesCache=types||[];
   var equips=await supaGet('equipements','site_id=eq.'+sid+'&select=id,nom,actif,actif_ronde,actif_releve,ordre_ronde,type_id,zone_id,puissance_kva,conso_theorique_lh,capacite_litres,seuil_vidange_heures,heures_dernier_vidange,prix_litre,type_compteur_heures,types_equipements(nom)&order=ordre_ronde.asc');
   equips=equips||[];
   // Charger modules du site (non-bloquant — fallback 'general' si colonne absente)
@@ -5584,6 +5770,14 @@ async function _rtConfig(sid){
     listHtml+=_cfgBuildEquipGroup(prioritaires);
   }
   listHtml+='<button class="config-add-eq-btn" onclick="_openAddEquipModal()">＋ Ajouter un équipement</button>';
+  listHtml+='<div style="padding:0 12px 12px;display:flex;gap:8px">'+
+    '<button onclick="_eqRondeDownloadTemplate()" style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:white;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:4px" title="Télécharger template Excel">📥 Template</button>'+
+    '<label style="flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:white;font-size:11px;font-weight:600;color:var(--text2);cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:4px" title="Importer depuis Excel">'+
+      '<input type="file" accept=".xlsx,.xls" style="display:none" onchange="_eqRondeHandleFile(this.files[0],\''+sid+'\')">'+
+      '📂 Importer'+
+    '</label>'+
+  '</div>'+
+  '<div id="eq-ronde-import-status" style="margin:0 12px 8px;font-size:11px;color:var(--text3);min-height:16px"></div>';
   listHtml+='</div>';
 
   // Right panel
