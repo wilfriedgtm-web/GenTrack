@@ -243,8 +243,8 @@ async function getFrequencesDisponibles(site: any): Promise<string[]> {
     if (Array.isArray(equipsReleve) && equipsReleve.length > 0) freqs.push('releve_horaire');
   }
 
-  // Relevé énergie — disponible si config existe ET pas encore saisi aujourd'hui
-  if (site.energie_actif !== false) {
+  // Relevé énergie — disponible uniquement si explicitement activé (opt-in) + config existe + pas encore saisi
+  if (site.energie_actif === true) {
     const hasConfig = await db('energie_config', { query: `&site_id=eq.${site.id}&actif=eq.true&limit=1`, select: 'id' });
     if (Array.isArray(hasConfig) && hasConfig.length > 0) {
       const dejaSaisi = await releveEnergieFaitAujourdhui(site.id);
