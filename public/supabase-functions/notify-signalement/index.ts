@@ -105,6 +105,7 @@ async function sendNotifications(payload: any) {
     `${typeLabel}${equipement_nom ? ' — ' + equipement_nom : ''}` +
     `${lieu ? '\n📍 ' + lieu : ''}` +
     `${signale_par ? '\n👤 ' + signale_par : ''}` +
+    `${signaleur_whatsapp ? '\n📞 ' + signaleur_whatsapp : ''}` +
     `\n\n📝 ${description}` +
     `${ref_code ? '\n\n_Réf : ' + ref_code + '_\n_Répondre *OK ' + ref_code + '* pour PEC_' : ''}` +
     `\n_${heure}_`;
