@@ -786,7 +786,7 @@ async function _rtAccueil(session,sid,cid){
         if(!_gasoilFound){
           gasoilNiveau={pct:pct,litres:litres,cap:cap,date:lr.date_releve,saisi_par:lr.saisi_par};
           _gasoilFound=true;
-        } else {
+        } else if(gf.capacite!=null&&parseFloat(gf.capacite)>0){
           autresFluides.push({fluide:gf,litres:litres,pct:pct,cap:cap,date:lr.date_releve});
         }
       }
