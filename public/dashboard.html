@@ -330,6 +330,9 @@ var _configSelectedEqId=null;
 var _configCurrentTab='equipements';
 var _configEquipCache={}; // id → equip object, évite les problèmes d'échappement dans onclick
 var _siteModules=['general']; // modules actifs du site courant, mis à jour dans _rtConfig
+var _activeSiteId=null;    // site actif pour resp_tech (multi-site)
+var _activeSiteNom='';     // nom du site actif
+var _rtPickerSites=[];     // cache sites pour le picker multi-site
 var _configTypesCache=[]; // types_equipements, mis à jour dans _rtConfig pour le template import
 // ── Résidence+ wizard state ──────────────────────────────────────────────────
 var _resSubTab='config';
@@ -532,18 +535,59 @@ function renderInvalidLink(){
 /* ── ROUTING ── */
 async function renderDashboard(s){
   if(!s){renderInvalidLink();return;}
+  // resp_tech multi-site : afficher le picker en premier
+  if((s.role==='resp_tech'||!s.role)&&s.site_ids&&s.site_ids.length>1&&!_activeSiteId){
+    renderRTSitePicker(s);
+    return;
+  }
   // Pré-charger les modules du site avant de construire le nav (sinon hasModule() retourne toujours true)
-  var sid=s.site_ids&&s.site_ids[0];
+  var sid=_activeSiteId||(s.site_ids&&s.site_ids[0]);
+  if(!_activeSiteId)_activeSiteId=sid; // init single-site
   if(sid){
     try{
-      var siteArr=await supaGet('sites','select=modules&id=eq.'+sid);
+      var siteArr=await supaGet('sites','select=modules,nom&id=eq.'+sid);
       _siteModules=(siteArr&&siteArr[0]&&Array.isArray(siteArr[0].modules))?siteArr[0].modules:['general'];
+      if(!_activeSiteNom&&siteArr&&siteArr[0])_activeSiteNom=siteArr[0].nom||'';
     }catch(e){ _siteModules=['general']; }
   }
-  if(s.role==='resp_tech')renderRespTech(s,'accueil');
+  if(s.role==='resp_tech'||!s.role)renderRespTech(s,'accueil');
   else if(s.role==='dir_tech')renderDirTech(s,'accueil');
   else if(s.role==='dir_ops')renderDirOps(s,'accueil');
   else renderRespTech(s,'accueil');
+}
+
+function renderRTSitePicker(session){
+  app().innerHTML='<div style="min-height:100vh;background:linear-gradient(145deg,var(--dark) 0%,var(--dark2) 100%);display:flex;align-items:center;justify-content:center"><span class="spinner" style="border-top-color:var(--amber)"></span></div>';
+  _loadRTSitePicker(session);
+}
+
+async function _loadRTSitePicker(session){
+  var sids=session.site_ids||[];
+  try{_rtPickerSites=await supaGet('sites','id=in.('+sids.join(',')+')'+'&select=id,nom,modules&order=nom.asc');}catch(e){_rtPickerSites=[];}
+  var nom=(session.contact&&session.contact.nom)||'';
+  var itemsHtml=_rtPickerSites.map(function(s){
+    return '<button onclick="_rtSetActiveSite(\''+s.id+'\')" style="width:100%;display:flex;align-items:center;gap:14px;padding:16px;border:1.5px solid var(--border);border-radius:14px;background:var(--white);cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.borderColor=\'var(--amber)\';this.style.background=\'var(--amber-pale)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'var(--white)\'">'+
+      '<span style="font-size:24px">🏨</span>'+
+      '<div style="flex:1"><div style="font-size:15px;font-weight:700;color:var(--dark)">'+escape_html(s.nom)+'</div></div>'+
+      '<span style="font-size:18px;color:var(--text3)">›</span>'+
+    '</button>';
+  }).join('');
+  app().innerHTML='<div style="min-height:100vh;background:linear-gradient(145deg,var(--dark) 0%,var(--dark2) 100%);display:flex;align-items:center;justify-content:center;padding:24px">'+
+    '<div style="background:var(--white);border-radius:20px;padding:32px 24px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.25)">'+
+      '<div style="font-size:10px;font-weight:800;letter-spacing:.2em;color:var(--amber);text-transform:uppercase;margin-bottom:20px">GENTRACK ✦</div>'+
+      '<div style="font-size:22px;font-weight:800;color:var(--dark);margin-bottom:6px">Bonjour'+(nom?' '+escape_html(nom.split(' ')[0]):'')+' 👋</div>'+
+      '<div style="font-size:13px;color:var(--text2);margin-bottom:24px">Sur quel site travaillez-vous aujourd\'hui ?</div>'+
+      '<div style="display:flex;flex-direction:column;gap:10px">'+itemsHtml+'</div>'+
+    '</div>'+
+  '</div>';
+}
+
+async function _rtSetActiveSite(sid){
+  var siteData=_rtPickerSites.find(function(s){return s.id===sid;})||{nom:'',modules:['general']};
+  _activeSiteId=sid;
+  _activeSiteNom=siteData.nom||'';
+  _siteModules=Array.isArray(siteData.modules)?siteData.modules:['general'];
+  renderRespTech(_session,'accueil');
 }
 // Navigate to a specific signalement card and highlight it
 function _goToSignalement(sgId){
@@ -618,10 +662,19 @@ function buildSidebar(session,activeNav){
       '</button>';
   }).join('');
   var nom=(session.contact&&session.contact.nom)||'';
+  var siteSwitcher='';
+  if((session.role==='resp_tech'||!session.role)&&session.site_ids&&session.site_ids.length>1&&_activeSiteNom){
+    siteSwitcher='<button onclick="renderRTSitePicker(_session)" style="width:100%;margin-bottom:8px;padding:8px 10px;border:1.5px solid var(--amber);border-radius:8px;background:transparent;cursor:pointer;font-size:11px;font-weight:700;color:var(--amber);text-align:left;display:flex;align-items:center;gap:6px">'+
+      '<span style="font-size:14px">🏨</span>'+
+      '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(_activeSiteNom)+'</span>'+
+      '<span>↕</span>'+
+    '</button>';
+  }
   return '<div class="sidebar">'+
     '<div class="sidebar-logo"><div class="sidebar-logo-name">GEN<span>TRACK</span></div><div class="sidebar-logo-sub">Pilotage équipements</div></div>'+
     '<nav class="sidebar-nav">'+navHtml+'</nav>'+
     '<div class="sidebar-user">'+
+      siteSwitcher+
       '<div class="persona-chip">'+
         '<div class="persona-name">'+(nom||'Utilisateur')+'</div>'+
         '<div class="persona-role">'+roleName(session.role)+'</div>'+
@@ -761,7 +814,7 @@ function renderRespTech(session,nav){
 }
 
 async function _loadRT(session,nav){
-  var sid=session.site_ids&&session.site_ids[0];
+  var sid=_activeSiteId||(session.site_ids&&session.site_ids[0]);
   var cid=session.client_id;
   var el=document.querySelector('.dash-content');
   if(!el)return;
@@ -1348,7 +1401,7 @@ function openDeclareVidange(eqId,eqNom,currentH){
       var el=document.querySelector('.dash-content');
       if(el&&_session&&_session.site_ids&&_session.site_ids.length){
         el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text3);font-size:13px">Actualisation...</div>';
-        el.innerHTML=await _rtAccueil(_session,_session.site_ids[0],_session.client_id);
+        el.innerHTML=await _rtAccueil(_session,_activeSiteId||_session.site_ids[0],_session.client_id);
       }
     }catch(ex){
       alert('Erreur : '+ex.message);
@@ -1406,7 +1459,7 @@ function openDeclarePlein(eqId,eqNom,cap,currentNiveau,operateur,prixLitre){
     btn.disabled=true;btn.textContent='…';
     var today=new Date().toISOString().slice(0,10);
     try{
-      var sid2=_session&&_session.site_ids?_session.site_ids[0]:null;
+      var sid2=_activeSiteId||(_session&&_session.site_ids?_session.site_ids[0]:null);
       await supaPost('pleins',{
         equipement_id:eqId,
         site_id:sid2,
@@ -1433,7 +1486,7 @@ function openDeclarePlein(eqId,eqNom,cap,currentNiveau,operateur,prixLitre){
       var el=document.querySelector('.dash-content');
       if(el&&_session&&_session.site_ids&&_session.site_ids.length){
         el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text3);font-size:13px">Actualisation...</div>';
-        el.innerHTML=await _rtAccueil(_session,_session.site_ids[0],_session.client_id);
+        el.innerHTML=await _rtAccueil(_session,_activeSiteId||_session.site_ids[0],_session.client_id);
       }
     }catch(ex){
       alert('Erreur : '+ex.message);
@@ -1497,7 +1550,7 @@ async function openDeclareRavitaillementFluide(fluideId,nom,cap,curLitres,seuilP
       var el=document.querySelector('.dash-content');
       if(el&&_session&&_session.site_ids&&_session.site_ids.length){
         el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text3);font-size:13px">Actualisation...</div>';
-        el.innerHTML=await _rtAccueil(_session,_session.site_ids[0],_session.client_id);
+        el.innerHTML=await _rtAccueil(_session,_activeSiteId||_session.site_ids[0],_session.client_id);
       }
     }catch(ex){
       alert('Erreur : '+ex.message);
@@ -1928,7 +1981,7 @@ async function _rtReleves(session,sid){
 async function _triggerReleve(){
   var session=_session;
   if(!session)return;
-  var sid=session.site_ids&&session.site_ids[0];
+  var sid=_activeSiteId||(session.site_ids&&session.site_ids[0]);
   var cid=session.contact&&session.contact.id;
 
   var btn=event&&event.target;
@@ -10644,9 +10697,9 @@ async function _openReport(period){
     var cutoff=dateNJours(period);
     var sid=null,siteNom='Tous les sites',sids=null;
     if(_session.role==='resp_tech'){
-      sid=_session.site_ids&&_session.site_ids[0];
+      sid=_activeSiteId||(_session.site_ids&&_session.site_ids[0]);
       var sr=sid?await supaGet('sites','id=eq.'+sid+'&select=nom&limit=1'):[];
-      siteNom=sr.length?sr[0].nom:'Mon site';
+      siteNom=sr.length?sr[0].nom:(_activeSiteNom||'Mon site');
     }else if(_doCurrentSite){sid=_doCurrentSite.id;siteNom=_doCurrentSite.nom;}
     else if(_dtCurrentSite){sid=_dtCurrentSite.id;siteNom=_dtCurrentSite.nom;}
     else{sids=_session.site_ids||[];}
@@ -11236,7 +11289,7 @@ async function _openRapportHebdo(period){
   var btn=document.getElementById('rapport-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳ Chargement...';}
   try{
-    var sid=_session.site_ids&&_session.site_ids[0];
+    var sid=_activeSiteId||(_session.site_ids&&_session.site_ids[0]);
     if(!sid){alert('Aucun site configuré.');return;}
     var cutoff=dateNJours(period);
     var dateDebut=new Date();dateDebut.setDate(dateDebut.getDate()-period);
@@ -11409,7 +11462,7 @@ async function _openRapportHebdoMois(offset){
   var btn=document.getElementById('rapport-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳ Chargement...';}
   try{
-    var sid=_session.site_ids&&_session.site_ids[0];
+    var sid=_activeSiteId||(_session.site_ids&&_session.site_ids[0]);
     if(!sid){alert('Aucun site configuré.');return;}
     var[siteRow,equips,rondes,signalements,maintenances]=await Promise.all([
       supaGet('sites','id=eq.'+sid+'&select=nom,nb_chambres&limit=1'),
