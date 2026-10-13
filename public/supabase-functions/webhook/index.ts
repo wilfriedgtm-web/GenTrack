@@ -314,14 +314,14 @@ async function alerterSeuilsEnArrierePlan(equip: any, questions: any[], reponses
       }
     }
   }
-  // 2. Toujours notifier resp_tech + dir_tech du site (garantie, multi-site inclus)
+  // 2. Toujours notifier resp_tech + dir_tech + technicien du site
   const responsables = await getResponsablesForSite(equip.site_id);
-  if (Array.isArray(responsables)) {
-    for (const r of responsables) {
-      if (r.whatsapp && !dejaEnvoyes.has(r.whatsapp)) {
-        dejaEnvoyes.add(r.whatsapp);
-        await sendWA(r.whatsapp, msg).catch(() => {});
-      }
+  const techsSeuil = await db('contacts', { query: `&site_id=eq.${equip.site_id}&role=eq.technicien&actif=eq.true` }).catch(() => []);
+  const destsSeuil = [...(Array.isArray(responsables) ? responsables : []), ...(Array.isArray(techsSeuil) ? techsSeuil : [])];
+  for (const r of destsSeuil) {
+    if (r.whatsapp && !dejaEnvoyes.has(r.whatsapp)) {
+      dejaEnvoyes.add(r.whatsapp);
+      await sendWA(r.whatsapp, msg).catch(() => {});
     }
   }
 }
@@ -964,14 +964,16 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       source: 'ronde',
       ronde_id: sd.ronde_id || null,
     }}).catch(() => {});
-    // Notifier resp_tech
+    // Notifier resp_tech + dir_tech + techniciens (sauf l'émetteur)
     const responsablesAno = await getResponsablesForSite(sd.site_id).catch(() => []);
-    if (Array.isArray(responsablesAno)) {
-      const alertMsg = `⚠️ *Anomalie signalée — ${sd.equip_nom}*\n_${siteNom}_\n\n"${desc}"\n\n_Signalé par ${contact.nom} · ${getHeure()}_`;
-      for (const r of responsablesAno) if (r.whatsapp) await sendWA(r.whatsapp, alertMsg).catch(() => {});
+    const techsAno = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=eq.technicien&actif=eq.true` }).catch(() => []);
+    const alertMsg = `⚠️ *Anomalie signalée — ${sd.equip_nom}*\n_${siteNom}_\n\n"${desc}"\n\n_Signalé par ${contact.nom} · ${getHeure()}_`;
+    const dejaAno = new Set<string>([phone]);
+    for (const r of [...(Array.isArray(responsablesAno) ? responsablesAno : []), ...(Array.isArray(techsAno) ? techsAno : [])]) {
+      if (r.whatsapp && !dejaAno.has(r.whatsapp)) { dejaAno.add(r.whatsapp); await sendWA(r.whatsapp, alertMsg).catch(() => {}); }
     }
 
-    await sendWA(phone, `✅ Anomalie enregistrée. Responsable notifié.`);
+    await sendWA(phone, `✅ Anomalie enregistrée. Responsables notifiés.`);
     return continuerRonde(phone, sd, contact, site); // continue la ronde sans bloquer
   }
 
@@ -1026,20 +1028,20 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     }}).catch(() => {});
     await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
 
-    // Notifier resp_tech + dir_tech (multi-site inclus)
+    // Notifier resp_tech + dir_tech + technicien du site (multi-site inclus)
     const responsables = await getResponsablesForSite(sd.site_id);
+    const techniciens = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=eq.technicien&actif=eq.true` });
+    const tousDestinataires = [...(Array.isArray(responsables) ? responsables : []), ...(Array.isArray(techniciens) ? techniciens : [])];
     const refLine = refCode ? `\n\n_Répondre *OK ${refCode}* pour PEC · ou *AFFECTER ${refCode}* pour assigner à un tech._` : `\n\n_Tapez *resolu* pour clôturer._`;
     const alertMsg = `🚨 *PANNE SIGNALÉE — GenTrack*\n*${siteNom}*\n\n🔧 Équipement : *${sd.equip_nom}*\n⚠️ Type : *${sd.panne_type_label}*\n📝 Détail : ${desc}\n\n👤 Signalé par : ${contact.nom}\n🕐 ${today} ${getHeure()}${refLine}`;
     const dejaEnvoyes = new Set<string>([phone]);
-    if (Array.isArray(responsables)) {
-      for (const r of responsables) {
-        if (r.whatsapp && !dejaEnvoyes.has(r.whatsapp)) {
-          dejaEnvoyes.add(r.whatsapp);
-          await sendWA(r.whatsapp, alertMsg);
-        }
+    for (const r of tousDestinataires) {
+      if (r.whatsapp && !dejaEnvoyes.has(r.whatsapp)) {
+        dejaEnvoyes.add(r.whatsapp);
+        await sendWA(r.whatsapp, alertMsg);
       }
     }
-    const notifTxt = dejaEnvoyes.size > 1 ? `Le responsable a été alerté. 📲` : `_Aucun responsable configuré._`;
+    const notifTxt = dejaEnvoyes.size > 1 ? `Les responsables ont été alertés. 📲` : `_Aucun responsable configuré._`;
     return sendWA(phone, `🚨 *Signalement enregistré !*\n\n🔧 ${sd.equip_nom}\n⚠️ ${sd.panne_type_label}\n📝 ${desc}\n\n${notifTxt}`);
   }
 
