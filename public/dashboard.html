@@ -747,7 +747,7 @@ async function _rtAccueil(session,sid,cid){
   // Cuve + GE data
   var cuveEquips=equips.filter(function(e){return e.type_id===CUVE_TYPE;});
   var geEquips=equips.filter(function(e){return e.type_id===GE_TYPE;});
-  var cuveSection='',vidangesSection='';
+  var cuveSection='',vidangesSection='',instantaneSection='';
   var specialIds=cuveEquips.concat(geEquips).map(function(e){return e.id;});
   if(specialIds.length){
     var geIds=geEquips.map(function(e){return e.id;});
@@ -762,14 +762,17 @@ async function _rtAccueil(session,sid,cid){
     var repByQ={};
     latestReps.forEach(function(r){if(!repByQ[r.question_id]||r.created_at>repByQ[r.question_id].created_at)repByQ[r.question_id]=r;});
     specialQs.forEach(function(q){q._lastVal=repByQ[q.id]?repByQ[q.id].valeur:null;q._lastAt=repByQ[q.id]?repByQ[q.id].created_at:null;});
-    // Gasoil depuis relevés énergie (source de vérité pour le niveau)
+    // Fluides instantanés depuis relevés énergie (gasoil = 1er, autres = butane etc.)
     var gasoilNiveau=null;
-    var[gasoilFluides,lastReleve]=await Promise.all([
-      supaGet('energie_config','site_id=eq.'+sid+'&type_valeur=eq.instantane&actif=eq.true&select=id,nom,capacite&order=ordre.asc&limit=10'),
-      supaGet('releves_energie','site_id=eq.'+sid+'&select=date_releve,valeurs,saisi_par&order=date_releve.desc&limit=1')
+    var[gasoilFluides,lastReleve,relevesHist]=await Promise.all([
+      supaGet('energie_config','site_id=eq.'+sid+'&type_valeur=eq.instantane&actif=eq.true&select=id,nom,capacite,seuil_alerte_bas&order=ordre.asc&limit=10'),
+      supaGet('releves_energie','site_id=eq.'+sid+'&select=date_releve,valeurs,saisi_par&order=date_releve.desc&limit=1'),
+      supaGet('releves_energie','site_id=eq.'+sid+'&select=date_releve,valeurs&order=date_releve.desc&limit=30')
     ]);
+    var autresFluides=[];
     if(gasoilFluides&&gasoilFluides.length&&lastReleve&&lastReleve.length){
       var lr=lastReleve[0];
+      var _gasoilFound=false;
       for(var _gi=0;_gi<gasoilFluides.length;_gi++){
         var gf=gasoilFluides[_gi];
         var rawVal=lr.valeurs&&lr.valeurs[gf.id]!=null?parseFloat(lr.valeurs[gf.id]):null;
@@ -780,12 +783,17 @@ async function _rtAccueil(session,sid,cid){
         var isLitres=rawVal>100;
         var litres=isLitres?Math.round(rawVal):Math.round(rawVal/100*cap);
         var pct=isLitres?Math.min(100,Math.round(rawVal/cap*100)):Math.min(100,Math.round(rawVal));
-        gasoilNiveau={pct:pct,litres:litres,cap:cap,date:lr.date_releve,saisi_par:lr.saisi_par};
-        break;
+        if(!_gasoilFound){
+          gasoilNiveau={pct:pct,litres:litres,cap:cap,date:lr.date_releve,saisi_par:lr.saisi_par};
+          _gasoilFound=true;
+        } else {
+          autresFluides.push({fluide:gf,litres:litres,pct:pct,cap:cap,date:lr.date_releve});
+        }
       }
     }
     cuveSection=_buildCuveSection(cuveEquips,specialQs.filter(function(q){return cuveEquips.some(function(e){return e.id===q.equipement_id;})}),pleinsHist,gasoilNiveau);
     vidangesSection=_buildVidangesSection(geEquips,specialQs.filter(function(q){return geEquips.some(function(e){return e.id===q.equipement_id;})}),vidangesHist);
+    instantaneSection=_buildInstantaneFluides(autresFluides,relevesHist,sid);
   }
 
   // Ronde journalière
@@ -955,7 +963,7 @@ async function _rtAccueil(session,sid,cid){
   }
 
   _updateAlertPill(nbAlertes);
-  return banner+kpis+cuveSection+vidangesSection+journee+statut+alertesHtml;
+  return banner+kpis+cuveSection+vidangesSection+instantaneSection+journee+statut+alertesHtml;
 }
 
 /* ── Cuve utilitaires partagés ── */
@@ -1057,6 +1065,76 @@ function _buildCuveSection(cuveEquips,cuveQs,pleinsHist,gasoilNiveau){
           '<div style="font-size:10px;font-weight:600;color:var(--text3);margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em">Derniers ravitaillements</div>'+
           rows+'</div>';
       })()+
+    '</div>';
+  });
+  return html;
+}
+
+/* ── Autres fluides instantanés (butane, etc.) ── */
+function _buildInstantaneFluides(autresFluides,relevesHist,sid){
+  if(!autresFluides||!autresFluides.length)return '';
+  var html='<div class="section-title">🔥 Gaz</div>';
+  autresFluides.forEach(function(af){
+    var gf=af.fluide,litres=af.litres,pct=af.pct,cap=af.cap,date=af.date;
+    var seuil=gf.seuil_alerte_bas!=null?parseFloat(gf.seuil_alerte_bas):20;
+    var seuilL=Math.round(cap*seuil/100);
+    var col=pct<=seuil?'var(--rouge)':pct<=(seuil*2)?'var(--orange)':'var(--vert)';
+    var dateStr=date?new Date(date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
+    // Sparkline depuis relevesHist
+    var sparkPts=(relevesHist||[]).slice().reverse().map(function(r){
+      var v=r.valeurs&&r.valeurs[gf.id]!=null?parseFloat(r.valeurs[gf.id]):null;
+      if(v==null)return null;
+      var rawCap=parseFloat(gf.capacite)||cap;
+      return v>100?Math.min(100,Math.round(v/rawCap*100)):Math.min(100,Math.round(v));
+    }).filter(function(v){return v!=null;});
+    // Dernier ravitaillement détecté (spike ≥ 5% entre 2 relevés)
+    var lastRavit=null;
+    for(var _si=sparkPts.length-1;_si>=1;_si--){
+      if(sparkPts[_si]-sparkPts[_si-1]>=5){
+        var ravitDate=(relevesHist||[]).slice().reverse()[_si];
+        if(ravitDate){lastRavit={date:ravitDate.date_releve,pct:sparkPts[_si],pctPrev:sparkPts[_si-1]};}
+        break;
+      }
+    }
+    // Sparkline SVG inline
+    var sparkSvg='';
+    if(sparkPts.length>1){
+      var _W=500,_H=60,_n=sparkPts.length;
+      var _spts=sparkPts.map(function(v,i){return [Math.round(i/(_n-1)*_W),Math.round(_H-(v/100)*_H)];});
+      var _ply=_spts.map(function(p,i){return (i?'L':'M')+p[0]+','+p[1];}).join(' ');
+      var _areaD=_ply+' L'+_W+','+_H+' L0,'+_H+' Z';
+      var _gid='sfg'+gf.id.replace(/-/g,'');
+      sparkSvg='<svg viewBox="0 0 '+_W+' '+_H+'" style="width:100%;height:56px;margin-bottom:10px;display:block" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">'+
+        '<defs><linearGradient id="'+_gid+'" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C49A3C" stop-opacity="0.18"/><stop offset="100%" stop-color="#C49A3C" stop-opacity="0.02"/></linearGradient></defs>'+
+        '<path d="'+_areaD+'" fill="url(#'+_gid+')" />'+
+        '<path d="'+_ply+'" fill="none" stroke="#C49A3C" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'+
+        '</svg>';
+    }
+    html+='<div class="eq-card" style="flex-direction:column;align-items:stretch;gap:0;padding:16px 18px;border-top:3px solid var(--amber)">'+
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">'+
+        '<div>'+
+          '<div class="eq-card-nom" style="font-size:14px">'+escape_html(gf.nom)+'</div>'+
+          '<div class="eq-card-type" style="margin-top:3px">Relevé : '+dateStr+'</div>'+
+        '</div>'+
+        '<div style="text-align:right">'+
+          '<div style="font-size:32px;font-weight:800;color:'+col+';line-height:1">'+pct+'%</div>'+
+          '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+Math.round(litres).toLocaleString('fr-FR')+' L / '+Math.round(cap).toLocaleString('fr-FR')+' L</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="height:10px;background:var(--border);border-radius:5px;overflow:hidden;margin-bottom:8px">'+
+        '<div style="height:100%;width:'+Math.max(2,pct)+'%;background:'+col+';border-radius:5px;transition:width .5s ease"></div>'+
+      '</div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:10px">'+
+        '<span>Alerte &lt; '+seuilL.toLocaleString('fr-FR')+' L ('+seuil+'%)</span>'+
+        '<span style="color:'+col+'">'+pct+'%</span>'+
+      '</div>'+
+      sparkSvg+
+      '<button onclick="openDeclareRavitaillementFluide(\''+gf.id+'\',\''+js_esc(gf.nom)+'\','+cap+','+litres+','+seuil+',\''+sid+'\')" style="padding:7px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text1);font-size:12px;cursor:pointer;width:100%;text-align:center;font-weight:600">🔥 Déclarer ravitaillement</button>'+
+      (lastRavit?'<div style="margin-top:10px"><div style="font-size:10px;font-weight:600;color:var(--text3);margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em">Dernier ravitaillement</div>'+
+        '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);padding:4px 0;border-top:1px solid var(--border)">'+
+          '<span>'+new Date(lastRavit.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</span>'+
+          '<span>⬆ '+lastRavit.pctPrev+'% → '+lastRavit.pct+'%</span>'+
+        '</div></div>':'')+
     '</div>';
   });
   return html;
@@ -1274,6 +1352,71 @@ function openDeclarePlein(eqId,eqNom,cap,currentNiveau,operateur,prixLitre){
       btn.disabled=false;btn.textContent='Confirmer';
     }
   };
+}
+
+/* ── Ravitaillement fluide (butane etc.) → releves_energie ── */
+async function openDeclareRavitaillementFluide(fluideId,nom,cap,curLitres,seuilPct,sid){
+  var m=document.getElementById('modal-ravit-fluide');
+  if(!m){
+    m=document.createElement('div');
+    m.id='modal-ravit-fluide';
+    m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999;display:flex;align-items:center;justify-content:center;padding:16px';
+    document.body.appendChild(m);
+  }
+  var niveauInfo='<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Niveau actuel : <strong>'+Math.round(curLitres).toLocaleString('fr-FR')+' L</strong> / '+Math.round(cap).toLocaleString('fr-FR')+' L ('+Math.round(curLitres/cap*100)+'%)</div>';
+  m.innerHTML='<div style="background:var(--card1);border-radius:16px;padding:24px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.3)">'+
+    '<div style="font-size:16px;font-weight:700;color:var(--text1);margin-bottom:12px">🔥 Ravitaillement – '+escape_html(nom)+'</div>'+
+    niveauInfo+
+    '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Litres ajoutés</label>'+
+    '<input id="mrf-litres" type="number" step="1" min="1" placeholder="ex: 2 040" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:6px"/>'+
+    '<div id="mrf-preview" style="font-size:12px;color:var(--text2);min-height:18px;margin-bottom:4px"></div>'+
+    '<div id="mrf-tag" style="min-height:22px;margin-bottom:12px"></div>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="document.getElementById(\'modal-ravit-fluide\').remove()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text2);font-size:13px;cursor:pointer">Annuler</button>'+
+      '<button id="mrf-confirm" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--amber);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Confirmer</button>'+
+    '</div>'+
+  '</div>';
+  document.getElementById('mrf-litres').oninput=function(){
+    var delta=parseInt(this.value);
+    if(isNaN(delta)||delta<=0){document.getElementById('mrf-preview').textContent='';document.getElementById('mrf-tag').innerHTML='';return;}
+    var newL=Math.min(cap,curLitres+delta);
+    var newPct=Math.round(newL/cap*100);
+    document.getElementById('mrf-preview').textContent=Math.round(curLitres).toLocaleString('fr-FR')+' L + '+delta.toLocaleString('fr-FR')+' L → '+Math.round(newL).toLocaleString('fr-FR')+' L ('+newPct+'%)';
+    if(delta>=500){document.getElementById('mrf-tag').innerHTML='<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#dcfce7;color:#15803d">Livraison</span>';}
+    else{document.getElementById('mrf-tag').innerHTML='<span style="font-size:11px;color:var(--text3)">Ajustement de niveau</span>';}
+  };
+  document.getElementById('mrf-confirm').onclick=async function(){
+    var delta=parseInt(document.getElementById('mrf-litres').value);
+    if(isNaN(delta)||delta<=0){alert('Entrez une quantité valide.');return;}
+    var newL=Math.min(cap,curLitres+delta);
+    var newPct=Math.round(newL/cap*100);
+    var btn=document.getElementById('mrf-confirm');
+    btn.disabled=true;btn.textContent='…';
+    var today=new Date().toISOString().slice(0,10);
+    try{
+      // Chercher le relevé du jour existant pour ce site
+      var existing=await supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=eq.'+today+'&select=id,valeurs&limit=1');
+      if(existing&&existing.length){
+        var row=existing[0];
+        var newValeurs=Object.assign({},row.valeurs||{});
+        newValeurs[fluideId]=newPct; // stocke en % comme les autres relevés
+        await supaPatch('releves_energie',row.id,{valeurs:newValeurs,updated_at:new Date().toISOString()});
+      } else {
+        var valObj={};valObj[fluideId]=newPct;
+        await supaPost('releves_energie',{site_id:sid,date_releve:today,valeurs:valObj,saisi_par:(_session&&_session.contact&&_session.contact.nom)||null});
+      }
+      document.getElementById('modal-ravit-fluide').remove();
+      var el=document.querySelector('.dash-content');
+      if(el&&_session&&_session.site_ids&&_session.site_ids.length){
+        el.innerHTML='<div style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text3);font-size:13px">Actualisation...</div>';
+        el.innerHTML=await _rtAccueil(_session,_session.site_ids[0],_session.client_id);
+      }
+    }catch(ex){
+      alert('Erreur : '+ex.message);
+      btn.disabled=false;btn.textContent='Confirmer';
+    }
+  };
+  m.addEventListener('click',function(e){if(e.target===m)m.remove();},{once:true});
 }
 
 /* ── Alertes (vue complète) ── */
