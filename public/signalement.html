@@ -86,7 +86,9 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .sg-confirm-icon{font-size:64px;margin-bottom:20px;animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
 @keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
 .sg-confirm-title{font-size:22px;font-weight:800;color:var(--dark);margin-bottom:8px}
-.sg-confirm-sub{font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:32px}
+.sg-confirm-sub{font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:16px}
+.sg-confirm-ref{display:inline-block;background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:10px;padding:10px 20px;font-size:16px;font-weight:800;color:var(--amber-dark);letter-spacing:.05em;margin-bottom:24px}
+.sg-confirm-ref-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:4px}
 .sg-new-btn{border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 28px;font-size:14px;font-weight:700;color:var(--text);background:var(--white);cursor:pointer}
 
 /* Error banner */
@@ -207,6 +209,13 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
       <img id="sg-photo-preview" class="photo-preview" alt="Aperçu"/>
     </div>
 
+    <!-- Numéro WhatsApp optionnel (résidents sans compte) -->
+    <div class="sg-section" id="sg-wa-section" style="display:none">
+      <div class="sg-label">Recevoir une confirmation WhatsApp <span style="font-weight:400;text-transform:none;letter-spacing:0">(optionnel)</span></div>
+      <input id="sg-wa-input" class="sg-input" type="tel" placeholder="Ex : +221 77 000 00 00" autocomplete="tel"/>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">Nous vous enverrons un message de confirmation avec un lien de suivi.</div>
+    </div>
+
     <button id="sg-submit-btn" class="sg-submit" onclick="_submit()">Envoyer le signalement</button>
     <div class="sg-footer-hint">Votre signalement sera transmis immédiatement à l'équipe technique.</div>
   </div>
@@ -215,7 +224,12 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 <div id="sg-confirm" class="sg-confirm">
   <div class="sg-confirm-icon">✅</div>
   <div class="sg-confirm-title">Signalement envoyé</div>
-  <div class="sg-confirm-sub">Merci ! L'équipe technique a été notifiée<br>et va prendre en charge le problème.</div>
+  <div class="sg-confirm-sub">Merci ! L'équipe technique a été notifiée<br>et va prendre en charge votre demande.</div>
+  <div id="sg-confirm-ref-wrap" style="display:none;margin-bottom:24px">
+    <div class="sg-confirm-ref-label">Votre référence</div>
+    <div class="sg-confirm-ref" id="sg-confirm-ref">—</div>
+    <div style="font-size:12px;color:var(--text3);margin-top:6px">Conservez ce code pour le suivi</div>
+  </div>
   <button class="sg-new-btn" onclick="_reset()">Faire un nouveau signalement</button>
 </div>
 
@@ -298,6 +312,11 @@ async function init(){
   _equipZones=results[2]||[];
   _demandeurs=results[3]||[];
   _buildWhoPicker();
+  // Si aucun demandeur connu → afficher le champ WA d'emblée
+  if(!_demandeurs.length){
+    var waSection=document.getElementById('sg-wa-section');
+    if(waSection)waSection.style.display='block';
+  }
 
   // Construire les tuiles catégories
   _buildZoneTiles();
@@ -544,18 +563,24 @@ function _selectDemandeur(id,btn){
     b.style.background='white';b.style.borderColor='var(--border)';b.style.color='var(--dark)';
   });
   if(_selectedDemandeurId===id){
-    // Désélectionner si re-clic
     _selectedDemandeurId=null;
     document.getElementById('sg-prenom').value='';
+    _toggleWaSection();
     return;
   }
   _selectedDemandeurId=id;
   btn.style.background='var(--amber-pale)';
   btn.style.borderColor='var(--amber-border)';
   btn.style.color='var(--amber-dark)';
-  // Auto-remplir le prénom
   var d=_demandeurs.find(function(x){return x.id===id;});
   if(d)document.getElementById('sg-prenom').value=d.nom;
+  _toggleWaSection();
+}
+
+function _toggleWaSection(){
+  // Afficher le champ WA seulement si pas de contact connu sélectionné
+  var waSection=document.getElementById('sg-wa-section');
+  if(waSection)waSection.style.display=_selectedDemandeurId?'none':'block';
 }
 
 function _getSignaleurInfo(){
@@ -645,6 +670,9 @@ async function _submit(){
       if(upRes.ok)photoUrl=SUPA_URL+'/storage/v1/object/public/gentrack-photos/'+fname;
     }
 
+    var waRaw=(document.getElementById('sg-wa-input')||{}).value||'';
+    var signaleurWa=waRaw.trim().replace(/\s+/g,'')||null;
+
     var newSg=await supaPost('signalements',{
       groupe_id:_groupeId,
       site_id:_groupeId,
@@ -653,6 +681,7 @@ async function _submit(){
       equipement_zone_id:equipZoneId||null,
       signale_par:prenom||null,
       signaleur_contact_id:_who.contactId||null,
+      signaleur_whatsapp:signaleurWa||null,
       lieu:lieuFinal,
       type:_selectedType,
       description:desc,
@@ -661,8 +690,9 @@ async function _submit(){
       source:'formulaire'
     });
 
-    var sgId=newSg&&(Array.isArray(newSg)?newSg[0]:newSg).id||null;
-    var sgRef=newSg&&(Array.isArray(newSg)?newSg[0]:newSg).ref_code||null;
+    var sgRow=newSg&&(Array.isArray(newSg)?newSg[0]:newSg)||{};
+    var sgId=sgRow.id||null;
+    var sgRef=sgRow.ref_code||null;
 
     // Créer l'alerte liée
     await supaPost('alertes',{
@@ -676,15 +706,35 @@ async function _submit(){
       resolue:false
     });
 
-    // Notifier resp_tech (fire & forget)
+    // Notifier (fire & forget) — resp_tech + demandeur connu + résident
     var equipNom=null;
     if(equipId){var eq=_equips.find(function(x){return x.id===equipId;});if(eq)equipNom=eq.nom;}
     if(!equipNom&&equipZoneId){var eqz=_equipZones.find(function(x){return x.id===equipZoneId;});if(eqz)equipNom=eqz.nom;}
     fetch(SUPA_URL+'/functions/v1/notify-signalement',{
       method:'POST',
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
-      body:JSON.stringify({site_id:_groupeId,type:_selectedType,description:desc,signale_par:prenom||null,equipement_nom:equipNom,lieu:lieuFinal,ref_code:sgRef,photo_url:photoUrl||null,signalement_id:sgId})
+      body:JSON.stringify({
+        site_id:_groupeId,
+        type:_selectedType,
+        description:desc,
+        signale_par:prenom||null,
+        equipement_nom:equipNom,
+        lieu:lieuFinal,
+        ref_code:sgRef,
+        photo_url:photoUrl||null,
+        signalement_id:sgId,
+        signaleur_contact_id:_who.contactId||null,
+        signaleur_whatsapp:signaleurWa||null
+      })
     }).catch(function(){});
+
+    // Afficher le REF sur l'écran de confirmation
+    if(sgRef){
+      var refWrap=document.getElementById('sg-confirm-ref-wrap');
+      var refEl=document.getElementById('sg-confirm-ref');
+      if(refWrap)refWrap.style.display='block';
+      if(refEl)refEl.textContent=sgRef;
+    }
 
     document.getElementById('sg-main').style.display='none';
     document.getElementById('sg-confirm').style.display='flex';
@@ -707,6 +757,9 @@ function _reset(){
   document.querySelectorAll('.type-pill').forEach(function(b){b.classList.remove('selected');});
   _selectedType=null;_photoFile=null;
   _selectedDemandeurId=null;
+  var waInp=document.getElementById('sg-wa-input');if(waInp)waInp.value='';
+  var refWrap=document.getElementById('sg-confirm-ref-wrap');if(refWrap)refWrap.style.display='none';
+  _toggleWaSection();
   document.getElementById('sg-who-chips').querySelectorAll('button').forEach(function(b){
     b.style.background='white';b.style.borderColor='var(--border)';b.style.color='var(--dark)';
   });

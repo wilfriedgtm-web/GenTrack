@@ -1076,6 +1076,36 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     if (Array.isArray(responsables)) {
       for (const r of responsables) if (r.whatsapp && r.whatsapp !== phone) await sendWA(r.whatsapp, notifMsg);
     }
+
+    // Notifier le demandeur (contact connu ou résident) — non bloquant
+    db('signalements', {
+      query: `&id=eq.${sd.sg_id}&limit=1`,
+      select: 'signaleur_contact_id,signaleur_whatsapp,ref_code,description',
+    }).then(async (sgRows: any[]) => {
+      const sg = Array.isArray(sgRows) ? sgRows[0] : null;
+      if (!sg) return;
+      const refCode = sg.ref_code || '';
+      const msgResolu =
+        `✅ *Votre demande a été résolue — GenTrack*\n\n` +
+        `📋 Référence : *${refCode || sd.sg_label}*\n` +
+        `${sd.resolution_note ? '🔧 ' + sd.resolution_note + '\n' : ''}` +
+        `${cout > 0 ? '💰 ' + cout.toLocaleString('fr-FR') + ' FCFA\n' : ''}` +
+        `\n_Résolu le ${today}._`;
+      // Contact connu (manager/gouvernant)
+      if (sg.signaleur_contact_id) {
+        const contacts = await db('contacts', {
+          query: `&id=eq.${sg.signaleur_contact_id}&actif=eq.true`,
+          select: 'whatsapp',
+        });
+        const c = Array.isArray(contacts) ? contacts[0] : null;
+        if (c?.whatsapp && c.whatsapp !== phone) sendWA(c.whatsapp, msgResolu).catch(() => {});
+      }
+      // Résident (numéro libre)
+      if (sg.signaleur_whatsapp && sg.signaleur_whatsapp !== phone) {
+        sendWA(sg.signaleur_whatsapp, msgResolu).catch(() => {});
+      }
+    }).catch(() => {});
+
     return sendWA(phone, `✅ *Clôturé !*\n\n${sd.sg_label}\n${sd.resolution_note ? '🔧 ' + sd.resolution_note + '\n' : ''}${cout > 0 ? '💰 ' + cout.toLocaleString('fr-FR') + ' FCFA\n' : ''}\n_Responsable notifié. 📲_`);
   }
 
