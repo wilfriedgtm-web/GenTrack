@@ -309,7 +309,7 @@ async function init(){
   var results=await Promise.all([
     supa('zones','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,etage,categorie&order=ordre.asc'),
     supa('equipements','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id,types_equipements(nom)&order=ordre_ronde.asc'),
-    supa('equipements_zone','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id&order=nom.asc'),
+    supa('equipements_zone','site_id=eq.'+siteId+'&actif=eq.true&select=id,nom,zone_id,zones!inner(type_zone)&zones.type_zone=in.(chambre,commun_etage,special)&order=nom.asc'),
     supa('contacts','site_id=eq.'+siteId+'&actif=eq.true&'+ROLES_DEMANDEUR+'&select=id,nom,role,whatsapp&order=nom.asc')
   ]);
   _zones=results[0]||[];

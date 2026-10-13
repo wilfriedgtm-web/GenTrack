@@ -374,7 +374,7 @@ function _updateAlertPill(n){
   badges.forEach(function(b){b.style.display=n>0?'block':'none';});
 }
 function roleName(r){var m={dir_ops:'Directeur des opérations',dir_tech:'Directeur technique',resp_tech:'Responsable technique',technicien:'Technicien'};return m[r]||r;}
-function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',releves:'Relevés horaires',signalements:'Signalements',maintenances:'Maintenance',config:'Configuration',rapport:'Rapport conso',commandes:'Commandes',energie:'Énergie',planning:'Planning rondes'};return m[id]||'Accueil';}
+function navViewTitle(id){var m={accueil:'Accueil',alertes:'Alertes',historique:'Historique',releves:'Relevés horaires',signalements:'Signalements',maintenances:'Maintenance',config:'Configuration',rapport:'Rapport conso',commandes:'Commandes',energie:'Énergie','residence-planning':'Planning de passage'};return m[id]||'Accueil';}
 function saveSession(s){_session=s;try{localStorage.setItem('gt_session',JSON.stringify(s));}catch(e){}}
 function loadStored(){try{return JSON.parse(localStorage.getItem('gt_session'));}catch(e){return null;}}
 function clearSession(){_session=null;try{localStorage.removeItem('gt_session');}catch(e){}}
@@ -593,7 +593,7 @@ function buildNavItems(role){
     }
     items.push({id:'equipe',icon:'group',label:'Mon équipe'});
     items.push({id:'releves',icon:'schedule',label:'Relevés'});
-    items.push({id:'planning',icon:'calendar_month',label:'Planning'});
+    if(hasModule('residence'))items.push({id:'residence-planning',icon:'calendar_month',label:'Planning'});
     items.push({id:'config',icon:'settings',label:'Config'});
   }
   if(role==='dir_tech'){
@@ -651,7 +651,7 @@ function buildMobileNav(role,activeNav,alerteBadge){
       {id:'signalements',icon:'location_on',label:'Signalements'},
       {id:'__plus__',icon:'apps',label:'Plus'}
     ];
-    plusIds=['maintenances','energie','commandes','equipe','releves','planning','historique','config'];
+    plusIds=['maintenances','energie','commandes','equipe','releves','residence-planning','historique','config'];
   }
   var plusItems=allItems.filter(function(it){return plusIds.indexOf(it.id)!==-1;});
   var plusActive=plusItems.some(function(it){return it.id===activeNav;});
@@ -776,7 +776,7 @@ async function _loadRT(session,nav){
     else if(nav==='energie')html=await _rtEnergie(sid);
     else if(nav==='commandes')html=await _rtCommandes(sid,session);
     else if(nav==='equipe')html=await _rtMonEquipe(sid,session);
-    else if(nav==='planning')html=await _buildPlanningTab(sid);
+    else if(nav==='residence-planning')html=await _buildResPlanningHtml(sid);
     else if(nav==='config')html=await _rtConfig(sid);
     el.innerHTML=html;
     if(nav==='signalements'){_sgSelected=null;_sgRenderKanban(sid);}
@@ -1025,8 +1025,33 @@ async function _rtAccueil(session,sid,cid){
     alertesHtml+='</div>';
   }
 
+  // Rondes zones du jour (module résidence)
+  var rondesZonesSection='';
+  if(hasModule('residence')){
+    var rzRes=await Promise.all([
+      supaGet('zones','site_id=eq.'+sid+'&type_zone=in.(chambre,commun_etage,special)&actif=eq.true&select=id'),
+      supaGet('releves_zones','site_id=eq.'+sid+'&date=eq.'+today+'&select=zone_id,statut')
+    ]);
+    var totalZones=(rzRes[0]||[]).length;
+    var relZones=rzRes[1]||[];
+    var visitedToday=relZones.length;
+    var incidentsToday=relZones.filter(function(r){return r.statut==='incident';}).length;
+    if(totalZones>0){
+      var pctZ=Math.round(visitedToday/totalZones*100);
+      var colZ=incidentsToday>0?'var(--rouge)':pctZ===100?'var(--vert)':pctZ>0?'var(--amber)':'var(--text3)';
+      var lblZ=incidentsToday>0?'⚠️ '+incidentsToday+' incident(s)':pctZ===100?'✅ Toutes les zones faites':visitedToday===0?'Aucun passage ce jour':''+( totalZones-visitedToday)+' zone(s) restante(s)';
+      rondesZonesSection='<div class="section-title">Rondes zones · aujourd\'hui</div>'+
+        '<div style="background:white;border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:14px;cursor:pointer" onclick="navTo(\'residence-planning\')">'+
+          '<div style="width:44px;height:44px;border-radius:50%;background:'+colZ+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:white;flex-shrink:0">'+pctZ+'%</div>'+
+          '<div><div style="font-size:14px;font-weight:600;color:var(--dark)">'+visitedToday+' / '+totalZones+' zones visitées</div>'+
+          '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+escape_html(lblZ)+'</div></div>'+
+          '<span style="margin-left:auto;font-size:18px;color:var(--text3)">›</span>'+
+        '</div>';
+    }
+  }
+
   _updateAlertPill(nbAlertes);
-  return banner+kpis+cuveSection+vidangesSection+instantaneSection+journee+statut+alertesHtml;
+  return banner+kpis+cuveSection+vidangesSection+instantaneSection+rondesZonesSection+journee+statut+alertesHtml;
 }
 
 /* ── Cuve utilitaires partagés ── */
@@ -5720,6 +5745,7 @@ async function _rtConfig(sid){
     {key:'setup',    label:'🚀 Démarrage',          show:isNewSite},
     {key:'zones',    label:'📍 Zones & Lieux',       show:true},
     {key:'equipements',label:'⚙️ Équipements & Rondes',show:true},
+    {key:'planning', label:'📅 Planning rondes',     show:true},
     {key:'seuils',   label:'🎯 Seuils d\'alerte',    show:true},
     {key:'contacts', label:'👥 Contacts & Alertes',  show:true},
     {key:'releves',  label:'📋 Relevés horaires',    show:true},
@@ -5735,6 +5761,12 @@ async function _rtConfig(sid){
     if(dc2s){dc2s.style.padding='24px';dc2s.style.maxWidth='680px';}
     var setupHtml=await _buildSetupTab(sid,equips,zonesArr||[],contactsArr||[]);
     return '<div class="config-tabs">'+tabHtml+'</div>'+setupHtml;
+  }
+  if(_configCurrentTab==='planning'){
+    var dc2p=document.getElementById('dash-content-main');
+    if(dc2p){dc2p.style.padding='24px';dc2p.style.maxWidth='none';}
+    var planningHtml=await _buildPlanningTab(sid);
+    return '<div class="config-tabs">'+tabHtml+'</div>'+planningHtml;
   }
   if(_configCurrentTab==='seuils'){
     var dc2=document.getElementById('dash-content-main');
@@ -6287,9 +6319,9 @@ async function _buildResPlanningHtml(sid){
   h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
   h+='<div style="font-size:12px;font-weight:600;color:var(--text)">État des zones</div>';
   h+='<div style="display:flex;gap:5px">';
-  h+='<button style="'+(_resPlanFilter==='all'?fBtnAct:fBtnBase)+'" onclick="_resPlanFilter=\'all\';if(_session)renderRespTech(_session,\'config\')">Tous</button>';
-  h+='<button style="'+(_resPlanFilter==='todo'?fBtnAct:fBtnBase)+'" onclick="_resPlanFilter=\'todo\';if(_session)renderRespTech(_session,\'config\')">À traiter'+(todoPct?' ('+todoPct+')':'')+'</button>';
-  h+='<button style="'+(_resPlanFilter==='never'?fBtnAct:fBtnBase)+'" onclick="_resPlanFilter=\'never\';if(_session)renderRespTech(_session,\'config\')">Jamais visité'+(counts.never?' ('+counts.never+')':'')+'</button>';
+  h+='<button style="'+(_resPlanFilter==='all'?fBtnAct:fBtnBase)+'" onclick="_resPlanFilter=\'all\';navTo(\'residence-planning\')">Tous</button>';
+  h+='<button style="'+(_resPlanFilter==='todo'?fBtnAct:fBtnBase)+'" onclick="_resPlanFilter=\'todo\';navTo(\'residence-planning\')">À traiter'+(todoPct?' ('+todoPct+')':'')+'</button>';
+  h+='<button style="'+(_resPlanFilter==='never'?fBtnAct:fBtnBase)+'" onclick="_resPlanFilter=\'never\';navTo(\'residence-planning\')">Jamais visité'+(counts.never?' ('+counts.never+')':'')+'</button>';
   h+='</div></div>';
 
   // ── Grille zones ─────────────────────────────────────────────────────────────
@@ -11397,7 +11429,17 @@ async function _openRapportHebdoMois(offset){
     var _budgetFluides=[];
     if(_budgetMensuel&&_budgetMensuel.id){_budgetFluides=await supaGet('energie_budget_fluide','budget_id=eq.'+_budgetMensuel.id+'&select=fluide_id,quantite_budget_jour,cout_budget_jour')||[];}
     var _nbCh=siteRow.length&&siteRow[0].nb_chambres?parseInt(siteRow[0].nb_chambres):null;
-    var html=_buildRapportPro(siteNom,periodeStr,daysInMonth,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[],_nbCh,_budgetMensuel,_budgetFluides);
+    // Rondes zones (module résidence)
+    var _relevesZones=[],_zonesRes=[];
+    if(hasModule('residence')){
+      var rzData=await Promise.all([
+        supaGet('releves_zones','site_id=eq.'+sid+'&date=gte.'+moisDebut+'&date=lte.'+moisFin+'&select=zone_id,date,technicien,statut,nb_anomalies&order=date.desc&limit=500'),
+        supaGet('zones','site_id=eq.'+sid+'&type_zone=in.(chambre,commun_etage,special)&actif=eq.true&select=id,nom,batiment,type_zone,frequence_passage&order=batiment.asc,nom.asc')
+      ]);
+      _relevesZones=rzData[0]||[];
+      _zonesRes=rzData[1]||[];
+    }
+    var html=_buildRapportPro(siteNom,periodeStr,daysInMonth,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[],_nbCh,_budgetMensuel,_budgetFluides,_relevesZones,_zonesRes);
     var w=window.open('','_blank');
     if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
     w.document.write(html);w.document.close();
@@ -11527,7 +11569,8 @@ function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,relev
   return h;
 }
 
-function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides,relevesEnergie,pleinsSite,nbChambres,budgetMensuel,budgetFluides){
+function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides,relevesEnergie,pleinsSite,nbChambres,budgetMensuel,budgetFluides,relevesZones,zonesRes){
+  relevesZones=relevesZones||[];zonesRes=zonesRes||[];
   var respNom=(session.contact&&session.contact.nom)||'Responsable technique';
   var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -11904,6 +11947,63 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     });
     h+='</tbody></table>';
   }
+  // ── Rondes zones (Résidence+) ──
+  if(zonesRes.length>0){
+    // Calcul statut par zone (même logique que _buildResPlanningHtml)
+    var lastRelZ={};
+    relevesZones.forEach(function(r){if(!lastRelZ[r.zone_id])lastRelZ[r.zone_id]=r;});
+    var today2=new Date();today2.setHours(0,0,0,0);
+    var rzCounts={ok:0,warn:0,late:0,never:0,incidents:0};
+    var rzVisitesPeriode=relevesZones.length;
+    var rzIncidentsPeriode=relevesZones.filter(function(r){return r.statut==='incident';}).length;
+    zonesRes.forEach(function(z){
+      var lr=lastRelZ[z.id],freq=z.frequence_passage||30;
+      if(!lr){rzCounts.never++;return;}
+      var days=Math.floor((today2-new Date(lr.date))/(86400000));
+      var left=freq-days;
+      if(lr.statut==='incident'||lr.nb_anomalies>0){rzCounts.late++;rzCounts.incidents++;return;}
+      if(left<=0){rzCounts.late++;return;}
+      if(left<=3){rzCounts.warn++;return;}
+      rzCounts.ok++;
+    });
+    var narRZ='';
+    narRZ+=zonesRes.length+' zone'+(zonesRes.length>1?'s résidentielles':' résidentielle')+' suivie'+(zonesRes.length>1?'s':'')+' sur la période. ';
+    narRZ+=rzVisitesPeriode+' passage'+(rzVisitesPeriode>1?'s':'')+' enregistré'+(rzVisitesPeriode>1?'s':'')+'. ';
+    if(rzIncidentsPeriode>0)narRZ+=rzIncidentsPeriode+' incident'+(rzIncidentsPeriode>1?'s':'')+'signalé'+(rzIncidentsPeriode>1?'s':'')+'. ';
+    narRZ+=rzCounts.ok+' zone'+(rzCounts.ok>1?'s':'')+' à jour, '+rzCounts.late+' en retard, '+rzCounts.never+' jamais visitée'+(rzCounts.never>1?'s':'')+'.'
+    h+='<h2>Rondes zones &amp; Résidence+</h2>';
+    h+='<p class="narrative" contenteditable="true">'+escape_html(narRZ)+'</p>';
+    h+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">';
+    h+='<div style="background:#E8F7EE;border:1px solid #A8DEC0;border-radius:8px;padding:10px 14px;flex:1;min-width:80px;text-align:center"><div style="font-size:20px;font-weight:700;color:#1B7A4A">'+rzCounts.ok+'</div><div style="font-size:11px;color:#5A5F78">Zones OK</div></div>';
+    h+='<div style="background:#FDF0EE;border:1px solid #F0B8B2;border-radius:8px;padding:10px 14px;flex:1;min-width:80px;text-align:center"><div style="font-size:20px;font-weight:700;color:#C0392B">'+rzCounts.late+'</div><div style="font-size:11px;color:#5A5F78">En retard / incident</div></div>';
+    h+='<div style="background:#FEF3E5;border:1px solid #F5C87A;border-radius:8px;padding:10px 14px;flex:1;min-width:80px;text-align:center"><div style="font-size:20px;font-weight:700;color:#D46B0A">'+rzCounts.warn+'</div><div style="font-size:11px;color:#5A5F78">Dû bientôt</div></div>';
+    h+='<div style="background:#F4F5FA;border:1px solid #E4E6EF;border-radius:8px;padding:10px 14px;flex:1;min-width:80px;text-align:center"><div style="font-size:20px;font-weight:700;color:#5A5F78">'+rzCounts.never+'</div><div style="font-size:11px;color:#5A5F78">Jamais visitée</div></div>';
+    h+='</div>';
+    // Tableau des passages sur la période (max 30 lignes)
+    if(relevesZones.length>0){
+      var zMap={};zonesRes.forEach(function(z){zMap[z.id]=z;});
+      h+='<table><thead><tr><th>Zone</th><th>Bâtiment</th><th>Date passage</th><th>Technicien</th><th>Statut</th></tr></thead><tbody>';
+      var shown=0;
+      relevesZones.forEach(function(r){
+        if(shown>=30)return;
+        var z=zMap[r.zone_id]||{};
+        var statCls=r.statut==='incident'?'badge-alert':'badge-ok';
+        var statLbl=r.statut==='incident'?'⚠️ Incident':'✓ OK';
+        if(r.nb_anomalies>0){statCls='badge-alert';statLbl='⚠️ '+r.nb_anomalies+' anomalie(s)';}
+        h+='<tr>'+
+          '<td><strong>'+escape_html(z.nom||r.zone_id)+'</strong></td>'+
+          '<td style="font-size:11px;color:#5A5F78">'+escape_html(z.batiment||'—')+'</td>'+
+          '<td style="font-size:11px;white-space:nowrap">'+escape_html(r.date||'—')+'</td>'+
+          '<td style="font-size:11px">'+escape_html(r.technicien||'—')+'</td>'+
+          '<td><span class="badge '+statCls+'">'+statLbl+'</span></td>'+
+        '</tr>';
+        shown++;
+      });
+      if(relevesZones.length>30)h+='<tr><td colspan="5" style="text-align:center;font-size:11px;color:#9AA0B8">…et '+(relevesZones.length-30)+' passage(s) supplémentaire(s)</td></tr>';
+      h+='</tbody></table>';
+    }
+  }
+
   // Note : évolution cuves supprimée — couverte par la section Énergie & Fluides ci-dessous
 
   // ── Énergie & Fluides HTML ──
