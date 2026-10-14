@@ -363,10 +363,12 @@ function hasModule(mod){
   return _siteModules.indexOf(mod)>=0;
 }
 var _configSecondaryCollapsed=true; // section équipements sans suivi, réduite par défaut
-var _energieCfgWizardStep=0; // 0=choix template 1=personnalisation
+var _energieCfgWizardStep=0; // 0=pays 1=type compteur(Autre) 2=personnalisation
+var _energieCfgWizardPays=null;     // {id,pays_code,pays_nom,flag,distributeur,items} ou null
 var _energieCfgWizardTemplate=null; // '1_index'|'2_jour_nuit'|'3_hc_hp_pointe'|'aucun'
 var _energieCfgWizardRows=[]; // [{nom,unite,type_valeur,seuil_alerte_bas,objectif_mensuel,actif}]
 var _energieCfgWizardSousFluides=[]; // sous-compteurs sélectionnés [{nom,unite,type_valeur,groupe}]
+var _energieTemplatesCache=[]; // templates chargés depuis DB
 
 function $id(id){return document.getElementById(id);}
 function app(){return $id('app');}
@@ -610,7 +612,7 @@ function _goToSignalement(sgId){
 
 function navTo(id){
   if(!_session)return;
-  if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;_zonesWizardStep=0;_zonesViewFilter='maintenance';_eqImportStep=0;_energieCfgWizardStep=0;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];_resWizStep=0;_resSubTab='config';_resExistingEqLoaded=false;_resPlanFilter='all';}
+  if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;_zonesWizardStep=0;_zonesViewFilter='maintenance';_eqImportStep=0;_energieCfgWizardStep=0;_energieCfgWizardPays=null;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];_resWizStep=0;_resSubTab='config';_resExistingEqLoaded=false;_resPlanFilter='all';}
   if(_session.role==='resp_tech')renderRespTech(_session,id);
   else if(_session.role==='dir_tech'){
     if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,id);
@@ -7276,7 +7278,7 @@ async function _moveQ(qId, freqKey, dir){
 
 function _switchConfigTab(tab){
   _configCurrentTab=tab;
-  if(tab!=='energie'){_energieCfgWizardStep=0;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];}
+  if(tab!=='energie'){_energieCfgWizardStep=0;_energieCfgWizardPays=null;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];}
   if(!_session)return;
   renderRespTech(_session,'config');
 }
@@ -14091,11 +14093,19 @@ async function _energieBudgetSave(sid,annee,mois){
 var _ECFG_COLS='30px 1fr 70px 90px 65px 85px 80px 80px 44px';
 
 async function _buildEnergieConfigTab(sid){
-  var[fluides,objsRows,siteRows]=await Promise.all([
+  var[fluides,objsRows,siteRows,tmplRows]=await Promise.all([
     supaGet('energie_config','site_id=eq.'+sid+'&select=id,nom,unite,type_valeur,tarif,budget_par_chambre,seuil_alerte_bas,capacite,actif,ordre,devise&order=ordre.asc'),
     supaGet('objectifs_energie','site_id=eq.'+sid+'&select=id,fluide_id,valeur,date_debut,date_fin,note&order=date_debut.desc&limit=200'),
-    supaGet('sites','id=eq.'+sid+'&select=nb_chambres&limit=1')
+    supaGet('sites','id=eq.'+sid+'&select=nb_chambres,pays_code&limit=1'),
+    supaGet('energie_templates','actif=eq.true&order=ordre.asc&select=id,pays_code,pays_nom,flag,distributeur,description,items').catch(function(){return[];})
   ]);
+  if(tmplRows&&tmplRows.length)_energieTemplatesCache=tmplRows;
+  // Pré-sélectionner le pays du site si connu et wizard pas encore commencé
+  if(_energieCfgWizardStep===0&&_energieCfgWizardPays===null&&siteRows&&siteRows[0]&&siteRows[0].pays_code){
+    var siteCode=siteRows[0].pays_code;
+    var match=(_energieTemplatesCache||[]).find(function(t){return t.pays_code===siteCode;});
+    if(match)_energieCfgWizardPays=match; // pré-sélectionné mais wizard reste à step 0 pour confirmer
+  }
   var nbChambresConfig=siteRows&&siteRows.length&&siteRows[0].nb_chambres!=null?siteRows[0].nb_chambres:'';
 
   // Cache pour les modals
@@ -14285,20 +14295,130 @@ var _ENERGIE_SOUSFLUIDES=[
 ];
 
 function _energieCfgWizardHtml(sid){
-  if(_energieCfgWizardStep===0){
-    return _energieCfgWizardStep0Html(sid);
-  }
-  if(_energieCfgWizardStep===1){
-    return _energieCfgWizardStep1Html(sid);
-  }
+  if(_energieCfgWizardStep===0) return _energieCfgWizardStepPaysHtml(sid);
+  if(_energieCfgWizardStep===1) return _energieCfgWizardStepTypeHtml(sid);
+  if(_energieCfgWizardStep===2) return _energieCfgWizardStepCustomHtml(sid);
   return '';
 }
 
-function _energieCfgWizardStep0Html(sid){
+/* ── Étape 0 : sélection du pays ── */
+function _energieCfgWizardStepPaysHtml(sid){
+  var templates=_energieTemplatesCache&&_energieTemplatesCache.length?_energieTemplatesCache:[];
+  // Sépare les pays réels du générique
+  var paysReels=templates.filter(function(t){return t.pays_code!=='*';});
+  var generic=templates.find(function(t){return t.pays_code==='*';});
+
+  function card(t,selected){
+    var border=selected?'var(--amber)':'var(--border)';
+    var bg=selected?'var(--amber-pale)':'white';
+    var items=Array.isArray(t.items)?t.items:(typeof t.items==='string'?JSON.parse(t.items):[]);
+    var preview=items.slice(0,3).map(function(it){return '<span style="font-size:10px;background:var(--creme);border-radius:3px;padding:1px 5px;color:var(--text2)">'+escape_html(it.nom)+'</span>';}).join(' ');
+    if(items.length>3)preview+=' <span style="font-size:10px;color:var(--text3)">+'+( items.length-3)+'</span>';
+    return '<div onclick="_energieCfgWizardSelectPays(\''+t.id+'\',\''+sid+'\')" '+
+      'style="border:1.5px solid '+border+';border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s,background .15s;background:'+bg+'" '+
+      'onmouseover="this.style.borderColor=\'var(--amber)\'" onmouseout="this.style.borderColor=\''+(selected?'var(--amber)':'var(--border)')+'\'">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+        '<span style="font-size:20px">'+escape_html(t.flag||'🌍')+'</span>'+
+        '<div>'+
+          '<div style="font-size:13px;font-weight:700;color:var(--text)">'+escape_html(t.pays_nom)+'</div>'+
+          '<div style="font-size:10px;color:var(--text3);margin-top:1px">'+escape_html(t.distributeur||'')+'</div>'+
+        '</div>'+
+        (selected?'<span style="margin-left:auto;font-size:14px">✓</span>':'')+
+      '</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:3px">'+preview+'</div>'+
+    '</div>';
+  }
+
+  var cardsHtml=paysReels.map(function(t){
+    return card(t,_energieCfgWizardPays&&_energieCfgWizardPays.id===t.id);
+  }).join('');
+
+  // Bouton "Autre pays"
+  var autreSelected=_energieCfgWizardPays&&_energieCfgWizardPays.id==='autre';
+  var autreBorder=autreSelected?'var(--amber)':'var(--border)';
+  var autreBg=autreSelected?'var(--amber-pale)':'white';
+  var autreCard='<div onclick="_energieCfgWizardSelectPays(\'autre\',\''+sid+'\')" '+
+    'style="border:1.5px dashed '+autreBorder+';border-radius:10px;padding:12px 14px;cursor:pointer;background:'+autreBg+';display:flex;align-items:center;gap:10px;grid-column:span 2" '+
+    'onmouseover="this.style.borderColor=\'var(--amber)\'" onmouseout="this.style.borderColor=\''+(autreSelected?'var(--amber)':'var(--border)')+'\'">' +
+    '<span style="font-size:20px">🌐</span>'+
+    '<div>'+
+      '<div style="font-size:13px;font-weight:700;color:var(--text)">Autre pays / Personnalisé</div>'+
+      '<div style="font-size:11px;color:var(--text2);margin-top:1px">Choisir manuellement le type de compteur</div>'+
+    '</div>'+
+    (autreSelected?'<span style="margin-left:auto;font-size:14px">✓</span>':'')+
+  '</div>';
+
+  var selectedInfo='';
+  if(_energieCfgWizardPays&&_energieCfgWizardPays.id!=='autre'){
+    var items2=Array.isArray(_energieCfgWizardPays.items)?_energieCfgWizardPays.items:(typeof _energieCfgWizardPays.items==='string'?JSON.parse(_energieCfgWizardPays.items):[]);
+    var itemsList=items2.map(function(it){
+      return '<li style="font-size:11px;color:var(--text2);margin-bottom:2px">'+escape_html(it.nom)+(it.unite?' <span style="color:var(--text3)">'+escape_html(it.unite)+'</span>':'')+
+        (it.seuil_alerte_bas!=null?' <span style="color:var(--amber-dark);font-size:9px">alerte < '+it.seuil_alerte_bas+'</span>':'')+
+      '</li>';
+    }).join('');
+    selectedInfo='<div style="margin-top:16px;padding:14px 16px;background:var(--creme);border-radius:10px;border:1px solid var(--border)">'+
+      '<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px">'+
+        escape_html(_energieCfgWizardPays.flag||'')+'  '+escape_html(_energieCfgWizardPays.pays_nom)+' — <span style="color:var(--amber-dark)">'+escape_html(_energieCfgWizardPays.distributeur||'')+'</span>'+
+        ' · <span style="font-weight:400;color:var(--text3)">'+escape_html(_energieCfgWizardPays.description||'')+'</span>'+
+      '</div>'+
+      '<ul style="padding-left:16px;margin:0">'+itemsList+'</ul>'+
+    '</div>'+
+    '<div style="margin-top:14px;display:flex;gap:10px;align-items:center">'+
+      '<button onclick="_energieCfgWizardConfirmPays(\''+sid+'\')" '+
+        'style="background:var(--amber);color:white;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer">'+
+        'Utiliser ce modèle → Personnaliser</button>'+
+    '</div>';
+  } else if(_energieCfgWizardPays&&_energieCfgWizardPays.id==='autre'){
+    selectedInfo='<div style="margin-top:14px;display:flex;gap:10px;align-items:center">'+
+      '<button onclick="_energieCfgWizardConfirmPays(\''+sid+'\')" '+
+        'style="background:var(--amber);color:white;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer">'+
+        'Choisir le type de compteur →</button>'+
+    '</div>';
+  }
+
+  return '<div style="max-width:680px">'+
+    '<div style="text-align:center;padding:24px 0 20px">'+
+      '<div style="font-size:32px;margin-bottom:8px">⚡</div>'+
+      '<div style="font-size:16px;font-weight:700;color:var(--text)">Configurer les relevés énergie</div>'+
+      '<div style="font-size:13px;color:var(--text2);margin-top:4px">Sélectionnez le pays pour utiliser le bon modèle de compteurs.</div>'+
+    '</div>'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">Étape 1 — Pays du site</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px">'+cardsHtml+autreCard+'</div>'+
+    selectedInfo+
+  '</div>';
+}
+
+function _energieCfgWizardSelectPays(templateId,sid){
+  if(templateId==='autre'){
+    _energieCfgWizardPays={id:'autre'};
+  } else {
+    var t=(_energieTemplatesCache||[]).find(function(x){return x.id===templateId;});
+    _energieCfgWizardPays=t||null;
+  }
+  if(_session)renderRespTech(_session,'config');
+}
+
+function _energieCfgWizardConfirmPays(sid){
+  if(!_energieCfgWizardPays)return;
+  if(_energieCfgWizardPays.id==='autre'){
+    _energieCfgWizardStep=1;
+    if(_session)renderRespTech(_session,'config');
+  } else {
+    // Charger les items du template comme rows
+    var items=Array.isArray(_energieCfgWizardPays.items)?_energieCfgWizardPays.items:(typeof _energieCfgWizardPays.items==='string'?JSON.parse(_energieCfgWizardPays.items):[]);
+    _energieCfgWizardRows=items.map(function(r){return Object.assign({},r,{actif:true});});
+    _energieCfgWizardSousFluides=[];
+    _energieCfgWizardStep=2;
+    if(_session)renderRespTech(_session,'config');
+  }
+}
+
+/* ── Étape 1 (Autre pays) : type de compteur ── */
+function _energieCfgWizardStepTypeHtml(sid){
   var tmpl=[
     {key:'1_index',title:'1 index',desc:'Un seul compteur (ex. SENELEC monophasé)',tag:'Hôtel simple'},
-    {key:'2_jour_nuit',title:'2 index Jour / Nuit',desc:'K1 Jour + K2 Nuit (bi-horaire SENELEC)',tag:'Standard'},
-    {key:'3_hc_hp_pointe',title:'3 index HC / HP / Pointe',desc:'Heures creuses + HP + Pointe (CIE Abidjan, ENEO)',tag:'Grands hôtels'}
+    {key:'2_jour_nuit',title:'2 index Jour / Nuit',desc:'K1 Jour + K2 Nuit (bi-horaire)',tag:'Standard'},
+    {key:'3_hc_hp_pointe',title:'3 index HC / HP / Pointe',desc:'Heures creuses + HP + Pointe',tag:'Grands hôtels'}
   ];
   var cards=tmpl.map(function(t){
     return '<div onclick="_energieCfgWizardSelectTemplate(\''+t.key+'\',\''+sid+'\')" '+
@@ -14316,9 +14436,11 @@ function _energieCfgWizardStep0Html(sid){
       '<div style="font-size:16px;font-weight:700;color:var(--text)">Configurer les relevés énergie</div>'+
       '<div style="font-size:13px;color:var(--text2);margin-top:4px">Commencez par choisir le type de compteur électrique sur ce site.</div>'+
     '</div>'+
-    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">Étape 1 — Type de compteur électrique</div>'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">Étape 2 — Type de compteur électrique</div>'+
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">'+cards+'</div>'+
-    '<div style="text-align:center;margin-top:8px">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">'+
+      '<button onclick="_energieCfgWizardBack(\''+sid+'\')" '+
+        'style="background:none;border:1.5px solid var(--border);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer">← Retour</button>'+
       '<button onclick="_energieCfgWizardSelectTemplate(\'aucun\',\''+sid+'\')" '+
         'style="background:none;border:none;font-size:12px;color:var(--text3);cursor:pointer;text-decoration:underline">'+
         'Pas d\'électricité de ville sur ce site →'+
@@ -14329,7 +14451,7 @@ function _energieCfgWizardStep0Html(sid){
 
 function _energieCfgWizardSelectTemplate(key,sid){
   _energieCfgWizardTemplate=key;
-  _energieCfgWizardStep=1;
+  _energieCfgWizardStep=2;
   // Construire les rows
   var baseRows=key==='aucun'?[]:(_ENERGIE_TEMPLATES[key]||[]).map(function(r){return Object.assign({},r,{actif:true});});
   var extrasRows=_ENERGIE_EXTRAS.map(function(r){return Object.assign({},r,{actif:true});});
@@ -14341,6 +14463,7 @@ function _energieCfgWizardSelectTemplate(key,sid){
 function _energieCfgWizardReset(sid){
   _energieCfgWizardStep=0;
   _energieCfgWizardTemplate=null;
+  _energieCfgWizardPays=null;
   _energieCfgWizardRows=[];
   _energieCfgWizardSousFluides=[];
   // Note admin : reset supprime les fluides existants côté UX mais ne DELETE pas en DB
@@ -14348,7 +14471,7 @@ function _energieCfgWizardReset(sid){
   if(_session)renderRespTech(_session,'config');
 }
 
-function _energieCfgWizardStep1Html(sid){
+function _energieCfgWizardStepCustomHtml(sid){
   var rows=_energieCfgWizardRows;
   var rowsHtml=rows.map(function(r,i){
     var actifCheck=r.actif?'checked':'';
@@ -14403,7 +14526,7 @@ function _energieCfgWizardStep1Html(sid){
   '</div>';
 
   return '<div style="max-width:900px">'+
-    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:12px">Étape 2 — Personnaliser les fluides</div>'+
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:12px">Étape 3 — Personnaliser les fluides</div>'+
     '<div style="font-size:12px;color:var(--text2);margin-bottom:14px">Renommez, ajustez les seuils et objectifs. Décochez les fluides à ne pas suivre.</div>'+
     '<div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:white">'+
     '<table style="width:100%;border-collapse:collapse;font-size:12px">'+
@@ -14455,10 +14578,19 @@ function _energieCfgWizardToggleSousFluide(idx,checked){
 }
 
 function _energieCfgWizardBack(sid){
-  _energieCfgWizardStep=0;
-  _energieCfgWizardTemplate=null;
-  _energieCfgWizardRows=[];
-  _energieCfgWizardSousFluides=[];
+  if(_energieCfgWizardStep===2&&_energieCfgWizardPays&&_energieCfgWizardPays.id==='autre'){
+    // Step 2 → step 1 (type compteur) si on est passé par "Autre"
+    _energieCfgWizardStep=1;
+    _energieCfgWizardTemplate=null;
+    _energieCfgWizardRows=[];
+    _energieCfgWizardSousFluides=[];
+  } else {
+    // Step 1 ou step 2 direct → retour step 0 (pays)
+    _energieCfgWizardStep=0;
+    _energieCfgWizardTemplate=null;
+    _energieCfgWizardRows=[];
+    _energieCfgWizardSousFluides=[];
+  }
   if(_session)renderRespTech(_session,'config');
 }
 
