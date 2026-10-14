@@ -82,6 +82,7 @@ async function sendNotifications(payload: any) {
     lieu,
     ref_code,
     signaleur_whatsapp,
+    photo_url,
   } = payload;
 
   const typeLabel  = TYPE_LABELS[type] || type || 'Signalement';
@@ -94,6 +95,13 @@ async function sendNotifications(payload: any) {
 
   console.log(`notify: site=${site_id} ref=${ref_code} type=${type}`);
 
+  // ── Nom du site (pour affichage dans la notif) ──────────────────────────
+  let site_nom = '';
+  if (site_id) {
+    const sites = await db('sites', { query: `&id=eq.${site_id}&limit=1`, select: 'nom' });
+    site_nom = Array.isArray(sites) && sites[0]?.nom ? sites[0].nom : '';
+  }
+
   // ── 1. Resp_tech + dir_tech + technicien ────────────────────────────────
   const responsables = await db('contacts', {
     query: `&site_id=eq.${site_id}&role=in.(resp_tech,dir_tech,technicien)&actif=eq.true`,
@@ -102,11 +110,13 @@ async function sendNotifications(payload: any) {
 
   const msgResp =
     `🚨 *Nouveau signalement — GenTrack*\n\n` +
+    (site_nom ? `🏨 *${site_nom}*\n` : '') +
     `${typeLabel}${equipement_nom ? ' — ' + equipement_nom : ''}` +
     `${lieu ? '\n📍 ' + lieu : ''}` +
     `${signale_par ? '\n👤 ' + signale_par : ''}` +
     `${signaleur_whatsapp ? '\n📞 ' + signaleur_whatsapp : ''}` +
     `\n\n📝 ${description}` +
+    `${photo_url ? '\n📷 Photo : ' + photo_url : ''}` +
     `${ref_code ? '\n\n_Réf : ' + ref_code + '_\n_Répondre *OK ' + ref_code + '* pour PEC · ou *AFFECTER ' + ref_code + ' NomTech* pour assigner._' : ''}` +
     `\n_${heure}_`;
 
