@@ -36,8 +36,24 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 /* ── CONTENT ── */
 .rz-content{padding:16px 14px 130px}
 
-/* ── ÉTAGE GROUP ── */
-.rz-group{margin-bottom:20px}
+/* ── BAT SELECTOR ── */
+.rz-bat-row{display:flex;gap:6px;padding:10px 16px 0;overflow-x:auto;scrollbar-width:none}
+.rz-bat-row::-webkit-scrollbar{display:none}
+.rz-bat-chip{flex-shrink:0;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;border:1.5px solid rgba(255,255,255,.15);color:rgba(255,255,255,.45);background:transparent;transition:all .15s}
+.rz-bat-chip.active{background:var(--amber);border-color:var(--amber);color:var(--dark)}
+.rz-bat-chip:active{opacity:.8}
+
+/* ── FLOOR TABS ── */
+.rz-floor-tabs{display:flex;gap:0;overflow-x:auto;padding:0 14px;scrollbar-width:none;border-top:1px solid rgba(255,255,255,.07)}
+.rz-floor-tabs::-webkit-scrollbar{display:none}
+.rz-ftab{flex-shrink:0;min-width:44px;padding:9px 14px;font-size:13px;font-weight:700;color:rgba(255,255,255,.35);cursor:pointer;border-bottom:3px solid transparent;text-align:center}
+.rz-ftab.active{color:#fff;border-bottom-color:var(--amber)}
+.rz-ftab.done{color:rgba(74,222,128,.6)}
+.rz-ftab.done.active{color:#4ADE80;border-bottom-color:#4ADE80}
+.rz-ftab-sub{display:block;font-size:8px;font-weight:600;letter-spacing:.02em;margin-top:1px;opacity:.7}
+
+/* ── ZONE GROUP HEADER ── */
+.rz-group{margin-bottom:16px}
 .rz-group-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px}
 .rz-group-label{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)}
 .rz-btn-all{padding:4px 11px;border-radius:7px;border:1px solid var(--vert-border);background:var(--vert-pale);color:var(--vert-text);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s}
@@ -170,6 +186,9 @@ var _incEquip={};        // zone_id → equipement_zone_id sélectionné
 var _resolus=[];         // ids de signalements marqués résolus
 var _resolusNotes={};    // sg_id → note résolution
 var _currentZone=null;
+var _activeBat=null;     // bâtiment sélectionné
+var _activeFloor=null;   // étage sélectionné
+var _bats=[];            // liste ordonnée des bâtiments
 
 /* ── HELPERS ── */
 function h(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -246,20 +265,131 @@ function showError(msg){
     '<div class="rz-state"><div class="rz-state-emoji">⚠️</div><div class="rz-state-title">Erreur</div><div class="rz-state-sub">'+h(msg)+'</div></div>';
 }
 
+/* ── NAV HELPERS ── */
+function _getBatFloors(bat){
+  var floors=[];
+  _zones.forEach(function(z){
+    if((z.batiment||'Résidence')===bat){
+      var et=String(z.etage||'—');
+      if(floors.indexOf(et)===-1)floors.push(et);
+    }
+  });
+  return floors.sort(function(a,b){
+    var na=parseInt(a),nb=parseInt(b);
+    if(!isNaN(na)&&!isNaN(nb))return na-nb;
+    return a.localeCompare(b);
+  });
+}
+
+function _getVisibleZones(){
+  return _zones.filter(function(z){
+    return (z.batiment||'Résidence')===_activeBat&&String(z.etage||'—')===_activeFloor;
+  });
+}
+
+function _zoneCardHtml(z){
+  var lv=lvInfo(z);
+  var hasSg=!!_signalements[z.id];
+  var chk=_checks[z.id];
+  var barColor=chk==='ok'?'var(--vert)':chk==='incident'?'var(--rouge)':lv.dot;
+  var chipBg=lv.dot==='#C0392B'?'var(--rouge-pale)':lv.dot==='#D46B0A'?'var(--orange-pale)':lv.dot==='#1B7A4A'?'var(--vert-pale)':'var(--bg)';
+  var chipCl=lv.dot==='#C0392B'?'var(--rouge)':lv.dot==='#D46B0A'?'var(--orange)':lv.dot==='#1B7A4A'?'var(--vert)':'var(--text3)';
+  var chipBd=lv.dot==='#C0392B'?'var(--rouge-border)':lv.dot==='#D46B0A'?'var(--orange-border)':lv.dot==='#1B7A4A'?'var(--vert-border)':'var(--border)';
+  var cardCls='rz-zone-card'+(chk==='ok'?' ok':chk==='incident'?' incident':'');
+  var icon=z.type_zone==='chambre'?'🛏️':z.type_zone==='commun_etage'?'🛋️':'⭐';
+  return '<div class="'+cardCls+'" id="room-'+h(z.id)+'" onclick="openDetail(\''+h(z.id)+'\')">'+
+    '<div class="rz-zc-bar" style="background:'+barColor+'"></div>'+
+    '<div class="rz-zc-icon" style="background:'+chipBg+'">'+icon+'</div>'+
+    '<div class="rz-zc-body">'+
+      '<div class="rz-zc-name">'+h(z.nom)+'</div>'+
+      '<div class="rz-zc-meta">'+h(z.batiment||'Résidence')+' · Ét. '+h(String(z.etage||'—'))+'</div>'+
+    '</div>'+
+    '<div class="rz-zc-right">'+
+      '<div class="rz-zc-chip" style="background:'+chipBg+';color:'+chipCl+';border:1px solid '+chipBd+'">'+h(lv.text)+'</div>'+
+      '<div class="rz-zc-last">'+h(lv.sub)+'</div>'+
+    '</div>'+
+    (hasSg?'<div class="rz-alert-badge"></div>':'')+
+  '</div>';
+}
+
+/* ── FLOOR TABS REBUILD ── */
+function _rebuildFloorTabs(){
+  var el=document.getElementById('rz-floor-tabs');
+  if(!el)return;
+  var floors=_getBatFloors(_activeBat);
+  el.innerHTML=floors.map(function(fl){
+    var flZones=_zones.filter(function(z){return (z.batiment||'Résidence')===_activeBat&&String(z.etage||'—')===fl;});
+    var done=flZones.filter(function(z){return _checks[z.id];}).length;
+    var allDone=done===flZones.length&&flZones.length>0;
+    var cls='rz-ftab'+(fl===_activeFloor?' active':'')+(allDone?' done':'');
+    return '<div class="'+cls+'" onclick="setFloor(\''+h(fl)+'\')">'+h(fl)+'<span class="rz-ftab-sub">'+done+'/'+flZones.length+'</span></div>';
+  }).join('');
+}
+
+/* ── BAT CHIPS REBUILD ── */
+function _rebuildBatChips(){
+  var el=document.getElementById('rz-bat-row');
+  if(!el)return;
+  el.innerHTML=_bats.map(function(bat){
+    var cls='rz-bat-chip'+(bat===_activeBat?' active':'');
+    return '<div class="'+cls+'" onclick="setBat(\''+h(bat)+'\')">'+h(bat)+'</div>';
+  }).join('');
+}
+
+/* ── ZONE LIST REBUILD ── */
+function _rebuildZoneList(){
+  var el=document.getElementById('rz-content');
+  if(!el)return;
+  var visible=_getVisibleZones();
+  var done=visible.filter(function(z){return _checks[z.id];}).length;
+  var grpHdr=
+    '<div class="rz-group-hdr">'+
+      '<span class="rz-group-label">'+h(_activeBat)+' — Étage '+h(_activeFloor)+'</span>'+
+      '<div style="display:flex;align-items:center;gap:6px">'+
+        '<span style="font-size:11px;font-weight:600;color:var(--text3)" id="rz-grp-count">'+done+'/'+visible.length+'</span>'+
+        '<button class="rz-btn-all" id="rz-btn-all" onclick="toutOk()">✓ Tout OK</button>'+
+      '</div>'+
+    '</div>';
+  el.innerHTML=grpHdr+visible.map(_zoneCardHtml).join('');
+  /* Marquer le bouton si déjà tout OK */
+  if(done===visible.length&&visible.length>0){
+    var btn=document.getElementById('rz-btn-all');
+    if(btn){btn.className='rz-btn-all done';}
+  }
+}
+
+/* ── NAV ACTIONS ── */
+function setBat(bat){
+  _activeBat=bat;
+  var floors=_getBatFloors(bat);
+  _activeFloor=floors[0]||null;
+  _rebuildBatChips();
+  _rebuildFloorTabs();
+  _rebuildZoneList();
+}
+
+function setFloor(floor){
+  _activeFloor=floor;
+  _rebuildFloorTabs();
+  _rebuildZoneList();
+}
+
 /* ── RENDER ── */
 function renderRonde(){
-  /* Group by batiment → étage */
-  var groups={};
+  /* Init navigation state */
+  _bats=[];
   _zones.forEach(function(z){
     var bat=z.batiment||'Résidence';
-    var et=z.etage||'—';
-    var key=bat+'|||'+et;
-    if(!groups[key])groups[key]={bat:bat,et:et,zones:[]};
-    groups[key].zones.push(z);
+    if(_bats.indexOf(bat)===-1)_bats.push(bat);
   });
-  var groupKeys=Object.keys(groups).sort();
+  _bats.sort();
+  _activeBat=_bats[0]||'Résidence';
+  var firstFloors=_getBatFloors(_activeBat);
+  _activeFloor=firstFloors[0]||null;
 
   var totalZones=_zones.length;
+  var multiBat=_bats.length>1;
+
   var html=
     '<div class="rz-header">'+
       '<div class="rz-header-top"><div class="rz-logo">GenTrack ✦</div><div class="rz-badge" id="rz-badge">0%</div></div>'+
@@ -273,53 +403,10 @@ function renderRonde(){
         '<span class="rz-prog-label" id="rz-prog-pct">0%</span>'+
       '</div>'+
       '<div class="rz-prog"><div class="rz-prog-bar" id="rz-prog-bar" style="width:0%"></div></div>'+
+      (multiBat?'<div class="rz-bat-row" id="rz-bat-row"></div>':'')+
+      '<div class="rz-floor-tabs" id="rz-floor-tabs"></div>'+
     '</div>'+
-    '<div class="rz-content">';
-
-  groupKeys.forEach(function(gk){
-    var g=groups[gk];
-    var grpOk=g.zones.filter(function(z){return _checks[z.id]==='ok';}).length;
-    html+=
-      '<div class="rz-group">'+
-        '<div class="rz-group-hdr">'+
-          '<span class="rz-group-label">'+h(g.bat)+' — Étage '+h(g.et)+'</span>'+
-          '<div style="display:flex;align-items:center;gap:6px">'+
-            '<span style="font-size:11px;font-weight:600;color:var(--text3)">'+grpOk+'/'+g.zones.length+'</span>'+
-            '<button class="rz-btn-all" id="tall-'+h(gk)+'" onclick="toutOk(\''+h(gk)+'\')">✓ Tout OK</button>'+
-          '</div>'+
-        '</div>'+
-        '<div class="rz-list" id="grid-'+h(gk)+'">';
-    g.zones.forEach(function(z){
-      var lv=lvInfo(z);
-      var hasSg=!!_signalements[z.id];
-      var chk=_checks[z.id];
-      var barColor=chk==='ok'?'var(--vert)':chk==='incident'?'var(--rouge)':lv.dot;
-      var chipBg=lv.dot==='#C0392B'?'var(--rouge-pale)':lv.dot==='#D46B0A'?'var(--orange-pale)':lv.dot==='#1B7A4A'?'var(--vert-pale)':'var(--bg)';
-      var chipCl=lv.dot==='#C0392B'?'var(--rouge)':lv.dot==='#D46B0A'?'var(--orange)':lv.dot==='#1B7A4A'?'var(--vert)':'var(--text3)';
-      var chipBd=lv.dot==='#C0392B'?'var(--rouge-border)':lv.dot==='#D46B0A'?'var(--orange-border)':lv.dot==='#1B7A4A'?'var(--vert-border)':'var(--border)';
-      var cardCls='rz-zone-card'+(chk==='ok'?' ok':chk==='incident'?' incident':'');
-      var icon=z.type_zone==='chambre'?'🛏️':z.type_zone==='commun_etage'?'🛋️':'⭐';
-      html+=
-        '<div class="'+cardCls+'" id="room-'+h(z.id)+'" onclick="openDetail(\''+h(z.id)+'\')" >'+
-          '<div class="rz-zc-bar" style="background:'+barColor+'"></div>'+
-          '<div class="rz-zc-icon" style="background:'+chipBg+'">'+icon+'</div>'+
-          '<div class="rz-zc-body">'+
-            '<div class="rz-zc-name">'+h(z.nom)+'</div>'+
-            '<div class="rz-zc-meta">'+h(z.batiment||'Résidence')+' · Ét. '+h(String(z.etage||'—'))+'</div>'+
-          '</div>'+
-          '<div class="rz-zc-right">'+
-            '<div class="rz-zc-chip" style="background:'+chipBg+';color:'+chipCl+';border:1px solid '+chipBd+'">'+h(lv.text)+'</div>'+
-            '<div class="rz-zc-last">'+h(lv.sub)+'</div>'+
-          '</div>'+
-          (hasSg?'<div class="rz-alert-badge"></div>':'')+
-        '</div>';
-    });
-    html+='</div></div>';
-  });
-
-  html+='</div>';// rz-content
-
-  html+=
+    '<div class="rz-content" id="rz-content" style="padding:16px 14px 130px"></div>'+
     '<div class="rz-overlay" id="rz-overlay" onclick="closeDetail()"></div>'+
     '<div class="rz-panel" id="rz-panel">'+
       '<div class="rz-panel-handle"></div>'+
@@ -339,6 +426,10 @@ function renderRonde(){
     '</div>';
 
   document.getElementById('app').innerHTML=html;
+
+  if(multiBat)_rebuildBatChips();
+  _rebuildFloorTabs();
+  _rebuildZoneList();
 }
 
 /* ── OPEN DETAIL ── */
@@ -484,6 +575,12 @@ function dpSetCheck(val){
   var roomEl=document.getElementById('room-'+zoneId);
   if(roomEl)roomEl.className='rz-zone-card focus'+(cur?' '+cur:'');
 
+  /* Refresh group count + floor tab */
+  var visible=_getVisibleZones();
+  var doneVis=visible.filter(function(z){return _checks[z.id];}).length;
+  var cntEl=document.getElementById('rz-grp-count');
+  if(cntEl)cntEl.textContent=doneVis+'/'+visible.length;
+  _rebuildFloorTabs();
   updateProgress();
 }
 
@@ -560,16 +657,21 @@ function marquerResolu(sgId,zoneId){
   if(_signalements[zoneId])_signalements[zoneId]._resolved=true;
 }
 
-function toutOk(groupKey){
-  var grid=document.getElementById('grid-'+groupKey);
-  if(!grid)return;
-  grid.querySelectorAll('.rz-zone-card').forEach(function(el){
+function toutOk(){
+  var content=document.getElementById('rz-content');
+  if(!content)return;
+  content.querySelectorAll('.rz-zone-card').forEach(function(el){
     var zoneId=el.id.replace('room-','');
     _checks[zoneId]='ok';
     el.className='rz-zone-card ok';
   });
-  var btn=document.getElementById('tall-'+groupKey);
-  if(btn){btn.className='rz-btn-all done';btn.textContent='✓ Tout OK';}
+  var btn=document.getElementById('rz-btn-all');
+  if(btn){btn.className='rz-btn-all done';}
+  /* Mettre à jour le compteur du groupe */
+  var visible=_getVisibleZones();
+  var cntEl=document.getElementById('rz-grp-count');
+  if(cntEl)cntEl.textContent=visible.length+'/'+visible.length;
+  _rebuildFloorTabs();
   updateProgress();
 }
 
