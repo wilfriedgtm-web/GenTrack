@@ -338,7 +338,8 @@ var _configTypesCache=[]; // types_equipements, mis à jour dans _rtConfig pour 
 var _resSubTab='config';
 var _resWizStep=0;
 var _resPlanFilter='all'; // 'all' | 'late' | 'warn' | 'ok' | 'never'
-var _planFreqZoneId=null; // zone en cours de config fréquence
+var _planFreqZoneId=null;     // zone en cours de config fréquence (individuelle)
+var _planGroupFreqKey=null;  // groupe en cours de config fréquence (étage/bât/site)
 var _resWizBats=[{nom:'Tour A'}];
 var _resWizEtages=[{bat:0,etage:'18',debut:1801,fin:1812}];
 var _resSpeciales={local_tech:false,restaurant:false,reception:false,parking:false,piscine:false,salle_sport:false,toiture:false};
@@ -6360,17 +6361,20 @@ async function _buildResPlanningHtml(sid){
 
   function zStatus(z){
     var lr=lastRel[z.id],freq=z.frequence_passage||30;
-    if(!lr)return {cls:'never',chip:'Jamais',chipColor:'var(--text3)',chipBg:'var(--bg)',chipBd:'var(--border)',lastVisit:'— premier passage',daysLeft:null};
-    var days=Math.floor((today-new Date(lr.date))/(86400000));
+    if(!lr)return {cls:'never',chip:'Jamais',chipColor:'var(--text3)',chipBg:'var(--bg)',chipBd:'var(--border)',lastVisit:'— premier passage',nextVisit:'À planifier',daysLeft:null};
+    var lrDate=new Date(lr.date+'T00:00:00'); // force heure locale, évite décalage UTC
+    var days=Math.floor((today-lrDate)/86400000);
     var left=freq-days;
-    var lastFmt=new Date(lr.date+' 12:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
+    var lastFmt=lrDate.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
+    var nextDate=new Date(lrDate);nextDate.setDate(nextDate.getDate()+freq);
+    var nextFmt=nextDate.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
     if(lr.statut==='incident'||lr.nb_anomalies>0)
-      return {cls:'late',chip:'Incident · il y a '+days+'j',chipColor:'var(--rouge)',chipBg:'var(--rouge-pale)',chipBd:'var(--rouge-border)',lastVisit:'Vu le '+lastFmt,daysLeft:left};
+      return {cls:'late',chip:'Incident · il y a '+days+'j',chipColor:'var(--rouge)',chipBg:'var(--rouge-pale)',chipBd:'var(--rouge-border)',lastVisit:'Vu le '+lastFmt,nextVisit:'Prochain le '+nextFmt,daysLeft:left};
     if(left<=0)
-      return {cls:'late',chip:'Retard '+(Math.abs(left))+'j',chipColor:'var(--rouge)',chipBg:'var(--rouge-pale)',chipBd:'var(--rouge-border)',lastVisit:'Vu le '+lastFmt,daysLeft:left};
+      return {cls:'late',chip:'Retard '+(Math.abs(left))+'j',chipColor:'var(--rouge)',chipBg:'var(--rouge-pale)',chipBd:'var(--rouge-border)',lastVisit:'Vu le '+lastFmt,nextVisit:'Dû depuis le '+nextFmt,daysLeft:left};
     if(left<=3)
-      return {cls:'warn',chip:'Dans '+left+'j',chipColor:'var(--orange)',chipBg:'var(--orange-pale)',chipBd:'var(--orange-border)',lastVisit:'Vu le '+lastFmt,daysLeft:left};
-    return {cls:'ok',chip:'Il y a '+days+'j',chipColor:'var(--vert)',chipBg:'var(--vert-pale)',chipBd:'var(--vert-border)',lastVisit:'Vu le '+lastFmt,daysLeft:left};
+      return {cls:'warn',chip:'Dans '+left+'j',chipColor:'var(--orange)',chipBg:'var(--orange-pale)',chipBd:'var(--orange-border)',lastVisit:'Vu le '+lastFmt,nextVisit:'Prochain le '+nextFmt,daysLeft:left};
+    return {cls:'ok',chip:'Il y a '+days+'j',chipColor:'var(--vert)',chipBg:'var(--vert-pale)',chipBd:'var(--vert-border)',lastVisit:'Vu le '+lastFmt,nextVisit:'Prochain le '+nextFmt,daysLeft:left};
   }
 
   // ── KPIs ────────────────────────────────────────────────────────────────────
@@ -6440,6 +6444,7 @@ async function _buildResPlanningHtml(sid){
     row+='<div style="text-align:right;padding:8px 10px;flex-shrink:0">';
     row+='<div style="display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;background:'+st.chipBg+';color:'+st.chipColor+';border:1px solid '+st.chipBd+'">'+escape_html(st.chip)+'</div>';
     row+='<div style="font-size:10px;color:var(--text3);margin-top:3px">'+escape_html(st.lastVisit)+'</div>';
+    row+='<div style="font-size:10px;color:var(--text3);margin-top:1px">'+escape_html(st.nextVisit||'')+'</div>';
     row+='</div>';
     // config btn (resp_tech / dir_tech seulement)
     if(canCfgFreq){
@@ -6468,7 +6473,19 @@ async function _buildResPlanningHtml(sid){
     h+='<div style="font-size:11px;font-weight:600;color:'+(batLate?'var(--rouge)':'var(--text2)')+'">'+batOk+'/'+batZones.length+' OK</div>';
     h+='</div>';
     Object.keys(byBat[bat]).sort().forEach(function(et){
-      byBat[bat][et].forEach(function(z){h+=renderZoneCard(z);});
+      var etZones=byBat[bat][et];
+      var gpKey=(bat+'_'+et).replace(/[^a-zA-Z0-9]/g,'_');
+      var batEsc=bat.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var etEsc=String(et).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var sidEsc=sid.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 2px 3px 2px;margin-top:6px">';
+      h+='<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Étage '+escape_html(String(et))+'</div>';
+      if(canCfgFreq){
+        h+='<button onclick="_openGroupFreqPanel(\''+batEsc+'\',\''+etEsc+'\',\''+sidEsc+'\',\''+gpKey+'\')" style="font-size:11px;background:none;border:1px solid var(--border);border-radius:20px;padding:2px 8px;cursor:pointer;color:var(--text3)">⚙️ Configurer l\'étage</button>';
+      }
+      h+='</div>';
+      h+='<div id="groupfreqpanel-'+gpKey+'" style="display:none;margin-bottom:5px"></div>';
+      etZones.forEach(function(z){h+=renderZoneCard(z);});
     });
     h+='</div>';
   });
@@ -6587,8 +6604,103 @@ async function _setZoneFreq(zoneId,freq){
       headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({frequence_passage:freq})
     });
-    // Fermer panneau et recharger la vue
     _planFreqZoneId=null;
+    navTo('residence-planning');
+  }catch(e){alert('Erreur lors de la mise à jour.');}
+}
+
+// ── Config fréquence par groupe (étage / bâtiment / tout le site) ────────────
+function _openGroupFreqPanel(bat,et,sid,gpKey){
+  if(_planGroupFreqKey===gpKey){
+    var old=document.getElementById('groupfreqpanel-'+gpKey);
+    if(old){old.style.display='none';old.innerHTML='';}
+    _planGroupFreqKey=null;return;
+  }
+  if(_planGroupFreqKey){
+    var prev=document.getElementById('groupfreqpanel-'+_planGroupFreqKey);
+    if(prev){prev.style.display='none';prev.innerHTML='';}
+  }
+  _planGroupFreqKey=gpKey;
+  var panel=document.getElementById('groupfreqpanel-'+gpKey);
+  if(!panel)return;
+  var presets=[{v:7,l:'7j – Hebdo'},{v:14,l:'14j'},{v:30,l:'30j – Mensuel'},{v:60,l:'60j'},{v:90,l:'90j – Trimestriel'}];
+  var scopeOpts=[
+    {v:'etage',   l:'Cet étage (Ét. '+et+')'},
+    {v:'batiment',l:'Tout le bâtiment ('+bat+')'},
+    {v:'site',    l:'Tout le site'},
+  ];
+  var batEsc=bat.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var etEsc=String(et).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var sidEsc=sid.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  var html='<div style="background:var(--creme);border:1.5px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:4px">';
+  html+='<div style="font-size:12px;font-weight:700;color:var(--dark);margin-bottom:10px">⚙️ Fréquence par groupe</div>';
+  // scope buttons
+  html+='<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Périmètre</div>';
+  html+='<div id="gfp-scope-'+gpKey+'" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">';
+  scopeOpts.forEach(function(s,i){
+    var isAct=i===0;
+    html+='<button onclick="_gfpSetScope(\''+gpKey+'\',\''+s.v+'\')" id="gfpsc-'+gpKey+'-'+s.v+'" style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid '+(isAct?'var(--amber)':'var(--border)')+';background:'+(isAct?'var(--amber-pale)':'white')+';color:'+(isAct?'var(--amber-dark)':'var(--text2)')+'">'+escape_html(s.l)+'</button>';
+  });
+  html+='</div>';
+  // freq buttons
+  html+='<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Nouvelle fréquence</div>';
+  html+='<div id="gfp-freq-'+gpKey+'" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">';
+  presets.forEach(function(p){
+    html+='<button onclick="_gfpSetFreq(\''+gpKey+'\','+p.v+')" id="gfpfq-'+gpKey+'-'+p.v+'" style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:white;color:var(--text2)">'+escape_html(p.l)+'</button>';
+  });
+  html+='</div>';
+  html+='<button onclick="_applyGroupFreq(\''+batEsc+'\',\''+etEsc+'\',\''+sidEsc+'\',\''+gpKey+'\')" style="width:100%;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;background:var(--amber);color:white">Appliquer</button>';
+  html+='</div>';
+  panel.innerHTML=html;
+  panel.style.display='block';
+  panel.dataset.scope='etage';
+  panel.dataset.freq='';
+}
+
+function _gfpSetScope(gpKey,scope){
+  var panel=document.getElementById('groupfreqpanel-'+gpKey);
+  if(panel)panel.dataset.scope=scope;
+  ['etage','batiment','site'].forEach(function(s){
+    var btn=document.getElementById('gfpsc-'+gpKey+'-'+s);
+    if(!btn)return;
+    var isAct=s===scope;
+    btn.style.borderColor=isAct?'var(--amber)':'var(--border)';
+    btn.style.background=isAct?'var(--amber-pale)':'white';
+    btn.style.color=isAct?'var(--amber-dark)':'var(--text2)';
+  });
+}
+
+function _gfpSetFreq(gpKey,freq){
+  var panel=document.getElementById('groupfreqpanel-'+gpKey);
+  if(panel)panel.dataset.freq=String(freq);
+  var container=document.getElementById('gfp-freq-'+gpKey);
+  if(!container)return;
+  container.querySelectorAll('button').forEach(function(btn){
+    btn.style.borderColor='var(--border)';btn.style.background='white';btn.style.color='var(--text2)';
+  });
+  var sel=document.getElementById('gfpfq-'+gpKey+'-'+freq);
+  if(sel){sel.style.borderColor='var(--amber)';sel.style.background='var(--amber-pale)';sel.style.color='var(--amber-dark)';}
+}
+
+async function _applyGroupFreq(bat,et,sid,gpKey){
+  var panel=document.getElementById('groupfreqpanel-'+gpKey);
+  if(!panel)return;
+  var scope=panel.dataset.scope||'etage';
+  var freq=parseInt(panel.dataset.freq||'0',10);
+  if(!freq){alert('Sélectionnez une fréquence.');return;}
+  var nb={etage:'l\'étage '+et+' ('+bat+')',batiment:'tout le bâtiment '+bat,site:'tout le site'}[scope];
+  if(!confirm('Appliquer '+freq+' jours pour '+nb+' ?'))return;
+  var filter='site_id=eq.'+encodeURIComponent(sid);
+  if(scope==='etage')  filter+='&batiment=eq.'+encodeURIComponent(bat)+'&etage=eq.'+encodeURIComponent(et);
+  else if(scope==='batiment') filter+='&batiment=eq.'+encodeURIComponent(bat);
+  // scope==='site' : pas de filtre supplémentaire
+  try{
+    await fetch(SUPA_URL+'/rest/v1/zones?'+filter,{
+      method:'PATCH',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({frequence_passage:freq})
+    });
+    _planGroupFreqKey=null;
     navTo('residence-planning');
   }catch(e){alert('Erreur lors de la mise à jour.');}
 }
