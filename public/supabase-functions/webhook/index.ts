@@ -703,6 +703,77 @@ async function demarrerResolu(phone: string, contact: any, site: any): Promise<a
   return sendWA(phone, `✅ *Clôturer un signalement*\n*${site?.nom || ''}*\n\nQuel signalement est résolu ?\n\n${liste}\n\nRépondez avec le numéro.`);
 }
 
+// ── Suivi → recap signalements du site ────────────────────────────────────────
+async function demarrerSuivi(phone: string, contact: any, site: any): Promise<any> {
+  const siteId = site?.id || contact.site_id;
+  const siteNom = site?.nom || '';
+  const today = new Date().toISOString().substring(0, 10);
+
+  const signalements = await db('signalements', {
+    query: `&groupe_id=eq.${siteId}&statut=in.(ouvert,en_cours,resolu)&order=created_at.asc&limit=50`
+  });
+  const allSigs = Array.isArray(signalements) ? signalements : [];
+
+  // Filtre résolus du jour uniquement
+  const sigs = allSigs.filter((s: any) =>
+    s.statut === 'ouvert' || s.statut === 'en_cours' ||
+    (s.statut === 'resolu' && (s.resolved_at || '').substring(0, 10) === today)
+  );
+
+  if (!sigs.length) return sendWA(phone, `✅ *${siteNom}*\n\nAucun signalement en cours ni résolu aujourd'hui.`);
+
+  const equipIds = [...new Set(sigs.map((s: any) => s.equipement_id).filter(Boolean))];
+  const equipMap: Record<string, string> = {};
+  if (equipIds.length > 0) {
+    const equips = await db('equipements', { query: `&id=in.(${equipIds.join(',')})` });
+    if (Array.isArray(equips)) for (const e of equips) equipMap[e.id] = e.nom;
+  }
+
+  const fmt = (s: any) => {
+    const eq = s.equipement_id ? (equipMap[s.equipement_id] || '—') : '—';
+    const desc = (s.description || '').substring(0, 45);
+    return `${s.ref_code || '—'} · ${eq} — ${desc}`;
+  };
+
+  const ouverts = sigs.filter((s: any) => s.statut === 'ouvert');
+  const enCours = sigs.filter((s: any) => s.statut === 'en_cours');
+  const resolus = sigs.filter((s: any) => s.statut === 'resolu');
+
+  let msg = `📋 *Suivi signalements*\n*${siteNom}*\n`;
+  if (ouverts.length) {
+    msg += `\n🔴 *Non pris en charge (${ouverts.length})*\n`;
+    for (const s of ouverts) msg += `• ${fmt(s)}\n`;
+  }
+  if (enCours.length) {
+    msg += `\n🟡 *En cours (${enCours.length})*\n`;
+    for (const s of enCours) {
+      const par = s.assigne_a || s.pris_en_charge_par || '—';
+      msg += `• ${fmt(s)} _(${par})_\n`;
+    }
+  }
+  if (resolus.length) {
+    msg += `\n✅ *Résolus aujourd'hui (${resolus.length})*\n`;
+    for (const s of resolus) {
+      const par = s.resolved_by || '—';
+      msg += `• ${fmt(s)} _(${par})_\n`;
+    }
+  }
+  return sendWA(phone, msg.trim());
+}
+
+// ── Bilan fin de journée ───────────────────────────────────────────────────────
+async function demarrerBilan(phone: string, contact: any, site: any): Promise<any> {
+  const siteNom = site?.nom || '';
+  await setSession(phone, 'bilan_collect', {
+    active_site_id: site?.id,
+    site_id: site?.id,
+    site_nom: siteNom,
+    tech_nom: contact.nom,
+    bilan_lignes: []
+  });
+  return sendWA(phone, `🌙 *Bilan de fin de journée*\n*${siteNom}*\n\nDécrivez vos interventions et blocages.\n_Envoyez plusieurs messages si besoin, puis tapez *ENVOYER* pour transmettre à votre responsable._`);
+}
+
 // ── Vidange ───────────────────────────────────────────────────────────────────
 async function demarrerVidange(phone: string, contact: any, site: any): Promise<any> {
   const siteId = site?.id || contact.site_id;
@@ -1043,6 +1114,33 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     }
     const notifTxt = dejaEnvoyes.size > 1 ? `Les responsables ont été alertés. 📲` : `_Aucun responsable configuré._`;
     return sendWA(phone, `🚨 *Signalement enregistré !*\n\n🔧 ${sd.equip_nom}\n⚠️ ${sd.panne_type_label}\n📝 ${desc}\n\n${notifTxt}`);
+  }
+
+  // ── Bilan collect ─────────────────────────────────────────
+  if (state === 'bilan_collect') {
+    if (bodyText.trim().toUpperCase() === 'ENVOYER') {
+      const lignes: string[] = sd.bilan_lignes || [];
+      if (!lignes.length) return sendWA(phone, `Aucune intervention à envoyer. Décrivez d'abord vos interventions.`);
+      const siteNom = sd.site_nom || siteNom;
+      const techNom = sd.tech_nom || contact.nom;
+      const dateStr = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const recapMsg = `🌙 *Bilan fin de journée — GenTrack*\n*${siteNom}*\n\n👷 *${techNom}* — ${dateStr} ${getHeure()}\n\n${lignes.map((l: string, i: number) => `${i + 1}. ${l}`).join('\n')}`;
+      const responsables = await getResponsablesForSite(sd.site_id);
+      let envoyeCount = 0;
+      if (Array.isArray(responsables)) {
+        for (const r of responsables) {
+          if (r.whatsapp && r.whatsapp !== phone) { await sendWA(r.whatsapp, recapMsg); envoyeCount++; }
+        }
+      }
+      await setSession(phone, 'idle', { active_site_id: sd.active_site_id });
+      const notif = envoyeCount > 0 ? `✅ Bilan envoyé à votre responsable. 📲` : `⚠️ Bilan enregistré — aucun responsable configuré.`;
+      return sendWA(phone, notif);
+    }
+    // Accumuler les lignes
+    const lignes: string[] = sd.bilan_lignes || [];
+    lignes.push(bodyText.trim());
+    await setSession(phone, 'bilan_collect', { ...sd, bilan_lignes: lignes });
+    return sendWA(phone, `✅ Note ajoutée (${lignes.length}).\n_Continuez ou tapez *ENVOYER* pour transmettre._`);
   }
 
   // ── Résolu flow ───────────────────────────────────────────
@@ -1549,7 +1647,8 @@ async function handleMessage(from: string, bodyText: string) {
       }
       const siteInfo = siteNomSig ? `\n📍 *${siteNomSig}*` : '';
       const continueMsg = rondeStates.includes(state) ? `\n\n_Votre ronde continue._` : `\n\nTapez *resolu* quand c'est réglé.`;
-      return sendWA(phone, `✅ *Pris en charge !*${siteInfo}\n📋 ${refCode}${continueMsg}`);
+      const photoLine = sig.photo_url ? `\n📷 Photo : ${sig.photo_url}` : '';
+      return sendWA(phone, `✅ *Pris en charge !*${siteInfo}\n📋 ${refCode}${photoLine}${continueMsg}`);
     }
 
     // ── Affectation interactive : "AFFECTER REF-XXXX" (sans nom → menu) ─────
@@ -1683,7 +1782,7 @@ async function handleMessage(from: string, bodyText: string) {
     // Commandes principales
     if (msg === 'aide' || msg === 'help') {
       const siteActif = siteNom ? `\n_Site actif : *${siteNom}* (tapez *site* pour changer)_` : '';
-      return sendWA(phone, `🔧 *GenTrack — Commandes*\n\n• *saisie* — Ronde / Relevé horaire\n• *panne* — Signaler une urgence\n• *resolu* — Clôturer un signalement\n• *plein* — Ravitaillement cuve\n• *vidange* — Déclarer une vidange\n• *rapport* — Dernier rapport\n• *site* — Changer de site\n• *annuler* — Annuler l'action en cours\n• *aide* — Ce menu${siteActif}`);
+      return sendWA(phone, `🔧 *GenTrack — Commandes*\n\n• *saisie* — Ronde / Relevé horaire\n• *panne* — Signaler une urgence\n• *resolu* — Clôturer un signalement\n• *suivi* — Recap signalements en cours\n• *bilan* — Bilan fin de journée → responsable\n• *plein* — Ravitaillement cuve\n• *vidange* — Déclarer une vidange\n• *rapport* — Dernier rapport\n• *site* — Changer de site\n• *annuler* — Annuler l'action en cours\n• *aide* — Ce menu${siteActif}`);
     }
     if (msg === 'rapport') {
       if (!site) return sendWA(phone, `Aucun site configuré.`);
@@ -1705,6 +1804,14 @@ async function handleMessage(from: string, bodyText: string) {
     }
     if (msg === 'vidange') {
       return demarrerVidange(phone, contact, site);
+    }
+    if (msg === 'suivi') {
+      if (!site) return sendWA(phone, `Aucun site configuré.`);
+      return demarrerSuivi(phone, contact, site);
+    }
+    if (msg === 'bilan') {
+      if (!site) return sendWA(phone, `Aucun site configuré.`);
+      return demarrerBilan(phone, contact, site);
     }
 
     return sendWA(phone, `Tapez *saisie* pour lancer une ronde.\nTapez *aide* pour toutes les commandes.`);
