@@ -41,15 +41,17 @@ async function db(table: string, opts: any = {}) {
 }
 
 // ── Twilio ────────────────────────────────────────────────────────────────────
-async function sendWA(to: string, message: string) {
+async function sendWA(to: string, message: string, mediaUrl?: string) {
   const toFmt = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
+  const payload: Record<string, string> = { From: TWILIO_FROM, To: toFmt, Body: message };
+  if (mediaUrl) payload['MediaUrl'] = mediaUrl;
   const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`, {
     method: 'POST',
     headers: {
       'Authorization': `Basic ${btoa(`${TWILIO_SID}:${TWILIO_TOKEN}`)}`,
       'Content-Type': 'application/x-www-form-urlencoded'
     },
-    body: new URLSearchParams({ From: TWILIO_FROM, To: toFmt, Body: message }).toString()
+    body: new URLSearchParams(payload).toString()
   });
   const data = await res.json();
   if (!res.ok) console.error('Twilio error:', data?.code, data?.message);
@@ -1043,7 +1045,7 @@ async function demarrerPlein(phone: string, contact: any, site: any): Promise<an
 }
 
 // ── Gestionnaire des états partagés ──────────────────────────────────────────
-async function handleStates(phone: string, msg: string, bodyText: string, contact: any, site: any, state: string, sd: any): Promise<any> {
+async function handleStates(phone: string, msg: string, bodyText: string, contact: any, site: any, state: string, sd: any, mediaUrl: string = ''): Promise<any> {
   const siteNom = site?.nom || sd.site_nom || '';
   const today = getToday();
 
@@ -1279,7 +1281,10 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
 
   if (state === 'panne_description') {
     const desc = bodyText.trim();
-    if (desc.length < 10) return sendWA(phone, `❌ Description trop courte. Donnez plus de détails :\n_(minimum 10 caractères)_`);
+    // Accepter si description suffisante OU si une photo est jointe (la photo vaut description)
+    if (!mediaUrl && desc.length < 10) return sendWA(phone, `❌ Description trop courte. Donnez plus de détails :\n_(minimum 10 caractères, ou joignez une photo)_`);
+
+    const fullDesc = `${sd.panne_type_label}${desc ? ` — ${desc}` : ''}`;
 
     // ── Écrire dans signalements ──
     const sigRes = await db('signalements', { method: 'POST', body: {
@@ -1287,10 +1292,11 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       site_id: sd.site_id,
       equipement_id: sd.equipement_id || null,
       type: sd.panne_type_slug || 'panne',
-      description: `${sd.panne_type_label} — ${desc}`,
+      description: fullDesc,
       signale_par: contact.nom,
       statut: 'ouvert',
       source: 'bot',
+      ...(mediaUrl ? { photo_url: mediaUrl } : {}),
     }});
     const refCode = (Array.isArray(sigRes) ? sigRes[0]?.ref_code : sigRes?.ref_code) || '';
     await db('alertes', { method: 'POST', body: {
@@ -1307,16 +1313,19 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     const techniciens = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=eq.technicien&actif=eq.true` });
     const tousDestinataires = [...(Array.isArray(responsables) ? responsables : []), ...(Array.isArray(techniciens) ? techniciens : [])];
     const refLine = refCode ? `\n\n_Répondre *OK ${refCode}* pour PEC · ou *AFFECTER ${refCode}* pour assigner à un tech._` : `\n\n_Tapez *resolu* pour clôturer._`;
-    const alertMsg = `🚨 *PANNE SIGNALÉE — GenTrack*\n*${siteNom}*\n\n🔧 Équipement : *${sd.equip_nom}*\n⚠️ Type : *${sd.panne_type_label}*\n📝 Détail : ${desc}\n\n👤 Signalé par : ${contact.nom}\n🕐 ${today} ${getHeure()}${refLine}`;
+    const photoLine = mediaUrl ? `\n📷 Photo jointe` : '';
+    const alertMsg = `🚨 *PANNE SIGNALÉE — GenTrack*\n*${siteNom}*\n\n🔧 Équipement : *${sd.equip_nom}*\n⚠️ Type : *${sd.panne_type_label}*${desc ? `\n📝 Détail : ${desc}` : ''}${photoLine}\n\n👤 Signalé par : ${contact.nom}\n🕐 ${today} ${getHeure()}${refLine}`;
     const dejaEnvoyes = new Set<string>([phone]);
     for (const r of tousDestinataires) {
       if (r.whatsapp && !dejaEnvoyes.has(r.whatsapp)) {
         dejaEnvoyes.add(r.whatsapp);
+        // Envoyer le texte d'alerte + la photo séparément si disponible
         await sendWA(r.whatsapp, alertMsg);
+        if (mediaUrl) await sendWA(r.whatsapp, `📷 Photo — ${sd.equip_nom}${refCode ? ` (${refCode})` : ''}`, mediaUrl);
       }
     }
     const notifTxt = dejaEnvoyes.size > 1 ? `Les responsables ont été alertés. 📲` : `_Aucun responsable configuré._`;
-    return sendWA(phone, `🚨 *Signalement enregistré !*\n\n🔧 ${sd.equip_nom}\n⚠️ ${sd.panne_type_label}\n📝 ${desc}\n\n${notifTxt}`);
+    return sendWA(phone, `🚨 *Signalement enregistré !*\n\n🔧 ${sd.equip_nom}\n⚠️ ${sd.panne_type_label}${desc ? `\n📝 ${desc}` : ''}${mediaUrl ? '\n📷 Photo enregistrée' : ''}\n\n${notifTxt}`);
   }
 
   // ── Suivi choix — PEC groupée + liens rapport ─────────────
@@ -1770,7 +1779,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
 }
 
 // ── Gestionnaire principal ────────────────────────────────────────────────────
-async function handleMessage(from: string, bodyText: string) {
+async function handleMessage(from: string, bodyText: string, mediaUrl: string = '') {
   const phone = from.replace('whatsapp:', '');
   const msg = bodyText.trim().toLowerCase();
 
@@ -2029,7 +2038,7 @@ async function handleMessage(from: string, bodyText: string) {
       'rapport_choix','bilan_recap','bilan_blocages','suivi_choix',
     ];
     if (activeStates.includes(state)) {
-      return handleStates(phone, msg, bodyText, contact, site, state, sd);
+      return handleStates(phone, msg, bodyText, contact, site, state, sd, mediaUrl);
     }
 
     // Annuler / retour — disponible à tout moment dans n'importe quel flux
@@ -2148,8 +2157,10 @@ serve(async (req) => {
     const params = new URLSearchParams(text);
     const from = params.get('From') || '';
     const body = params.get('Body') || '';
-    if (!from || !body) return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
-    const work = handleMessage(from, body).catch(e => console.error('handleMessage error:', e));
+    const mediaUrl = params.get('MediaUrl0') || '';
+    // Ignorer si ni texte ni media
+    if (!from || (!body && !mediaUrl)) return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
+    const work = handleMessage(from, body, mediaUrl).catch(e => console.error('handleMessage error:', e));
     // Empêche le runtime Supabase de couper la fonction avant la fin du traitement
     (globalThis as any).EdgeRuntime?.waitUntil(work);
     return new Response('<?xml version="1.0"?><Response></Response>', { headers: { 'Content-Type': 'text/xml' } });
