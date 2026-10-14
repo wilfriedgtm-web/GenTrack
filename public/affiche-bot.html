@@ -66,6 +66,7 @@ body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 .aff-quick{padding:20px 40px 0}
 .aff-quick-title{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9AA0B8;margin-bottom:10px}
 .quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+@media(min-width:600px){.quick-grid{grid-template-columns:repeat(6,1fr)}}
 .quick-item{background:#F4F5FA;border-radius:8px;padding:8px 6px;text-align:center}
 .quick-word{font-size:13px;font-weight:800;color:#12151E;margin-bottom:2px;font-family:monospace}
 .quick-desc{font-size:10px;color:#9AA0B8}
@@ -238,6 +239,42 @@ body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
       </div>
     </div>
 
+    <!-- SUIVI + BILAN -->
+    <div class="cmd-card" style="border-left:4px solid #5E35B1">
+      <div class="cmd-header">
+        <span class="cmd-icon">📋</span>
+        <div>
+          <div class="cmd-label">Suivi des signalements</div>
+          <span class="cmd-tag" style="background:#EDE7F6;color:#5E35B1">suivi</span>
+        </div>
+      </div>
+      <div class="cmd-desc">Consultez en un coup d'œil tous les signalements du site : non pris en charge, en cours (par qui), résolus aujourd'hui.</div>
+      <div class="flow">
+        <div class="flow-label">Exemple</div>
+        <div class="flow-msg user">suivi</div>
+        <div class="flow-msg bot wa">📋 Suivi signalements<br/>🔴 Non pris en charge (1)<br/>• REF-1042 · GE Principal — Ne démarre plus<br/><br/>🟡 En cours (1)<br/>• REF-1038 · Groupe Froid — Surchauffe _(Moussa)_<br/><br/>✅ Résolus aujourd'hui (2)</div>
+      </div>
+    </div>
+
+    <div class="cmd-card" style="border-left:4px solid #00897B">
+      <div class="cmd-header">
+        <span class="cmd-icon">🌙</span>
+        <div>
+          <div class="cmd-label">Bilan fin de journée</div>
+          <span class="cmd-tag" style="background:#E0F2F1;color:#00695C">bilan</span>
+        </div>
+      </div>
+      <div class="cmd-desc">Envoyez votre récap d'interventions à votre responsable en fin de journée. Décrivez vos actions une par une, puis tapez <strong>ENVOYER</strong>.</div>
+      <div class="flow">
+        <div class="flow-label">Exemple</div>
+        <div class="flow-msg user">bilan</div>
+        <div class="flow-msg bot wa">🌙 Bilan de fin de journée<br/>Décrivez vos interventions...<br/><em>Tapez ENVOYER pour transmettre</em></div>
+        <div class="flow-msg user">Changé courroie GE Principal — OK</div>
+        <div class="flow-msg user">ENVOYER</div>
+        <div class="flow-msg bot wa">✅ Bilan envoyé à votre responsable. 📲</div>
+      </div>
+    </div>
+
     <!-- RÉSOLU -->
     <div class="cmd-card resolu" style="grid-column:1/-1">
       <div class="cmd-header">
@@ -272,15 +309,18 @@ body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
   <div class="aff-quick">
     <div class="aff-quick-title">Toutes les commandes disponibles</div>
     <div class="quick-grid">
-      <div class="quick-item"><div class="quick-word">ronde</div><div class="quick-desc">Ronde équipements</div></div>
-      <div class="quick-item"><div class="quick-word">saisie</div><div class="quick-desc">Relevé horaire</div></div>
-      <div class="quick-item"><div class="quick-word">plein</div><div class="quick-desc">Ravitaillement cuve</div></div>
+      <div class="quick-item"><div class="quick-word">saisie</div><div class="quick-desc">Ronde / Relevé</div></div>
       <div class="quick-item"><div class="quick-word">panne</div><div class="quick-desc">Déclarer une panne</div></div>
       <div class="quick-item"><div class="quick-word">resolu</div><div class="quick-desc">Clôturer panne</div></div>
       <div class="quick-item" style="background:#e8f5e9;border:1px solid #a5d6a7"><div class="quick-word" style="color:#1b7a4a">OK REF-…</div><div class="quick-desc">Prendre en charge</div></div>
-      <div class="quick-item"><div class="quick-word">menu</div><div class="quick-desc">Afficher menu</div></div>
-      <div class="quick-item"><div class="quick-word">aide</div><div class="quick-desc">Aide commandes</div></div>
-      <div class="quick-item"><div class="quick-word">stop</div><div class="quick-desc">Annuler saisie</div></div>
+      <div class="quick-item"><div class="quick-word">suivi</div><div class="quick-desc">Signalements en cours</div></div>
+      <div class="quick-item"><div class="quick-word">bilan</div><div class="quick-desc">Fin de journée</div></div>
+      <div class="quick-item"><div class="quick-word">plein</div><div class="quick-desc">Ravitaillement cuve</div></div>
+      <div class="quick-item"><div class="quick-word">vidange</div><div class="quick-desc">Déclarer vidange</div></div>
+      <div class="quick-item"><div class="quick-word">rapport</div><div class="quick-desc">Dernier rapport</div></div>
+      <div class="quick-item"><div class="quick-word">aide</div><div class="quick-desc">Liste commandes</div></div>
+      <div class="quick-item"><div class="quick-word">site</div><div class="quick-desc">Changer de site</div></div>
+      <div class="quick-item"><div class="quick-word">annuler</div><div class="quick-desc">Annuler action</div></div>
     </div>
   </div>
 
