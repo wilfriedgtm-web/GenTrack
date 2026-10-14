@@ -814,8 +814,16 @@ async function demarrerBilan(phone: string, contact: any, site: any): Promise<an
   });
   const sigsArr = Array.isArray(sigsRaw) ? sigsRaw : [];
 
+  // Signalements en cours pris en charge par ce tech (non encore résolus)
+  const sigsEnCoursRaw = await db('signalements', {
+    query: `&groupe_id=eq.${siteId}&statut=eq.en_cours&pris_en_charge_par=eq.${encodeURIComponent(contact.nom)}`,
+    select: 'id,ref_code,description,equipement_id'
+  });
+  const sigsEnCoursArr = Array.isArray(sigsEnCoursRaw) ? sigsEnCoursRaw : [];
+
   // Noms équipements pour affichage
-  const equipIds = [...new Set(sigsArr.map((s: any) => s.equipement_id).filter(Boolean))];
+  const allSigsForEquip = [...sigsArr, ...sigsEnCoursArr];
+  const equipIds = [...new Set(allSigsForEquip.map((s: any) => s.equipement_id).filter(Boolean))];
   const equipMap: Record<string, string> = {};
   if (equipIds.length > 0) {
     const equips = await db('equipements', { query: `&id=in.(${equipIds.join(',')})` });
@@ -840,7 +848,15 @@ async function demarrerBilan(phone: string, contact: any, site: any): Promise<an
   } else {
     msg += `🔧 *Signalements résolus :* aucun aujourd'hui\n\n`;
   }
-  msg += `_Des blocages à signaler sur des signalements en cours ?_\n*(OUI / NON)*`;
+  if (sigsEnCoursArr.length > 0) {
+    msg += `🔵 *Signalements en cours (${sigsEnCoursArr.length}) :*\n`;
+    for (const s of sigsEnCoursArr) {
+      const eq = s.equipement_id ? (equipMap[s.equipement_id] || '—') : '—';
+      msg += `🔵 ${s.ref_code || '—'} — ${eq}\n`;
+    }
+    msg += '\n';
+  }
+  msg += `_Des blocages à signaler sur ces signalements ?_\n*(OUI / NON)*`;
 
   await setSession(phone, 'bilan_recap', {
     active_site_id: siteId,
@@ -850,6 +866,10 @@ async function demarrerBilan(phone: string, contact: any, site: any): Promise<an
     tech_id: contact.id,
     rondes: rondesArr.map((r: any) => ({ frequence: r.frequence })),
     sigs_resolus: sigsArr.map((s: any) => ({
+      ref_code: s.ref_code || '—',
+      desc: (s.description || '').substring(0, 60),
+    })),
+    sigs_en_cours: sigsEnCoursArr.map((s: any) => ({
       ref_code: s.ref_code || '—',
       desc: (s.description || '').substring(0, 60),
     })),
@@ -880,6 +900,7 @@ async function envoyerBilan(phone: string, contact: any, sd: any, blocages: stri
   // Construire le message pour resp_tech
   const rondes: any[] = sd.rondes || [];
   const sigsResolus: any[] = sd.sigs_resolus || [];
+  const sigsEnCours: any[] = sd.sigs_en_cours || [];
   let recapMsg = `🌙 *Bilan fin de journée — GenTrack*\n*${siteNom}*\n\n`;
   recapMsg += `👷 *${contact.nom}* · ${today} ${heure}\n\n`;
   if (rondes.length > 0) {
@@ -892,8 +913,13 @@ async function envoyerBilan(phone: string, contact: any, sd: any, blocages: stri
     for (const s of sigsResolus) recapMsg += `✅ ${s.ref_code} — ${s.desc}\n`;
     recapMsg += '\n';
   }
+  if (sigsEnCours.length > 0) {
+    recapMsg += `🔵 *Signalements en cours :*\n`;
+    for (const s of sigsEnCours) recapMsg += `🔵 ${s.ref_code} — ${s.desc}\n`;
+    recapMsg += '\n';
+  }
   if (blocages) recapMsg += `⚠️ *Blocages :*\n${blocages}\n\n`;
-  if (!rondes.length && !sigsResolus.length && !blocages) recapMsg += `_Aucune activité enregistrée aujourd'hui._\n\n`;
+  if (!rondes.length && !sigsResolus.length && !sigsEnCours.length && !blocages) recapMsg += `_Aucune activité enregistrée aujourd'hui._\n\n`;
   recapMsg += `_Envoyé par ${contact.nom}_`;
 
   const responsables = await getResponsablesForSite(sd.site_id);
