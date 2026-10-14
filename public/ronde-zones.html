@@ -44,18 +44,24 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
 .rz-btn-all:active{transform:scale(.97)}
 .rz-btn-all.done{background:var(--vert);border-color:var(--vert);color:#fff}
 
-/* ── ROOM GRID ── */
-.rz-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
-.rz-room{border-radius:9px;padding:7px 4px 6px;text-align:center;cursor:pointer;border:1.5px solid var(--border);background:var(--white);transition:border-color .15s,background .15s;position:relative;user-select:none}
-.rz-room:active{transform:scale(.95)}
-.rz-room.ok{background:var(--vert-pale);border-color:var(--vert-border)}
-.rz-room.incident{background:var(--rouge-pale);border-color:var(--rouge-border)}
-.rz-room.focus{box-shadow:0 0 0 2.5px #2B5BA8;border-color:#2B5BA8}
-.rz-room-num{font-size:12px;font-weight:700;color:var(--text);line-height:1}
-.rz-room.ok .rz-room-num{color:var(--vert-text)}
-.rz-room.incident .rz-room-num{color:var(--rouge-text)}
-.rz-room-dot{width:6px;height:6px;border-radius:50%;margin:4px auto 0}
-.rz-alert-badge{position:absolute;top:-3px;right:-3px;width:10px;height:10px;border-radius:50%;background:var(--rouge);border:2px solid var(--bg)}
+/* ── ZONE CARDS (list view) ── */
+.rz-list{display:flex;flex-direction:column;gap:5px}
+.rz-zone-card{display:flex;align-items:center;gap:0;border-radius:10px;border:1.5px solid var(--border);background:var(--white);cursor:pointer;overflow:hidden;position:relative;transition:border-color .1s,background .1s;user-select:none}
+.rz-zone-card:active{opacity:.85}
+.rz-zone-card.ok{border-color:var(--vert-border)}
+.rz-zone-card.incident{border-color:var(--rouge-border);background:var(--rouge-pale)}
+.rz-zone-card.focus{box-shadow:0 0 0 2.5px #2B5BA8;border-color:#2B5BA8}
+.rz-zc-bar{width:3px;align-self:stretch;flex-shrink:0}
+.rz-zc-icon{width:34px;height:34px;margin:7px 6px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.rz-zc-body{flex:1;min-width:0;padding:8px 0}
+.rz-zc-name{font-size:13px;font-weight:700;color:var(--text);line-height:1.2}
+.rz-zone-card.ok .rz-zc-name{color:var(--vert-text)}
+.rz-zone-card.incident .rz-zc-name{color:var(--rouge-text)}
+.rz-zc-meta{font-size:10px;color:var(--text3);margin-top:2px}
+.rz-zc-right{text-align:right;padding:8px 10px;flex-shrink:0}
+.rz-zc-chip{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;line-height:1.4}
+.rz-zc-last{font-size:10px;color:var(--text3);margin-top:2px}
+.rz-alert-badge{position:absolute;top:5px;right:5px;width:8px;height:8px;border-radius:50%;background:var(--rouge);border:1.5px solid var(--white)}
 
 /* ── FOOTER ── */
 .rz-footer{position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1.5px solid var(--border);padding:12px 16px calc(env(safe-area-inset-bottom,0px) + 12px);box-shadow:0 -4px 24px rgba(18,21,30,.1);z-index:40}
@@ -272,20 +278,39 @@ function renderRonde(){
 
   groupKeys.forEach(function(gk){
     var g=groups[gk];
+    var grpOk=g.zones.filter(function(z){return _checks[z.id]==='ok';}).length;
     html+=
       '<div class="rz-group">'+
         '<div class="rz-group-hdr">'+
           '<span class="rz-group-label">'+h(g.bat)+' — Étage '+h(g.et)+'</span>'+
-          '<button class="rz-btn-all" id="tall-'+h(gk)+'" onclick="toutOk(\''+h(gk)+'\')">✓ Tout OK</button>'+
+          '<div style="display:flex;align-items:center;gap:6px">'+
+            '<span style="font-size:11px;font-weight:600;color:var(--text3)">'+grpOk+'/'+g.zones.length+'</span>'+
+            '<button class="rz-btn-all" id="tall-'+h(gk)+'" onclick="toutOk(\''+h(gk)+'\')">✓ Tout OK</button>'+
+          '</div>'+
         '</div>'+
-        '<div class="rz-grid" id="grid-'+h(gk)+'">';
+        '<div class="rz-list" id="grid-'+h(gk)+'">';
     g.zones.forEach(function(z){
       var lv=lvInfo(z);
       var hasSg=!!_signalements[z.id];
+      var chk=_checks[z.id];
+      var barColor=chk==='ok'?'var(--vert)':chk==='incident'?'var(--rouge)':lv.dot;
+      var chipBg=lv.dot==='#C0392B'?'var(--rouge-pale)':lv.dot==='#D46B0A'?'var(--orange-pale)':lv.dot==='#1B7A4A'?'var(--vert-pale)':'var(--bg)';
+      var chipCl=lv.dot==='#C0392B'?'var(--rouge)':lv.dot==='#D46B0A'?'var(--orange)':lv.dot==='#1B7A4A'?'var(--vert)':'var(--text3)';
+      var chipBd=lv.dot==='#C0392B'?'var(--rouge-border)':lv.dot==='#D46B0A'?'var(--orange-border)':lv.dot==='#1B7A4A'?'var(--vert-border)':'var(--border)';
+      var cardCls='rz-zone-card'+(chk==='ok'?' ok':chk==='incident'?' incident':'');
+      var icon=z.type_zone==='chambre'?'🛏️':z.type_zone==='commun_etage'?'🛋️':'⭐';
       html+=
-        '<div class="rz-room" id="room-'+h(z.id)+'" onclick="openDetail(\''+h(z.id)+'\')">'+
-          '<div class="rz-room-num">'+h(z.nom)+'</div>'+
-          '<div class="rz-room-dot" style="background:'+lv.dot+'"></div>'+
+        '<div class="'+cardCls+'" id="room-'+h(z.id)+'" onclick="openDetail(\''+h(z.id)+'\')" >'+
+          '<div class="rz-zc-bar" style="background:'+barColor+'"></div>'+
+          '<div class="rz-zc-icon" style="background:'+chipBg+'">'+icon+'</div>'+
+          '<div class="rz-zc-body">'+
+            '<div class="rz-zc-name">'+h(z.nom)+'</div>'+
+            '<div class="rz-zc-meta">'+h(z.batiment||'Résidence')+' · Ét. '+h(String(z.etage||'—'))+'</div>'+
+          '</div>'+
+          '<div class="rz-zc-right">'+
+            '<div class="rz-zc-chip" style="background:'+chipBg+';color:'+chipCl+';border:1px solid '+chipBd+'">'+h(lv.text)+'</div>'+
+            '<div class="rz-zc-last">'+h(lv.sub)+'</div>'+
+          '</div>'+
           (hasSg?'<div class="rz-alert-badge"></div>':'')+
         '</div>';
     });
@@ -323,7 +348,7 @@ function openDetail(zoneId){
   _currentZone=z;
 
   /* remove focus from previous */
-  document.querySelectorAll('.rz-room.focus').forEach(function(el){el.classList.remove('focus');});
+  document.querySelectorAll('.rz-zone-card.focus').forEach(function(el){el.classList.remove('focus');});
   var roomEl=document.getElementById('room-'+zoneId);
   if(roomEl)roomEl.classList.add('focus');
 
@@ -432,7 +457,7 @@ function openDetail(zoneId){
 function closeDetail(){
   document.getElementById('rz-panel').classList.remove('open');
   document.getElementById('rz-overlay').classList.remove('show');
-  document.querySelectorAll('.rz-room.focus').forEach(function(el){el.classList.remove('focus');});
+  document.querySelectorAll('.rz-zone-card.focus').forEach(function(el){el.classList.remove('focus');});
   _currentZone=null;
 }
 
@@ -457,7 +482,7 @@ function dpSetCheck(val){
 
   /* Update room tile */
   var roomEl=document.getElementById('room-'+zoneId);
-  if(roomEl)roomEl.className='rz-room focus'+(cur?' '+cur:'');
+  if(roomEl)roomEl.className='rz-zone-card focus'+(cur?' '+cur:'');
 
   updateProgress();
 }
@@ -507,7 +532,7 @@ function setEqCheck(eqId,val,zoneId){
     var chip=document.querySelector('[onclick="selIncEquip(\''+zoneId+'\',\''+eqId+'\')"]');
     if(chip)chip.classList.add('sel');
     var roomEl=document.getElementById('room-'+zoneId);
-    if(roomEl)roomEl.className='rz-room focus incident';
+    if(roomEl)roomEl.className='rz-zone-card focus incident';
     updateProgress();
   }
 }
@@ -538,10 +563,10 @@ function marquerResolu(sgId,zoneId){
 function toutOk(groupKey){
   var grid=document.getElementById('grid-'+groupKey);
   if(!grid)return;
-  grid.querySelectorAll('.rz-room').forEach(function(el){
+  grid.querySelectorAll('.rz-zone-card').forEach(function(el){
     var zoneId=el.id.replace('room-','');
     _checks[zoneId]='ok';
-    el.className='rz-room ok';
+    el.className='rz-zone-card ok';
   });
   var btn=document.getElementById('tall-'+groupKey);
   if(btn){btn.className='rz-btn-all done';btn.textContent='✓ Tout OK';}

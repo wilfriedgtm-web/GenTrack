@@ -337,7 +337,8 @@ var _configTypesCache=[]; // types_equipements, mis à jour dans _rtConfig pour 
 // ── Résidence+ wizard state ──────────────────────────────────────────────────
 var _resSubTab='config';
 var _resWizStep=0;
-var _resPlanFilter='all'; // 'all' | 'todo' | 'never'
+var _resPlanFilter='all'; // 'all' | 'late' | 'warn' | 'ok' | 'never'
+var _planFreqZoneId=null; // zone en cours de config fréquence
 var _resWizBats=[{nom:'Tour A'}];
 var _resWizEtages=[{bat:0,etage:'18',debut:1801,fin:1812}];
 var _resSpeciales={local_tech:false,restaurant:false,reception:false,parking:false,piscine:false,salle_sport:false,toiture:false};
@@ -6351,60 +6352,61 @@ async function _buildResPlanningHtml(sid){
   var dateHisto=new Date(Date.now()-30*24*60*60*1000).toISOString().split('T')[0];
   var releves=await supaGet('releves_zones','site_id=eq.'+sid+'&zone_id=in.('+zoneIds.join(',')+')'+'&date=gte.'+dateStatus+'&select=zone_id,date,technicien,statut,nb_anomalies&order=date.desc,zone_id.asc')||[];
 
-  // lastRel par zone (pour statut courant)
   var lastRel={};
   releves.forEach(function(r){if(!lastRel[r.zone_id])lastRel[r.zone_id]=r;});
 
   var today=new Date();today.setHours(0,0,0,0);
+  var todayStr=today.toISOString().split('T')[0];
 
   function zStatus(z){
     var lr=lastRel[z.id],freq=z.frequence_passage||30;
-    if(!lr)return {cls:'never',lbl:'Jamais passé'};
+    if(!lr)return {cls:'never',chip:'Jamais',chipColor:'var(--text3)',chipBg:'var(--bg)',chipBd:'var(--border)',lastVisit:'— premier passage',daysLeft:null};
     var days=Math.floor((today-new Date(lr.date))/(86400000));
     var left=freq-days;
-    if(lr.statut==='incident'||lr.nb_anomalies>0)return {cls:'late',lbl:'Incident · il y a '+days+'j',days:days};
-    if(left<=0)return {cls:'late',lbl:'En retard (+'+(Math.abs(left))+'j)',days:days};
-    if(left<=3)return {cls:'warn',lbl:'Dû dans '+left+'j',days:days};
-    return {cls:'ok',lbl:'OK · il y a '+days+'j',days:days};
+    var lastFmt=new Date(lr.date+' 12:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
+    if(lr.statut==='incident'||lr.nb_anomalies>0)
+      return {cls:'late',chip:'Incident · il y a '+days+'j',chipColor:'var(--rouge)',chipBg:'var(--rouge-pale)',chipBd:'var(--rouge-border)',lastVisit:'Vu le '+lastFmt,daysLeft:left};
+    if(left<=0)
+      return {cls:'late',chip:'Retard '+(Math.abs(left))+'j',chipColor:'var(--rouge)',chipBg:'var(--rouge-pale)',chipBd:'var(--rouge-border)',lastVisit:'Vu le '+lastFmt,daysLeft:left};
+    if(left<=3)
+      return {cls:'warn',chip:'Dans '+left+'j',chipColor:'var(--orange)',chipBg:'var(--orange-pale)',chipBd:'var(--orange-border)',lastVisit:'Vu le '+lastFmt,daysLeft:left};
+    return {cls:'ok',chip:'Il y a '+days+'j',chipColor:'var(--vert)',chipBg:'var(--vert-pale)',chipBd:'var(--vert-border)',lastVisit:'Vu le '+lastFmt,daysLeft:left};
   }
-
-  var SS={
-    ok:  {bg:'var(--vert-pale)',  bd:'var(--vert-border)',  cl:'var(--vert)'},
-    warn:{bg:'var(--orange-pale)',bd:'var(--orange-border)',cl:'var(--orange)'},
-    late:{bg:'var(--rouge-pale)', bd:'var(--rouge-border)', cl:'var(--rouge)'},
-    never:{bg:'var(--bg)',        bd:'var(--border)',        cl:'var(--text3)'}
-  };
 
   // ── KPIs ────────────────────────────────────────────────────────────────────
   var counts={ok:0,warn:0,late:0,never:0};
   zones.forEach(function(z){var s=zStatus(z);counts[s.cls]=(counts[s.cls]||0)+1;});
 
-  var kpiStyle='background:white;border:1px solid var(--border);border-radius:10px;padding:10px 14px;flex:1;min-width:80px';
-  var h='<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">';
-  h+='<div style="'+kpiStyle+'"><div style="font-size:20px;font-weight:700;color:var(--vert)">'+counts.ok+'</div><div style="font-size:11px;color:var(--text2)">Zones OK</div></div>';
-  h+='<div style="'+kpiStyle+'"><div style="font-size:20px;font-weight:700;color:var(--rouge)">'+counts.late+'</div><div style="font-size:11px;color:var(--text2)">En retard</div></div>';
-  h+='<div style="'+kpiStyle+'"><div style="font-size:20px;font-weight:700;color:var(--orange)">'+counts.warn+'</div><div style="font-size:11px;color:var(--text2)">Dû bientôt</div></div>';
-  h+='<div style="'+kpiStyle+'"><div style="font-size:20px;font-weight:700;color:var(--text2)">'+counts.never+'</div><div style="font-size:11px;color:var(--text2)">Jamais visité</div></div>';
+  var canCfgFreq=(_session&&(_session.role==='resp_tech'||_session.role==='dir_tech'));
+
+  var h='';
+  // KPI row
+  var kpiBase='flex:1;background:white;border:1.5px solid var(--border);border-radius:10px;padding:10px 8px;text-align:center;cursor:pointer;';
+  h+='<div style="display:flex;gap:6px;margin-bottom:14px">';
+  h+='<div style="'+kpiBase+(  _resPlanFilter==='late' ?'border-color:var(--rouge);background:var(--rouge-pale)':'')+'" onclick="_resPlanFilter=\'late\';navTo(\'residence-planning\')"><div style="font-size:20px;font-weight:800;color:var(--rouge)">'+counts.late+'</div><div style="font-size:10px;font-weight:600;color:var(--text2);margin-top:1px">En retard</div></div>';
+  h+='<div style="'+kpiBase+(_resPlanFilter==='warn'?'border-color:var(--orange);background:var(--orange-pale)':'')+'" onclick="_resPlanFilter=\'warn\';navTo(\'residence-planning\')"><div style="font-size:20px;font-weight:800;color:var(--orange)">'+counts.warn+'</div><div style="font-size:10px;font-weight:600;color:var(--text2);margin-top:1px">Bientôt</div></div>';
+  h+='<div style="'+kpiBase+(  _resPlanFilter==='ok'  ?'border-color:var(--vert);background:var(--vert-pale)'  :'')+'" onclick="_resPlanFilter=\'ok\';navTo(\'residence-planning\')"><div style="font-size:20px;font-weight:800;color:var(--vert)">'+counts.ok+'</div><div style="font-size:10px;font-weight:600;color:var(--text2);margin-top:1px">Zones OK</div></div>';
+  h+='<div style="'+kpiBase+(_resPlanFilter==='never'?'border-color:var(--amber);background:var(--amber-pale)':'')+'" onclick="_resPlanFilter=\'never\';navTo(\'residence-planning\')"><div style="font-size:20px;font-weight:800;color:var(--text3)">'+counts.never+'</div><div style="font-size:10px;font-weight:600;color:var(--text2);margin-top:1px">Jamais</div></div>';
   h+='</div>';
 
-  // ── Filtres ─────────────────────────────────────────────────────────────────
-  var fBtnBase='padding:5px 10px;border-radius:5px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:white;color:var(--text2)';
-  var fBtnAct='padding:5px 10px;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--amber);background:var(--amber-pale);color:var(--amber-dark)';
-  var todoPct=counts.late+counts.warn;
-  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
-  h+='<div style="font-size:12px;font-weight:600;color:var(--text)">État des zones</div>';
-  h+='<div style="display:flex;gap:5px">';
-  h+='<button style="'+(_resPlanFilter==='all'?fBtnAct:fBtnBase)+'" onclick="_resPlanFilter=\'all\';navTo(\'residence-planning\')">Tous</button>';
-  h+='<button style="'+(_resPlanFilter==='todo'?fBtnAct:fBtnBase)+'" onclick="_resPlanFilter=\'todo\';navTo(\'residence-planning\')">À traiter'+(todoPct?' ('+todoPct+')':'')+'</button>';
-  h+='<button style="'+(_resPlanFilter==='never'?fBtnAct:fBtnBase)+'" onclick="_resPlanFilter=\'never\';navTo(\'residence-planning\')">Jamais visité'+(counts.never?' ('+counts.never+')':'')+'</button>';
-  h+='</div></div>';
+  // Filter tabs row
+  var tabBase='padding:5px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:white;color:var(--text2);white-space:nowrap';
+  var tabAct='padding:5px 10px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--amber);background:var(--amber-pale);color:var(--amber-dark);white-space:nowrap';
+  h+='<div style="display:flex;gap:5px;overflow-x:auto;padding-bottom:10px;margin-bottom:6px;scrollbar-width:none">';
+  h+='<button style="'+(_resPlanFilter==='all'?tabAct:tabBase)+'" onclick="_resPlanFilter=\'all\';navTo(\'residence-planning\')">Toutes ('+zones.length+')</button>';
+  if(counts.late)h+='<button style="'+(_resPlanFilter==='late'?tabAct:tabBase)+'" onclick="_resPlanFilter=\'late\';navTo(\'residence-planning\')">🔴 En retard ('+counts.late+')</button>';
+  if(counts.warn)h+='<button style="'+(_resPlanFilter==='warn'?tabAct:tabBase)+'" onclick="_resPlanFilter=\'warn\';navTo(\'residence-planning\')">🟡 Bientôt ('+counts.warn+')</button>';
+  if(counts.ok)h+='<button style="'+(_resPlanFilter==='ok'?tabAct:tabBase)+'" onclick="_resPlanFilter=\'ok\';navTo(\'residence-planning\')">✅ OK ('+counts.ok+')</button>';
+  if(counts.never)h+='<button style="'+(_resPlanFilter==='never'?tabAct:tabBase)+'" onclick="_resPlanFilter=\'never\';navTo(\'residence-planning\')">⬜ Jamais ('+counts.never+')</button>';
+  h+='</div>';
 
-  // ── Grille zones ─────────────────────────────────────────────────────────────
-  // Séparer zones spéciales des zones par étage
+  // ── Liste zones par bâtiment ────────────────────────────────────────────────
   var byBat={};var specials=[];
   zones.forEach(function(z){
     var st=zStatus(z);
-    if(_resPlanFilter==='todo'&&st.cls!=='late'&&st.cls!=='warn')return;
+    if(_resPlanFilter==='late'&&st.cls!=='late')return;
+    if(_resPlanFilter==='warn'&&st.cls!=='warn')return;
+    if(_resPlanFilter==='ok'&&st.cls!=='ok')return;
     if(_resPlanFilter==='never'&&st.cls!=='never')return;
     if(z.type_zone==='special'){specials.push(z);return;}
     var bat=z.batiment||'Résidence';var et=z.etage||'—';
@@ -6413,51 +6415,74 @@ async function _buildResPlanningHtml(sid){
     byBat[bat][et].push(z);
   });
 
-  // Blocs par bâtiment
-  Object.keys(byBat).forEach(function(bat){
+  function zIcon(z){
+    if(z.type_zone==='chambre')return '🛏️';
+    if(z.type_zone==='commun_etage')return '🛋️';
+    if(z.type_zone==='special')return '⭐';
+    return '📍';
+  }
+
+  function renderZoneCard(z){
+    var st=zStatus(z);
+    var leftBar={late:'var(--rouge)',warn:'var(--orange)',ok:'var(--vert)',never:'var(--text3)'}[st.cls];
+    var freq=z.frequence_passage||30;
+    var row='<div id="zcard-'+z.id+'" style="background:white;border:1.5px solid '+({late:'var(--rouge-border)',warn:'var(--orange-border)',ok:'var(--vert-border)',never:'var(--border)'}[st.cls])+';border-radius:10px;display:flex;align-items:center;gap:0;margin-bottom:5px;overflow:hidden;position:relative">';
+    // left color bar
+    row+='<div style="width:3px;align-self:stretch;background:'+leftBar+';flex-shrink:0"></div>';
+    // icon
+    row+='<div style="width:34px;height:34px;margin:8px 6px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:'+st.chipBg+'">'+zIcon(z)+'</div>';
+    // body
+    row+='<div style="flex:1;min-width:0;padding:8px 0">';
+    row+='<div style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(z.nom)+'</div>';
+    row+='<div style="font-size:11px;color:var(--text2);margin-top:1px">'+escape_html(z.batiment||'Résidence')+' · Ét. '+escape_html(String(z.etage||'—'))+(canCfgFreq?' · <span style="color:var(--text3)">'+freq+'j</span>':'')+'</div>';
+    row+='</div>';
+    // chip + last visit
+    row+='<div style="text-align:right;padding:8px 10px;flex-shrink:0">';
+    row+='<div style="display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;background:'+st.chipBg+';color:'+st.chipColor+';border:1px solid '+st.chipBd+'">'+escape_html(st.chip)+'</div>';
+    row+='<div style="font-size:10px;color:var(--text3);margin-top:3px">'+escape_html(st.lastVisit)+'</div>';
+    row+='</div>';
+    // config btn (resp_tech / dir_tech seulement)
+    if(canCfgFreq){
+      row+='<button title="Changer la fréquence" onclick="_openFreqPanel(\''+z.id+'\','+freq+')" style="padding:6px 10px;background:none;border:none;border-left:1px solid var(--border);color:var(--text3);font-size:14px;cursor:pointer;align-self:stretch;flex-shrink:0">⚙️</button>';
+    }
+    row+='</div>';
+    // freq panel placeholder
+    row+='<div id="freqpanel-'+z.id+'" style="display:none"></div>';
+    return row;
+  }
+
+  // Blocs par bâtiment → étage
+  var batKeys=Object.keys(byBat).sort();
+  if(batKeys.length===0&&specials.length===0){
+    h+='<div style="text-align:center;padding:30px;color:var(--text3);background:white;border:1px solid var(--border);border-radius:10px;font-size:13px">Aucune zone pour ce filtre.</div>';
+  }
+  batKeys.forEach(function(bat){
     var batZones=[];Object.values(byBat[bat]).forEach(function(arr){batZones=batZones.concat(arr);});
+    var batLate=batZones.filter(function(z){return zStatus(z).cls==='late';}).length;
     var batOk=batZones.filter(function(z){return zStatus(z).cls==='ok';}).length;
     var covPct=batZones.length?Math.round(batOk/batZones.length*100):0;
-    h+='<div style="background:white;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px">';
-    h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--creme);border-bottom:1px solid var(--border)">';
-    h+='<div style="font-size:12px;font-weight:600;color:var(--dark)">'+escape_html(bat)+'</div>';
-    h+='<div style="font-size:11px;color:var(--text2)">'+batZones.length+' zones · '+covPct+'% OK ce cycle</div>';
+
+    h+='<div style="margin-bottom:12px">';
+    h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 2px;margin-bottom:4px">';
+    h+='<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">'+escape_html(bat)+'</div>';
+    h+='<div style="font-size:11px;font-weight:600;color:'+(batLate?'var(--rouge)':'var(--text2)')+'">'+batOk+'/'+batZones.length+' OK</div>';
     h+='</div>';
-    Object.keys(byBat[bat]).sort().forEach(function(et,ei,ets){
-      var flZones=byBat[bat][et];
-      var flOk=flZones.filter(function(z){return zStatus(z).cls==='ok';}).length;
-      var isLast=(ei===ets.length-1);
-      h+='<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:'+(isLast?'none':'1px solid var(--border)')+'">';
-      h+='<div style="font-size:11px;color:var(--text2);width:58px;flex-shrink:0">Étage '+escape_html(et)+'</div>';
-      h+='<div style="display:flex;flex-wrap:wrap;gap:3px;flex:1">';
-      flZones.forEach(function(z){
-        var st=zStatus(z);var ss=SS[st.cls];
-        h+='<div title="'+escape_html(st.lbl)+'" style="background:'+ss.bg+';border:1px solid '+ss.bd+';border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600;color:'+ss.cl+';cursor:default">'+escape_html(z.nom)+'</div>';
-      });
-      h+='</div>';
-      h+='<div style="font-size:11px;color:'+(flOk===flZones.length?'var(--vert)':'var(--rouge)')+';font-weight:600;flex-shrink:0;width:40px;text-align:right">'+flOk+'/'+flZones.length+'</div>';
-      h+='</div>';
+    Object.keys(byBat[bat]).sort().forEach(function(et){
+      byBat[bat][et].forEach(function(z){h+=renderZoneCard(z);});
     });
     h+='</div>';
   });
 
-  // Zones spéciales (piscine, spa, etc.)
+  // Zones spéciales
   if(specials.length){
-    h+='<div style="background:white;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px">';
-    h+='<div style="padding:9px 14px;background:var(--creme);border-bottom:1px solid var(--border)">';
-    h+='<div style="font-size:12px;font-weight:600;color:var(--dark)">Zones spéciales</div></div>';
-    h+='<div style="display:flex;align-items:center;gap:10px;padding:8px 14px">';
-    h+='<div style="display:flex;flex-wrap:wrap;gap:3px;flex:1">';
-    specials.forEach(function(z){
-      var st=zStatus(z);var ss=SS[st.cls];
-      h+='<div title="'+escape_html(st.lbl)+'" style="background:'+ss.bg+';border:1px solid '+ss.bd+';border-radius:5px;padding:2px 7px;font-size:11px;font-weight:600;color:'+ss.cl+';cursor:default">'+escape_html(z.nom)+'</div>';
-    });
-    h+='</div></div></div>';
+    h+='<div style="margin-bottom:12px">';
+    h+='<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);padding:6px 2px;margin-bottom:4px">Zones spéciales</div>';
+    specials.forEach(function(z){h+=renderZoneCard(z);});
+    h+='</div>';
   }
 
   // ── Historique des passages (30 derniers jours) ──────────────────────────────
   var recentRel=releves.filter(function(r){return r.date>=dateHisto;});
-  // Grouper par date + technicien
   var sessMap={};
   recentRel.forEach(function(r){
     var key=r.date+'|'+(r.technicien||'?');
@@ -6468,65 +6493,104 @@ async function _buildResPlanningHtml(sid){
   });
   var sessions=Object.values(sessMap).sort(function(a,b){return b.date.localeCompare(a.date);});
 
+  h+='<div style="margin-top:16px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">';
+  h+='<div style="font-size:12px;font-weight:700;color:var(--text)">📅 Historique des passages</div>';
+  h+='<div style="font-size:11px;color:var(--text3)">30 derniers jours</div>';
+  h+='</div>';
+
   if(sessions.length){
-    h+='<div style="margin-top:6px">';
-    h+='<div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">Historique des passages <span style="font-size:11px;font-weight:400;color:var(--text2)">(30 jours)</span></div>';
-    h+='<div style="background:white;border:1px solid var(--border);border-radius:10px;overflow:hidden">';
+    var avatarColors=['background:#FFF6E0;color:var(--amber-dark)','background:var(--vert-pale);color:var(--vert)','background:#EEF2FF;color:#4F56B8','background:var(--rouge-pale);color:var(--rouge)'];
     sessions.forEach(function(sess,i){
       var nb=sess.zoneIds.length;
       var total=zones.length;
+      var pct=Math.round(nb/total*100);
       var isPartial=nb<total;
       var initials=sess.tech.split(' ').map(function(w){return w[0]||'';}).slice(0,2).join('').toUpperCase()||'?';
-      var avatarColors=['background:#FFF6E0;color:var(--amber-dark)','background:var(--vert-pale);color:var(--vert)','background:#EEF2FF;color:#4F56B8','background:var(--rouge-pale);color:var(--rouge)'];
       var avatarStyle=avatarColors[i%avatarColors.length];
+      var dFmt=new Date(sess.date+' 12:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
+      var isToday=sess.date===todayStr;
 
-      // Résumé zones par bâtiment
       var batSummary={};
       sess.zoneIds.forEach(function(zid){
         var z=zoneMap[zid];if(!z)return;
         var bat=z.batiment||(z.type_zone==='special'?'Spécial':'Résidence');
-        if(!batSummary[bat])batSummary[bat]=0;
-        batSummary[bat]++;
+        if(!batSummary[bat])batSummary[bat]=0;batSummary[bat]++;
       });
       var batParts=Object.keys(batSummary).map(function(b){return batSummary[b]+' zone'+(batSummary[b]>1?'s':'')+' ('+b+')';}).join(' · ');
 
-      // Date formatée
-      var dFmt=new Date(sess.date+' 12:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'short'});
-      var isToday=sess.date===today.toISOString().split('T')[0];
+      var barColor=sess.hasIncident?'var(--rouge)':(isPartial?'var(--orange)':'var(--vert)');
 
-      h+='<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 14px;border-bottom:'+(i<sessions.length-1?'1px solid var(--border)':'none')+'">';
-      // Date
-      h+='<div style="font-size:11px;color:var(--text2);width:48px;flex-shrink:0;padding-top:2px">'+(isToday?'Auj.':dFmt)+'</div>';
-      // Avatar
-      h+='<div style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;'+avatarStyle+'">'+initials+'</div>';
-      // Contenu
-      h+='<div style="flex:1;min-width:0">';
-      h+='<div style="font-size:12px;font-weight:600;color:var(--dark)">'+escape_html(sess.tech)+'</div>';
-      h+='<div style="font-size:11px;color:var(--text2);margin-top:2px">'+escape_html(batParts)+'</div>';
-      // Tags
-      h+='<div style="display:flex;gap:4px;margin-top:5px;flex-wrap:wrap">';
-      if(!sess.hasIncident&&sess.anomalies===0&&!isPartial){
+      h+='<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:6px">';
+      // top row
+      h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">';
+      h+='<div style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;'+avatarStyle+'">'+escape_html(initials)+'</div>';
+      h+='<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(sess.tech)+'</div>';
+      h+='<div style="font-size:11px;color:var(--text2)">'+(isToday?'Aujourd\'hui':dFmt)+'</div></div>';
+      h+='<div style="font-size:14px;font-weight:800;color:'+(isPartial?'var(--orange)':sess.hasIncident?'var(--rouge)':'var(--vert)')+'">'+nb+'/'+total+'</div>';
+      h+='</div>';
+      // tags
+      h+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">';
+      if(!sess.hasIncident&&sess.anomalies===0&&!isPartial)
         h+='<span style="background:var(--vert-pale);border:1px solid var(--vert-border);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:600;color:var(--vert)">'+nb+' zones OK</span>';
-      } else {
+      else
         h+='<span style="background:var(--bg);border:1px solid var(--border);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:500;color:var(--text2)">'+nb+' zones</span>';
-      }
-      if(sess.hasIncident||sess.anomalies>0){
-        h+='<span style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:600;color:var(--rouge)">'+(sess.anomalies||'')+(sess.hasIncident?' + incident':'anomalie'+(sess.anomalies>1?'s':''))+'</span>';
-      }
-      if(isPartial){
+      if(sess.hasIncident||sess.anomalies>0)
+        h+='<span style="background:var(--rouge-pale);border:1px solid var(--rouge-border);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:600;color:var(--rouge)">'+(sess.anomalies?sess.anomalies+' anomalie'+(sess.anomalies>1?'s':''):'incident')+'</span>';
+      if(isPartial)
         h+='<span style="background:var(--orange-pale);border:1px solid var(--orange-border);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:600;color:var(--orange)">Partiel</span>';
-      }
-      h+='</div></div>';
-      // Score
-      h+='<div style="font-size:12px;font-weight:700;color:'+(isPartial?'var(--orange)':'var(--vert)')+';flex-shrink:0;padding-top:2px">'+nb+'/'+total+'</div>';
+      h+='</div>';
+      // barre progression
+      h+='<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:3px"><span>'+escape_html(batParts)+'</span><span>'+pct+'%</span></div>';
+      h+='<div style="height:4px;background:var(--bg);border-radius:2px;overflow:hidden"><div style="height:100%;width:'+pct+'%;border-radius:2px;background:'+barColor+'"></div></div>';
       h+='</div>';
     });
-    h+='</div></div>';
   } else {
-    h+='<div style="text-align:center;padding:24px;color:var(--text3);background:white;border:1px solid var(--border);border-radius:10px;margin-top:6px;font-size:12px">Aucun passage enregistré ces 30 derniers jours.</div>';
+    h+='<div style="text-align:center;padding:24px;color:var(--text3);background:white;border:1px solid var(--border);border-radius:10px;font-size:12px">Aucun passage enregistré ces 30 derniers jours.</div>';
   }
 
   return h;
+}
+
+// ── Panneau config fréquence (resp_tech / dir_tech) ─────────────────────────
+function _openFreqPanel(zoneId,currentFreq){
+  // Fermer si déjà ouvert sur la même zone
+  if(_planFreqZoneId===zoneId){
+    var old=document.getElementById('freqpanel-'+zoneId);
+    if(old){old.style.display='none';old.innerHTML='';}
+    _planFreqZoneId=null;return;
+  }
+  // Fermer l'éventuel précédent
+  if(_planFreqZoneId){
+    var prev=document.getElementById('freqpanel-'+_planFreqZoneId);
+    if(prev){prev.style.display='none';prev.innerHTML='';}
+  }
+  _planFreqZoneId=zoneId;
+  var panel=document.getElementById('freqpanel-'+zoneId);
+  if(!panel)return;
+  var presets=[{v:7,l:'Hebdo (7j)'},{v:15,l:'Bi-hebdo (15j)'},{v:30,l:'Mensuel (30j)'},{v:60,l:'Bi-mensuel (60j)'},{v:90,l:'Trimestriel (90j)'}];
+  var html='<div style="background:var(--creme);border-top:1px solid var(--border);padding:10px 12px">';
+  html+='<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:7px">Fréquence de passage</div>';
+  html+='<div style="display:flex;gap:5px;flex-wrap:wrap">';
+  presets.forEach(function(p){
+    var isCur=p.v===currentFreq;
+    html+='<button onclick="_setZoneFreq(\''+zoneId+'\','+p.v+')" style="padding:5px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid '+(isCur?'var(--amber)':'var(--border)')+';background:'+(isCur?'var(--amber-pale)':'white')+';color:'+(isCur?'var(--amber-dark)':'var(--text2)')+'">'+p.l+'</button>';
+  });
+  html+='</div></div>';
+  panel.innerHTML=html;
+  panel.style.display='block';
+}
+
+async function _setZoneFreq(zoneId,freq){
+  try{
+    await fetch(SUPA_URL+'/rest/v1/zones?id=eq.'+zoneId,{
+      method:'PATCH',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({frequence_passage:freq})
+    });
+    // Fermer panneau et recharger la vue
+    _planFreqZoneId=null;
+    navTo('residence-planning');
+  }catch(e){alert('Erreur lors de la mise à jour.');}
 }
 
 async function _buildSetupTab(sid,equips,zonesArr,contactsArr){
