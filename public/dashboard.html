@@ -8134,7 +8134,19 @@ async function _saveEditQ(qId){
 
 async function _deleteQ(qId){
   if(!confirm('Supprimer cette question ?'))return;
-  await supaDelete('questions','id=eq.'+qId);
+  // Supprimer d'abord les réponses liées (FK constraint)
+  try{
+    var r1=await fetch(SUPA_URL+'/rest/v1/reponses?question_id=eq.'+qId,{
+      method:'DELETE',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Prefer':'return=minimal'}
+    });
+    if(!r1.ok){var e1=await r1.json();console.error('[_deleteQ] reponses',e1);}
+    var r2=await fetch(SUPA_URL+'/rest/v1/questions?id=eq.'+qId,{
+      method:'DELETE',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Prefer':'return=minimal'}
+    });
+    if(!r2.ok){var e2=await r2.json();alert('Erreur suppression question : '+(e2.message||r2.status));return;}
+  }catch(e){alert('Erreur réseau : '+e.message);return;}
   if(_session)renderRespTech(_session,'config');
 }
 

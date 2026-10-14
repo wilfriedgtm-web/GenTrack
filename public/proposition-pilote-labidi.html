@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack × Pilote Labidi — Mövenpick & Pullman Abidjan</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #F5F0E8;
+  color: #1C1917;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.page {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 0 60px;
+}
+
+/* HEADER */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 48px;
+  border-bottom: 0.5px solid #E2DDD5;
+}
+.logo { font-size: 15px; font-weight: 900; letter-spacing: .5px; color: #1C1917; }
+.logo span { color: #C49A3C; }
+.top-meta { font-size: 9px; color: #78716C; letter-spacing: .8px; text-align: right; line-height: 1.6; }
+
+/* HERO */
+.hero {
+  padding: 40px 48px 32px;
+  border-bottom: 0.5px solid #E2DDD5;
+}
+.eyebrow {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #C49A3C;
+  border-bottom: 2px solid #C49A3C;
+  padding-bottom: 2px;
+  margin-bottom: 14px;
+}
+.hero h1 {
+  font-size: 36px;
+  font-weight: 900;
+  line-height: 1.1;
+  color: #1C1917;
+  margin-bottom: 10px;
+}
+.hero .sub {
+  font-size: 11px;
+  color: #78716C;
+  line-height: 1.7;
+}
+.hero .sub strong { color: #1C1917; }
+
+/* SECTION */
+.section { padding: 28px 48px; border-bottom: 0.5px solid #E2DDD5; }
+.section-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #C49A3C;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #E2DDD5;
+}
+
+/* CONSTAT BOX */
+.constat {
+  background: #FDFAF5;
+  border: 0.5px solid #E2DDD5;
+  border-radius: 6px;
+  padding: 18px 22px;
+  font-size: 10.5px;
+  color: #44403C;
+  line-height: 1.75;
+}
+.constat strong { color: #1C1917; }
+
+/* PRIORITIES */
+.priority {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+.priority:last-child { margin-bottom: 0; }
+.pnum {
+  font-size: 12px;
+  font-weight: 900;
+  color: #C49A3C;
+  min-width: 24px;
+  margin-top: 1px;
+}
+.priority h4 { font-size: 11px; font-weight: 700; color: #1C1917; margin-bottom: 3px; }
+.priority p { font-size: 9.5px; color: #78716C; line-height: 1.55; }
+
+/* FEATURES GRID */
+.features-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+.feat {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 0;
+  border-bottom: 0.3px solid #E2DDD5;
+  font-size: 9.5px;
+  color: #1C1917;
+}
+.feat:nth-child(odd) { padding-right: 20px; }
+.feat::before { content: '✓'; color: #C49A3C; font-weight: 700; flex-shrink: 0; font-size: 11px; }
+.feat span { color: #78716C; font-size: 8.5px; }
+
+/* REFERENCE STATS */
+.ref-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  background: #FDFAF5;
+  border: 0.5px solid #E2DDD5;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.ref-stat {
+  padding: 18px 20px;
+  text-align: center;
+  border-right: 0.5px solid #E2DDD5;
+}
+.ref-stat:last-child { border-right: none; }
+.ref-stat .val { font-size: 32px; font-weight: 900; color: #C49A3C; line-height: 1; margin-bottom: 6px; }
+.ref-stat .lbl { font-size: 8.5px; color: #78716C; line-height: 1.4; }
+
+/* PILOT STRUCTURE */
+.pilot-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  border: 0.5px solid #E2DDD5;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.pilot-phase {
+  padding: 16px 18px;
+  border-right: 0.5px solid #E2DDD5;
+  background: #FDFAF5;
+}
+.pilot-phase:last-child { border-right: none; background: #1C1917; }
+.pilot-phase .ph-tag {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #C49A3C;
+  margin-bottom: 8px;
+}
+.pilot-phase h4 {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #1C1917;
+  margin-bottom: 8px;
+}
+.pilot-phase:last-child h4 { color: white; }
+.pilot-phase ul {
+  list-style: none;
+  padding: 0;
+}
+.pilot-phase ul li {
+  font-size: 8.5px;
+  color: #78716C;
+  padding: 3px 0;
+  padding-left: 12px;
+  position: relative;
+}
+.pilot-phase:last-child ul li { color: #A8A29E; }
+.pilot-phase ul li::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  color: #C49A3C;
+  font-weight: 900;
+}
+
+/* KPIs row */
+.kpi-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0;
+  background: #FDFAF5;
+  border: 0.5px solid #E2DDD5;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.kpi-item {
+  padding: 16px 18px;
+  border-right: 0.5px solid #E2DDD5;
+  text-align: center;
+}
+.kpi-item:last-child { border-right: none; }
+.kpi-item .kv { font-size: 26px; font-weight: 900; color: #C49A3C; line-height: 1; margin-bottom: 5px; }
+.kpi-item .kl { font-size: 8.5px; color: #78716C; line-height: 1.4; }
+.kpi-item .kd { font-size: 8px; color: #A8A29E; margin-top: 3px; }
+
+/* PRICING */
+.pricing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.plan {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 0.5px solid #E2DDD5;
+}
+.plan-head {
+  padding: 14px 16px 10px;
+  background: #FDFAF5;
+}
+.plan-head.featured { background: #1C1917; }
+.plan-name {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #C49A3C;
+  margin-bottom: 6px;
+}
+.plan-price {
+  font-size: 22px;
+  font-weight: 900;
+  color: #1C1917;
+  line-height: 1;
+}
+.plan-head.featured .plan-price { color: white; }
+.plan-unit { font-size: 8px; color: #78716C; margin-top: 2px; }
+.plan-head.featured .plan-unit { color: #78716C; }
+.plan-annual { font-size: 8px; color: #A8A29E; margin-top: 2px; }
+.plan-badge {
+  display: inline-block;
+  background: #C49A3C;
+  color: white;
+  font-size: 7px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 2px;
+  letter-spacing: .8px;
+  margin-top: 6px;
+}
+.plan-body {
+  background: #FDFAF5;
+  padding: 10px 14px;
+  border-top: 0.5px solid #E2DDD5;
+}
+.plan-body.featured { background: #252117; border-top-color: #333; }
+.plan-feat {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  padding: 5px 0;
+  border-bottom: 0.3px solid #E2DDD5;
+  font-size: 8.5px;
+  color: #44403C;
+  line-height: 1.4;
+}
+.plan-body.featured .plan-feat { color: #A8A29E; border-bottom-color: #333; }
+.plan-feat:last-child { border-bottom: none; }
+.plan-feat::before { content: '✓'; color: #C49A3C; font-weight: 700; flex-shrink: 0; }
+.plan-feat.inherited::before { content: '·'; color: #78716C; }
+.plan-feat.inherited { color: #78716C; }
+.plan-body.featured .plan-feat.inherited { color: #555; }
+
+.pricing-note {
+  background: #FBF3DC;
+  border: 0.5px solid #C49A3C;
+  border-radius: 5px;
+  padding: 10px 14px;
+  font-size: 9px;
+  color: #44403C;
+  line-height: 1.6;
+}
+.pricing-note strong { color: #C49A3C; }
+
+/* NEXT STEP */
+.next-step {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  background: #1C1917;
+  border-radius: 6px;
+  padding: 18px 22px;
+}
+.ns-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #C49A3C;
+  white-space: nowrap;
+  padding-top: 2px;
+}
+.ns-content h4 { font-size: 12px; font-weight: 700; color: white; margin-bottom: 5px; }
+.ns-content p { font-size: 9.5px; color: #A8A29E; line-height: 1.6; }
+
+/* FOOTER */
+.footer {
+  padding: 16px 48px;
+  border-top: 0.5px solid #E2DDD5;
+  display: flex;
+  justify-content: space-between;
+  font-size: 8.5px;
+  color: #78716C;
+  margin-top: 32px;
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="top-bar">
+    <div class="logo">GEN<span>TRACK</span></div>
+    <div class="top-meta">
+      Note de présentation — Mövenpick &amp; Pullman Abidjan<br>
+      Octobre 2026 · Confidentiel
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="eyebrow">Proposition pilote</div>
+    <h1>Digitalisation du suivi technique<br>— Mövenpick &amp; Pullman Abidjan</h1>
+    <p class="sub">
+      À l'attention de <strong>M. Dhaker Labidi</strong>, Directeur Technique Groupe ·
+      Suite à notre échange du 13 octobre 2026<br>
+      Contact Mövenpick Abidjan : <strong>M. Secredou</strong>, Responsable Technique ·
+      Contact Pullman Abidjan : <strong>M. Topé</strong>, avec qui un échange préalable a déjà eu lieu
+    </p>
+  </div>
+
+  <!-- PILOTE BANNER -->
+  <div style="margin: 0; padding: 14px 48px; background: #1C1917; display: flex; justify-content: space-between; align-items: center; border-bottom: 0.5px solid #2e2a26;">
+    <div style="display: flex; gap: 32px; align-items: center;">
+      <div style="text-align:center;">
+        <div style="font-size: 22px; font-weight: 900; color: #C49A3C; line-height: 1;">3 mois</div>
+        <div style="font-size: 8px; color: #78716C; letter-spacing: .8px; text-transform: uppercase; margin-top: 2px;">Durée pilote</div>
+      </div>
+      <div style="width:1px; height:36px; background:#2e2a26;"></div>
+      <div style="text-align:center;">
+        <div style="font-size: 22px; font-weight: 900; color: #C49A3C; line-height: 1;">Gratuit</div>
+        <div style="font-size: 8px; color: #78716C; letter-spacing: .8px; text-transform: uppercase; margin-top: 2px;">Aucun engagement</div>
+      </div>
+      <div style="width:1px; height:36px; background:#2e2a26;"></div>
+      <div style="text-align:center;">
+        <div style="font-size: 22px; font-weight: 900; color: #C49A3C; line-height: 1;">Oct → Déc</div>
+        <div style="font-size: 8px; color: #78716C; letter-spacing: .8px; text-transform: uppercase; margin-top: 2px;">Octobre — Décembre 2026</div>
+      </div>
+      <div style="width:1px; height:36px; background:#2e2a26;"></div>
+      <div style="text-align:center;">
+        <div style="font-size: 22px; font-weight: 900; color: #C49A3C; line-height: 1;">2 hôtels</div>
+        <div style="font-size: 8px; color: #78716C; letter-spacing: .8px; text-transform: uppercase; margin-top: 2px;">Mövenpick &amp; Pullman Abidjan</div>
+      </div>
+    </div>
+    <div style="font-size: 9px; color: #44403C; background: rgba(196,154,60,0.12); border: 0.5px solid rgba(196,154,60,0.3); border-radius: 4px; padding: 8px 14px; text-align:right; line-height: 1.6;">
+      Aucune installation IT<br>Aucune migration CMMS<br>Formation incluse
+    </div>
+  </div>
+
+  <!-- LE CONSTAT -->
+  <div class="section">
+    <div class="section-label">Le constat</div>
+    <div class="constat">
+      <strong>Le CMMS est en cours de déploiement — les rondes mobiles ne sont pas encore activées partout.</strong>
+      En attendant, les techniciens continuent naturellement sur WhatsApp : pannes signalées dans des fils de discussion,
+      rondes validées à l'oral, données qui ne remontent pas. La Direction n'a pas de visibilité consolidée
+      en temps réel sur l'état des équipements, les anomalies et les consommations.
+      GenTrack s'intercale sans remplacer le CMMS — il digitalise la collecte terrain là où elle se passe vraiment.
+    </div>
+  </div>
+
+  <!-- 3 PRIORITÉS -->
+  <div class="section">
+    <div class="section-label">3 priorités · 3 réponses</div>
+    <div class="priority">
+      <div class="pnum">01</div>
+      <div>
+        <h4>Rondes terrain fiables dès le mois 1</h4>
+        <p>Fiche de ronde digitale via WhatsApp — alertes automatiques sur seuils. Résultat pilote Azalaï Dakar : <strong style="color:#1C1917">99% de conformité, 0 jour manqué en 90 jours.</strong></p>
+      </div>
+    </div>
+    <div class="priority">
+      <div class="pnum">02</div>
+      <div>
+        <h4>WhatsApp comme unique interface terrain</h4>
+        <p>Aucune application à installer, aucune migration CMMS. Les techniciens travaillent dans WhatsApp qu'ils utilisent déjà — adoption en 1h, sans formation IT.</p>
+      </div>
+    </div>
+    <div class="priority">
+      <div class="pnum">03</div>
+      <div>
+        <h4>Visibilité groupe pour vous, sans appel</h4>
+        <p>Tableau de bord multi-sites : conformité rondes, alertes actives, consommations — en temps réel sur les 2 hôtels. Rapport mensuel prêt pour votre comité.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CE QUE LA PLATEFORME COUVRE -->
+  <div class="section">
+    <div class="section-label">Ce que la plateforme couvre</div>
+    <div class="features-grid">
+      <div class="feat">Rondes digitales via WhatsApp <span>&nbsp;— alertes automatiques sur seuils</span></div>
+      <div class="feat">Dashboard Direction multi-sites <span>&nbsp;— KPIs et alertes sans appel</span></div>
+      <div class="feat">Relevés &amp; consommations <span>&nbsp;— carburant, eau, électricité, gaz</span></div>
+      <div class="feat">Rapport mensuel automatique <span>&nbsp;— prêt pour comité de direction</span></div>
+      <div class="feat">Signalements QR code <span>&nbsp;— sans compte ni application (mois 3)</span></div>
+      <div class="feat">Affectation &amp; MTTR <span>&nbsp;— suivi interventions techniciens</span></div>
+      <div class="feat">Suivi énergie &amp; budget <span>&nbsp;— budget vs réalisé mensuel</span></div>
+      <div class="feat">Alertes dépassement seuil <span>&nbsp;— notif WhatsApp resp. technique</span></div>
+    </div>
+  </div>
+
+  <!-- RÉFÉRENCE -->
+  <div class="section">
+    <div class="section-label">Référence · Pilote Azalaï Hotel Dakar — 90 jours</div>
+    <div class="ref-stats">
+      <div class="ref-stat">
+        <div class="val">99%</div>
+        <div class="lbl">Conformité rondes<br>90 derniers jours</div>
+      </div>
+      <div class="ref-stat">
+        <div class="val">0</div>
+        <div class="lbl">Jour manqué<br>en 90 jours</div>
+      </div>
+      <div class="ref-stat">
+        <div class="val">J+7</div>
+        <div class="lbl">Autonomie techniciens<br>sans support</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STRUCTURE DU PILOTE -->
+  <div class="section">
+    <div class="section-label">Structure · Pilote 3 mois — entièrement gratuit</div>
+    <div class="pilot-row">
+      <div class="pilot-phase">
+        <div class="ph-tag">Mois 1 – 2 · Rondes</div>
+        <h4>Module Rondes</h4>
+        <ul>
+          <li>Paramétrage équipements</li>
+          <li>Formation techniciens (1h)</li>
+          <li>Rondes guidées via WhatsApp</li>
+          <li>Alertes seuils automatiques</li>
+          <li>Dashboard resp. technique</li>
+          <li>Rapport hebdomadaire auto</li>
+        </ul>
+      </div>
+      <div class="pilot-phase">
+        <div class="ph-tag">Mois 3 · Option signalements</div>
+        <h4>Module Signalements</h4>
+        <ul>
+          <li>QR codes par zone / équipement</li>
+          <li>Signalement en 10 secondes</li>
+          <li>Affectation technicien WhatsApp</li>
+          <li>Rapport d'intervention</li>
+          <li>Suivi MTTR &amp; coûts</li>
+          <li>Si résultats M1–M2 satisfaisants</li>
+        </ul>
+      </div>
+      <div class="pilot-phase">
+        <div class="ph-tag">Après 3 mois · Bilan</div>
+        <h4>Décision commune</h4>
+        <ul>
+          <li>Revue KPIs avec vous</li>
+          <li>Retours M. Secredou, M. Topé &amp; techniciens</li>
+          <li>Proposition contrat adapté</li>
+          <li>Extension autres hôtels groupe</li>
+          <li>Aucune obligation</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs DU PILOTE -->
+  <div class="section">
+    <div class="section-label">KPIs · Ce qu'on mesure ensemble</div>
+    <div class="kpi-row">
+      <div class="kpi-item">
+        <div class="kv">&gt; 90%</div>
+        <div class="kl">Taux de rondes</div>
+        <div class="kd">Rondes effectuées / planifiées</div>
+      </div>
+      <div class="kpi-item">
+        <div class="kv">100%</div>
+        <div class="kl">Fiabilité des alertes</div>
+        <div class="kd">Envoyées en &lt; 5 min · zéro manqué</div>
+      </div>
+      <div class="kpi-item">
+        <div class="kv">J+7</div>
+        <div class="kl">Adoption techniciens</div>
+        <div class="kd">Autonomie complète, sans appel support</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OFFRE POST-PILOTE -->
+  <div class="section">
+    <div class="section-label">Offre · Tarification post-pilote</div>
+
+    <div class="pricing-grid">
+
+      <!-- RONDE -->
+      <div class="plan">
+        <div class="plan-head featured">
+          <div class="plan-name">Rondes</div>
+          <div class="plan-price">75 000</div>
+          <div class="plan-unit">FCFA / hôtel / mois</div>
+          <div class="plan-annual">≈ 114 € · 150 000 FCFA pour 2 hôtels</div>
+          <div class="plan-badge">RECOMMANDÉ POUR DÉMARRER</div>
+        </div>
+        <div class="plan-body featured">
+          <div class="plan-feat">Rondes digitales via WhatsApp</div>
+          <div class="plan-feat">Dashboard équipements temps réel</div>
+          <div class="plan-feat">Alertes sur seuils configurables</div>
+          <div class="plan-feat">Historique &amp; rapports hebdo auto</div>
+          <div class="plan-feat">Vue multi-sites Direction</div>
+        </div>
+      </div>
+
+      <!-- MAINTENANCE -->
+      <div class="plan">
+        <div class="plan-head">
+          <div class="plan-name">Maintenance</div>
+          <div class="plan-price">250 000</div>
+          <div class="plan-unit">FCFA / hôtel / mois</div>
+          <div class="plan-annual">≈ 381 € · 500 000 FCFA pour 2 hôtels</div>
+        </div>
+        <div class="plan-body">
+          <div class="plan-feat inherited">Tout RONDES, plus :</div>
+          <div class="plan-feat">Signalements QR code terrain</div>
+          <div class="plan-feat">KPI : MTBF, MTTR, coûts</div>
+          <div class="plan-feat">Suivi énergie par fluide</div>
+          <div class="plan-feat">Budget mensuel vs réalisé</div>
+          <div class="plan-feat">Rapport PDF direction</div>
+        </div>
+      </div>
+
+      <!-- PERFORMANCE -->
+      <div class="plan">
+        <div class="plan-head">
+          <div class="plan-name">Performance</div>
+          <div class="plan-price">350 000</div>
+          <div class="plan-unit">FCFA / hôtel / mois</div>
+          <div class="plan-annual">≈ 534 € · 700 000 FCFA pour 2 hôtels</div>
+        </div>
+        <div class="plan-body">
+          <div class="plan-feat inherited">Tout MAINTENANCE, plus :</div>
+          <div class="plan-feat">Ratios énergie / chambre occupée</div>
+          <div class="plan-feat">Benchmark inter-hôtels groupe</div>
+          <div class="plan-feat">Consolidation export groupe</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- PROCHAINE ÉTAPE -->
+  <div class="section" style="border-bottom:none;">
+    <div class="section-label">Prochaine étape</div>
+    <div class="next-step">
+      <div class="ns-label">Prochaine<br>étape</div>
+      <div style="width:1px;background:#333;align-self:stretch;flex-shrink:0;"></div>
+      <div class="ns-content">
+        <h4>Démarrage en 48h après réception de la fiche hôtel</h4>
+        <p>Dès que M. Labidi confirme les 2 hôtels, nous envoyons la fiche de configuration à remplir par les responsables techniques (M. Secredou / M. Topé) : liste des équipements à suivre, seuils d'alerte, numéros des techniciens en charge des rondes. Paramétrage, test bot et formation effectués dans les 48h suivantes.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span><strong style="color:#1C1917;">GEN<span style="color:#C49A3C;">TRACK</span></strong> · Wilfried Tchinda · wilfried.gtm@gmail.com</span>
+    <span>Document confidentiel · Mövenpick &amp; Pullman Abidjan · Octobre 2026</span>
+  </div>
+
+</div>
+</body>
+</html>
