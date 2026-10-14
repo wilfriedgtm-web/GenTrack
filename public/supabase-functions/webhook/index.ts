@@ -19,6 +19,40 @@ const PROSPECT_NOTIFY  = Deno.env.get('PROSPECT_NOTIFY_NUMBER')  || '';
 const WEBHOOK_URL      = Deno.env.get('WEBHOOK_URL')             || '';
 const BASE_URL         = 'https://gen-track.vercel.app';
 
+// ── Supabase Storage upload ───────────────────────────────────────────────────
+async function uploadTwilioPhoto(twilioUrl: string, prefix: string = 'panne'): Promise<string | null> {
+  try {
+    // 1. Télécharger la photo depuis Twilio avec Basic Auth
+    const imgRes = await fetch(twilioUrl, {
+      headers: { 'Authorization': `Basic ${btoa(`${TWILIO_SID}:${TWILIO_TOKEN}`)}` }
+    });
+    if (!imgRes.ok) { console.error('uploadTwilioPhoto: fetch failed', imgRes.status); return null; }
+    const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+    const ext = contentType.includes('png') ? 'png' : contentType.includes('gif') ? 'gif' : 'jpg';
+    const blob = await imgRes.arrayBuffer();
+
+    // 2. Upload vers Supabase Storage bucket gentrack-photos
+    const filename = `${prefix}/${Date.now()}.${ext}`;
+    const upRes = await fetch(`${SUPA_URL}/storage/v1/object/gentrack-photos/${filename}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPA_KEY}`,
+        'apikey': SUPA_KEY,
+        'Content-Type': contentType,
+        'x-upsert': 'true',
+      },
+      body: blob,
+    });
+    if (!upRes.ok) { const err = await upRes.text(); console.error('uploadTwilioPhoto: storage upload failed', err); return null; }
+
+    // 3. Retourner l'URL publique
+    return `${SUPA_URL}/storage/v1/object/public/gentrack-photos/${filename}`;
+  } catch (e) {
+    console.error('uploadTwilioPhoto error:', e);
+    return null;
+  }
+}
+
 // ── DB helper ─────────────────────────────────────────────────────────────────
 async function db(table: string, opts: any = {}) {
   const { method = 'GET', body, query = '', select = '*', prefer } = opts;
@@ -1286,6 +1320,12 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
 
     const fullDesc = `${sd.panne_type_label}${desc ? ` — ${desc}` : ''}`;
 
+    // ── Upload photo vers Supabase Storage si disponible ──
+    let publicPhotoUrl: string | null = null;
+    if (mediaUrl) {
+      publicPhotoUrl = await uploadTwilioPhoto(mediaUrl, 'pannes');
+    }
+
     // ── Écrire dans signalements ──
     const sigRes = await db('signalements', { method: 'POST', body: {
       groupe_id: sd.site_id,
@@ -1296,7 +1336,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       signale_par: contact.nom,
       statut: 'ouvert',
       source: 'bot',
-      ...(mediaUrl ? { photo_url: mediaUrl } : {}),
+      ...(publicPhotoUrl ? { photo_url: publicPhotoUrl } : {}),
     }});
     const refCode = (Array.isArray(sigRes) ? sigRes[0]?.ref_code : sigRes?.ref_code) || '';
     await db('alertes', { method: 'POST', body: {
@@ -1313,7 +1353,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     const techniciens = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=eq.technicien&actif=eq.true` });
     const tousDestinataires = [...(Array.isArray(responsables) ? responsables : []), ...(Array.isArray(techniciens) ? techniciens : [])];
     const refLine = refCode ? `\n\n_Répondre *OK ${refCode}* pour PEC · ou *AFFECTER ${refCode}* pour assigner à un tech._` : `\n\n_Tapez *resolu* pour clôturer._`;
-    const photoLine = mediaUrl ? `\n📷 Photo jointe` : '';
+    const photoLine = publicPhotoUrl ? `\n📷 Photo jointe` : '';
     const alertMsg = `🚨 *PANNE SIGNALÉE — GenTrack*\n*${siteNom}*\n\n🔧 Équipement : *${sd.equip_nom}*\n⚠️ Type : *${sd.panne_type_label}*${desc ? `\n📝 Détail : ${desc}` : ''}${photoLine}\n\n👤 Signalé par : ${contact.nom}\n🕐 ${today} ${getHeure()}${refLine}`;
     const dejaEnvoyes = new Set<string>([phone]);
     for (const r of tousDestinataires) {
@@ -1321,11 +1361,11 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
         dejaEnvoyes.add(r.whatsapp);
         // Envoyer le texte d'alerte + la photo séparément si disponible
         await sendWA(r.whatsapp, alertMsg);
-        if (mediaUrl) await sendWA(r.whatsapp, `📷 Photo — ${sd.equip_nom}${refCode ? ` (${refCode})` : ''}`, mediaUrl);
+        if (publicPhotoUrl) await sendWA(r.whatsapp, `📷 Photo — ${sd.equip_nom}${refCode ? ` (${refCode})` : ''}`, publicPhotoUrl);
       }
     }
     const notifTxt = dejaEnvoyes.size > 1 ? `Les responsables ont été alertés. 📲` : `_Aucun responsable configuré._`;
-    return sendWA(phone, `🚨 *Signalement enregistré !*\n\n🔧 ${sd.equip_nom}\n⚠️ ${sd.panne_type_label}${desc ? `\n📝 ${desc}` : ''}${mediaUrl ? '\n📷 Photo enregistrée' : ''}\n\n${notifTxt}`);
+    return sendWA(phone, `🚨 *Signalement enregistré !*\n\n🔧 ${sd.equip_nom}\n⚠️ ${sd.panne_type_label}${desc ? `\n📝 ${desc}` : ''}${publicPhotoUrl ? '\n📷 Photo enregistrée' : ''}\n\n${notifTxt}`);
   }
 
   // ── Suivi choix — PEC groupée + liens rapport ─────────────
