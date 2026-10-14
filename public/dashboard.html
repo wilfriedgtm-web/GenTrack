@@ -2239,7 +2239,7 @@ async function _rtSignalements(sid){
     supaGet('zones','site_id=eq.'+sid+'&actif=eq.true&order=categorie.asc,ordre.asc,nom.asc&select=id,nom,etage,categorie,type'),
     supaGet('signalements',
       'groupe_id=eq.'+sid+'&order=created_at.desc&limit=200'+
-      '&select=id,groupe_id,site_id,type,description,statut,signale_par,lieu,zone_id,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,pris_en_charge_par,pris_en_charge_at,ref_code,created_at,source,photo_url,equipement_id,equipement_zone_id,equipements(nom),equipements_zone(nom),maintenances(photo_url,prestataire)'
+      '&select=id,groupe_id,site_id,type,description,statut,signale_par,lieu,zone_id,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,pris_en_charge_par,pris_en_charge_at,ref_code,created_at,source,photo_url,equipement_id,equipement_zone_id,equipements(nom),equipements_zone(nom),maintenances!signalement_id(photo_url,prestataire)'
     )
   ]);
   zones=zones||[]; allRows=allRows||[];
