@@ -533,7 +533,6 @@ async function demarrerSaisie(phone: string, contact: any, site: any): Promise<a
   };
   const EXTRAS = [
     '🚨 Déclarer une panne',
-    '✅ Clôturer un signalement',
     '📋 Suivi des signalements',
     '🌙 Bilan de journée',
   ];
@@ -708,18 +707,17 @@ async function demarrerResolu(phone: string, contact: any, site: any): Promise<a
   return sendWA(phone, `✅ *Clôturer un signalement*\n*${site?.nom || ''}*\n\nQuel signalement est résolu ?\n\n${liste}\n\nRépondez avec le numéro.`);
 }
 
-// ── Suivi → recap signalements du site ────────────────────────────────────────
+// ── Suivi → hub interactif numéroté ──────────────────────────────────────────
 async function demarrerSuivi(phone: string, contact: any, site: any): Promise<any> {
   const siteId = site?.id || contact.site_id;
   const siteNom = site?.nom || '';
-  const today = new Date().toISOString().substring(0, 10);
+  const today = getToday();
 
   const signalements = await db('signalements', {
     query: `&groupe_id=eq.${siteId}&statut=in.(ouvert,en_cours,resolu)&order=created_at.asc&limit=50`
   });
   const allSigs = Array.isArray(signalements) ? signalements : [];
 
-  // Filtre résolus du jour uniquement
   const sigs = allSigs.filter((s: any) =>
     s.statut === 'ouvert' || s.statut === 'en_cours' ||
     (s.statut === 'resolu' && (s.resolved_at || '').substring(0, 10) === today)
@@ -734,35 +732,60 @@ async function demarrerSuivi(phone: string, contact: any, site: any): Promise<an
     if (Array.isArray(equips)) for (const e of equips) equipMap[e.id] = e.nom;
   }
 
-  const fmt = (s: any) => {
-    const eq = s.equipement_id ? (equipMap[s.equipement_id] || '—') : '—';
-    const desc = (s.description || '').substring(0, 45);
-    return `${s.ref_code || '—'} · ${eq} — ${desc}`;
-  };
-
   const ouverts = sigs.filter((s: any) => s.statut === 'ouvert');
   const enCours = sigs.filter((s: any) => s.statut === 'en_cours');
   const resolus = sigs.filter((s: any) => s.statut === 'resolu');
 
+  // Construire la liste numérotée en continu (ouverts → en_cours → résolus)
+  const indexed: Array<{ num: number; id: string; ref_code: string; statut: string; desc: string }> = [];
+  let num = 1;
   let msg = `📋 *Suivi signalements*\n*${siteNom}*\n`;
+
   if (ouverts.length) {
     msg += `\n🔴 *Non pris en charge (${ouverts.length})*\n`;
-    for (const s of ouverts) msg += `• ${fmt(s)}\n`;
+    for (const s of ouverts) {
+      const eq = s.equipement_id ? (equipMap[s.equipement_id] || '—') : '—';
+      const desc = (s.description || '').substring(0, 45);
+      msg += `*${num}* — ${s.ref_code || '—'} · ${eq} — ${desc}\n`;
+      indexed.push({ num, id: s.id, ref_code: s.ref_code || '', statut: s.statut, desc: (s.description || '').substring(0, 60) });
+      num++;
+    }
   }
   if (enCours.length) {
     msg += `\n🟡 *En cours (${enCours.length})*\n`;
     for (const s of enCours) {
+      const eq = s.equipement_id ? (equipMap[s.equipement_id] || '—') : '—';
+      const desc = (s.description || '').substring(0, 45);
       const par = s.assigne_a || s.pris_en_charge_par || '—';
-      msg += `• ${fmt(s)} _(${par})_\n`;
+      msg += `*${num}* — ${s.ref_code || '—'} · ${eq} — ${desc} _(${par})_\n`;
+      indexed.push({ num, id: s.id, ref_code: s.ref_code || '', statut: s.statut, desc: (s.description || '').substring(0, 60) });
+      num++;
     }
   }
   if (resolus.length) {
     msg += `\n✅ *Résolus aujourd'hui (${resolus.length})*\n`;
     for (const s of resolus) {
-      const par = s.resolved_by || '—';
-      msg += `• ${fmt(s)} _(${par})_\n`;
+      const eq = s.equipement_id ? (equipMap[s.equipement_id] || '—') : '—';
+      const desc = (s.description || '').substring(0, 45);
+      msg += `*${num}* — ${s.ref_code || '—'} · ${eq} — ${desc}\n`;
+      indexed.push({ num, id: s.id, ref_code: s.ref_code || '', statut: s.statut, desc: (s.description || '').substring(0, 60) });
+      num++;
     }
   }
+
+  // Footer interactif uniquement si des signalements actifs existent
+  const nonResolus = indexed.filter(i => i.statut !== 'resolu');
+  if (nonResolus.length > 0) {
+    msg += `\n_Tapez un ou plusieurs numéros pour prendre en charge et recevoir le lien rapport._\n_Ex : *1 2* ou *3*_`;
+  }
+
+  await setSession(phone, 'suivi_choix', {
+    active_site_id: siteId,
+    site_id: siteId,
+    site_nom: siteNom,
+    tech_nom: contact.nom,
+    sigs: indexed,
+  });
   return sendWA(phone, msg.trim());
 }
 
@@ -867,7 +890,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
   // ── Choix fréquence (menu plat) ───────────────────────────
   if (state === 'saisie_choix_freq') {
     const freqs: string[] = sd.freqs || [];
-    const EXTRA_KEYS = ['panne', 'resolu', 'suivi', 'bilan'];
+    const EXTRA_KEYS = ['panne', 'suivi', 'bilan'];
     const totalOptions = freqs.length + EXTRA_KEYS.length;
     const n = parseInt(msg.trim());
     if (isNaN(n) || n < 1 || n > totalOptions) return sendWA(phone, `Répondez avec un numéro entre 1 et ${totalOptions}.`);
@@ -1128,6 +1151,52 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     }
     const notifTxt = dejaEnvoyes.size > 1 ? `Les responsables ont été alertés. 📲` : `_Aucun responsable configuré._`;
     return sendWA(phone, `🚨 *Signalement enregistré !*\n\n🔧 ${sd.equip_nom}\n⚠️ ${sd.panne_type_label}\n📝 ${desc}\n\n${notifTxt}`);
+  }
+
+  // ── Suivi choix — PEC groupée + liens rapport ─────────────
+  if (state === 'suivi_choix') {
+    const sigs: any[] = sd.sigs || [];
+    if (!sigs.length) {
+      await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
+      return sendWA(phone, `Aucun signalement disponible. Tapez *suivi* pour rafraîchir.`);
+    }
+    // Parser les numéros : "1 2", "1,2", "3"
+    const parts = msg.trim().split(/[\s,]+/).map((p: string) => parseInt(p)).filter((n: number) => !isNaN(n));
+    if (!parts.length) {
+      return sendWA(phone, `Tapez un ou plusieurs numéros entre 1 et ${sigs.length}.\n_Ex : *1 2* ou *3*_`);
+    }
+    const invalid = parts.filter((n: number) => n < 1 || n > sigs.length);
+    if (invalid.length) return sendWA(phone, `Numéro(s) invalide(s) : ${invalid.join(', ')}. Choisissez entre 1 et ${sigs.length}.`);
+
+    const chosen = parts
+      .map((n: number) => sigs.find((s: any) => s.num === n))
+      .filter(Boolean)
+      .filter((s: any, idx: number, arr: any[]) => arr.findIndex((x: any) => x.id === s.id) === idx); // dédoublonner
+
+    const appUrl = Deno.env.get('APP_URL') || 'https://gen-track.vercel.app';
+
+    // PEC uniquement pour les ouverts
+    const ouvertChosen = chosen.filter((s: any) => s.statut === 'ouvert');
+    for (const s of ouvertChosen) {
+      await db('signalements', { method: 'PATCH', query: `&id=eq.${s.id}`, body: {
+        statut: 'en_cours',
+        pris_en_charge_par: contact.nom,
+        pris_en_charge_at: new Date().toISOString(),
+      }}).catch(() => {});
+    }
+
+    let responseMsg = '';
+    if (ouvertChosen.length > 0) {
+      const refList = ouvertChosen.map((s: any) => s.ref_code).filter(Boolean).join(' · ');
+      responseMsg += `✅ *Pris en charge !*\n📋 ${refList}\n\n`;
+    }
+    responseMsg += `📝 *Rapport(s) d'intervention :*\n\n`;
+    for (const s of chosen) {
+      responseMsg += `*${s.ref_code || s.id}* — ${s.desc.substring(0, 40)}\n${appUrl}/rapport.html?sg=${s.id}\n\n`;
+    }
+
+    await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
+    return sendWA(phone, responseMsg.trim());
   }
 
   // ── Rapport choix (resp_tech) ──────────────────────────────
@@ -1800,7 +1869,7 @@ async function handleMessage(from: string, bodyText: string) {
       'vidange_equip','vidange_intervenant','vidange_confirm',
       'plein_litres','plein_confirm_litres','plein_operateur',
       'affecter_choix',
-      'rapport_choix','bilan_collect',
+      'rapport_choix','bilan_collect','suivi_choix',
     ];
     if (activeStates.includes(state)) {
       return handleStates(phone, msg, bodyText, contact, site, state, sd);
