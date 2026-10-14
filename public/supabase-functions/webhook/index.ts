@@ -522,7 +522,6 @@ async function sendRapportRonde(rondeId: string, phone: string, techNom: string,
 // ── Démarrer ronde ────────────────────────────────────────────────────────────
 async function demarrerSaisie(phone: string, contact: any, site: any): Promise<any> {
   const freqs = await getFrequencesDisponibles(site);
-  if (!freqs.length) return sendWA(phone, `✅ Toutes les rondes sont à jour.\n\nTapez *aide* pour les commandes.`);
 
   const freqLabels: Record<string, string> = {
     releve_horaire:  '📊 Relevé horaire',
@@ -532,14 +531,20 @@ async function demarrerSaisie(phone: string, contact: any, site: any): Promise<a
     releve_energie:  '⚡ Relevé énergie',
     ronde_zones:     '🏠 Ronde de zones',
   };
+  const EXTRAS = [
+    '🚨 Déclarer une panne',
+    '✅ Clôturer un signalement',
+    '📋 Suivi des signalements',
+    '🌙 Bilan de journée',
+  ];
+
   const sd = { tech_id: contact.id, tech_nom: contact.nom, site_id: site.id, site_nom: site.nom, active_site_id: site.id };
 
-  if (freqs.length === 1) {
-    if (freqs[0] === 'releve_horaire') return envoyerLienReleve(phone, site, contact.nom);
-    if (freqs[0] === 'ronde_zones') return envoyerLienRondeZones(phone, site, contact);
-    return demarrerRonde(phone, contact, site, sd, freqs[0]);
-  }
-  const liste = freqs.map((f, i) => `*${i + 1}* — ${freqLabels[f] || f}`).join('\n');
+  const freqListe = freqs.map((f: string, i: number) => `*${i + 1}* — ${freqLabels[f] || f}`).join('\n');
+  const sep = freqs.length ? '\n\n' : '';
+  const extrasListe = EXTRAS.map((label, i) => `*${freqs.length + i + 1}* — ${label}`).join('\n');
+  const liste = freqListe + sep + extrasListe;
+
   await setSession(phone, 'saisie_choix_freq', { ...sd, freqs });
   return sendWA(phone, `Bonjour ${contact.nom} 👋\n*${site.nom}*\n\nQue souhaitez-vous faire ?\n\n${liste}`);
 }
@@ -859,16 +864,25 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     return sendWA(phone, `❌ Action annulée.\n\nTapez *aide* pour les commandes.`);
   }
 
-  // ── Choix fréquence ───────────────────────────────────────
+  // ── Choix fréquence (menu plat) ───────────────────────────
   if (state === 'saisie_choix_freq') {
     const freqs: string[] = sd.freqs || [];
+    const EXTRA_KEYS = ['panne', 'resolu', 'suivi', 'bilan'];
+    const totalOptions = freqs.length + EXTRA_KEYS.length;
     const n = parseInt(msg.trim());
-    if (isNaN(n) || n < 1 || n > freqs.length) return sendWA(phone, `Répondez avec un numéro entre 1 et ${freqs.length}.`);
-    const freq = freqs[n - 1];
-    if (freq === 'releve_horaire') return envoyerLienReleve(phone, site, contact.nom);
-    if (freq === 'releve_energie') return demarrerReleveEnergie(phone, contact, site);
-    if (freq === 'ronde_zones') return envoyerLienRondeZones(phone, site, contact);
-    return demarrerRonde(phone, contact, site, sd, freq);
+    if (isNaN(n) || n < 1 || n > totalOptions) return sendWA(phone, `Répondez avec un numéro entre 1 et ${totalOptions}.`);
+    if (n <= freqs.length) {
+      const freq = freqs[n - 1];
+      if (freq === 'releve_horaire') return envoyerLienReleve(phone, site, contact.nom);
+      if (freq === 'releve_energie') return demarrerReleveEnergie(phone, contact, site);
+      if (freq === 'ronde_zones') return envoyerLienRondeZones(phone, site, contact);
+      return demarrerRonde(phone, contact, site, sd, freq);
+    }
+    const extraKey = EXTRA_KEYS[n - freqs.length - 1];
+    if (extraKey === 'panne') return demarrerPanne(phone, contact, site);
+    if (extraKey === 'resolu') return demarrerResolu(phone, contact, site);
+    if (extraKey === 'suivi') return demarrerSuivi(phone, contact, site);
+    if (extraKey === 'bilan') return demarrerBilan(phone, contact, site);
   }
 
   // ── Choix équipement ──────────────────────────────────────
@@ -1114,6 +1128,22 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     }
     const notifTxt = dejaEnvoyes.size > 1 ? `Les responsables ont été alertés. 📲` : `_Aucun responsable configuré._`;
     return sendWA(phone, `🚨 *Signalement enregistré !*\n\n🔧 ${sd.equip_nom}\n⚠️ ${sd.panne_type_label}\n📝 ${desc}\n\n${notifTxt}`);
+  }
+
+  // ── Rapport choix (resp_tech) ──────────────────────────────
+  if (state === 'rapport_choix') {
+    const n = parseInt(msg.trim());
+    if (isNaN(n) || n < 1 || n > 3) return sendWA(phone, `Répondez avec *1*, *2* ou *3*.`);
+    const siteObj = site || { id: sd.site_id, nom: sd.site_nom };
+    await setSession(phone, 'idle', { active_site_id: sd.active_site_id });
+    if (n === 1) {
+      const rondes = await db('rondes', { query: `&site_id=eq.${sd.site_id}&order=date_ronde.desc,created_at.desc&limit=1` });
+      if (!Array.isArray(rondes) || !rondes.length) return sendWA(phone, `Aucune ronde enregistrée pour *${sd.site_nom}*.`);
+      const ronde = rondes[0];
+      return sendRapportRonde(ronde.id, phone, contact.nom, sd.site_nom, '', sd.site_id, ronde.frequence);
+    }
+    if (n === 2) return demarrerSuivi(phone, contact, siteObj);
+    if (n === 3) return sendWA(phone, `🌙 *Bilans de journée — ${sd.site_nom}*\n\nLes bilans de vos techniciens vous sont envoyés directement dans cette conversation lorsqu'ils tapent *bilan*.\n\nFaites défiler pour les retrouver.`);
   }
 
   // ── Bilan collect ─────────────────────────────────────────
@@ -1646,9 +1676,11 @@ async function handleMessage(from: string, bodyText: string) {
         await setSession(phone, 'idle', { active_site_id: sd.active_site_id || siteIdSig });
       }
       const siteInfo = siteNomSig ? `\n📍 *${siteNomSig}*` : '';
-      const continueMsg = rondeStates.includes(state) ? `\n\n_Votre ronde continue._` : `\n\nTapez *resolu* quand c'est réglé.`;
       const photoLine = sig.photo_url ? `\n📷 Photo : ${sig.photo_url}` : '';
-      return sendWA(phone, `✅ *Pris en charge !*${siteInfo}\n📋 ${refCode}${photoLine}${continueMsg}`);
+      const appUrlPec = Deno.env.get('APP_URL') || 'https://gen-track.vercel.app';
+      const rapportUrlPec = `${appUrlPec}/rapport.html?sg=${sig.id}`;
+      const rondeNote = rondeStates.includes(state) ? `\n_Votre ronde continue._\n\n` : `\n\n`;
+      return sendWA(phone, `✅ *Pris en charge !*${siteInfo}\n📋 ${refCode}${photoLine}${rondeNote}📝 Rapport d'intervention :\n${rapportUrlPec}`);
     }
 
     // ── Affectation interactive : "AFFECTER REF-XXXX" (sans nom → menu) ─────
@@ -1768,6 +1800,7 @@ async function handleMessage(from: string, bodyText: string) {
       'vidange_equip','vidange_intervenant','vidange_confirm',
       'plein_litres','plein_confirm_litres','plein_operateur',
       'affecter_choix',
+      'rapport_choix','bilan_collect',
     ];
     if (activeStates.includes(state)) {
       return handleStates(phone, msg, bodyText, contact, site, state, sd);
@@ -1786,6 +1819,12 @@ async function handleMessage(from: string, bodyText: string) {
     }
     if (msg === 'rapport') {
       if (!site) return sendWA(phone, `Aucun site configuré.`);
+      const isResp = ['resp_tech', 'dir_tech'].includes(contact.role || '');
+      if (isResp) {
+        await setSession(phone, 'rapport_choix', { active_site_id: site.id, site_id: site.id, site_nom: site.nom });
+        return sendWA(phone, `📊 *Rapport — ${site.nom}*\n\nQue souhaitez-vous consulter ?\n\n*1* — 📋 Dernière ronde journalière\n*2* — 🔴 Suivi des signalements\n*3* — 🌙 Bilans de fin de journée`);
+      }
+      // Technicien → rapport direct
       const rondes = await db('rondes', { query: `&site_id=eq.${site.id}&order=date_ronde.desc,created_at.desc&limit=1` });
       if (!Array.isArray(rondes) || !rondes.length) return sendWA(phone, `Aucune ronde enregistrée pour *${site.nom}*.`);
       const ronde = rondes[0];
