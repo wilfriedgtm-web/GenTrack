@@ -8,78 +8,94 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:24px 16px}
 
-.toolbar{display:flex;gap:12px;margin-bottom:24px;align-items:center;width:100%;max-width:720px;flex-wrap:wrap}
+.toolbar{display:flex;gap:12px;margin-bottom:24px;align-items:center;width:100%;max-width:760px;flex-wrap:wrap}
 .toolbar-title{font-size:14px;font-weight:700;color:#1A1D28;flex:1}
 .btn{padding:8px 18px;border-radius:8px;border:none;font-size:13px;font-weight:700;cursor:pointer}
 .btn-print{background:#25D366;color:white}
 .btn-close{background:white;border:1.5px solid #E4E6EF;color:#5A5F78}
 
-.affiche{width:720px;max-width:100%;background:white;border-radius:16px;box-shadow:0 4px 32px rgba(18,21,30,.12);overflow:hidden}
+.affiche{width:760px;max-width:100%;background:white;border-radius:16px;box-shadow:0 4px 32px rgba(18,21,30,.12);overflow:hidden}
 
-/* Header */
-.aff-header{background:linear-gradient(145deg,#12151E 0%,#1A2D1F 100%);padding:32px 40px 28px;display:flex;align-items:center;gap:28px;flex-wrap:wrap}
-.aff-header-left{flex:1;min-width:200px}
-.aff-logo{font-size:10px;font-weight:800;letter-spacing:.25em;color:#E8A020;text-transform:uppercase;margin-bottom:10px}
-.aff-title{font-size:28px;font-weight:900;color:white;letter-spacing:-.03em;margin-bottom:6px;line-height:1.1}
-.aff-subtitle{font-size:13px;color:rgba(255,255,255,.55);line-height:1.5;max-width:340px}
+/* ── HEADER ── */
+.aff-header{background:linear-gradient(145deg,#12151E 0%,#1C2415 100%);padding:28px 36px 24px;display:flex;align-items:center;gap:28px;flex-wrap:wrap}
+.aff-header-left{flex:1;min-width:220px}
+.aff-logo{font-size:10px;font-weight:800;letter-spacing:.25em;color:#C49A3C;text-transform:uppercase;margin-bottom:10px}
+.aff-title{font-size:26px;font-weight:900;color:white;letter-spacing:-.03em;margin-bottom:4px;line-height:1.1}
+.aff-subtitle{font-size:12px;color:rgba(255,255,255,.45);line-height:1.5}
 .aff-header-right{text-align:center;flex-shrink:0}
-.aff-wa-qr{background:white;border-radius:12px;padding:12px;display:inline-block;margin-bottom:8px}
-.aff-wa-qr img{display:block;border-radius:4px}
-.aff-wa-num{font-size:11px;color:rgba(255,255,255,.5)}
-.wa-badge{display:inline-flex;align-items:center;gap:6px;background:#25D366;border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;color:white;margin-bottom:8px}
+.aff-wa-qr{background:white;border-radius:10px;padding:10px;display:inline-block;margin-bottom:6px}
+.aff-wa-qr img{display:block;border-radius:3px}
+.aff-wa-num{font-size:10px;color:rgba(255,255,255,.4)}
+.wa-badge{display:inline-flex;align-items:center;gap:5px;background:#25D366;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:700;color:white;margin-bottom:6px}
 
-/* Intro */
-.aff-intro{padding:20px 40px 0;display:flex;gap:12px;align-items:flex-start}
-.aff-intro-icon{font-size:24px;flex-shrink:0;margin-top:2px}
-.aff-intro-text{font-size:13px;color:#5A5F78;line-height:1.6}
+/* ── HERO SAISIE ── */
+.aff-hero{background:linear-gradient(135deg,#C49A3C 0%,#E8B84B 100%);padding:18px 36px;display:flex;align-items:center;gap:18px}
+.hero-cmd{font-size:36px;font-weight:900;color:#1C1917;font-family:monospace;letter-spacing:-.02em;flex-shrink:0}
+.hero-arrow{font-size:28px;color:rgba(28,25,23,.5);flex-shrink:0}
+.hero-text{font-size:13px;color:#1C1917;line-height:1.55}
+.hero-text strong{font-weight:800;font-size:14px}
 
-/* Commands grid */
-.aff-commands{padding:20px 40px 0;display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.cmd-card{background:#F4F5FA;border-radius:12px;padding:16px;border-left:4px solid}
-.cmd-card.panne{border-color:#C0392B}
-.cmd-card.plein{border-color:#1565C0}
-.cmd-card.ronde{border-color:#1B7A4A}
-.cmd-card.saisie{border-color:#7B1FA2}
-.cmd-card.resolu{border-color:#E8A020}
+/* ── SECTION LABEL ── */
+.section-label{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#9AA0B8;padding:16px 36px 10px}
+
+/* ── FLOW CARDS GRID ── */
+.aff-commands{padding:0 36px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.cmd-card{background:#F8F9FE;border-radius:12px;padding:15px;border:1.5px solid #E4E6EF;overflow:hidden}
+.cmd-card.full{grid-column:1/-1}
 
 .cmd-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.cmd-icon{font-size:22px}
-.cmd-label{font-size:13px;font-weight:800;color:#12151E}
-.cmd-tag{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:4px;padding:2px 7px;display:inline-block}
-.panne .cmd-tag{background:#FDF0EE;color:#C0392B}
-.plein .cmd-tag{background:#E3F0FF;color:#1565C0}
-.ronde .cmd-tag{background:#E8F7EE;color:#1B7A4A}
-.saisie .cmd-tag{background:#F5E8FF;color:#7B1FA2}
-.resolu .cmd-tag{background:#FFF6E0;color:#B87A10}
+.cmd-icon-wrap{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.cmd-icon-ronde{background:#FEF3DC;color:#B87A10}
+.cmd-icon-releve{background:#E6F1FB;color:#185FA5}
+.cmd-icon-panne{background:#FCEBEB;color:#A32D2D}
+.cmd-icon-suivi{background:#EDE7F6;color:#5E35B1}
+.cmd-icon-bilan{background:#E1F5EE;color:#0F6E56}
 
-.cmd-desc{font-size:12px;color:#5A5F78;line-height:1.5;margin-bottom:10px}
+.cmd-label{font-size:13px;font-weight:800;color:#12151E;line-height:1.2}
+.cmd-tag{font-size:10px;font-weight:700;border-radius:4px;padding:2px 6px;margin-left:auto;flex-shrink:0;white-space:nowrap}
+.tag-ronde{background:#FEF3DC;color:#B87A10}
+.tag-releve{background:#E6F1FB;color:#185FA5}
+.tag-panne{background:#FCEBEB;color:#A32D2D}
+.tag-suivi{background:#EDE7F6;color:#5E35B1}
+.tag-bilan{background:#E1F5EE;color:#0F6E56}
 
-/* Flow steps (mini chat bubbles) */
-.flow{display:flex;flex-direction:column;gap:4px}
-.flow-msg{font-size:11px;border-radius:8px;padding:5px 9px;max-width:90%;line-height:1.35;position:relative}
-.flow-msg.bot{background:#E8F7EE;color:#1B7A4A;align-self:flex-start;border-bottom-left-radius:2px}
-.flow-msg.user{background:#12151E;color:white;align-self:flex-end;border-bottom-right-radius:2px}
-.flow-msg.bot.wa{background:#DCF8C6;color:#1A1D28}
-.flow-label{font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#9AA0B8;margin-top:4px;margin-bottom:2px}
+.cmd-desc{font-size:11px;color:#5A5F78;line-height:1.5;margin-bottom:10px}
 
-/* Quick commands */
-.aff-quick{padding:20px 40px 0}
-.aff-quick-title{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#9AA0B8;margin-bottom:10px}
-.quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-@media(min-width:600px){.quick-grid{grid-template-columns:repeat(6,1fr)}}
-.quick-item{background:#F4F5FA;border-radius:8px;padding:8px 6px;text-align:center}
-.quick-word{font-size:13px;font-weight:800;color:#12151E;margin-bottom:2px;font-family:monospace}
-.quick-desc{font-size:10px;color:#9AA0B8}
+/* Mini WhatsApp thread */
+.flow{display:flex;flex-direction:column;gap:4px;background:#F0F0F0;border-radius:8px;padding:8px 9px}
+.flow-msg{font-size:10px;border-radius:7px;padding:4px 8px;max-width:88%;line-height:1.4}
+.flow-msg.bot{background:white;color:#1A1D28;align-self:flex-start;border-bottom-left-radius:2px}
+.flow-msg.user{background:#DCF8C6;color:#1A1D28;align-self:flex-end;border-bottom-right-radius:2px}
+.flow-msg b{font-weight:700}
+.flow-msg i{font-style:italic;color:#5A5F78}
 
-/* Tips */
-.aff-tips{padding:16px 40px 0;display:flex;gap:10px;flex-wrap:wrap}
-.tip{display:flex;align-items:center;gap:7px;font-size:11px;color:#5A5F78;background:#F4F5FA;border-radius:8px;padding:7px 10px;flex:1;min-width:180px}
-.tip-icon{font-size:16px;flex-shrink:0}
+/* ── RESP TECH ── */
+.aff-resp{margin:14px 36px 0;background:#F3EEF9;border-radius:12px;padding:15px;border:1.5px solid #D1C4E9}
+.resp-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.resp-badge{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:#EDE7F6;color:#5E35B1;border-radius:4px;padding:3px 8px;flex-shrink:0}
+.resp-title{font-size:13px;font-weight:700;color:#12151E}
+.resp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.resp-item{background:white;border-radius:8px;padding:10px 12px;border:1px solid #D1C4E9}
+.resp-cmd{font-size:12px;font-weight:800;color:#3C2482;font-family:monospace;background:#EDE7F6;display:inline-block;border-radius:4px;padding:2px 6px;margin-bottom:5px}
+.resp-desc{font-size:10px;color:#5A5F78;line-height:1.4}
 
-/* Footer */
-.aff-footer{margin-top:24px;background:#12151E;padding:16px 40px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.aff-footer-brand{font-size:10px;font-weight:800;letter-spacing:.2em;color:#E8A020;text-transform:uppercase}
-.aff-footer-note{font-size:10px;color:rgba(255,255,255,.35)}
+/* ── QUICK GRID ── */
+.aff-quick{padding:14px 36px 0}
+.aff-quick-title{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#9AA0B8;margin-bottom:8px}
+.quick-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.quick-item{background:#F4F5FA;border-radius:8px;padding:8px 6px;text-align:center;border:1px solid #E4E6EF}
+.quick-word{font-size:12px;font-weight:800;color:#12151E;margin-bottom:2px;font-family:monospace}
+.quick-desc{font-size:9px;color:#9AA0B8}
+
+/* ── TIPS ── */
+.aff-tips{padding:12px 36px 0;display:flex;gap:8px;flex-wrap:wrap}
+.tip{display:flex;align-items:center;gap:6px;font-size:10px;color:#5A5F78;background:#F4F5FA;border-radius:8px;padding:6px 9px;flex:1;min-width:160px}
+.tip-icon{font-size:14px;flex-shrink:0}
+
+/* ── FOOTER ── */
+.aff-footer{margin-top:20px;background:#12151E;padding:14px 36px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.aff-footer-brand{font-size:10px;font-weight:800;letter-spacing:.2em;color:#C49A3C;text-transform:uppercase}
+.aff-footer-note{font-size:10px;color:rgba(255,255,255,.3)}
 
 @media print{
   body{background:white;padding:0}
@@ -92,7 +108,7 @@ body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 <body>
 
 <div class="toolbar">
-  <span class="toolbar-title">Guide Bot WhatsApp — Techniciens</span>
+  <span class="toolbar-title" id="toolbar-title">Guide Bot WhatsApp — Techniciens</span>
   <button class="btn btn-close" onclick="window.close()">✕ Fermer</button>
   <button class="btn btn-print" onclick="window.print()">🖨️ Imprimer / PDF</button>
 </div>
@@ -103,230 +119,191 @@ body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
   <div class="aff-header">
     <div class="aff-header-left">
       <div class="aff-logo">GenTrack</div>
-      <div class="aff-title">Bot WhatsApp<br/>Techniciens</div>
-      <div class="aff-subtitle">Signalez, déclarez et suivez toutes les interventions directement depuis WhatsApp — sans connexion internet ni application à installer.</div>
+      <div class="aff-title">Bot WhatsApp<br/>Équipe technique</div>
+      <div class="aff-subtitle" id="site-name-sub">Scannez le QR code ou enregistrez le numéro pour commencer</div>
     </div>
     <div class="aff-header-right">
       <div class="wa-badge">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.087.537 4.047 1.48 5.755L0 24l6.395-1.677A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.823 0-3.534-.487-5.012-1.337l-.36-.214-3.8.997.999-3.702-.237-.38A9.949 9.949 0 0 1 2 12c0-5.514 4.486-10 10-10s10 4.486 10 10-4.486 10-10 10z"/></svg>
-        WhatsApp Bot
-      </div>
+        <span>💬</span><span>WhatsApp</span>
+      </div><br/>
       <div class="aff-wa-qr">
-        <img id="wa-qr" src="" width="120" height="120" alt="QR WhatsApp"/>
+        <img id="wa-qr" width="100" height="100" alt="QR code bot"/>
       </div>
-      <div class="aff-wa-num" id="wa-num">+1 (984) 341-8695</div>
+      <div class="aff-wa-num" id="wa-num-display"></div>
     </div>
   </div>
 
-  <!-- INTRO -->
-  <div class="aff-intro">
-    <div class="aff-intro-icon">💡</div>
-    <div class="aff-intro-text"><strong>Comment démarrer :</strong> Scannez le QR code avec votre téléphone pour ouvrir une conversation WhatsApp avec le bot, ou enregistrez le numéro et envoyez n'importe quel message pour commencer. Le bot guide chaque étape.</div>
+  <!-- HERO SAISIE -->
+  <div class="aff-hero">
+    <div class="hero-cmd">saisie</div>
+    <div class="hero-arrow">→</div>
+    <div class="hero-text">
+      <strong>La commande principale.</strong><br/>
+      Envoyez ce mot au bot pour accéder à toutes les actions — rondes, relevés, signalements, bilan.
+    </div>
   </div>
 
-  <!-- COMMANDS -->
+  <!-- FLOWS -->
+  <div class="section-label">Dans l'ordre de votre journée</div>
+
   <div class="aff-commands">
 
-    <!-- PANNE -->
-    <div class="cmd-card panne">
+    <!-- RONDE -->
+    <div class="cmd-card">
       <div class="cmd-header">
-        <span class="cmd-icon">🚨</span>
+        <div class="cmd-icon-wrap cmd-icon-ronde">☀️</div>
         <div>
-          <div class="cmd-label">Déclarer une panne</div>
-          <span class="cmd-tag">panne</span>
+          <div class="cmd-label">Ronde journalière</div>
         </div>
+        <span class="cmd-tag tag-ronde">via saisie</span>
       </div>
-      <div class="cmd-desc">Signalez une panne ou un dysfonctionnement sur un équipement. Le resp. technique reçoit une notification WhatsApp avec un code de référence.</div>
+      <div class="cmd-desc">Saisissez les relevés équipement par équipement. Le bot pose chaque question à la suite. Rondes journalières et hebdomadaires disponibles.</div>
       <div class="flow">
-        <div class="flow-label">Exemple</div>
-        <div class="flow-msg user">panne</div>
-        <div class="flow-msg bot wa">🚨 Quel équipement est en panne ?<br/>1 - GE Principal<br/>2 - Cuve Fuel<br/>3 - Climatisation</div>
-        <div class="flow-msg user">1</div>
-        <div class="flow-msg bot wa">📝 Décrivez le problème :</div>
-        <div class="flow-msg user">Ne démarre plus, alarme rouge</div>
-        <div class="flow-msg bot wa">✅ Panne enregistrée — REF-1042<br/><em>Répondre OK REF-1042 pour prendre en charge</em></div>
-      </div>
-    </div>
-
-    <!-- PLEIN -->
-    <div class="cmd-card plein">
-      <div class="cmd-header">
-        <span class="cmd-icon">⛽</span>
-        <div>
-          <div class="cmd-label">Déclarer un ravitaillement</div>
-          <span class="cmd-tag">plein</span>
-        </div>
-      </div>
-      <div class="cmd-desc">Enregistrez un ravitaillement de cuve. Le niveau et l'autonomie sont calculés automatiquement.</div>
-      <div class="flow">
-        <div class="flow-label">Exemple</div>
-        <div class="flow-msg user">plein</div>
-        <div class="flow-msg bot wa">⛽ Quelle cuve a été ravitaillée ?<br/>1 - Cuve Fuel Principale (450L)</div>
-        <div class="flow-msg user">1</div>
-        <div class="flow-msg bot wa">💧 Niveau actuel (litres) ?</div>
-        <div class="flow-msg user">280</div>
-        <div class="flow-msg bot wa">💧 Litres ajoutés ?</div>
-        <div class="flow-msg user">200</div>
-        <div class="flow-msg bot wa">👤 Votre nom / opérateur ?</div>
-        <div class="flow-msg user">Moussa</div>
-        <div class="flow-msg bot wa">✅ Ravitaillement enregistré.<br/>📊 Niveau : 480L (96%) 🟢<br/>⏱️ Autonomie : ~7j</div>
-      </div>
-    </div>
-
-    <!-- SAISIE / MENU PRINCIPAL -->
-    <div class="cmd-card ronde">
-      <div class="cmd-header">
-        <span class="cmd-icon">☀️</span>
-        <div>
-          <div class="cmd-label">Rondes & relevés</div>
-          <span class="cmd-tag">saisie</span>
-        </div>
-      </div>
-      <div class="cmd-desc">Menu principal — choisissez parmi les rondes disponibles (journalière, hebdo…), le relevé horaire ou le relevé énergie. Le bot guide chaque étape.</div>
-      <div class="flow">
-        <div class="flow-label">Exemple</div>
         <div class="flow-msg user">saisie</div>
-        <div class="flow-msg bot wa">Bonjour Moussa 👋<br/><strong>Hôtel Azalaï</strong><br/><br/>Que souhaitez-vous faire ?<br/><strong>1</strong> — ☀️ Ronde journalière<br/><strong>2</strong> — 📅 Ronde hebdomadaire<br/><strong>3</strong> — 🚨 Déclarer une panne<br/><strong>4</strong> — 📋 Suivi signalements<br/><strong>5</strong> — 🌙 Bilan de journée</div>
+        <div class="flow-msg bot">Bonjour Moussa 👋 — <b>Hôtel Azalaï</b><br/><b>1</b> ☀️ Ronde journalière<br/><b>2</b> 📅 Ronde hebdomadaire<br/><b>3</b> 🚨 Déclarer une panne…</div>
         <div class="flow-msg user">1</div>
-        <div class="flow-msg bot wa">Ronde journalière — 3 équipements :<br/><strong>1</strong> — GE Principal<br/><strong>2</strong> — Cuve Fuel<br/><strong>3</strong> — Groupe Froid<br/>Lequel commencer ?</div>
+        <div class="flow-msg bot">GE Principal — Niveau cuve (L) ?</div>
+        <div class="flow-msg user">380</div>
+        <div class="flow-msg bot">✅ Ronde enregistrée.</div>
       </div>
     </div>
 
     <!-- RELEVÉ HORAIRE -->
-    <div class="cmd-card saisie">
+    <div class="cmd-card">
       <div class="cmd-header">
-        <span class="cmd-icon">📊</span>
+        <div class="cmd-icon-wrap cmd-icon-releve">📊</div>
         <div>
           <div class="cmd-label">Relevé horaire</div>
-          <span class="cmd-tag">via saisie → relevé</span>
         </div>
+        <span class="cmd-tag tag-releve">via saisie</span>
       </div>
-      <div class="cmd-desc">Accessible depuis le menu <strong>saisie</strong>. Enregistrez un relevé horaire sur n'importe quel équipement : température, pression, consommation…</div>
+      <div class="cmd-desc">Relevé ponctuel d'un équipement (température, pression, consommation…). Ouvre un formulaire mobile. Peut être fait 2-3 fois par jour, les valeurs précédentes sont affichées.</div>
       <div class="flow">
-        <div class="flow-label">Depuis le menu saisie</div>
-        <div class="flow-msg bot wa">📊 Relevé horaire — Hôtel Azalaï<br/><br/>Ouvrez ce lien pour saisir le relevé :<br/><u>gen-track.vercel.app/releve.html?…</u></div>
-        <div class="flow-msg bot wa">✅ Relevé enregistré. Aucune anomalie détectée.</div>
+        <div class="flow-msg user">saisie → relevé horaire</div>
+        <div class="flow-msg bot">📊 Ouvrez le formulaire :<br/><i>gen-track.vercel.app/releve.html?…</i></div>
+        <div class="flow-msg bot">✅ 4/6 relevés enregistrés — GE · CF · Cuve · TGBT</div>
       </div>
     </div>
 
-    <!-- PRISE EN CHARGE -->
-    <div class="cmd-card" style="border-left:4px solid #25D366;grid-column:1/-1">
+    <!-- PANNE -->
+    <div class="cmd-card">
       <div class="cmd-header">
-        <span class="cmd-icon">✅</span>
+        <div class="cmd-icon-wrap cmd-icon-panne">🚨</div>
         <div>
-          <div class="cmd-label">Prendre en charge un signalement</div>
-          <span class="cmd-tag" style="background:#e8f5e9;color:#1b7a4a">OK REF-XXXX</span>
+          <div class="cmd-label">Déclarer une panne</div>
         </div>
+        <span class="cmd-tag tag-panne">saisie ou panne</span>
       </div>
-      <div class="cmd-desc">Le resp. technique reçoit une notification WhatsApp pour chaque signalement. Répondez <strong>OK REF-XXXX</strong> (avec le code reçu) pour indiquer que vous prenez en charge. Le dashboard se met à jour automatiquement et les autres contacts sont avertis.</div>
-      <div class="flow" style="flex-direction:row;flex-wrap:wrap;gap:12px;align-items:flex-start">
-        <div style="flex:1;min-width:200px">
-          <div class="flow-label">Notification reçue</div>
-          <div class="flow-msg bot wa" style="max-width:none">🚨 PANNE SIGNALÉE — GenTrack<br/><strong>Hôtel Pullman Dakar</strong><br/><br/>🔧 GE Principal<br/>⚠️ Ne démarre plus, alarme rouge<br/>👤 Signalé par : Moussa<br/>🕐 08:42<br/><br/><em>Répondre OK REF-1042 pour prendre en charge</em></div>
-        </div>
-        <div style="flex:1;min-width:200px">
-          <div class="flow-label">Prise en charge</div>
-          <div class="flow-msg user" style="max-width:none">OK REF-1042</div>
-          <div class="flow-msg bot wa" style="max-width:none">✅ Pris en charge !<br/>📋 REF-1042<br/><br/>Tapez <strong>resolu</strong> quand c'est réglé.</div>
-          <div style="font-size:11px;color:#5A5F78;margin-top:6px;line-height:1.4">Les autres contacts reçoivent une confirmation de prise en charge. Le statut passe à "En cours" dans le dashboard.</div>
-        </div>
+      <div class="cmd-desc">Signalez une panne urgente. Vous pouvez joindre une photo. Le responsable technique est notifié immédiatement avec un numéro de référence.</div>
+      <div class="flow">
+        <div class="flow-msg user">panne</div>
+        <div class="flow-msg bot">⚡ Quel équipement ?<br/><b>1</b> GE Principal &nbsp; <b>2</b> Groupe Froid</div>
+        <div class="flow-msg user">1</div>
+        <div class="flow-msg bot">Décrivez le problème :</div>
+        <div class="flow-msg user">Ne démarre plus depuis ce matin</div>
+        <div class="flow-msg bot">✅ <b>REF-1042</b> créé. Resp. notifié 📲</div>
       </div>
     </div>
 
-    <!-- SUIVI + BILAN -->
-    <div class="cmd-card" style="border-left:4px solid #5E35B1">
+    <!-- SUIVI -->
+    <div class="cmd-card">
       <div class="cmd-header">
-        <span class="cmd-icon">📋</span>
+        <div class="cmd-icon-wrap cmd-icon-suivi">📋</div>
         <div>
           <div class="cmd-label">Suivi des signalements</div>
-          <span class="cmd-tag" style="background:#EDE7F6;color:#5E35B1">suivi</span>
         </div>
+        <span class="cmd-tag tag-suivi">via saisie</span>
       </div>
-      <div class="cmd-desc">Liste numérotée des signalements du site. Tapez un ou plusieurs numéros pour prendre en charge et recevoir directement les liens de rapport.</div>
+      <div class="cmd-desc">Liste numérotée de tous les signalements du site. Tapez un ou plusieurs numéros pour prendre en charge et recevoir les liens rapport directement.</div>
       <div class="flow">
-        <div class="flow-label">Exemple</div>
         <div class="flow-msg user">suivi</div>
-        <div class="flow-msg bot wa">📋 Suivi — Hôtel Azalaï<br/><br/>🔴 <strong>1</strong> · REF-1042 · GE Principal — Ne démarre plus<br/>🔴 <strong>2</strong> · REF-1045 · Compresseur — Fuite huile<br/><br/>🟡 <strong>3</strong> · REF-1038 · Groupe Froid — Surchauffe _(Moussa)_<br/><br/>✅ <strong>4</strong> · REF-1030 · Pompe eau — Résolu<br/><br/><em>Tapez un ou plusieurs numéros (ex : 1 2) pour prendre en charge</em></div>
+        <div class="flow-msg bot">🔴 <b>1</b> REF-1042 · GE Principal<br/>🔴 <b>2</b> REF-1045 · Compresseur<br/>🟡 <b>3</b> REF-1038 · CF <i>(Moussa)</i><br/><br/><i>Tapez un ou plusieurs numéros</i></div>
         <div class="flow-msg user">1 2</div>
-        <div class="flow-msg bot wa">✅ <strong>Pris en charge !</strong><br/>📋 REF-1042, REF-1045<br/><br/>📝 <strong>Rapports d'intervention :</strong><br/><br/><strong>REF-1042</strong> — GE Principal — Ne démarre plus<br/><u>gen-track.vercel.app/rapport.html?sg=…</u><br/><br/><strong>REF-1045</strong> — Compresseur — Fuite huile<br/><u>gen-track.vercel.app/rapport.html?sg=…</u></div>
+        <div class="flow-msg bot">✅ Pris en charge ! REF-1042, REF-1045<br/>📝 Rapports :<br/><i>gen-track.vercel.app/rapport.html?…</i></div>
       </div>
     </div>
 
-    <div class="cmd-card" style="border-left:4px solid #00897B">
+    <!-- BILAN -->
+    <div class="cmd-card full">
       <div class="cmd-header">
-        <span class="cmd-icon">🌙</span>
+        <div class="cmd-icon-wrap cmd-icon-bilan">🌙</div>
         <div>
-          <div class="cmd-label">Bilan fin de journée</div>
-          <span class="cmd-tag" style="background:#E0F2F1;color:#00695C">bilan</span>
+          <div class="cmd-label">Bilan de fin de journée</div>
         </div>
+        <span class="cmd-tag tag-bilan">via saisie</span>
       </div>
-      <div class="cmd-desc">Le bot génère automatiquement votre récap du jour (rondes effectuées + signalements résolus) et vous demande si vous avez des blocages à signaler.</div>
-      <div class="flow">
-        <div class="flow-label">Exemple technicien</div>
-        <div class="flow-msg user">bilan</div>
-        <div class="flow-msg bot wa">🌙 <strong>Bilan de journée — Moussa</strong><br/>📍 Hôtel Azalaï · Aujourd'hui<br/><br/>📋 <strong>Rondes effectuées</strong><br/>• ☀️ Ronde journalière<br/>• 📅 Ronde hebdomadaire<br/><br/>✅ <strong>Signalements résolus</strong><br/>• REF-1038 · Groupe Froid — Surchauffe<br/>• REF-1029 · Pompe eau — Fuite<br/><br/><em>Des blocages à signaler sur des signalements en cours ?</em><br/><strong>(OUI / NON)</strong></div>
-        <div class="flow-msg user">OUI</div>
-        <div class="flow-msg bot wa">📝 Décrivez vos blocages ou difficultés :</div>
-        <div class="flow-msg user">Pièce de rechange GE Principal pas disponible</div>
-        <div class="flow-msg bot wa">✅ Bilan enregistré et transmis à votre responsable. 📲</div>
-      </div>
-    </div>
-
-    <!-- RÉSOLU -->
-    <div class="cmd-card resolu" style="grid-column:1/-1">
-      <div class="cmd-header">
-        <span class="cmd-icon">✅</span>
-        <div>
-          <div class="cmd-label">Clôturer une intervention</div>
-          <span class="cmd-tag">resolu</span>
+      <div class="cmd-desc">Le bot génère automatiquement votre récap du jour (rondes effectuées + signalements résolus) et vous demande si vous avez des blocages à signaler. Le responsable reçoit le bilan.</div>
+      <div class="flow" style="flex-direction:row;gap:8px;flex-wrap:wrap;background:none;padding:0">
+        <div style="flex:1;min-width:160px">
+          <div class="flow" style="background:#F0F0F0">
+            <div class="flow-msg user">bilan</div>
+            <div class="flow-msg bot">🌙 <b>Bilan — Moussa</b><br/>📋 ☀️ Ronde journalière<br/>✅ REF-1038 · Groupe Froid<br/>✅ REF-1029 · Pompe eau<br/><br/><i>Des blocages ? <b>(OUI / NON)</b></i></div>
+          </div>
         </div>
-      </div>
-      <div class="cmd-desc">Après avoir résolu une panne, utilisez "resolu" pour clôturer le ticket et créer la fiche maintenance automatiquement. Vous pouvez aussi remplir le formulaire rapport via le lien WhatsApp reçu lors de l'affectation.</div>
-      <div class="flow" style="flex-direction:row;flex-wrap:wrap;gap:12px;align-items:flex-start">
-        <div style="flex:1;min-width:200px">
-          <div class="flow-label">Via bot</div>
-          <div class="flow-msg user" style="max-width:none">resolu</div>
-          <div class="flow-msg bot wa" style="max-width:none">✅ Quelle panne est résolue ?<br/>1 - GE Principal — Ne démarre plus</div>
-          <div class="flow-msg user" style="max-width:none">1</div>
-          <div class="flow-msg bot wa" style="max-width:none">Décrivez l'intervention :</div>
-          <div class="flow-msg user" style="max-width:none">Remplacement courroie alternateur</div>
-          <div class="flow-msg bot wa" style="max-width:none">✅ Panne clôturée. Fiche maintenance créée.</div>
-        </div>
-        <div style="flex:1;min-width:200px">
-          <div class="flow-label">Via lien rapport (photo possible)</div>
-          <div class="flow-msg bot wa" style="max-width:none">👷 Affectation reçue — GE Principal<br/>📋 Remplissez le rapport : <u>bit.ly/rapport-...</u></div>
-          <div style="font-size:11px;color:#5A5F78;margin-top:6px;line-height:1.4">Le lien ouvre un formulaire mobile avec champ photo pour documenter l'intervention avec une preuve visuelle.</div>
+        <div style="flex:1;min-width:160px">
+          <div class="flow" style="background:#F0F0F0">
+            <div class="flow-msg user">NON</div>
+            <div class="flow-msg bot">✅ Bilan transmis à votre responsable. 📲</div>
+            <div class="flow-msg user">OUI</div>
+            <div class="flow-msg bot">📝 Décrivez vos blocages :</div>
+            <div class="flow-msg user">Pièce GE Principal non disponible</div>
+            <div class="flow-msg bot">✅ Bilan avec blocage transmis. 📲</div>
+          </div>
         </div>
       </div>
     </div>
 
   </div>
 
-  <!-- QUICK COMMANDS -->
+  <!-- RESPONSABLE TECHNIQUE -->
+  <div class="aff-resp">
+    <div class="resp-header">
+      <span class="resp-badge">Responsable technique</span>
+      <span class="resp-title">Commandes supplémentaires disponibles</span>
+    </div>
+    <div class="resp-grid">
+      <div class="resp-item">
+        <div class="resp-cmd">rapport</div>
+        <div class="resp-desc">Menu rapport : rondes du site, signalements actifs, bilans du jour techniciens</div>
+      </div>
+      <div class="resp-item">
+        <div class="resp-cmd">bilan</div>
+        <div class="resp-desc">Voir les bilans soumis aujourd'hui par chaque technicien</div>
+      </div>
+      <div class="resp-item">
+        <div class="resp-cmd">resolu</div>
+        <div class="resp-desc">Clôturer manuellement un signalement avec note et coût d'intervention</div>
+      </div>
+      <div class="resp-item">
+        <div class="resp-cmd">aide</div>
+        <div class="resp-desc">Afficher toutes les commandes disponibles selon votre rôle</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUICK GRID -->
   <div class="aff-quick">
-    <div class="aff-quick-title">Toutes les commandes disponibles</div>
+    <div class="aff-quick-title">Toutes les commandes</div>
     <div class="quick-grid">
-      <div class="quick-item"><div class="quick-word">saisie</div><div class="quick-desc">Rondes / Relevés</div></div>
-      <div class="quick-item"><div class="quick-word">panne</div><div class="quick-desc">Déclarer une panne</div></div>
+      <div class="quick-item"><div class="quick-word">saisie</div><div class="quick-desc">Menu principal</div></div>
+      <div class="quick-item"><div class="quick-word">panne</div><div class="quick-desc">Déclarer panne</div></div>
       <div class="quick-item"><div class="quick-word">resolu</div><div class="quick-desc">Clôturer panne</div></div>
-      <div class="quick-item"><div class="quick-word">suivi</div><div class="quick-desc">Signalements (PEC)</div></div>
+      <div class="quick-item"><div class="quick-word">suivi</div><div class="quick-desc">Signalements</div></div>
       <div class="quick-item"><div class="quick-word">bilan</div><div class="quick-desc">Fin de journée</div></div>
       <div class="quick-item"><div class="quick-word">rapport</div><div class="quick-desc">Dernier rapport</div></div>
-      <div class="quick-item"><div class="quick-word">plein</div><div class="quick-desc">Ravitaillement cuve</div></div>
+      <div class="quick-item"><div class="quick-word">plein</div><div class="quick-desc">Ravitaillement</div></div>
       <div class="quick-item"><div class="quick-word">vidange</div><div class="quick-desc">Déclarer vidange</div></div>
       <div class="quick-item"><div class="quick-word">aide</div><div class="quick-desc">Liste commandes</div></div>
-      <div class="quick-item"><div class="quick-word">site</div><div class="quick-desc">Changer de site</div></div>
       <div class="quick-item"><div class="quick-word">annuler</div><div class="quick-desc">Annuler action</div></div>
     </div>
   </div>
 
   <!-- TIPS -->
   <div class="aff-tips">
-    <div class="tip"><span class="tip-icon">📱</span>Pas besoin d'application — fonctionne avec WhatsApp standard</div>
+    <div class="tip"><span class="tip-icon">📱</span>Fonctionne avec WhatsApp standard — aucune application à installer</div>
     <div class="tip"><span class="tip-icon">🌐</span>Connexion internet requise au moment de l'envoi</div>
-    <div class="tip"><span class="tip-icon">🔔</span>Le resp. technique reçoit une notification à chaque signalement</div>
-    <div class="tip"><span class="tip-icon">📷</span>Vous pouvez joindre une photo via le formulaire rapport</div>
-    <div class="tip"><span class="tip-icon">💬</span>Enregistrez le numéro dans vos contacts pour retrouver facilement la conversation</div>
+    <div class="tip"><span class="tip-icon">🔔</span>Le resp. technique est notifié à chaque signalement</div>
+    <div class="tip"><span class="tip-icon">📷</span>Joignez une photo lors de la déclaration de panne</div>
   </div>
 
   <!-- FOOTER -->
@@ -343,10 +320,15 @@ var siteNom=params.get('nom')||'';
 var WA_NUMBER='19843418695';
 var WA_URL='https://wa.me/'+WA_NUMBER;
 
-// QR code du bot
-document.getElementById('wa-qr').src='https://api.qrserver.com/v1/create-qr-code/?size=120x120&data='+encodeURIComponent(WA_URL);
-document.getElementById('site-name-footer').textContent=decodeURIComponent(siteNom);
-if(siteNom)document.querySelector('.toolbar-title').textContent='Guide Bot — '+decodeURIComponent(siteNom);
+document.getElementById('wa-qr').src='https://api.qrserver.com/v1/create-qr-code/?size=100x100&data='+encodeURIComponent(WA_URL);
+document.getElementById('wa-num-display').textContent='+1 984 341 8695';
+
+if(siteNom){
+  var nom=decodeURIComponent(siteNom);
+  document.getElementById('site-name-footer').textContent=nom;
+  document.getElementById('site-name-sub').textContent='Site : '+nom;
+  document.getElementById('toolbar-title').textContent='Guide Bot WhatsApp — '+nom;
+}
 </script>
 </body>
 </html>
