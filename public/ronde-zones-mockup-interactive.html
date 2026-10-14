@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack — Ronde de Zones — Mockup Interactif</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --dark:#1C1917;--amber:#C49A3C;--creme:#F5F0E8;--border:#E7E0D3;--muted:#78716C;
+  --wa-green:#25D366;--wa-dark-green:#128C7E;--wa-bg:#ECE5DD;--wa-header:#075E54;
+  --wa-out:#DCF8C6;--wa-in:#fff;--wa-bot:#E8F5E9;
+  --rz-dark:#12151E;--rz-dark2:#1E2332;--rz-amber:#E8A020;
+  --rz-vert:#1B7A4A;--rz-vert-pale:#E8F7EE;--rz-vert-border:#A8DEC0;--rz-vert-text:#155F39;
+  --rz-rouge:#C0392B;--rz-rouge-pale:#FDF0EE;--rz-rouge-border:#F0B8B2;
+  --rz-border:#E4E6EF;--rz-bg:#F4F5FA;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:var(--creme);color:var(--dark);padding:32px 16px 48px;min-height:100vh}
+
+/* PAGE TITLE */
+.page-title{text-align:center;margin-bottom:8px}
+.page-title h1{font-size:22px;font-weight:800;color:var(--dark)}
+.page-title p{font-size:13px;color:var(--muted);margin-top:4px}
+.step-label{display:inline-block;background:var(--amber);color:var(--dark);font-size:10px;font-weight:800;padding:2px 8px;border-radius:3px;letter-spacing:.5px;margin:0 4px}
+.interactive-badge{display:inline-block;background:#1B7A4A;color:#fff;font-size:10px;font-weight:800;padding:3px 10px;border-radius:12px;margin-top:8px;letter-spacing:.3px}
+
+/* LAYOUT */
+.layout{display:flex;gap:20px;align-items:flex-start;justify-content:center;max-width:900px;margin:28px auto 0;flex-wrap:wrap}
+
+/* PHONE SHELL */
+.phone{width:280px;flex-shrink:0;background:#fff;border-radius:32px;box-shadow:0 16px 50px rgba(0,0,0,.22),0 0 0 5px var(--dark);overflow:hidden}
+.phone-notch{height:22px;background:var(--dark);display:flex;justify-content:center;align-items:flex-end;padding-bottom:3px}
+.phone-notch-pill{width:64px;height:4px;background:#333;border-radius:2px}
+
+/* WA HEADER */
+.wa-header{background:var(--wa-header);padding:8px 12px;display:flex;align-items:center;gap:8px;color:#fff}
+.wa-avatar{width:32px;height:32px;border-radius:50%;background:var(--wa-green);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.wa-contact h4{font-size:13px;font-weight:700}
+.wa-contact p{font-size:10px;color:rgba(255,255,255,.65)}
+.wa-actions{margin-left:auto;font-size:14px;color:rgba(255,255,255,.75)}
+
+/* WA BODY */
+.wa-body{background:var(--wa-bg);padding:8px 6px;display:flex;flex-direction:column;gap:5px;height:420px;overflow-y:auto}
+.wa-date-sep{text-align:center;margin:2px 0}
+.wa-date-sep span{background:rgba(255,255,255,.8);font-size:10px;color:#667781;padding:2px 8px;border-radius:7px}
+
+/* MESSAGES */
+.wa-msg{max-width:84%;padding:5px 8px 4px;border-radius:8px;font-size:12px;line-height:1.45;position:relative;word-wrap:break-word}
+.wa-time{font-size:9px;color:#8696A0;float:right;margin-left:8px;margin-top:2px}
+.wa-tick{color:var(--wa-green)}
+.wa-out{background:var(--wa-out);align-self:flex-end;border-radius:8px 0 8px 8px}
+.wa-in{background:var(--wa-in);align-self:flex-start;border-radius:0 8px 8px 8px;box-shadow:0 1px 1px rgba(0,0,0,.07)}
+.wa-bot{background:var(--wa-bot);align-self:flex-start;border-radius:0 8px 8px 8px;border-left:2.5px solid var(--wa-green);box-shadow:0 1px 1px rgba(0,0,0,.07)}
+.wa-bot-name{font-size:10px;font-weight:700;color:var(--wa-dark-green);margin-bottom:2px}
+
+/* WA message hidden/shown */
+.wa-msg-hidden{display:none!important}
+
+/* WA LINK PREVIEW */
+.wa-link-preview{background:var(--wa-in);align-self:flex-start;border-radius:0 8px 8px 8px;box-shadow:0 1px 2px rgba(0,0,0,.1);max-width:92%;overflow:hidden;cursor:pointer;transition:transform .1s}
+.wa-link-preview:active{transform:scale(.97)}
+.wa-link-top{display:flex}
+.wa-link-bar{width:4px;background:#25D366;flex-shrink:0}
+.wa-link-content{padding:7px 9px 5px}
+.wa-link-domain{font-size:9px;color:#667781;margin-bottom:2px}
+.wa-link-title{font-size:12px;font-weight:700;color:var(--rz-dark);margin-bottom:3px}
+.wa-link-body{font-size:11px;color:#444;line-height:1.4;margin-bottom:4px}
+.wa-link-url{font-size:9px;color:#128C7E;word-break:break-all;line-height:1.3}
+.wa-link-thumb{background:var(--rz-dark2);height:48px;display:flex;align-items:center;justify-content:center;font-size:22px}
+.wa-link-time{font-size:9px;color:#8696A0;text-align:right;padding:0 8px 5px}
+
+/* PULSING LINK */
+@keyframes pulse-border{0%,100%{box-shadow:0 0 0 0 rgba(37,211,102,.5)}50%{box-shadow:0 0 0 5px rgba(37,211,102,0)}}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+.wa-link-preview.pulse{animation:pulse-border 1.8s infinite;border-radius:0 8px 8px 8px}
+.wa-link-tap-hint{text-align:left;font-size:10px;color:var(--wa-dark-green);padding:3px 6px 4px;font-weight:700;display:flex;align-items:center;gap:4px}
+
+/* WA INPUT BAR */
+.wa-input-bar{background:#F0F2F5;padding:6px 10px;display:flex;align-items:center;gap:7px}
+.wa-input{flex:1;background:#fff;border-radius:18px;padding:7px 12px;font-size:12px;color:#667781}
+.wa-send{width:32px;height:32px;background:var(--wa-header);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
+
+/* WA CHAT STEP BUTTONS */
+.wa-step-btns{display:flex;gap:5px;align-self:flex-end;max-width:84%}
+.wa-step-btn{padding:6px 12px;border-radius:8px;background:var(--wa-out);border:1.5px solid rgba(18,140,126,.3);font-size:12px;font-weight:700;color:var(--wa-dark-green);cursor:pointer;transition:transform .1s,background .1s}
+.wa-step-btn:active{transform:scale(.94);background:#c3f0b0}
+.wa-step-btn.disabled{opacity:.4;pointer-events:none}
+
+/* ===== RZ PHONE ===== */
+.rz-phone{width:280px;flex-shrink:0;background:#fff;border-radius:32px;box-shadow:0 16px 50px rgba(0,0,0,.22),0 0 0 5px var(--dark);overflow:hidden;position:relative}
+.rz-inner{position:relative;border-radius:0 0 27px 27px;overflow:hidden}
+
+.rz-header{background:linear-gradient(145deg,var(--rz-dark),var(--rz-dark2));padding:14px 14px 12px}
+.rz-header-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.rz-logo{font-size:9px;font-weight:800;letter-spacing:.15em;color:var(--rz-amber);text-transform:uppercase}
+.rz-badge{background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.35);border-radius:12px;padding:3px 8px;font-size:11px;font-weight:800;color:var(--rz-amber)}
+.rz-title{font-size:16px;font-weight:800;color:#fff;margin-bottom:3px}
+.rz-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+.rz-site{font-size:11px;color:rgba(255,255,255,.5)}
+.rz-contact-pill{font-size:10px;color:rgba(255,255,255,.5);background:rgba(255,255,255,.08);border-radius:12px;padding:2px 8px}
+.rz-prog-labels{display:flex;justify-content:space-between;margin-bottom:3px}
+.rz-prog-label{font-size:9px;color:rgba(255,255,255,.4)}
+.rz-prog-label.on{color:rgba(255,255,255,.8);font-weight:700}
+.rz-prog{height:4px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden}
+.rz-prog-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--rz-amber),#F5C040);border-radius:2px;transition:width .4s ease}
+
+/* CONTENT SCROLL */
+.rz-content{padding:10px 10px 0;background:var(--rz-bg);height:340px;overflow-y:auto}
+.rz-group{margin-bottom:14px}
+.rz-group-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;padding:0 1px}
+.rz-group-label{font-size:9px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#9AA0B8}
+.rz-btn-all{padding:3px 8px;border-radius:6px;border:1px solid var(--rz-vert-border);background:var(--rz-vert-pale);color:var(--rz-vert-text);font-size:9px;font-weight:700;cursor:pointer;transition:transform .1s,background .1s}
+.rz-btn-all:active{transform:scale(.92);background:#c2ecd4}
+.rz-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.rz-room{border-radius:7px;padding:5px 3px 4px;text-align:center;border:1.5px solid var(--rz-border);background:#fff;position:relative;cursor:pointer;transition:transform .12s,box-shadow .12s,background .15s,border-color .15s;-webkit-tap-highlight-color:transparent}
+.rz-room:active{transform:scale(.88);box-shadow:0 0 0 2px var(--rz-amber)}
+.rz-room.ok{background:var(--rz-vert-pale);border-color:var(--rz-vert-border)}
+.rz-room.inc{background:var(--rz-rouge-pale);border-color:var(--rz-rouge-border)}
+.rz-room-num{font-size:10px;font-weight:700;color:#1A1D28}
+.rz-room.ok .rz-room-num{color:var(--rz-vert-text)}
+.rz-room.inc .rz-room-num{color:#9B2D22}
+.rz-room-dot{width:5px;height:5px;border-radius:50%;margin:3px auto 0;background:var(--rz-border)}
+.rz-room.ok .rz-room-dot{background:var(--rz-vert)}
+.rz-room.inc .rz-room-dot{background:var(--rz-rouge)}
+.rz-room.span2{grid-column:span 2}
+.rz-alert-badge{position:absolute;top:-2px;right:-2px;width:8px;height:8px;border-radius:50%;background:var(--rz-rouge);border:1.5px solid var(--rz-bg)}
+
+/* FOOTER */
+.rz-footer{background:#fff;border-top:1.5px solid var(--rz-border);padding:10px 12px}
+.rz-footer-info{font-size:10px;color:#5A5F78;text-align:center;margin-bottom:6px}
+.rz-submit{width:100%;height:40px;border-radius:10px;background:linear-gradient(135deg,#9AA0B8,#7A7F9A);border:none;color:#fff;font-size:13px;font-weight:800;cursor:pointer;transition:background .3s,box-shadow .3s}
+.rz-submit.active{background:linear-gradient(135deg,var(--rz-vert),#24A060);box-shadow:0 3px 14px rgba(27,122,74,.3)}
+@keyframes pulse-green{0%,100%{box-shadow:0 3px 14px rgba(27,122,74,.3)}50%{box-shadow:0 3px 22px rgba(27,122,74,.6)}}
+.rz-submit.done{background:linear-gradient(135deg,var(--rz-vert),#24A060);animation:pulse-green 1.5s infinite}
+
+/* ===== BOTTOM SHEET ===== */
+.rz-overlay{position:absolute;inset:0;background:rgba(0,0,0,0);pointer-events:none;transition:background .25s;z-index:5;border-radius:0 0 27px 27px}
+.rz-overlay.show{background:rgba(0,0,0,.42);pointer-events:auto}
+.rz-sheet{position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:18px 18px 0 0;transform:translateY(100%);transition:transform .3s cubic-bezier(.16,1,.3,1);z-index:10;max-height:92%}
+.rz-sheet.open{transform:translateY(0)}
+.rz-sheet-handle-row{display:flex;justify-content:center;padding:10px 0 0}
+.rz-sheet-handle{width:32px;height:4px;background:#E4E6EF;border-radius:2px}
+.rz-sheet-hdr{padding:10px 16px 8px;border-bottom:1px solid #E4E6EF;display:flex;align-items:flex-start;justify-content:space-between}
+.rz-sheet-title{font-size:18px;font-weight:800;color:#1A1D28;letter-spacing:-.02em}
+.rz-sheet-sub{font-size:11px;color:#5A5F78;margin-top:1px}
+.rz-sheet-close{width:24px;height:24px;border-radius:50%;background:#F4F5FA;border:1px solid #E4E6EF;display:flex;align-items:center;justify-content:center;font-size:11px;color:#5A5F78;cursor:pointer;flex-shrink:0;margin-top:2px}
+.rz-sheet-close:active{background:#E4E6EF}
+.rz-sheet-body{padding:10px 14px 0;overflow-y:auto;max-height:340px}
+.rz-sect-title{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9AA0B8;margin-bottom:6px;margin-top:10px}
+/* last visit */
+.rz-lv{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;border:1px solid #E4E6EF;background:#F4F5FA}
+.rz-lv-dot{width:8px;height:8px;border-radius:50%;background:#C8CAD8;flex-shrink:0}
+.rz-lv-text{font-size:12px;font-weight:600;color:#1A1D28}
+.rz-lv-sub{font-size:10px;color:#5A5F78}
+/* equipment */
+.rz-eq-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;border:1px solid #E4E6EF;background:#F4F5FA;margin-bottom:4px;transition:background .15s}
+.rz-eq-icon{font-size:14px;width:20px;text-align:center;flex-shrink:0}
+.rz-eq-nom{flex:1;font-size:11px;font-weight:500;color:#1A1D28}
+.rz-eq-btns{display:flex;gap:4px}
+.rz-eq-btn{width:28px;height:24px;border-radius:5px;border:1.5px solid #E4E6EF;background:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .1s,background .12s,border-color .12s}
+.rz-eq-btn:active{transform:scale(.84)}
+.rz-eq-btn.ok-on{background:var(--rz-vert-pale);border-color:var(--rz-vert-border)}
+.rz-eq-btn.inc-on{background:var(--rz-rouge-pale);border-color:var(--rz-rouge-border)}
+/* status buttons */
+.rz-status-row{display:flex;gap:6px;margin-top:8px}
+.rz-status-btn{flex:1;padding:9px;border-radius:8px;border:1.5px solid #E4E6EF;background:#fff;font-size:11px;font-weight:700;color:#5A5F78;text-align:center;cursor:pointer;transition:background .15s,border-color .15s,color .15s,transform .1s}
+.rz-status-btn:active{transform:scale(.95)}
+.rz-status-btn.ok-on{background:var(--rz-vert-pale);border-color:var(--rz-vert-border);color:var(--rz-vert-text)}
+.rz-status-btn.inc-on{background:var(--rz-rouge-pale);border-color:var(--rz-rouge-border);color:var(--rz-rouge)}
+/* confirm */
+.rz-sheet-foot{padding:8px 14px 14px;border-top:1px solid #E4E6EF;margin-top:8px}
+.rz-confirm-btn{width:100%;height:40px;border-radius:10px;border:none;font-size:12px;font-weight:800;background:linear-gradient(135deg,var(--rz-vert),#24A060);color:#fff;box-shadow:0 2px 10px rgba(27,122,74,.3);cursor:pointer;transition:background .15s,transform .1s}
+.rz-confirm-btn:active{transform:scale(.97)}
+.rz-confirm-btn.inc{background:linear-gradient(135deg,var(--rz-rouge),#E74C3C);box-shadow:0 2px 10px rgba(192,57,43,.3)}
+
+/* ===== ARROW ===== */
+.arrow-wrap{display:flex;flex-direction:column;align-items:center;padding-top:90px;gap:4px}
+.arrow-wrap div:first-child{font-size:26px;color:var(--amber)}
+.arrow-wrap div:last-child{font-size:10px;color:var(--muted);text-align:center;line-height:1.4}
+
+/* CAPTION */
+.phone-caption{text-align:center;margin-top:10px;font-size:11px;color:var(--muted);font-weight:600}
+
+/* SUCCESS TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1B7A4A;color:#fff;padding:10px 18px;border-radius:12px;font-size:13px;font-weight:700;box-shadow:0 4px 20px rgba(0,0,0,.2);transition:transform .3s cubic-bezier(.16,1,.3,1);z-index:999;white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+@media(max-width:680px){.arrow-wrap{display:none}.layout{flex-direction:column;align-items:center}}
+</style>
+</head>
+<body>
+
+<div class="page-title">
+  <h1>Ronde de Zones — Flux WhatsApp</h1>
+  <p>
+    <span class="step-label">ÉTAPE 1</span> Tech envoie "saisie" →
+    <span class="step-label">ÉTAPE 2</span> Choisit le site →
+    <span class="step-label">ÉTAPE 3</span> Sélectionne "Ronde de zones" →
+    <span class="step-label">ÉTAPE 4</span> Page GenTrack s'ouvre
+  </p>
+  <div><span class="interactive-badge">✦ Mockup interactif — cliquez partout</span></div>
+</div>
+
+<div class="layout">
+
+  <!-- ===== PHONE 1 : WHATSAPP ===== -->
+  <div>
+    <div class="phone">
+      <div class="phone-notch"><div class="phone-notch-pill"></div></div>
+      <div class="wa-header">
+        <div class="wa-avatar">🤖</div>
+        <div class="wa-contact"><h4>GenTrack Bot</h4><p>+225 07 00 00 000</p></div>
+        <div class="wa-actions">⋮</div>
+      </div>
+      <div class="wa-body" id="wa-body">
+        <div class="wa-date-sep"><span>Aujourd'hui, 07:34</span></div>
+      </div>
+      <div class="wa-input-bar">
+        <div style="font-size:16px;color:#8696A0">😊</div>
+        <div class="wa-input">Message…</div>
+        <div style="font-size:16px;color:#8696A0">📎</div>
+        <div class="wa-send">🎤</div>
+      </div>
+    </div>
+    <div class="phone-caption">WhatsApp — Sélection de la ronde</div>
+    <button onclick="waPlay()" style="margin:10px auto 0;display:block;background:none;border:1.5px solid var(--border);border-radius:8px;padding:6px 16px;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;letter-spacing:.02em">▶ Rejouer</button>
+  </div>
+
+  <!-- ARROW -->
+  <div class="arrow-wrap">
+    <div>→</div>
+    <div>Lien<br>s'ouvre</div>
+  </div>
+
+  <!-- ===== PHONE 2 : RONDE ZONES (interactive) ===== -->
+  <div>
+    <div class="rz-phone" id="rz-phone">
+      <div class="phone-notch"><div class="phone-notch-pill"></div></div>
+
+      <!-- RZ HEADER -->
+      <div class="rz-header">
+        <div class="rz-header-top">
+          <span class="rz-logo">GenTrack</span>
+          <span class="rz-badge" id="rz-badge">0 / 15</span>
+        </div>
+        <div class="rz-title">🏘️ Ronde de zones</div>
+        <div class="rz-meta">
+          <span class="rz-site">ATAF — Plateau</span>
+          <span class="rz-contact-pill">Jean-Paul K.</span>
+        </div>
+        <div class="rz-prog-labels">
+          <span class="rz-prog-label on" id="rz-prog-label">Zones : 0/15</span>
+          <span class="rz-prog-label" id="rz-prog-pct">0%</span>
+        </div>
+        <div class="rz-prog"><div class="rz-prog-bar" id="rz-prog-bar"></div></div>
+      </div>
+
+      <!-- INNER (content + overlay + sheet) -->
+      <div class="rz-inner">
+
+        <!-- SCROLL CONTENT -->
+        <div class="rz-content" id="rz-content">
+          <!-- generated by JS -->
+        </div>
+
+        <!-- FOOTER -->
+        <div class="rz-footer">
+          <div class="rz-footer-info" id="rz-footer-info">0 zone validée · 0 incident · 15 restantes</div>
+          <button class="rz-submit" id="rz-submit" onclick="submitRonde()">Valider la ronde →</button>
+        </div>
+
+        <!-- OVERLAY -->
+        <div class="rz-overlay" id="rz-overlay" onclick="closeSheet()"></div>
+
+        <!-- BOTTOM SHEET -->
+        <div class="rz-sheet" id="rz-sheet">
+          <div class="rz-sheet-handle-row"><div class="rz-sheet-handle"></div></div>
+          <div class="rz-sheet-hdr">
+            <div>
+              <div class="rz-sheet-title" id="sheet-title">Zone</div>
+              <div class="rz-sheet-sub" id="sheet-sub">—</div>
+            </div>
+            <div class="rz-sheet-close" onclick="closeSheet()">✕</div>
+          </div>
+          <div class="rz-sheet-body">
+            <div class="rz-sect-title">DERNIÈRE VISITE</div>
+            <div class="rz-lv">
+              <div class="rz-lv-dot"></div>
+              <div>
+                <div class="rz-lv-text" id="sheet-lv-text">Jamais inspecté</div>
+                <div class="rz-lv-sub" id="sheet-lv-sub">Fréquence 30 j</div>
+              </div>
+            </div>
+            <div class="rz-sect-title">ÉQUIPEMENTS</div>
+            <div id="sheet-equips"></div>
+            <div class="rz-sect-title">STATUT DE LA ZONE</div>
+            <div class="rz-status-row">
+              <div class="rz-status-btn" id="btn-ok" onclick="setZoneStatus('ok')">✅ OK</div>
+              <div class="rz-status-btn" id="btn-inc" onclick="setZoneStatus('inc')">⚠️ Incident</div>
+            </div>
+          </div>
+          <div class="rz-sheet-foot">
+            <button class="rz-confirm-btn" id="rz-confirm-btn" onclick="confirmZone()">✅ Confirmer — Zone OK</button>
+          </div>
+        </div>
+
+      </div><!-- /rz-inner -->
+    </div>
+    <div class="phone-caption">Page GenTrack — ronde-zones.html · <b>Cliquez sur une zone !</b></div>
+  </div>
+
+</div><!-- /layout -->
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────
+var GROUPS = [
+  {
+    id:'tourA', label:'Tour A — Clims',
+    showAll: true,
+    zones:[
+      {id:'101',label:'101'},{id:'102',label:'102'},{id:'103',label:'103'},
+      {id:'104',label:'104'},{id:'105',label:'105'},
+      {id:'201',label:'201'},{id:'202',label:'202'},{id:'203',label:'203'},
+      {id:'204',label:'204'},{id:'205',label:'205'},
+    ]
+  },
+  {
+    id:'commun', label:'Équipements communs',
+    showAll: false,
+    zones:[
+      {id:'ascA',label:'Ascenseur A',span:2},
+      {id:'ascB',label:'Ascenseur B',span:2},
+      {id:'pompe',label:'Pompe'},
+    ]
+  }
+];
+
+var APT_EQ = [
+  {icon:'❄️',nom:'Climatisation'},
+  {icon:'🔒',nom:'Coffre-fort'},
+  {icon:'🔌',nom:'Électricité'},
+  {icon:'🚿',nom:'Plomberie'},
+];
+var EQUIPS = {
+  'ascA':[{icon:'🚪',nom:'Portes'},{icon:'💡',nom:'Éclairage'},{icon:'⚙️',nom:'Moteur'},{icon:'🎛️',nom:'Panneau commande'}],
+  'ascB':[{icon:'🚪',nom:'Portes'},{icon:'💡',nom:'Éclairage'},{icon:'⚙️',nom:'Moteur'},{icon:'🎛️',nom:'Panneau commande'}],
+  'pompe':[{icon:'🔩',nom:'Corps pompe'},{icon:'🔗',nom:'Raccordements'},{icon:'📊',nom:'Manomètre'},{icon:'⚡',nom:'Alimentation'}],
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────
+var zoneStatus = {};
+var eqStatus = {};
+var currentZone = null;
+var curZoneStatus = null;
+var rzActive = false;
+// ── WA HELPERS ────────────────────────────────────────────────────────
+function waBody(){ return document.getElementById('wa-body'); }
+function waAppend(el){ var b=waBody(); b.appendChild(el); b.scrollTop=b.scrollHeight; }
+
+function waMsgOut(text,time){
+  var el=document.createElement('div');
+  el.className='wa-msg wa-out';
+  el.innerHTML=text+'<span class="wa-time">'+time+' <span class="wa-tick">✓✓</span></span>';
+  return el;
+}
+function waMsgBot(html,time){
+  var el=document.createElement('div');
+  el.className='wa-msg wa-bot';
+  el.innerHTML='<div class="wa-bot-name">🤖 GenTrack</div>'+html+'<span class="wa-time">'+time+'</span>';
+  return el;
+}
+function waTyping(){
+  var el=document.createElement('div');
+  el.className='wa-msg wa-bot';
+  el.style.cssText='padding:8px 12px;width:44px';
+  el.innerHTML='<span style="display:flex;gap:3px;align-items:center">'
+    +'<span style="width:5px;height:5px;border-radius:50%;background:#aaa;animation:blink 1s infinite 0s"></span>'
+    +'<span style="width:5px;height:5px;border-radius:50%;background:#aaa;animation:blink 1s infinite .2s"></span>'
+    +'<span style="width:5px;height:5px;border-radius:50%;background:#aaa;animation:blink 1s infinite .4s"></span>'
+    +'</span>';
+  return el;
+}
+function waLinkCard(site){
+  var card=document.createElement('div');
+  card.className='wa-link-preview pulse';
+  card.innerHTML=
+    '<div class="wa-link-thumb">🏘️</div>'
+    +'<div class="wa-link-top">'
+    +'<div class="wa-link-bar"></div>'
+    +'<div class="wa-link-content">'
+    +'<div class="wa-link-domain">gen-track.vercel.app</div>'
+    +'<div class="wa-link-title">GenTrack · Ronde de zones</div>'
+    +'<div class="wa-link-body">🏘️ <b>Ronde de zones — '+site+'</b><br>Bonjour Jean-Paul !<br>Ouvrez ce lien pour effectuer la ronde.</div>'
+    +'<div class="wa-link-url">https://gen-track.vercel.app/ronde?site=ataf&amp;agent=jp</div>'
+    +'</div></div>'
+    +'<div class="wa-link-tap-hint">👆 Appuyez pour ouvrir →</div>'
+    +'<div class="wa-link-time">07:35</div>';
+  card.onclick=function(){ activateRzPhone(); card.style.opacity='.7'; };
+  return card;
+}
+
+// ── WA AUTO-PLAY FLOW ─────────────────────────────────────────────────
+// La conversation se joue automatiquement.
+// Seul le clic sur la carte lien est interactif.
+var _waSite='ATAF — Plateau';
+
+function waPlay(){
+  // Vider le chat sauf le séparateur date
+  var b=waBody();
+  while(b.children.length>1) b.removeChild(b.lastChild);
+  rzActive=false;
+  // Réinitialiser l'overlay/sheet du RZ phone
+  document.getElementById('rz-overlay').classList.remove('show');
+  document.getElementById('rz-sheet').classList.remove('open');
+
+  var t1=waTyping(); waAppend(t1);
+
+  // t=700ms : bot demande le site
+  setTimeout(function(){
+    t1.remove();
+    waAppend(waMsgBot(
+      '📍 <b>Sur quel site travaillez-vous aujourd\'hui ?</b><br><br>'
+      +'<b>1</b> — ATAF Plateau &nbsp; <b>2</b> — Zone Industrielle &nbsp; <b>3</b> — Palévia',
+      '07:34'
+    ));
+
+    // t=700+900 : user répond "1"
+    setTimeout(function(){
+      waAppend(waMsgOut('1','07:34'));
+      var t2=waTyping(); waAppend(t2);
+
+      // t=700+900+800 : bot demande l'action
+      setTimeout(function(){
+        t2.remove();
+        waAppend(waMsgBot(
+          'Bonjour <b>Jean-Paul</b> 👋 — <b>'+_waSite+'</b><br><br>'
+          +'Que souhaitez-vous faire ?<br><br>'
+          +'<b>1</b> — 🌟 Ronde journalière &nbsp; <b>2</b> — 📊 Relevé horaire &nbsp; <b>3</b> — 🏘️ Ronde de zones',
+          '07:34'
+        ));
+
+        // t=…+900 : user répond "3"
+        setTimeout(function(){
+          waAppend(waMsgOut('3','07:35'));
+          var t3=waTyping(); waAppend(t3);
+
+          // t=…+900 : bot envoie le lien
+          setTimeout(function(){
+            t3.remove();
+            waAppend(waLinkCard(_waSite));
+          },900);
+        },900);
+      },800);
+    },900);
+  },700);
+}
+
+// Démarrage automatique
+waPlay();
+
+// ── RZ PHONE ──────────────────────────────────────────────────────────
+function activateRzPhone(){
+  if(!rzActive){
+    rzActive=true;
+    renderGrid();
+    showToast('🏘️ Ronde de zones ouverte !');
+  }
+}
+
+// ── GRID RENDER ───────────────────────────────────────────────────────
+function renderGrid(){
+  var el=document.getElementById('rz-content');
+  var html='';
+  GROUPS.forEach(function(g){
+    html+='<div class="rz-group">';
+    html+='<div class="rz-group-hdr">';
+    html+='<span class="rz-group-label">'+g.label+'</span>';
+    if(g.showAll) html+='<button class="rz-btn-all" onclick="markGroupOk(\''+g.id+'\')">Tout OK</button>';
+    html+='</div><div class="rz-grid">';
+    g.zones.forEach(function(z){
+      var st=zoneStatus[z.id]||'';
+      var spanCls=z.span===2?'rz-room span2':'rz-room';
+      var incBadge=(st==='inc')?'<div class="rz-alert-badge"></div>':'';
+      html+='<div class="'+spanCls+(st?' '+st:'')+'" onclick="openSheet(\''+z.id+'\')">';
+      html+='<div class="rz-room-num" style="font-size:'+(z.label.length>3?'8px':'10px')+'">'+z.label+'</div>';
+      html+='<div class="rz-room-dot"></div>'+incBadge+'</div>';
+    });
+    html+='</div></div>';
+  });
+  el.innerHTML=html;
+  updateProgress();
+}
+
+// ── PROGRESS ──────────────────────────────────────────────────────────
+var TOTAL=15;
+function updateProgress(){
+  var done=0,inc=0;
+  Object.keys(zoneStatus).forEach(function(id){
+    if(zoneStatus[id]) done++;
+    if(zoneStatus[id]==='inc') inc++;
+  });
+  var left=TOTAL-done;
+  var pct=Math.round(done/TOTAL*100);
+  document.getElementById('rz-badge').textContent=done+' / '+TOTAL;
+  document.getElementById('rz-prog-label').textContent='Zones : '+done+'/'+TOTAL;
+  document.getElementById('rz-prog-pct').textContent=pct+'%';
+  document.getElementById('rz-prog-bar').style.width=pct+'%';
+  document.getElementById('rz-footer-info').textContent=
+    done+(done===1?' zone validée':' zones validées')+' · '+inc+(inc===1?' incident':' incidents')+' · '+left+(left===1?' restante':' restantes');
+  var btn=document.getElementById('rz-submit');
+  if(done===TOTAL){
+    btn.className='rz-submit done';
+    btn.textContent='✅ Soumettre la ronde ('+TOTAL+' zones)';
+  } else if(done>0){
+    btn.className='rz-submit active';
+    btn.textContent='Valider la ronde → ('+done+'/'+TOTAL+')';
+  } else {
+    btn.className='rz-submit';
+    btn.textContent='Valider la ronde →';
+  }
+}
+
+// ── SHEET ─────────────────────────────────────────────────────────────
+function openSheet(zoneId){
+  if(!rzActive){showToast('👆 Ouvrez d\'abord le lien WhatsApp →');return;}
+  currentZone=zoneId;
+  curZoneStatus=zoneStatus[zoneId]||null;
+
+  // Find zone label
+  var zLabel=zoneId,gLabel='';
+  GROUPS.forEach(function(g){
+    g.zones.forEach(function(z){
+      if(z.id===zoneId){zLabel=z.label;gLabel=g.label;}
+    });
+  });
+
+  document.getElementById('sheet-title').textContent=
+    (zoneId.startsWith('asc')||zoneId==='pompe')?zLabel:('Appt '+zLabel);
+  document.getElementById('sheet-sub').textContent=
+    zoneId.startsWith('10')||zoneId.startsWith('20')?'chambre · Tour A':gLabel;
+
+  var wasVisited=zoneStatus[zoneId];
+  document.getElementById('sheet-lv-text').textContent=wasVisited?'Déjà inspecté cette ronde':'Jamais inspecté';
+  document.getElementById('sheet-lv-sub').textContent='Fréquence 30 j';
+
+  // Equips
+  var eqs=EQUIPS[zoneId]||APT_EQ;
+  var eqHtml='';
+  eqs.forEach(function(eq,i){
+    var key=zoneId+'_'+i;
+    var st=eqStatus[key]||null;
+    eqHtml+='<div class="rz-eq-row" id="eqrow-'+i+'">';
+    eqHtml+='<div class="rz-eq-icon">'+eq.icon+'</div>';
+    eqHtml+='<div class="rz-eq-nom">'+eq.nom+'</div>';
+    eqHtml+='<div class="rz-eq-btns">';
+    eqHtml+='<div class="rz-eq-btn'+(st==='ok'?' ok-on':'')+'" onclick="toggleEq('+i+',\'ok\')">✅</div>';
+    eqHtml+='<div class="rz-eq-btn'+(st==='inc'?' inc-on':'')+'" onclick="toggleEq('+i+',\'inc\')">⚠️</div>';
+    eqHtml+='</div></div>';
+  });
+  document.getElementById('sheet-equips').innerHTML=eqHtml;
+
+  // Status
+  updateStatusBtns();
+
+  document.getElementById('rz-overlay').classList.add('show');
+  document.getElementById('rz-sheet').classList.add('open');
+}
+
+function closeSheet(){
+  document.getElementById('rz-overlay').classList.remove('show');
+  document.getElementById('rz-sheet').classList.remove('open');
+  currentZone=null;
+  curZoneStatus=null;
+}
+
+function toggleEq(idx,val){
+  if(!currentZone) return;
+  var key=currentZone+'_'+idx;
+  eqStatus[key]=eqStatus[key]===val?null:val;
+  // Re-render that eq row
+  var eqs=EQUIPS[currentZone]||APT_EQ;
+  var row=document.getElementById('eqrow-'+idx);
+  if(row){
+    var st=eqStatus[key]||null;
+    var btns=row.querySelectorAll('.rz-eq-btn');
+    btns[0].className='rz-eq-btn'+(st==='ok'?' ok-on':'');
+    btns[1].className='rz-eq-btn'+(st==='inc'?' inc-on':'');
+  }
+  // Auto-detect zone status from equips
+  var hasInc=false,allOk=true;
+  eqs.forEach(function(_,i){
+    var k=currentZone+'_'+i;
+    if(eqStatus[k]==='inc') hasInc=true;
+    if(eqStatus[k]!=='ok') allOk=false;
+  });
+  if(hasInc) setZoneStatus('inc');
+  else if(allOk) setZoneStatus('ok');
+}
+
+function setZoneStatus(val){
+  curZoneStatus=val;
+  updateStatusBtns();
+}
+
+function updateStatusBtns(){
+  var btnOk=document.getElementById('btn-ok');
+  var btnInc=document.getElementById('btn-inc');
+  btnOk.className='rz-status-btn'+(curZoneStatus==='ok'?' ok-on':'');
+  btnInc.className='rz-status-btn'+(curZoneStatus==='inc'?' inc-on':'');
+  var cfm=document.getElementById('rz-confirm-btn');
+  if(curZoneStatus==='inc'){
+    cfm.className='rz-confirm-btn inc';
+    cfm.textContent='⚠️ Confirmer — Incident signalé';
+  } else {
+    cfm.className='rz-confirm-btn';
+    cfm.textContent='✅ Confirmer — Zone OK';
+  }
+}
+
+function confirmZone(){
+  if(!currentZone) return;
+  var st=curZoneStatus||'ok';
+  zoneStatus[currentZone]=st;
+  closeSheet();
+  renderGrid();
+  if(st==='inc') showToast('⚠️ Incident signalé pour cette zone');
+  else showToast('✅ Zone validée !');
+}
+
+// ── GROUP OK ──────────────────────────────────────────────────────────
+function markGroupOk(groupId){
+  GROUPS.forEach(function(g){
+    if(g.id===groupId){
+      g.zones.forEach(function(z){zoneStatus[z.id]='ok';});
+    }
+  });
+  renderGrid();
+  showToast('✅ Groupe entier validé !');
+}
+
+// ── SUBMIT ────────────────────────────────────────────────────────────
+function submitRonde(){
+  var done=Object.keys(zoneStatus).filter(function(id){return zoneStatus[id];}).length;
+  if(done===0){showToast('👆 Commencez par valider des zones');return;}
+  if(done<TOTAL){showToast('⚠️ '+done+'/'+TOTAL+' zones validées');return;}
+  showToast('🎉 Ronde soumise — merci Jean-Paul !');
+  // Reset after 2s
+  setTimeout(function(){
+    zoneStatus={};eqStatus={};renderGrid();
+    var btn=document.getElementById('rz-submit');
+    btn.className='rz-submit';btn.textContent='Valider la ronde →';
+  },2000);
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────
+var toastTimer=null;
+function showToast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){t.classList.remove('show');},2200);
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────
+renderGrid();
+</script>
+</body>
+</html>
