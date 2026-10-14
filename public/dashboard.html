@@ -368,6 +368,7 @@ var _energieCfgWizardPays=null;     // {id,pays_code,pays_nom,flag,distributeur,
 var _energieCfgWizardTemplate=null; // '1_index'|'2_jour_nuit'|'3_hc_hp_pointe'|'aucun'
 var _energieCfgWizardRows=[]; // [{nom,unite,type_valeur,seuil_alerte_bas,objectif_mensuel,actif}]
 var _energieCfgWizardSousFluides=[]; // sous-compteurs sélectionnés [{nom,unite,type_valeur,groupe}]
+var _energieCfgWizardForced=false;   // true = afficher le wizard même si des fluides existent déjà
 var _energieTemplatesCache=[]; // templates chargés depuis DB
 
 function $id(id){return document.getElementById(id);}
@@ -612,7 +613,7 @@ function _goToSignalement(sgId){
 
 function navTo(id){
   if(!_session)return;
-  if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;_zonesWizardStep=0;_zonesViewFilter='maintenance';_eqImportStep=0;_energieCfgWizardStep=0;_energieCfgWizardPays=null;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];_resWizStep=0;_resSubTab='config';_resExistingEqLoaded=false;_resPlanFilter='all';}
+  if(id!=='config'){_configCurrentTab='equipements';_configSelectedEqId=null;_zonesWizardStep=0;_zonesViewFilter='maintenance';_eqImportStep=0;_energieCfgWizardStep=0;_energieCfgWizardPays=null;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];_energieCfgWizardForced=false;_resWizStep=0;_resSubTab='config';_resExistingEqLoaded=false;_resPlanFilter='all';}
   if(_session.role==='resp_tech')renderRespTech(_session,id);
   else if(_session.role==='dir_tech'){
     if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,id);
@@ -7278,7 +7279,7 @@ async function _moveQ(qId, freqKey, dir){
 
 function _switchConfigTab(tab){
   _configCurrentTab=tab;
-  if(tab!=='energie'){_energieCfgWizardStep=0;_energieCfgWizardPays=null;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];}
+  if(tab!=='energie'){_energieCfgWizardStep=0;_energieCfgWizardPays=null;_energieCfgWizardTemplate=null;_energieCfgWizardRows=[];_energieCfgWizardForced=false;}
   if(!_session)return;
   renderRespTech(_session,'config');
 }
@@ -14123,8 +14124,8 @@ async function _buildEnergieConfigTab(sid){
 
   var h='<div style="max-width:920px">';
 
-  // ── Si aucun fluide : afficher le wizard ──
-  if(!fluides||!fluides.length){
+  // ── Si aucun fluide OU reset forcé : afficher le wizard ──
+  if(!fluides||!fluides.length||_energieCfgWizardForced){
     h+=_energieCfgWizardHtml(sid);
     return h+'</div>';
   }
@@ -14461,13 +14462,14 @@ function _energieCfgWizardSelectTemplate(key,sid){
 }
 
 function _energieCfgWizardReset(sid){
+  // Confirm avant de tout réinitialiser
+  if(!window.confirm('Réinitialiser la configuration avec un nouveau modèle ?\n\nVos fluides actuels seront conservés en base — vous pourrez les supprimer manuellement si besoin.'))return;
   _energieCfgWizardStep=0;
   _energieCfgWizardTemplate=null;
   _energieCfgWizardPays=null;
   _energieCfgWizardRows=[];
   _energieCfgWizardSousFluides=[];
-  // Note admin : reset supprime les fluides existants côté UX mais ne DELETE pas en DB
-  if(!window.confirm('Réinitialiser la configuration avec un nouveau modèle ?\n\nVos fluides actuels seront conservés en base — vous pourrez les supprimer manuellement si besoin.'))return;
+  _energieCfgWizardForced=true; // forcer l'affichage du wizard même si des fluides existent
   if(_session)renderRespTech(_session,'config');
 }
 
@@ -14647,8 +14649,10 @@ async function _energieCfgWizardSaveAll(sid){
   }
   _energieCfgWizardStep=0;
   _energieCfgWizardTemplate=null;
+  _energieCfgWizardPays=null;
   _energieCfgWizardRows=[];
   _energieCfgWizardSousFluides=[];
+  _energieCfgWizardForced=false; // retour au mode normal après save
   if(_session)renderRespTech(_session,'config');
 }
 
