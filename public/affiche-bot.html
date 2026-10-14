@@ -173,44 +173,38 @@ body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
       </div>
     </div>
 
-    <!-- RONDE -->
+    <!-- SAISIE / MENU PRINCIPAL -->
     <div class="cmd-card ronde">
       <div class="cmd-header">
-        <span class="cmd-icon">🔄</span>
+        <span class="cmd-icon">☀️</span>
         <div>
-          <div class="cmd-label">Effectuer une ronde</div>
-          <span class="cmd-tag">ronde</span>
+          <div class="cmd-label">Rondes & relevés</div>
+          <span class="cmd-tag">saisie</span>
         </div>
       </div>
-      <div class="cmd-desc">Saisissez les relevés de ronde quotidiens ou hebdomadaires. Le bot pose chaque question équipement par équipement.</div>
+      <div class="cmd-desc">Menu principal — choisissez parmi les rondes disponibles (journalière, hebdo…), le relevé horaire ou le relevé énergie. Le bot guide chaque étape.</div>
       <div class="flow">
         <div class="flow-label">Exemple</div>
-        <div class="flow-msg user">ronde</div>
-        <div class="flow-msg bot wa">🔄 Ronde journalière<br/>📍 Hôtel Azalaï<br/><br/>GE Principal :<br/>Q: Niveau cuve (litres) ?</div>
-        <div class="flow-msg user">380</div>
-        <div class="flow-msg bot wa">Q: État général (OK/Anomalie) ?</div>
-        <div class="flow-msg user">OK</div>
-        <div class="flow-msg bot wa">✅ Ronde enregistrée (5/5 équipements)</div>
+        <div class="flow-msg user">saisie</div>
+        <div class="flow-msg bot wa">Bonjour Moussa 👋<br/><strong>Hôtel Azalaï</strong><br/><br/>Que souhaitez-vous faire ?<br/><strong>1</strong> — ☀️ Ronde journalière<br/><strong>2</strong> — 📅 Ronde hebdomadaire<br/><strong>3</strong> — 🚨 Déclarer une panne<br/><strong>4</strong> — 📋 Suivi signalements<br/><strong>5</strong> — 🌙 Bilan de journée</div>
+        <div class="flow-msg user">1</div>
+        <div class="flow-msg bot wa">Ronde journalière — 3 équipements :<br/><strong>1</strong> — GE Principal<br/><strong>2</strong> — Cuve Fuel<br/><strong>3</strong> — Groupe Froid<br/>Lequel commencer ?</div>
       </div>
     </div>
 
-    <!-- SAISIE / RELEVÉ -->
+    <!-- RELEVÉ HORAIRE -->
     <div class="cmd-card saisie">
       <div class="cmd-header">
         <span class="cmd-icon">📊</span>
         <div>
           <div class="cmd-label">Relevé horaire</div>
-          <span class="cmd-tag">saisie</span>
+          <span class="cmd-tag">via saisie → relevé</span>
         </div>
       </div>
-      <div class="cmd-desc">Enregistrez un relevé horaire sur n'importe quel équipement : température, pression, consommation…</div>
+      <div class="cmd-desc">Accessible depuis le menu <strong>saisie</strong>. Enregistrez un relevé horaire sur n'importe quel équipement : température, pression, consommation…</div>
       <div class="flow">
-        <div class="flow-label">Exemple</div>
-        <div class="flow-msg user">saisie</div>
-        <div class="flow-msg bot wa">📊 Relevé horaire<br/>Quel équipement ?<br/>1 - GE Principal<br/>2 - Cuve Fuel<br/>3 - Groupe Froid</div>
-        <div class="flow-msg user">1</div>
-        <div class="flow-msg bot wa">📋 GE Principal<br/>Q: Température eau (°C) ?</div>
-        <div class="flow-msg user">87</div>
+        <div class="flow-label">Depuis le menu saisie</div>
+        <div class="flow-msg bot wa">📊 Relevé horaire — Hôtel Azalaï<br/><br/>Ouvrez ce lien pour saisir le relevé :<br/><u>gen-track.vercel.app/releve.html?…</u></div>
         <div class="flow-msg bot wa">✅ Relevé enregistré. Aucune anomalie détectée.</div>
       </div>
     </div>
@@ -248,11 +242,13 @@ body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
           <span class="cmd-tag" style="background:#EDE7F6;color:#5E35B1">suivi</span>
         </div>
       </div>
-      <div class="cmd-desc">Consultez en un coup d'œil tous les signalements du site : non pris en charge, en cours (par qui), résolus aujourd'hui.</div>
+      <div class="cmd-desc">Liste numérotée des signalements du site. Tapez un ou plusieurs numéros pour prendre en charge et recevoir directement les liens de rapport.</div>
       <div class="flow">
         <div class="flow-label">Exemple</div>
         <div class="flow-msg user">suivi</div>
-        <div class="flow-msg bot wa">📋 Suivi signalements<br/>🔴 Non pris en charge (1)<br/>• REF-1042 · GE Principal — Ne démarre plus<br/><br/>🟡 En cours (1)<br/>• REF-1038 · Groupe Froid — Surchauffe _(Moussa)_<br/><br/>✅ Résolus aujourd'hui (2)</div>
+        <div class="flow-msg bot wa">📋 Suivi — Hôtel Azalaï<br/><br/>🔴 <strong>1</strong> · REF-1042 · GE Principal — Ne démarre plus<br/>🔴 <strong>2</strong> · REF-1045 · Compresseur — Fuite huile<br/><br/>🟡 <strong>3</strong> · REF-1038 · Groupe Froid — Surchauffe _(Moussa)_<br/><br/>✅ <strong>4</strong> · REF-1030 · Pompe eau — Résolu<br/><br/><em>Tapez un ou plusieurs numéros (ex : 1 2) pour prendre en charge</em></div>
+        <div class="flow-msg user">1 2</div>
+        <div class="flow-msg bot wa">✅ <strong>Pris en charge !</strong><br/>📋 REF-1042, REF-1045<br/><br/>📝 <strong>Rapports d'intervention :</strong><br/><br/><strong>REF-1042</strong> — GE Principal — Ne démarre plus<br/><u>gen-track.vercel.app/rapport.html?sg=…</u><br/><br/><strong>REF-1045</strong> — Compresseur — Fuite huile<br/><u>gen-track.vercel.app/rapport.html?sg=…</u></div>
       </div>
     </div>
 
@@ -264,14 +260,15 @@ body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
           <span class="cmd-tag" style="background:#E0F2F1;color:#00695C">bilan</span>
         </div>
       </div>
-      <div class="cmd-desc">Envoyez votre récap d'interventions à votre responsable en fin de journée. Décrivez vos actions une par une, puis tapez <strong>ENVOYER</strong>.</div>
+      <div class="cmd-desc">Le bot génère automatiquement votre récap du jour (rondes effectuées + signalements résolus) et vous demande si vous avez des blocages à signaler.</div>
       <div class="flow">
-        <div class="flow-label">Exemple</div>
+        <div class="flow-label">Exemple technicien</div>
         <div class="flow-msg user">bilan</div>
-        <div class="flow-msg bot wa">🌙 Bilan de fin de journée<br/>Décrivez vos interventions...<br/><em>Tapez ENVOYER pour transmettre</em></div>
-        <div class="flow-msg user">Changé courroie GE Principal — OK</div>
-        <div class="flow-msg user">ENVOYER</div>
-        <div class="flow-msg bot wa">✅ Bilan envoyé à votre responsable. 📲</div>
+        <div class="flow-msg bot wa">🌙 <strong>Bilan de journée — Moussa</strong><br/>📍 Hôtel Azalaï · Aujourd'hui<br/><br/>📋 <strong>Rondes effectuées</strong><br/>• ☀️ Ronde journalière<br/>• 📅 Ronde hebdomadaire<br/><br/>✅ <strong>Signalements résolus</strong><br/>• REF-1038 · Groupe Froid — Surchauffe<br/>• REF-1029 · Pompe eau — Fuite<br/><br/><em>Des blocages à signaler sur des signalements en cours ?</em><br/><strong>(OUI / NON)</strong></div>
+        <div class="flow-msg user">OUI</div>
+        <div class="flow-msg bot wa">📝 Décrivez vos blocages ou difficultés :</div>
+        <div class="flow-msg user">Pièce de rechange GE Principal pas disponible</div>
+        <div class="flow-msg bot wa">✅ Bilan enregistré et transmis à votre responsable. 📲</div>
       </div>
     </div>
 
@@ -309,15 +306,14 @@ body{background:#F4F5FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
   <div class="aff-quick">
     <div class="aff-quick-title">Toutes les commandes disponibles</div>
     <div class="quick-grid">
-      <div class="quick-item"><div class="quick-word">saisie</div><div class="quick-desc">Ronde / Relevé</div></div>
+      <div class="quick-item"><div class="quick-word">saisie</div><div class="quick-desc">Rondes / Relevés</div></div>
       <div class="quick-item"><div class="quick-word">panne</div><div class="quick-desc">Déclarer une panne</div></div>
       <div class="quick-item"><div class="quick-word">resolu</div><div class="quick-desc">Clôturer panne</div></div>
-      <div class="quick-item" style="background:#e8f5e9;border:1px solid #a5d6a7"><div class="quick-word" style="color:#1b7a4a">OK REF-…</div><div class="quick-desc">Prendre en charge</div></div>
-      <div class="quick-item"><div class="quick-word">suivi</div><div class="quick-desc">Signalements en cours</div></div>
+      <div class="quick-item"><div class="quick-word">suivi</div><div class="quick-desc">Signalements (PEC)</div></div>
       <div class="quick-item"><div class="quick-word">bilan</div><div class="quick-desc">Fin de journée</div></div>
+      <div class="quick-item"><div class="quick-word">rapport</div><div class="quick-desc">Dernier rapport</div></div>
       <div class="quick-item"><div class="quick-word">plein</div><div class="quick-desc">Ravitaillement cuve</div></div>
       <div class="quick-item"><div class="quick-word">vidange</div><div class="quick-desc">Déclarer vidange</div></div>
-      <div class="quick-item"><div class="quick-word">rapport</div><div class="quick-desc">Dernier rapport</div></div>
       <div class="quick-item"><div class="quick-word">aide</div><div class="quick-desc">Liste commandes</div></div>
       <div class="quick-item"><div class="quick-word">site</div><div class="quick-desc">Changer de site</div></div>
       <div class="quick-item"><div class="quick-word">annuler</div><div class="quick-desc">Annuler action</div></div>
