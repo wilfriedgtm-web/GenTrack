@@ -9551,6 +9551,7 @@ async function _openRapportDTMois(offset){
   var tgt=new Date(now.getFullYear(),now.getMonth()+(offset||0),1);
   var moisDebut=tgt.toISOString().split('T')[0];
   var moisFin=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).toISOString().split('T')[0];
+  var daysInMonthDT=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).getDate();
   var ml=tgt.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
   var periodeStr=ml.charAt(0).toUpperCase()+ml.slice(1);
   var m=document.getElementById('rapport-menu-dt');if(m)m.style.display='none';
@@ -9577,7 +9578,7 @@ async function _openRapportDTMois(offset){
     var nbChambresMap={};(sites||[]).forEach(function(s){nbChambresMap[s.id]=s.nb_chambres?parseInt(s.nb_chambres):null;});
     var rIds=rondes.map(function(r){return r.id;});
     var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,equipement_id,statut'):[];
-    var html=_buildRapportDirTech(30,periodeStr,_session,sites,pleins,maintenances,signalements,rondes,rondesEq,energieFluidesDT||[],relevesEnergieDT||[],budgetsMensuels||[],budgetsFluidesDT||[],nbChambresMap,relevesZonesDT||[]);
+    var html=_buildRapportDirTech(daysInMonthDT,periodeStr,_session,sites,pleins,maintenances,signalements,rondes,rondesEq,energieFluidesDT||[],relevesEnergieDT||[],budgetsMensuels||[],budgetsFluidesDT||[],nbChambresMap,relevesZonesDT||[]);
     var w=window.open('','_blank');
     if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
     w.document.write(html);w.document.close();
@@ -9773,11 +9774,20 @@ async function _dtEnergie(sids,session){
       '<div class="kpi-trend">'+(g.totalObj>0?'Objectif : '+g.totalObj.toLocaleString('fr-FR')+(g.unite?' '+escape_html(g.unite):'')+' — '+(pct!=null?pct+'%':'—'):'Objectif non défini')+'</div>'+
     '</div>';
   });
-  // KPI kWh/chambre : meilleur/pire site
-  var kwhChKpi=[];
+  // KPI kWh/ch et m³/ch : somme de tous les fluides par unité par site
+  var kwhChKpi=[],m3ChKpi=[];
   sids.forEach(function(sid){
     var items=consoData[sid]||[];
-    items.forEach(function(f){if(f.kwhParChambre!=null)kwhChKpi.push({nom:siteMap[sid]||sid,val:f.kwhParChambre});});
+    var _toS=toMoyenBySite[sid],_nbS=nbChambresMap[sid];
+    var _chOcc=_toS!=null&&_nbS?Math.round(_nbS*_toS/100):null;
+    if(!_chOcc)return;
+    var totKwh=0,hasKwh=false,totM3=0,hasM3=false;
+    items.forEach(function(f){
+      if(f.unite&&f.unite.toLowerCase()==='kwh'&&f.conso!=null){totKwh+=f.conso;hasKwh=true;}
+      if((f.unite==='m³'||f.unite==='m3')&&f.conso!=null){totM3+=f.conso;hasM3=true;}
+    });
+    if(hasKwh)kwhChKpi.push({nom:siteMap[sid]||sid,val:Math.round(totKwh/_chOcc*10)/10,totalKwh:totKwh,chOcc:_chOcc,toP:_toS});
+    if(hasM3)m3ChKpi.push({nom:siteMap[sid]||sid,val:Math.round(totM3/_chOcc*100)/100,totalM3:Math.round(totM3*10)/10,chOcc:_chOcc,toP:_toS});
   });
   if(kwhChKpi.length){
     kwhChKpi.sort(function(a,b){return a.val-b.val;});
@@ -9785,7 +9795,16 @@ async function _dtEnergie(sids,session){
     kpisHtml+='<div class="kpi">'+
       '<div class="kpi-label">⚡ kWh / ch. occ.</div>'+
       '<div class="kpi-value" style="color:#1e40af">'+best.val.toLocaleString('fr-FR')+'</div>'+
-      '<div class="kpi-trend">Meilleur : '+escape_html(best.nom)+(worst.nom!==best.nom?' · Pire : '+escape_html(worst.nom)+' ('+worst.val.toLocaleString('fr-FR')+'kWh)':'')+'</div>'+
+      '<div class="kpi-trend">'+(kwhChKpi.length===1?best.totalKwh.toLocaleString('fr-FR')+' kWh · '+best.chOcc+' ch. occ. (TO '+best.toP+'%)':'Meilleur : '+escape_html(best.nom)+(worst.nom!==best.nom?' · Pire : '+escape_html(worst.nom)+' ('+worst.val.toLocaleString('fr-FR')+' kWh)':''))+'</div>'+
+    '</div>';
+  }
+  if(m3ChKpi.length){
+    m3ChKpi.sort(function(a,b){return a.val-b.val;});
+    var bestM=m3ChKpi[0];var worstM=m3ChKpi[m3ChKpi.length-1];
+    kpisHtml+='<div class="kpi">'+
+      '<div class="kpi-label">💧 m³ / ch. occ.</div>'+
+      '<div class="kpi-value" style="color:#0891b2">'+bestM.val.toLocaleString('fr-FR')+'</div>'+
+      '<div class="kpi-trend">'+(m3ChKpi.length===1?bestM.totalM3.toLocaleString('fr-FR')+' m³ · '+bestM.chOcc+' ch. occ. (TO '+bestM.toP+'%)':'Meilleur : '+escape_html(bestM.nom)+(worstM.nom!==bestM.nom?' · Pire : '+escape_html(worstM.nom)+' ('+worstM.val.toLocaleString('fr-FR')+' m³)':''))+'</div>'+
     '</div>';
   }
   // FCFA KPI tiles
