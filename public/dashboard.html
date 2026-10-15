@@ -1038,7 +1038,8 @@ async function _rtAccueil(session,sid,cid){
       // Pour les cuves, afficher le niveau énergie si pas de saisie ronde
       var isCuve=e.capacite_litres!=null&&parseFloat(e.capacite_litres)>0;
       if(!ls&&isCuve&&gasoilNiveau){
-        ls={v:gasoilNiveau.pct+'% · '+Math.round(gasoilNiveau.litres).toLocaleString('fr-FR')+' L',t:gasoilNiveau.date+'T12:00:00',unite:''};
+        // ls.v doit être numérique pour passer le guard !isNaN — on met les litres, unite affiche le %
+        ls={v:gasoilNiveau.litres,t:gasoilNiveau.date+'T12:00:00',unite:'L ('+gasoilNiveau.pct+'%)'};
       }
       var today=new Date().toISOString().split('T')[0];
       var lsOld=ls?new Date(ls.t).toISOString().split('T')[0]<today:false;
@@ -1157,7 +1158,8 @@ function _resolveCuveNivFromSources(e,niveauQ,latestPlein,gasoilNiveau){
     niv=(rawNiv!=null&&!isNaN(rawNiv))?(rawNiv>100?Math.round(rawNiv):Math.round(rawNiv/100*cap)):null;
     if(latestPlein&&latestPlein.niveau_apres!=null){
       var pleinDate=latestPlein.date||'';
-      var rondeDate=niveauQ&&niveauQ._lastAt?niveauQ._lastAt.slice(0,10):'0';
+      // rondeDate ne doit servir de barrière que si niv est valide — sinon on laisse latestPlein passer
+      var rondeDate=(niv!=null&&niveauQ&&niveauQ._lastAt)?niveauQ._lastAt.slice(0,10):'0';
       if(pleinDate>=rondeDate){niv=parseFloat(latestPlein.niveau_apres);sourceLabel='Après plein du '+new Date(latestPlein.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});}
     }
     pct=niv!=null?Math.min(100,Math.round(niv/cap*100)):null;
