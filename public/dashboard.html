@@ -13503,7 +13503,15 @@ async function _rtEnergie(sid){
   var hierChambresStr=hierReleve&&hierReleve.nb_chambres_occupees!=null?String(hierReleve.nb_chambres_occupees):'';
   var hierCovStr=hierReleve&&hierReleve.nb_couverts!=null?String(hierReleve.nb_couverts):'';
   // Moyenne chambres occupées du mois (pour affichage dans panneau saisie)
-  var chamReal=(function(){var s=0;var n=0;relevesAsc.forEach(function(r){if(r.nb_chambres_occupees!=null){s+=r.nb_chambres_occupees;n++;}});return n?Math.round(s/n):null;})();
+  // Fallback : si pas de nb_chambres_occupees, dériver depuis to_percent × nb_chambres
+  var chamReal=(function(){
+    var s=0;var n=0;
+    relevesAsc.forEach(function(r){
+      if(r.nb_chambres_occupees!=null){s+=r.nb_chambres_occupees;n++;}
+      else if(r.to_percent!=null&&nbChambres){s+=Math.round(parseFloat(r.to_percent)/100*nbChambres);n++;}
+    });
+    return n?Math.round(s/n):null;
+  })();
 
   // ── TILES ──
 
