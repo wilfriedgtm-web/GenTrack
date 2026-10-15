@@ -913,7 +913,7 @@ async function _rtAccueil(session,sid,cid){
       }
     }
     cuveSection=_buildCuveSection(cuveEquips,specialQs.filter(function(q){return cuveEquips.some(function(e){return e.id===q.equipement_id;})}),pleinsHist,gasoilNiveau);
-    vidangesSection=_buildVidangesSection(geEquips,specialQs.filter(function(q){return geEquips.some(function(e){return e.id===q.equipement_id;})}),vidangesHist);
+    vidangesSection=_buildVidangesSection(geEquips,specialQs.filter(function(q){return geEquips.some(function(e){return e.id===q.equipement_id;})}),vidangesHist,sid);
     instantaneSection=_buildInstantaneFluides(autresFluides,relevesHist,sid);
   }
 
@@ -1288,7 +1288,7 @@ function _buildInstantaneFluides(autresFluides,relevesHist,sid){
 }
 
 /* ── Vidanges / maintenance préventive section ── */
-function _buildVidangesSection(geEquips,geQs,vidangesHist){
+function _buildVidangesSection(geEquips,geQs,vidangesHist,sid){
   vidangesHist=vidangesHist||[];
   if(!geEquips.length)return '';
   var hasVidange=geEquips.some(function(e){return e.seuil_vidange_heures;});
@@ -1333,14 +1333,14 @@ function _buildVidangesSection(geEquips,geQs,vidangesHist){
       (pct!=null?
         '<div>'+
           '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:4px">'+
-            '<span>'+(heuresDepuis!=null?Math.round(heuresDepuis)+'h depuis vidange':'')+'</span>'+
+            '<span>'+(heuresDepuis!=null&&!isNaN(heuresDepuis)?Math.round(heuresDepuis)+'h depuis vidange':'')+'</span>'+
             '<span>Seuil : '+seuil+'h'+(restantH!==null&&restantH>0?' · '+restantH+'h restantes':'')+'</span>'+
           '</div>'+
           '<div class="progress-bar-wrap" style="height:6px"><div class="progress-bar" style="width:'+Math.min(100,pct)+'%;background:'+col+'"></div></div>'+
         '</div>':
         '<div style="font-size:11px;color:var(--text3)">'+(baseline==null?'Compteur de référence non configuré':'Pas de lecture compteur')+'</div>'
       )+
-      '<button onclick="openDeclareVidange(\''+e.id+'\',\''+escape_html(e.nom)+'\','+(currentH!=null?currentH:'null')+')" style="margin-top:4px;padding:6px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text1);font-size:12px;cursor:pointer;width:100%;text-align:center">🛢 Déclarer vidange effectuée</button>'+
+      '<button onclick="openDeclareVidange(\''+e.id+'\',\''+escape_html(e.nom)+'\','+(currentH!=null?currentH:'null')+',\''+sid+'\')" style="margin-top:4px;padding:6px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text1);font-size:12px;cursor:pointer;width:100%;text-align:center">🛢 Déclarer vidange effectuée</button>'+
       (function(){
         var hist=vidangesHist.filter(function(v){return v.equipement_id===e.id;}).slice(0,5);
         if(!hist.length)return '';
@@ -1361,7 +1361,7 @@ function _buildVidangesSection(geEquips,geQs,vidangesHist){
   return html;
 }
 
-function openDeclareVidange(eqId,eqNom,currentH){
+function openDeclareVidange(eqId,eqNom,currentH,sid){
   // currentH = dernière lecture compteur connue (auto depuis la dernière ronde)
   var m=document.getElementById('modal-vidange');
   if(!m){
@@ -1398,6 +1398,7 @@ function openDeclareVidange(eqId,eqNom,currentH){
       });
       await supaPost('vidanges',{
         equipement_id:eqId,
+        groupe_id:sid,
         date:now.slice(0,10),
         heures_au_moment:currentH,
         cout:cout,
@@ -1549,7 +1550,10 @@ async function openDeclareRavitaillementFluide(fluideId,nom,cap,curLitres,seuilP
         newValeurs[fluideId]=newPct; // stocke en % comme les autres relevés
         await supaPatch('releves_energie',row.id,{valeurs:newValeurs,updated_at:new Date().toISOString()});
       } else {
-        var valObj={};valObj[fluideId]=newPct;
+        // Récupérer les valeurs du dernier relevé pour ne pas perdre les autres fluides
+        var lastR=await supaGet('releves_energie','site_id=eq.'+sid+'&order=date_releve.desc&limit=1&select=valeurs');
+        var valObj=Object.assign({},lastR&&lastR.length&&lastR[0].valeurs?lastR[0].valeurs:{});
+        valObj[fluideId]=newPct;
         await supaPost('releves_energie',{site_id:sid,date_releve:today,valeurs:valObj,saisi_par:(_session&&_session.contact&&_session.contact.nom)||null});
       }
       document.getElementById('modal-ravit-fluide').remove();

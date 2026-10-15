@@ -1707,7 +1707,9 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
         `⚠️ *Écart important — ${f.nom}*\n` +
         `Valeur saisie : *${numVal}${f.unite ? ' ' + f.unite : ''}*\n` +
         `Dernier relevé : ${lastValNum}${f.unite ? ' ' + f.unite : ''} (écart : ${dir}${Math.round(deltaVal).toLocaleString('fr-FR')}${f.unite ? ' ' + f.unite : ''})\n\n` +
-        `Cet écart est-il normal ?\nRépondez *OUI* ou *NON*`
+        `Répondez :\n` +
+        `• *OUI* — l'écart est normal, je confirme la valeur\n` +
+        `• *NON* — erreur de saisie, je veux corriger`
       );
     }
 
@@ -1759,7 +1761,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
         const lastV = sd.last_releve?.[f.id] ?? null;
         return sendWA(phone, `🔄 Saisissez à nouveau la valeur.\n\n${fmtFluidQuestion(f, lastV, idx + 1, fluides.length)}`);
       }
-      return sendWA(phone, `Répondez *OUI* (l'écart est normal) ou *NON* (je veux corriger ma saisie).`);
+      return sendWA(phone, `Répondez *OUI* (l'écart est normal, je confirme) ou *NON* (erreur de saisie, je veux corriger).`);
     }
 
     if (sd.delta_step === 'declare') {

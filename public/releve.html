@@ -396,7 +396,7 @@ function _eqLastBadge(eqId){
 
 function _prevValLine(qId){
   var lr=_lastReponses[qId];
-  if(!lr)return '';
+  if(!lr||lr.valeur==null||String(lr.valeur).trim()==='')return '';
   var d=new Date(lr.created_at);
   var today=d.toDateString()===new Date().toDateString();
   var when=today?d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
@@ -716,6 +716,8 @@ async function _submitReleve(){
     var alertePosts=[];
     var posts=_questions.map(function(q){
       var val=String(_answers[q.id]!=null?_answers[q.id]:'');
+      // Ne pas sauvegarder les questions sans réponse (évite d'écraser la vraie dernière valeur)
+      if(val==='')return Promise.resolve();
       if(q.type_reponse==='numerique'){
         var num=parseFloat(val.replace(',','.'));
         if(!isNaN(num)){
