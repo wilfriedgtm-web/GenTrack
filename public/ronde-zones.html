@@ -731,8 +731,9 @@ async function submitRonde(){
       await Promise.all(incidents.map(function(z){
         var selEqId=_incEquip[z.id]||null;
         var selEq=selEqId?(_equipements[z.id]||[]).find(function(e){return e.id===selEqId;}):null;
-        var eqSuffix=selEq?' · '+selEq.nom:'';
-        var desc=(_incDesc[z.id]||'').trim()||('Incident — '+z.nom+eqSuffix);
+        var eqNomInc=selEq?selEq.nom:'';
+        var freeDesc=(_incDesc[z.id]||'').trim();
+        var desc=freeDesc&&eqNomInc?(eqNomInc+' — '+freeDesc):freeDesc||(eqNomInc?('Incident — '+z.nom+' · '+eqNomInc):('Incident constaté lors de la ronde — '+z.nom));
         return supaPost('signalements',{
           groupe_id:_site.id,site_id:_site.id,
           zone_id:z.id,
