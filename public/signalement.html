@@ -723,8 +723,8 @@ async function _submit(){
     var sgId=sgRow.id||null;
     var sgRef=sgRow.ref_code||null;
 
-    // Créer l'alerte liée
-    await supaPost('alertes',{
+    // Créer l'alerte liée (fire & forget — une erreur ici ne doit pas bloquer la confirmation)
+    supaPost('alertes',{
       groupe_id:_groupeId,
       type:'signalement',
       severite:'warning',
@@ -733,7 +733,7 @@ async function _submit(){
       signalement_id:sgId,
       lue:false,
       resolue:false
-    });
+    }).catch(function(){});
 
     // Notifier (fire & forget) — resp_tech + demandeur connu + résident
     var equipNom=null;
