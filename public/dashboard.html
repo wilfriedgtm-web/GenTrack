@@ -13383,8 +13383,8 @@ async function _rtEnergie(sid){
   _energieSidGlobal=sid;
 
   var[fluides,relevesRows,siteRows,objsRows,budgetRows]=await Promise.all([
-    supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,budget_par_chambre,seuil_alerte_bas,objectif_mensuel,capacite,ordre,devise&order=ordre.asc'),
-    supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=id,date_releve,valeurs,saisi_par,note,to_percent,nb_couverts,nb_chambres_occupees&order=date_releve.asc&limit=62'),
+    supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,budget_par_chambre,seuil_alerte_bas,seuil_delta_alerte,objectif_mensuel,capacite,ordre,devise&order=ordre.asc'),
+    supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=id,date_releve,valeurs,saisi_par,note,to_percent,nb_couverts,nb_chambres_occupees,anomalies&order=date_releve.asc&limit=62'),
     supaGet('sites','id=eq.'+sid+'&select=nom,nb_chambres&limit=1'),
     supaGet('objectifs_energie','site_id=eq.'+sid+'&select=id,fluide_id,valeur,date_debut,date_fin,note&order=date_debut.desc&limit=200'),
     supaGet('energie_budget_mensuel','site_id=eq.'+sid+'&annee=eq.'+tgt.getFullYear()+'&mois=eq.'+(tgt.getMonth()+1)+'&limit=1')
@@ -13959,14 +13959,20 @@ async function _rtEnergie(sid){
         var _fCap=f.capacite?parseFloat(f.capacite):null;
         var _vCmp=vNum!=null&&f.type_valeur==='instantane'&&_fCap!=null?(vNum>100?vNum:Math.round(vNum/100*_fCap)):vNum;
         var alerte=f.seuil_alerte_bas!=null&&_vCmp!=null&&_vCmp<f.seuil_alerte_bas;
+        var anomFlag=r.anomalies&&r.anomalies[f.id];
+        var anomDeclare=anomFlag==='déclarée';
+        var anomNormale=anomFlag==='normale';
         var deltaStr='';
         if(delta!=null&&f.type_valeur==='index'){
           var objJ=(_objActif[f.id]&&_objActif[f.id].valeur!=null)?parseFloat(_objActif[f.id].valeur)/daysInMonth:null;
           var over=objJ&&delta>objJ*1.05;
           deltaStr='<div style="font-size:9px;color:'+(over?'#E8841A':'var(--text3)')+'">'+delta.toLocaleString('fr-FR')+(f.unite?' '+f.unite:'')+'/j</div>';
         }
-        return '<td style="padding:7px 9px;text-align:right;color:'+(alerte?'var(--rouge)':vNum!=null?'var(--dark)':'var(--text3)')+'">'+
-          (vNum!=null?(alerte?'⚠️ ':'')+vNum.toLocaleString('fr-FR'):'—')+deltaStr+'</td>';
+        var anomBadge=anomDeclare?'<div style="font-size:9px;font-weight:700;color:var(--rouge);background:#FFF0F0;border-radius:4px;padding:1px 4px;margin-top:2px">⚠️ Anomalie déclarée</div>':
+          anomNormale?'<div style="font-size:9px;color:var(--text3);margin-top:2px">✓ Écart confirmé normal</div>':'';
+        var cellBg=anomDeclare?';background:#FFF5F5':'';
+        return '<td style="padding:7px 9px;text-align:right;color:'+(anomDeclare?'var(--rouge)':alerte?'var(--rouge)':vNum!=null?'var(--dark)':'var(--text3)')+cellBg+'">'+
+          (vNum!=null?((alerte||anomDeclare)?'⚠️ ':'')+vNum.toLocaleString('fr-FR'):'—')+deltaStr+anomBadge+'</td>';
       }).join('')+
       '<td id="ech-cell-'+r.id+'" style="padding:7px 9px;text-align:right">'+
         '<span id="ech-span-'+r.id+'" onclick="_energieEditChambres(\''+r.id+'\','+(r.nb_chambres_occupees!=null?r.nb_chambres_occupees:'null')+')" '+
@@ -14834,7 +14840,10 @@ function _energieCfgFormHtml(f){
         '<input id="ecfg-edit-cap" type="number" step="any" class="cfg-form-input" value="'+(f.capacite!=null?f.capacite:'')+'" placeholder="Cuves seulement" /></div>'+
     '</div>'+
     '<div class="cfg-form-group"><label class="cfg-form-label">Budget / chambre / jour (FCFA/ch/j)</label>'+
-      '<input id="ecfg-edit-bpc" type="number" step="any" class="cfg-form-input" value="'+(f.budget_par_chambre!=null?f.budget_par_chambre:'')+'" placeholder="ex: 8525" /></div>';
+      '<input id="ecfg-edit-bpc" type="number" step="any" class="cfg-form-input" value="'+(f.budget_par_chambre!=null?f.budget_par_chambre:'')+'" placeholder="ex: 8525" /></div>'+
+    '<div class="cfg-form-group"><label class="cfg-form-label">Seuil alerte écart (bot ronde)</label>'+
+      '<input id="ecfg-edit-delta" type="number" step="any" class="cfg-form-input" value="'+(f.seuil_delta_alerte!=null?f.seuil_delta_alerte:'')+'" placeholder="ex: 500 (m³ ou kWh max entre 2 relevés)" />'+
+      '<div style="font-size:10px;color:var(--text3);margin-top:3px">Si l\'écart entre deux relevés dépasse cette valeur, le bot demande confirmation au tech.</div></div>';
 }
 
 function _energieCfgAjouterModal(sid){
@@ -14981,6 +14990,7 @@ async function _energieCfgSaveFluid(){
     budget_par_chambre:(function(){var e=g('ecfg-edit-bpc');return e&&e.value!==''?parseFloat(e.value):null;})(),
     seuil_alerte_bas:(function(){var e=g('ecfg-edit-seuil');return e&&e.value!==''?parseFloat(e.value):null;})(),
     capacite:(function(){var e=g('ecfg-edit-cap');return e&&e.value!==''?parseFloat(e.value):null;})(),
+    seuil_delta_alerte:(function(){var e=g('ecfg-edit-delta');return e&&e.value!==''?parseFloat(e.value):null;})(),
     updated_at:new Date().toISOString()
   };
   var saveBtn=document.querySelector('#cfg-modal .cfg-btn-amber');

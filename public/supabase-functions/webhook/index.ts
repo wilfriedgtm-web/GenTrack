@@ -621,9 +621,11 @@ async function demarrerReleveEnergie(phone: string, contact: any, site: any): Pr
       id: fl.id, nom: fl.nom,
       unite: fl.unite || '',
       type_valeur: fl.type_valeur || 'index',
-      seuil_alerte_bas: fl.seuil_alerte_bas ?? null
+      seuil_alerte_bas: fl.seuil_alerte_bas ?? null,
+      seuil_delta_alerte: fl.seuil_delta_alerte ?? null
     })),
     reponses: {} as Record<string, number>,
+    anomalies: {} as Record<string, string>,
     field_idx: 0,
     last_releve: lastReleve
   };
@@ -646,9 +648,12 @@ async function demarrerReleveEnergieDepuisRonde(phone: string, contact: any, sit
     tech_id: contact.id, tech_nom: contact.nom,
     fluides: fluides.map((fl: any) => ({
       id: fl.id, nom: fl.nom, unite: fl.unite || '',
-      type_valeur: fl.type_valeur || 'index', seuil_alerte_bas: fl.seuil_alerte_bas ?? null
+      type_valeur: fl.type_valeur || 'index',
+      seuil_alerte_bas: fl.seuil_alerte_bas ?? null,
+      seuil_delta_alerte: fl.seuil_delta_alerte ?? null
     })),
     reponses: {} as Record<string, number>,
+    anomalies: {} as Record<string, string>,
     field_idx: 0,
     last_releve: lastReleve,
     ronde_context: {
@@ -1688,6 +1693,24 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       }
     }
 
+    // ── Vérification delta (seuil_delta_alerte) ──────────────────────────────
+    const lastValNum = lastVal != null ? parseFloat(String(lastVal)) : null;
+    const deltaVal = lastValNum != null ? Math.abs(numVal - lastValNum) : null;
+    if (f.seuil_delta_alerte != null && deltaVal != null && deltaVal > f.seuil_delta_alerte) {
+      const dir = numVal > lastValNum! ? '+' : '-';
+      await setSession(phone, 'energie_delta_confirm', {
+        ...sd, reponses: newReponses, field_idx: idx,
+        delta_step: 'normal',
+        delta_fid: f.id, delta_val: numVal, delta_from: lastValNum, delta_ecart: deltaVal
+      });
+      return sendWA(phone,
+        `⚠️ *Écart important — ${f.nom}*\n` +
+        `Valeur saisie : *${numVal}${f.unite ? ' ' + f.unite : ''}*\n` +
+        `Dernier relevé : ${lastValNum}${f.unite ? ' ' + f.unite : ''} (écart : ${dir}${Math.round(deltaVal).toLocaleString('fr-FR')}${f.unite ? ' ' + f.unite : ''})\n\n` +
+        `Cet écart est-il normal ?\nRépondez *OUI* ou *NON*`
+      );
+    }
+
     const next = idx + 1;
     // Confirmation delta si index
     let confirmMsg = '';
@@ -1708,6 +1731,66 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     // Tous les fluides saisis → récap
     await setSession(phone, 'energie_recap', { ...sd, reponses: newReponses });
     return sendWA(phone, fmtRecapEnergie(fluides, newReponses, sd.last_releve || {}, siteNom));
+  }
+
+  // ── Relevé énergie — confirmation écart anormal ──────────────────────────
+  if (state === 'energie_delta_confirm') {
+    const v = msg.toLowerCase().trim();
+    const fluides: any[] = sd.fluides || [];
+    const idx: number = sd.field_idx || 0;
+    const f = fluides[idx];
+    const next = idx + 1;
+
+    if (sd.delta_step === 'normal') {
+      // OUI = l'écart est normal → demander si déclarer anomalie
+      if (v === 'oui') {
+        await setSession(phone, 'energie_delta_confirm', { ...sd, delta_step: 'declare' });
+        return sendWA(phone,
+          `Voulez-vous déclarer une anomalie au responsable ?\n` +
+          `_(Le responsable sera notifié et pourra corriger la valeur dans le dashboard)_\n\n` +
+          `Répondez *OUI* ou *NON*`
+        );
+      }
+      // NON = erreur de saisie → re-poser la question du fluide
+      if (v === 'non') {
+        const newReponses = { ...sd.reponses };
+        delete newReponses[sd.delta_fid]; // annuler la valeur incorrecte
+        await setSession(phone, 'energie_saisie', { ...sd, reponses: newReponses, field_idx: idx });
+        const lastV = sd.last_releve?.[f.id] ?? null;
+        return sendWA(phone, `🔄 Saisissez à nouveau la valeur.\n\n${fmtFluidQuestion(f, lastV, idx + 1, fluides.length)}`);
+      }
+      return sendWA(phone, `Répondez *OUI* (l'écart est normal) ou *NON* (je veux corriger ma saisie).`);
+    }
+
+    if (sd.delta_step === 'declare') {
+      const newAnomalies: Record<string, string> = { ...(sd.anomalies || {}) };
+      if (v === 'oui') {
+        newAnomalies[sd.delta_fid] = 'déclarée';
+        // Notifier le resp tech immédiatement
+        const responsablesA = await getResponsablesForSite(sd.site_id).catch(() => []);
+        if (Array.isArray(responsablesA)) {
+          const fNom = f?.nom || 'Fluide';
+          const alertMsg = `🚨 *Anomalie énergie déclarée — ${fNom}*\n_${siteNom}_\n\nValeur saisie : *${sd.delta_val}${f?.unite ? ' ' + f.unite : ''}*\nDernier relevé : ${sd.delta_from}${f?.unite ? ' ' + f.unite : ''} (écart : ${Math.round(sd.delta_ecart).toLocaleString('fr-FR')}${f?.unite ? ' ' + f.unite : ''})\n\nTech a confirmé la valeur mais déclaré une anomalie.\n_Vérifier et corriger dans le dashboard si besoin._\n\n_Saisi par ${contact.nom} · ${getHeure()}_`;
+          for (const r of responsablesA) if (r.whatsapp) await sendWA(r.whatsapp, alertMsg).catch(() => {});
+        }
+      } else if (v === 'non') {
+        newAnomalies[sd.delta_fid] = 'normale';
+      } else {
+        return sendWA(phone, `Répondez *OUI* (déclarer une anomalie) ou *NON* (continuer normalement).`);
+      }
+
+      // Continuer le relevé avec la valeur confirmée
+      const confirmedReponses = sd.reponses || {};
+      const confirmMsg = `✅ ${f?.nom || 'Fluide'} : *${sd.delta_val}${f?.unite ? ' ' + f.unite : ''}* ${v === 'oui' ? '_(anomalie déclarée)_' : ''}\n\n`;
+      if (next < fluides.length) {
+        const nextF = fluides[next];
+        const nextLast = sd.last_releve?.[nextF.id] ?? null;
+        await setSession(phone, 'energie_saisie', { ...sd, reponses: confirmedReponses, anomalies: newAnomalies, field_idx: next });
+        return sendWA(phone, `${confirmMsg}${fmtFluidQuestion(nextF, nextLast, next + 1, fluides.length)}`);
+      }
+      await setSession(phone, 'energie_recap', { ...sd, reponses: confirmedReponses, anomalies: newAnomalies });
+      return sendWA(phone, fmtRecapEnergie(fluides, confirmedReponses, sd.last_releve || {}, siteNom));
+    }
   }
 
   // ── Relevé énergie — validation recap ────────────────────────────────────
@@ -1735,16 +1818,17 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       query: `&site_id=eq.${sd.site_id}&date_releve=eq.${dateReleve}&limit=1`,
       select: 'id'
     });
+    const anomalies = sd.anomalies && Object.keys(sd.anomalies).length ? sd.anomalies : null;
     if (Array.isArray(existingRow) && existingRow.length > 0) {
       await db('releves_energie', {
         method: 'PATCH',
         query: `&id=eq.${existingRow[0].id}`,
-        body: { valeurs, saisi_par: contact.nom, updated_at: new Date().toISOString() }
+        body: { valeurs, saisi_par: contact.nom, anomalies, updated_at: new Date().toISOString() }
       });
     } else {
       await db('releves_energie', {
         method: 'POST',
-        body: { site_id: sd.site_id, date_releve: dateReleve, valeurs, saisi_par: contact.nom }
+        body: { site_id: sd.site_id, date_releve: dateReleve, valeurs, saisi_par: contact.nom, anomalies }
       });
     }
     await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
@@ -2069,7 +2153,7 @@ async function handleMessage(from: string, bodyText: string, mediaUrl: string = 
     const activeStates = [
       'saisie_choix_freq','saisie_choix_equip','saisie_question','saisie_followup',
       'saisie_recap','saisie_correction','saisie_anomalie','saisie_anomalie_text',
-      'energie_saisie','energie_recap',
+      'energie_saisie','energie_recap','energie_delta_confirm',
       'panne_equip','panne_type','panne_description',
       'resolu_choix','resolu_note','resolu_cout','resolu_technicien','resolu_final',
       'vidange_equip','vidange_intervenant','vidange_confirm',
