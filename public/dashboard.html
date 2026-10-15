@@ -14329,7 +14329,7 @@ var _ECFG_COLS='30px 1fr 70px 90px 65px 85px 80px 80px 44px';
 
 async function _buildEnergieConfigTab(sid){
   var[fluides,objsRows,siteRows,tmplRows]=await Promise.all([
-    supaGet('energie_config','site_id=eq.'+sid+'&select=id,nom,unite,type_valeur,tarif,budget_par_chambre,seuil_alerte_bas,capacite,actif,ordre,devise&order=ordre.asc'),
+    supaGet('energie_config','site_id=eq.'+sid+'&select=id,nom,unite,type_valeur,tarif,budget_par_chambre,seuil_alerte_bas,seuil_delta_alerte,capacite,actif,ordre,devise&order=ordre.asc'),
     supaGet('objectifs_energie','site_id=eq.'+sid+'&select=id,fluide_id,valeur,date_debut,date_fin,note&order=date_debut.desc&limit=200'),
     supaGet('sites','id=eq.'+sid+'&select=nb_chambres,pays_code&limit=1'),
     supaGet('energie_templates','actif=eq.true&order=ordre.asc&select=id,pays_code,pays_nom,flag,distributeur,description,items').catch(function(){return[];})
