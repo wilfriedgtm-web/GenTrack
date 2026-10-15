@@ -367,7 +367,9 @@ async function init(){
   ).catch(function(){return[];});
   if(Array.isArray(lastRows)){
     lastRows.forEach(function(r){
-      if(!_lastReponses[r.question_id])_lastReponses[r.question_id]=r;
+      // Ignorer les valeurs vides — on veut la dernière VRAIE valeur
+      if(!_lastReponses[r.question_id]&&r.valeur!=null&&String(r.valeur).trim()!=='')
+        _lastReponses[r.question_id]=r;
     });
     _questions.forEach(function(q){
       var lr=_lastReponses[q.id];
