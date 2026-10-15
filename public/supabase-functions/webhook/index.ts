@@ -843,10 +843,10 @@ async function demarrerBilan(phone: string, contact: any, site: any): Promise<an
   });
   const rondesArr = Array.isArray(rondesRaw) ? rondesRaw : [];
 
-  // Signalements résolus aujourd'hui par ce tech
+  // Signalements résolus aujourd'hui sur le site (quel que soit le résolveur — rapport.html ou commande resolu)
   const sigsRaw = await db('signalements', {
-    query: `&groupe_id=eq.${siteId}&statut=eq.resolu&resolved_by=eq.${encodeURIComponent(contact.nom)}&resolved_at=gte.${today}T00:00:00`,
-    select: 'id,ref_code,description,equipement_id'
+    query: `&groupe_id=eq.${siteId}&statut=eq.resolu&resolved_at=gte.${today}T00:00:00`,
+    select: 'id,ref_code,description,equipement_id,resolved_by'
   });
   const sigsArr = Array.isArray(sigsRaw) ? sigsRaw : [];
 
