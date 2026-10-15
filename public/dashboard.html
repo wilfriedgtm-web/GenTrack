@@ -13169,6 +13169,42 @@ async function _energieSaveCouvertsInline(releveId, rawVal){
   }
 }
 
+// ── Inline edit fluide values in historique ──────────────────────────────────
+function _energieEditFluide(releveId, fluideId, currentVal){
+  var cell=document.getElementById('ef-cell-'+releveId+'-'+fluideId);
+  if(!cell)return;
+  var inp=document.createElement('input');
+  inp.type='number';inp.step='any';
+  inp.value=currentVal!=null?currentVal:'';
+  inp.style.cssText='width:90px;padding:3px 6px;border:1.5px solid var(--amber);border-radius:6px;font-size:12px;text-align:right;font-weight:600';
+  inp.onblur=function(){_energieSaveFluideInline(releveId,fluideId,inp.value);};
+  inp.onkeydown=function(e){
+    if(e.key==='Enter')inp.blur();
+    if(e.key==='Escape')_energieRestoreFluideCell(releveId,fluideId,currentVal);
+  };
+  cell.innerHTML='';cell.appendChild(inp);inp.focus();inp.select();
+}
+function _energieRestoreFluideCell(releveId, fluideId, val){
+  var span=document.getElementById('ef-span-'+releveId+'-'+fluideId);
+  var cell=document.getElementById('ef-cell-'+releveId+'-'+fluideId);
+  if(!cell)return;
+  cell.innerHTML='<span id="ef-span-'+releveId+'-'+fluideId+'" onclick="_energieEditFluide(\''+releveId+'\',\''+fluideId+'\','+(val!=null?val:'null')+')" style="cursor:pointer;color:'+(val!=null?'var(--dark)':'var(--text3)')+'" title="Cliquer pour modifier">'+
+    (val!=null?parseFloat(val).toLocaleString('fr-FR'):'— <span style="font-size:9px">(+)</span>')+'</span>';
+}
+async function _energieSaveFluideInline(releveId, fluideId, rawVal){
+  var val=rawVal!==''&&rawVal!=null?parseFloat(String(rawVal).replace(',','.')):null;
+  if(val!==null&&isNaN(val)){_energieRestoreFluideCell(releveId,fluideId,null);return;}
+  // Récupérer le relevé en mémoire pour reconstruire les valeurs complètes
+  var releve=(_energieReleves||[]).find(function(r){return r.id===releveId;});
+  if(!releve){alert('Relevé introuvable.');return;}
+  var newValeurs=Object.assign({},releve.valeurs||{});
+  if(val!==null)newValeurs[fluideId]=val;
+  else delete newValeurs[fluideId];
+  var ok=await supaPatch('releves_energie',releveId,{valeurs:newValeurs,updated_at:new Date().toISOString()});
+  if(ok){if(_session)setTimeout(function(){renderRespTech(_session,'energie');},200);}
+  else{alert('Erreur lors de la sauvegarde.');_energieRestoreFluideCell(releveId,fluideId,releve.valeurs?.[fluideId]??null);}
+}
+
 async function _energieSaveObjectifs(sid){
   var fluides=_energieFluides;
   var btn=document.getElementById('energie-obj-btn');
@@ -13971,8 +14007,13 @@ async function _rtEnergie(sid){
         var anomBadge=anomDeclare?'<div style="font-size:9px;font-weight:700;color:var(--rouge);background:#FFF0F0;border-radius:4px;padding:1px 4px;margin-top:2px">⚠️ Anomalie déclarée</div>':
           anomNormale?'<div style="font-size:9px;color:var(--text3);margin-top:2px">✓ Écart confirmé normal</div>':'';
         var cellBg=anomDeclare?';background:#FFF5F5':'';
-        return '<td style="padding:7px 9px;text-align:right;color:'+(anomDeclare?'var(--rouge)':alerte?'var(--rouge)':vNum!=null?'var(--dark)':'var(--text3)')+cellBg+'">'+
-          (vNum!=null?((alerte||anomDeclare)?'⚠️ ':'')+vNum.toLocaleString('fr-FR'):'—')+deltaStr+anomBadge+'</td>';
+        var fIdJs=f.id; var rIdJs=r.id;
+        var spanStyle='cursor:pointer;'+(anomDeclare?'color:var(--rouge)':alerte?'color:var(--rouge)':vNum!=null?'color:var(--dark)':'color:var(--text3)');
+        return '<td id="ef-cell-'+rIdJs+'-'+fIdJs+'" style="padding:7px 9px;text-align:right'+cellBg+'">'+
+          '<span id="ef-span-'+rIdJs+'-'+fIdJs+'" onclick="_energieEditFluide(\''+rIdJs+'\',\''+fIdJs+'\','+(vNum!=null?vNum:'null')+')" '+
+            'style="'+spanStyle+'" title="Cliquer pour modifier">'+
+            (vNum!=null?((alerte||anomDeclare)?'⚠️ ':'')+vNum.toLocaleString('fr-FR'):'— <span style="font-size:9px">(+)</span>')+
+          '</span>'+deltaStr+anomBadge+'</td>';
       }).join('')+
       '<td id="ech-cell-'+r.id+'" style="padding:7px 9px;text-align:right">'+
         '<span id="ech-span-'+r.id+'" onclick="_energieEditChambres(\''+r.id+'\','+(r.nb_chambres_occupees!=null?r.nb_chambres_occupees:'null')+')" '+
