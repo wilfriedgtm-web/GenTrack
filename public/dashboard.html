@@ -1154,7 +1154,7 @@ function _resolveCuveNivFromSources(e,niveauQ,latestPlein,gasoilNiveau){
     sourceLabel='Relevé énergie · '+new Date(gasoilNiveau.date+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+(gasoilNiveau.saisi_par?' · '+gasoilNiveau.saisi_par:'');
   } else {
     var rawNiv=niveauQ&&niveauQ._lastVal!=null?parseFloat(niveauQ._lastVal):null;
-    niv=rawNiv!=null?(rawNiv>100?Math.round(rawNiv):Math.round(rawNiv/100*cap)):null;
+    niv=(rawNiv!=null&&!isNaN(rawNiv))?(rawNiv>100?Math.round(rawNiv):Math.round(rawNiv/100*cap)):null;
     if(latestPlein&&latestPlein.niveau_apres!=null){
       var pleinDate=latestPlein.date||'';
       var rondeDate=niveauQ&&niveauQ._lastAt?niveauQ._lastAt.slice(0,10):'0';
