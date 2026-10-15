@@ -1877,13 +1877,24 @@ async function _rtHistorique(sid){
 }
 
 /* ── Config ── */
+var _rtMonthOffset=0; // 0=mois en cours, -1=mois précédent, etc.
+function _rtNavMonth(delta){_rtMonthOffset+=delta;if(_session)renderRespTech(_session,'releves');}
+
 async function _rtReleves(session,sid){
   var BASE_URL=location.origin+location.pathname.replace('dashboard.html','');
 
-  // Fetch today's relevés + last 7 days
-  var since=new Date();since.setDate(since.getDate()-7);since.setHours(0,0,0,0);
+  // Calculer la plage du mois sélectionné
+  var now=new Date();
+  var displayDate=new Date(now.getFullYear(),now.getMonth()+_rtMonthOffset,1);
+  var moisDebut=new Date(displayDate.getFullYear(),displayDate.getMonth(),1);
+  moisDebut.setHours(0,0,0,0);
+  var moisFin=new Date(displayDate.getFullYear(),displayDate.getMonth()+1,0);
+  moisFin.setHours(23,59,59,999);
+  var isCurrentMonth=_rtMonthOffset===0;
+
   var releves=await supaGet('releves_horaires',
-    'site_id=eq.'+sid+'&created_at=gte.'+since.toISOString()+
+    'site_id=eq.'+sid+'&created_at=gte.'+moisDebut.toISOString()+
+    '&created_at=lte.'+moisFin.toISOString()+
     '&select=id,site_id,contact_id,token,statut,expires_at,validated_at,nb_valeurs,nb_alertes,created_at'+
     '&order=created_at.desc'
   );
@@ -1897,8 +1908,8 @@ async function _rtReleves(session,sid){
   }
 
   var today=new Date().toDateString();
-  var todayReleves=releves.filter(function(r){return new Date(r.created_at).toDateString()===today;});
-  var histReleves=releves.filter(function(r){return new Date(r.created_at).toDateString()!==today;});
+  var todayReleves=isCurrentMonth?releves.filter(function(r){return new Date(r.created_at).toDateString()===today;}):[];
+  var histReleves=isCurrentMonth?releves.filter(function(r){return new Date(r.created_at).toDateString()!==today;}):releves;
 
   function statusBadge(r){
     if(r.statut==='validé') return '<span style="font-size:10px;font-weight:700;color:var(--vert);background:var(--vert-pale);border:1px solid var(--vert-border);padding:2px 8px;border-radius:10px">✅ Validé</span>';
@@ -1951,6 +1962,30 @@ async function _rtReleves(session,sid){
     });
   }
 
+  var monthLabel=displayDate.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  monthLabel=monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1);
+
+  var navHtml='<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">'+
+    '<button onclick="_rtNavMonth(-1)" style="width:32px;height:32px;border:1.5px solid var(--border);border-radius:8px;background:white;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--dark)">‹</button>'+
+    '<div style="flex:1;text-align:center;font-size:13px;font-weight:700;color:var(--dark)">'+monthLabel+'</div>'+
+    (isCurrentMonth
+      ? '<div style="width:32px;height:32px"></div>'
+      : '<button onclick="_rtNavMonth(1)" style="width:32px;height:32px;border:1.5px solid var(--border);border-radius:8px;background:white;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--dark)">›</button>')+
+  '</div>';
+
+  var todaySection=isCurrentMonth?
+    '<div style="margin-bottom:24px">'+
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">Aujourd\'hui</div>'+
+      '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden">'+todayHtml+'</div>'+
+    '</div>':'';
+
+  var histSection=histReleves.length?
+    '<div>'+
+      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">'+(isCurrentMonth?'Ce mois-ci':monthLabel)+'</div>'+
+      '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden">'+histHtml+'</div>'+
+    '</div>':
+    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:24px;text-align:center;color:var(--text3);font-size:13px">Aucun relevé ce mois-ci</div>';
+
   var html='<div style="max-width:640px">'+
     // CTA déclencher
     '<div style="background:var(--dark);border-radius:14px;padding:20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;gap:16px">'+
@@ -1960,23 +1995,10 @@ async function _rtReleves(session,sid){
       '</div>'+
       '<button class="cfg-btn-primary" style="white-space:nowrap;padding:10px 18px;flex-shrink:0" onclick="_triggerReleve()">Nouveau relevé</button>'+
     '</div>'+
-
-    // Aujourd'hui
-    '<div style="margin-bottom:24px">'+
-      '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">Aujourd\'hui</div>'+
-      '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden">'+
-        todayHtml+
-      '</div>'+
-    '</div>'+
-
-    // Historique 7j
-    (histReleves.length?
-      '<div>'+
-        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">7 derniers jours</div>'+
-        '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;overflow:hidden">'+histHtml+'</div>'+
-      '</div>':'')
-
-  +'</div>';
+    navHtml+
+    todaySection+
+    histSection+
+  '</div>';
 
   // Reset padding
   var dc=document.getElementById('dash-content-main');
