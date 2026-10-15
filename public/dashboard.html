@@ -13322,22 +13322,34 @@ function _rtEnergieShowView(v){
   if(v==='historique'&&window._energieCurrentFluide)_renderEnergieChart(window._energieCurrentFluide);
 }
 
+function _evTodayCalcTo(inp){
+  var nbCh=window._energieSiteNbChambres||null;
+  var el=document.getElementById('ev-today-to-calc');
+  if(!el)return;
+  var ch=inp.value!==''?parseInt(inp.value):null;
+  el.textContent=(ch!=null&&nbCh&&nbCh>0)?'= '+Math.round(ch/nbCh*100)+'% TO':'';
+}
+
 async function _energieSaveDayEntry(sid){
   var dateInp=document.getElementById('ev-today-date');
-  var toInp=document.getElementById('ev-today-to');
+  var chambresInp=document.getElementById('ev-today-chambres');
   var couvertsInp=document.getElementById('ev-today-couverts');
   var msgEl=document.getElementById('ev-today-msg');
   var dateVal=dateInp?dateInp.value:'';
-  var toVal=toInp&&toInp.value!==''?parseFloat(toInp.value):null;
+  var chambresVal=chambresInp&&chambresInp.value!==''?parseInt(chambresInp.value):null;
   var covVal=couvertsInp&&couvertsInp.value!==''?parseInt(couvertsInp.value):null;
   function showMsg(ok,txt){if(msgEl){msgEl.textContent=txt;msgEl.style.color=ok?'var(--vert)':'var(--rouge)';msgEl.style.display='inline';}}
   if(!dateVal)return showMsg(false,'Date requise');
-  if(toVal==null&&covVal==null)return showMsg(false,'Saisir TO% ou nb couverts');
+  if(chambresVal==null&&covVal==null)return showMsg(false,'Saisir chambres occupées ou couverts');
   var btn=document.getElementById('ev-today-save-btn');
   if(btn){btn.disabled=true;btn.textContent='...';}
+  var nbCh=window._energieSiteNbChambres||null;
   var existing=await supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=eq.'+dateVal+'&select=id&limit=1');
   var body={};
-  if(toVal!=null&&!isNaN(toVal))body.to_percent=toVal;
+  if(chambresVal!=null&&!isNaN(chambresVal)){
+    body.nb_chambres_occupees=chambresVal;
+    if(nbCh&&nbCh>0)body.to_percent=Math.round(chambresVal/nbCh*100);
+  }
   if(covVal!=null&&!isNaN(covVal))body.nb_couverts=covVal;
   var ok=false;
   try{
@@ -13488,8 +13500,10 @@ async function _rtEnergie(sid){
   // ── Hier (pour panneau saisie Aujourd'hui) ──
   var hierDate=(function(){var d=new Date();d.setDate(d.getDate()-1);return d.toISOString().split('T')[0];})();
   var hierReleve=releveByDate[hierDate];
-  var hierToStr=hierReleve&&hierReleve.to_percent!=null?String(parseFloat(hierReleve.to_percent)):'';
+  var hierChambresStr=hierReleve&&hierReleve.nb_chambres_occupees!=null?String(hierReleve.nb_chambres_occupees):'';
   var hierCovStr=hierReleve&&hierReleve.nb_couverts!=null?String(hierReleve.nb_couverts):'';
+  // Moyenne chambres occupées du mois (pour affichage dans panneau saisie)
+  var chamReal=(function(){var s=0;var n=0;relevesAsc.forEach(function(r){if(r.nb_chambres_occupees!=null){s+=r.nb_chambres_occupees;n++;}});return n?Math.round(s/n):null;})();
 
   // ── TILES ──
 
@@ -13704,7 +13718,8 @@ async function _rtEnergie(sid){
         '<div style="font-size:13px;font-weight:700;color:var(--dark)">📋 Saisie du jour</div>'+
         '<div style="font-size:10px;color:var(--text3)">Données de la nuit précédente</div>'+
       '</div>'+
-      (toMoyenPct!=null?'<div style="font-size:11px;color:var(--text3)">Moy. mois : <strong style="color:var(--dark)">'+toMoyenPct+'%</strong></div>':'')+
+      (chamReal!=null?'<div style="font-size:11px;color:var(--text3)">Moy. mois : <strong style="color:var(--dark)">'+chamReal+' ch</strong>'+(toMoyenPct!=null?' ('+toMoyenPct+'%)':'')+'</div>':
+       toMoyenPct!=null?'<div style="font-size:11px;color:var(--text3)">Moy. mois : <strong style="color:var(--dark)">'+toMoyenPct+'%</strong></div>':'')+
     '</div>'+
     '<div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">'+
       '<div>'+
@@ -13713,10 +13728,15 @@ async function _rtEnergie(sid){
           'style="border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;width:150px"/>'+
       '</div>'+
       '<div>'+
-        '<div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">TO%</div>'+
-        '<input id="ev-today-to" type="number" min="0" max="100" step="0.1" placeholder="ex: 72.5" '+
-          'value="'+hierToStr+'" '+
-          'style="border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100px"/>'+
+        '<div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Ch. occ. / nuit</div>'+
+        '<div style="display:flex;align-items:center;gap:6px">'+
+          '<input id="ev-today-chambres" type="number" min="0" step="1" placeholder="ex: 180" '+
+            'value="'+hierChambresStr+'" '+
+            'oninput="_evTodayCalcTo(this)" '+
+            'style="border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;width:100px"/>'+
+          '<span id="ev-today-to-calc" style="font-size:10px;color:var(--text3)">'+
+            (hierChambresStr&&nbChambres?'= '+Math.round(parseInt(hierChambresStr)/nbChambres*100)+'% TO':'')+'</span>'+
+        '</div>'+
       '</div>'+
       (nbChambres?
       '<div>'+
@@ -13773,10 +13793,18 @@ async function _rtEnergie(sid){
     var dateStr=new Date(r.date_releve+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
     miniHistHtml+='<tr style="border-top:1px solid var(--border);background:'+(isHier?'#FFFEF5':'white')+'">'+
       '<td style="padding:7px 10px;color:var(--dark);white-space:nowrap">'+dateStr+(isHier?' <span style="font-size:8px;color:var(--amber-dark);font-weight:700;background:var(--amber-pale);border-radius:4px;padding:1px 4px">HIER</span>':'')+'</td>'+
-      '<td style="padding:7px 10px;text-align:right;color:'+(r.nb_chambres_occupees!=null?'var(--dark)':'var(--text3)')+'">'+
-        (r.nb_chambres_occupees!=null?r.nb_chambres_occupees+' ch'+(r.to_percent!=null?' <span style="font-size:9px;color:var(--text3)">('+Math.round(r.to_percent)+'%)</span>':''):'—')+'</td>'+
-      (nbChambres?'<td style="padding:7px 10px;text-align:right;color:'+(r.nb_couverts!=null?'var(--dark)':'var(--text3)')+'">'+
-        (r.nb_couverts!=null?r.nb_couverts.toLocaleString('fr-FR'):'—')+'</td>':'')+
+      '<td id="ech-cell-'+r.id+'" style="padding:7px 10px;text-align:right">'+
+        '<span id="ech-span-'+r.id+'" onclick="_energieEditChambres(\''+r.id+'\','+(r.nb_chambres_occupees!=null?r.nb_chambres_occupees:'null')+')" '+
+          'style="cursor:pointer;color:'+(r.nb_chambres_occupees!=null?'var(--dark)':'var(--text3)')+';font-size:11px" title="Cliquer pour modifier">'+
+          (r.nb_chambres_occupees!=null?r.nb_chambres_occupees+' ch'+(r.to_percent!=null?' <span style="font-size:9px;color:var(--text3)">('+Math.round(r.to_percent)+'%)</span>':''):'— <span style="font-size:9px">(+)</span>')+
+        '</span>'+
+      '</td>'+
+      (nbChambres?'<td id="ecov-cell-'+r.id+'" style="padding:7px 10px;text-align:right">'+
+        '<span id="ecov-span-'+r.id+'" onclick="_energieEditCouverts(\''+r.id+'\','+(r.nb_couverts!=null?r.nb_couverts:'null')+')" '+
+          'style="cursor:pointer;color:'+(r.nb_couverts!=null?'var(--dark)':'var(--text3)')+';font-size:11px" title="Cliquer pour modifier">'+
+          (r.nb_couverts!=null?r.nb_couverts.toLocaleString('fr-FR'):'— <span style="font-size:9px">(+)</span>')+
+        '</span>'+
+      '</td>':'')+
       fluides.slice(0,3).map(function(f){
         var v=r.valeurs&&r.valeurs[f.id];
         return '<td style="padding:7px 10px;text-align:right;color:'+(v!=null?'var(--dark)':'var(--text3)')+'">'+
@@ -13793,7 +13821,7 @@ async function _rtEnergie(sid){
     var chamBudg=budgetMensuel.nb_chambres_budget!=null?parseInt(budgetMensuel.nb_chambres_budget):null;
     var nbTotalCh=window._energieSiteNbChambres||null;
     var toBudg=chamBudg!=null&&nbTotalCh?Math.round(chamBudg/nbTotalCh*100):null;
-    var chamReal=(function(){var s=0;var n=0;relevesAsc.forEach(function(r){if(r.nb_chambres_occupees!=null){s+=r.nb_chambres_occupees;n++;}});return n?Math.round(s/n):null;})();
+    // chamReal déjà calculé plus haut
     var covReal=(function(){var s=0;var n=0;relevesAsc.forEach(function(r){if(r.nb_couverts!=null){s+=r.nb_couverts;n++;}});return n?Math.round(s/n):null;})();
     var covBudg=budgetMensuel.nb_couverts_budget;
     var budgetKpiCards=[
