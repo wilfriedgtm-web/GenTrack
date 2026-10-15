@@ -13080,6 +13080,95 @@ async function _energieSaveToPctInline(releveId, rawVal){
   }
 }
 
+// ── Édition inline Chambres occupées ──────────────────────────────────────────
+function _energieEditChambres(releveId, currentVal){
+  var cell=document.getElementById('ech-cell-'+releveId);
+  if(!cell)return;
+  cell.setAttribute('data-orig',currentVal!=null?currentVal:'');
+  cell.innerHTML='<input id="ech-inp-'+releveId+'" type="number" min="0" step="1" '+
+    'value="'+(currentVal!=null?currentVal:'')+'" placeholder="ch" '+
+    'style="border:1px solid var(--amber);border-radius:5px;padding:3px 6px;font-size:12px;width:58px;text-align:right;-moz-appearance:textfield" '+
+    'onblur="_energieSaveChambresInline(\''+releveId+'\',this.value)" '+
+    'onkeydown="if(event.key===\'Enter\'){this.blur();}else if(event.key===\'Escape\'){_energieCancelChambres(\''+releveId+'\');}" />';
+  var inp=document.getElementById('ech-inp-'+releveId);
+  if(inp){inp.focus();inp.select();}
+}
+function _energieCancelChambres(releveId){
+  var cell=document.getElementById('ech-cell-'+releveId);
+  if(!cell)return;
+  var inp=document.getElementById('ech-inp-'+releveId);
+  if(inp)inp.removeAttribute('onblur');
+  var orig=cell.getAttribute('data-orig');
+  _energieRestoreChambresCell(releveId,orig!==''?parseInt(orig):null);
+}
+function _energieRestoreChambresCell(releveId,val,toP){
+  var cell=document.getElementById('ech-cell-'+releveId);
+  if(!cell)return;
+  var toPStr=toP!=null?' <span style="font-size:9px;color:var(--text3)">('+Math.round(toP)+'%)</span>':'';
+  cell.innerHTML='<span id="ech-span-'+releveId+'" onclick="_energieEditChambres(\''+releveId+'\','+(val!=null?val:'null')+')" '+
+    'style="cursor:pointer;color:'+(val!=null?'var(--dark)':'var(--text3)')+';font-size:11px" title="Cliquer pour saisir les chambres occupées">'+
+    (val!=null?val+' ch'+toPStr:'— <span style="font-size:9px">(+)</span>')+
+  '</span>';
+}
+async function _energieSaveChambresInline(releveId, rawVal){
+  var nbCh=window._energieSiteNbChambres||null;
+  var val=rawVal!=null&&rawVal!==''?parseInt(rawVal):null;
+  var patch={nb_chambres_occupees:val};
+  if(val!=null&&nbCh&&nbCh>0)patch.to_percent=Math.round(val/nbCh*100);
+  else if(val==null)patch.to_percent=null;
+  var ok=await supaPatch('releves_energie',releveId,patch);
+  if(ok){
+    if(_session)setTimeout(function(){renderRespTech(_session,'energie');},200);
+  }else{
+    alert('Erreur lors de l\'enregistrement.');
+    var cell=document.getElementById('ech-cell-'+releveId);
+    var orig=cell?cell.getAttribute('data-orig'):'';
+    _energieRestoreChambresCell(releveId,orig!==''?parseInt(orig):null);
+  }
+}
+
+// ── Édition inline Couverts ────────────────────────────────────────────────────
+function _energieEditCouverts(releveId, currentVal){
+  var cell=document.getElementById('ecov-cell-'+releveId);
+  if(!cell)return;
+  cell.setAttribute('data-orig',currentVal!=null?currentVal:'');
+  cell.innerHTML='<input id="ecov-inp-'+releveId+'" type="number" min="0" step="1" '+
+    'value="'+(currentVal!=null?currentVal:'')+'" placeholder="cvts" '+
+    'style="border:1px solid var(--amber);border-radius:5px;padding:3px 6px;font-size:12px;width:64px;text-align:right;-moz-appearance:textfield" '+
+    'onblur="_energieSaveCouvertsInline(\''+releveId+'\',this.value)" '+
+    'onkeydown="if(event.key===\'Enter\'){this.blur();}else if(event.key===\'Escape\'){_energieCancelCouverts(\''+releveId+'\');}" />';
+  var inp=document.getElementById('ecov-inp-'+releveId);
+  if(inp){inp.focus();inp.select();}
+}
+function _energieCancelCouverts(releveId){
+  var cell=document.getElementById('ecov-cell-'+releveId);
+  if(!cell)return;
+  var inp=document.getElementById('ecov-inp-'+releveId);
+  if(inp)inp.removeAttribute('onblur');
+  var orig=cell.getAttribute('data-orig');
+  _energieRestoreCouvertsCell(releveId,orig!==''?parseInt(orig):null);
+}
+function _energieRestoreCouvertsCell(releveId,val){
+  var cell=document.getElementById('ecov-cell-'+releveId);
+  if(!cell)return;
+  cell.innerHTML='<span id="ecov-span-'+releveId+'" onclick="_energieEditCouverts(\''+releveId+'\','+(val!=null?val:'null')+')" '+
+    'style="cursor:pointer;color:'+(val!=null?'var(--dark)':'var(--text3)')+';font-size:11px" title="Cliquer pour saisir les couverts">'+
+    (val!=null?val.toLocaleString('fr-FR'):'— <span style="font-size:9px">(+)</span>')+
+  '</span>';
+}
+async function _energieSaveCouvertsInline(releveId, rawVal){
+  var val=rawVal!=null&&rawVal!==''?parseInt(rawVal):null;
+  var ok=await supaPatch('releves_energie',releveId,{nb_couverts:val});
+  if(ok){
+    if(_session)setTimeout(function(){renderRespTech(_session,'energie');},200);
+  }else{
+    alert('Erreur lors de l\'enregistrement.');
+    var cell=document.getElementById('ecov-cell-'+releveId);
+    var orig=cell?cell.getAttribute('data-orig'):'';
+    _energieRestoreCouvertsCell(releveId,orig!==''?parseInt(orig):null);
+  }
+}
+
 async function _energieSaveObjectifs(sid){
   var fluides=_energieFluides;
   var btn=document.getElementById('energie-obj-btn');
@@ -13843,11 +13932,18 @@ async function _rtEnergie(sid){
         return '<td style="padding:7px 9px;text-align:right;color:'+(alerte?'var(--rouge)':vNum!=null?'var(--dark)':'var(--text3)')+'">'+
           (vNum!=null?(alerte?'⚠️ ':'')+vNum.toLocaleString('fr-FR'):'—')+deltaStr+'</td>';
       }).join('')+
-      '<td style="padding:7px 9px;text-align:right;color:'+(r.nb_chambres_occupees!=null?'var(--dark)':'var(--text3)')+'">'+
-        (r.nb_chambres_occupees!=null?r.nb_chambres_occupees+' ch'+(r.to_percent!=null?' <span style="font-size:9px;color:var(--text3)">('+Math.round(r.to_percent)+'%)</span>':''):'—')+
+      '<td id="ech-cell-'+r.id+'" style="padding:7px 9px;text-align:right">'+
+        '<span id="ech-span-'+r.id+'" onclick="_energieEditChambres(\''+r.id+'\','+(r.nb_chambres_occupees!=null?r.nb_chambres_occupees:'null')+')" '+
+          'style="cursor:pointer;color:'+(r.nb_chambres_occupees!=null?'var(--dark)':'var(--text3)')+';font-size:11px" title="Cliquer pour saisir les chambres occupées">'+
+          (r.nb_chambres_occupees!=null?r.nb_chambres_occupees+' ch'+(r.to_percent!=null?' <span style="font-size:9px;color:var(--text3)">('+Math.round(r.to_percent)+'%)</span>':''):'— <span style="font-size:9px">(+)</span>')+
+        '</span>'+
       '</td>'+
-      '<td style="padding:7px 9px;text-align:right;color:'+(r.nb_couverts!=null?'var(--dark)':'var(--text3)')+'">'+
-        (r.nb_couverts!=null?r.nb_couverts.toLocaleString('fr-FR'):'—')+'</td>'+
+      '<td id="ecov-cell-'+r.id+'" style="padding:7px 9px;text-align:right">'+
+        '<span id="ecov-span-'+r.id+'" onclick="_energieEditCouverts(\''+r.id+'\','+(r.nb_couverts!=null?r.nb_couverts:'null')+')" '+
+          'style="cursor:pointer;color:'+(r.nb_couverts!=null?'var(--dark)':'var(--text3)')+';font-size:11px" title="Cliquer pour saisir les couverts">'+
+          (r.nb_couverts!=null?r.nb_couverts.toLocaleString('fr-FR'):'— <span style="font-size:9px">(+)</span>')+
+        '</span>'+
+      '</td>'+
       '<td id="enote-cell-'+r.id+'" style="padding:7px 9px;min-width:80px">'+
         '<span id="enote-span-'+r.id+'" onclick="_energieEditNote(\''+r.id+'\',\''+escape_html(r.note||'')+'\''+')" '+
           'style="cursor:pointer;color:'+(r.note?'var(--dark)':'var(--text3)')+';font-size:10px">'+(r.note?escape_html(r.note):'+ Note')+'</span>'+
