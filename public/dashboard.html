@@ -10912,8 +10912,8 @@ async function _fetchRecoEquipements(sid){
     if(!repByEqQ[eqId][r.question_id])repByEqQ[eqId][r.question_id]=[];
     repByEqQ[eqId][r.question_id].push({v:parseFloat(r.valeur),t:r.created_at,q:q});
   });
-  // --- Relevés horaires validés (7 derniers jours) ---
-  var relevesRecent=await supaGet('releves_horaires','site_id=eq.'+sid+'&statut=eq.validé&created_at=gte.'+since7+'T00:00:00Z&select=id&limit=50');
+  // --- Relevés horaires (7 derniers jours, tous statuts — on prend les valeurs saisies même partielles) ---
+  var relevesRecent=await supaGet('releves_horaires','site_id=eq.'+sid+'&created_at=gte.'+since7+'T00:00:00Z&select=id&limit=50');
   if(relevesRecent.length){
     var relIds=relevesRecent.map(function(r){return r.id;});
     var releveReps=await supaGet('reponses','releve_id=in.('+relIds.join(',')+')'+'&select=valeur,created_at,question_id,questions(texte,type_reponse,unite,seuil_min,seuil_max,equipement_id)'+'&order=created_at.desc&limit=400');
