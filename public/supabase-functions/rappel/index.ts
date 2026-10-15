@@ -117,7 +117,17 @@ serve(async (_req) => {
   const heureUTC = getUTCHour();
   const jourUTC  = getUTCDay();
   const today    = getToday();
-  const stats    = { rappels_ronde: 0, rappels_releve: 0, rappels_hebdo: 0, alertes_carburant: 0, erreurs: 0 };
+  const stats    = { rappels_ronde: 0, rappels_releve: 0, rappels_hebdo: 0, alertes_carburant: 0, erreurs: 0, rappels_skipped: 0 };
+
+  // ── Techniciens actifs récemment (session bot dans les 7 derniers jours) ──────
+  // Un tech "actif" = a envoyé au moins un message au bot dans les 7 jours
+  // → reçoit les rappels. Les inactifs reçoivent toujours les alertes urgentes.
+  const seuilActif = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const sessionsActives = await dbGet('sessions', `&updated_at=gte.${seuilActif}&select=phone`).catch(() => []);
+  const phonesActifs = new Set<string>(
+    Array.isArray(sessionsActives) ? sessionsActives.map((s: any) => s.phone?.replace('whatsapp:', '')) : []
+  );
+  const estActif = (whatsapp: string) => phonesActifs.has(whatsapp.replace('whatsapp:', '').replace('+', ''));
 
   const sites = await dbGet('sites', '&actif=eq.true');
 
@@ -195,6 +205,7 @@ serve(async (_req) => {
         const cuveStr     = cuves.length ? `\n⛽ ${cuves.map((c: any) => c.nom).join(', ')}` : '';
 
         for (const tech of techniciens) {
+          if (!estActif(tech.whatsapp)) { stats.rappels_skipped++; continue; }
           const msg =
             `☀️ *GenTrack — Ronde du jour*\n\n` +
             `Bonjour ${tech.nom || ''} ! *${site.nom}*\n\n` +
@@ -227,6 +238,7 @@ serve(async (_req) => {
         const listeEquip  = equipsRonde.map((e: any) => `📟 ${e.nom}`).join('\n');
 
         for (const tech of techniciens) {
+          if (!estActif(tech.whatsapp)) { stats.rappels_skipped++; continue; }
           const msg =
             `📅 *GenTrack — Ronde hebdomadaire*\n\n` +
             `Bonjour ${tech.nom || ''} ! *${site.nom}*\n\n` +
@@ -246,6 +258,7 @@ serve(async (_req) => {
         const link = await getReleveLink(site.id);
         if (link) {
           for (const tech of techniciens) {
+            if (!estActif(tech.whatsapp)) { stats.rappels_skipped++; continue; }
             const msg =
               `📊 *GenTrack — Relevé horaire*\n\n` +
               `Bonjour ${tech.nom || ''} ! *${site.nom}*\n\n` +
