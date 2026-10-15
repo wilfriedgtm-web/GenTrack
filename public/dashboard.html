@@ -9614,7 +9614,7 @@ async function _dtEnergie(sids,session){
     supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,devise,tarif&order=ordre.asc'),
     supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=site_id,date_releve,valeurs,to_percent,nb_couverts&order=date_releve.asc&limit=600'),
     supaGet('objectifs_energie','site_id=in.('+sidStr+')&select=fluide_id,valeur,date_debut,date_fin&order=date_debut.desc&limit=400'),
-    supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=eq.instantane&select=id,site_id,nom,unite,capacite&order=ordre.asc'),
+    supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=eq.instantane&select=id,site_id,nom,unite,capacite,tarif&order=ordre.asc'),
     supaGet('energie_budget_mensuel','site_id=in.('+sidStr+')&annee=eq.'+tgt.getFullYear()+'&mois=eq.'+(tgt.getMonth()+1)+'&select=id,site_id,nb_couverts_budget,nb_chambres_budget')
   ]);
   var _budgetMIds=(budgetsMensuels||[]).map(function(b){return b.id;});
@@ -9706,18 +9706,37 @@ async function _dtEnergie(sids,session){
 
   // Niveaux instantanés (butane, cuve gasoil, cos phi…) par site — tous les instantanés du RT
   var niveauxData={};
+  var coutInstantBySite={}; // coût mensuel des fluides instantanés par site (gasoil, gaz…)
   sids.forEach(function(sid){
     var ifls=(niveauxFluides||[]).filter(function(f){return f.site_id===sid;});
     if(!ifls.length)return;
-    var last=(relevesBySite[sid]||[]).slice(-1)[0]||null;
+    var rels=(relevesBySite[sid]||[]).slice().sort(function(a,b){return a.date_releve.localeCompare(b.date_releve);});
+    var last=rels.length?rels[rels.length-1]:null;
     var _niv=[];
+    var _coutInstSite=0;
     ifls.forEach(function(f){
       var val=last&&last.valeurs&&last.valeurs[f.id]!=null?parseFloat(last.valeurs[f.id]):null;
       var cap=f.capacite!=null?parseFloat(f.capacite):null;
       var pct=val!=null&&cap&&cap>0?(val>100?Math.round(val/cap*100):Math.round(val)):val!=null&&f.unite==='%'?Math.round(val):null;
-      _niv.push({nom:f.nom,unite:f.unite||'',val:val,pct:pct,date:last?last.date_releve:null});
+      // Calcul conso mensuelle instantané (somme des baisses de niveau en L)
+      var consoInstant=null;
+      if(cap!=null&&rels.length>=2){
+        var drops=0,_prev=null;
+        rels.forEach(function(r){
+          var v=r.valeurs&&r.valeurs[f.id]!=null?parseFloat(r.valeurs[f.id]):null;
+          if(v==null)return;
+          if(_prev!=null){var dL=v>100?v:v/100*cap,pL=_prev>100?_prev:_prev/100*cap;if(dL<pL)drops+=(pL-dL);}
+          _prev=v;
+        });
+        consoInstant=Math.round(drops);
+      }
+      var tarif=f.tarif!=null?parseFloat(f.tarif):null;
+      var coutInstant=consoInstant!=null&&consoInstant>0&&tarif!=null?Math.round(consoInstant*tarif):null;
+      if(coutInstant!=null)_coutInstSite+=coutInstant;
+      _niv.push({nom:f.nom,unite:f.unite||'',val:val,pct:pct,date:last?last.date_releve:null,coutInstant:coutInstant});
     });
     if(_niv.length)niveauxData[sid]=_niv;
+    if(_coutInstSite>0)coutInstantBySite[sid]=_coutInstSite;
   });
 
   // Global KPIs: group by fluide nom+unite across all sites
@@ -9771,7 +9790,10 @@ async function _dtEnergie(sids,session){
   }
   // FCFA KPI tiles
   var _cTotDT=0,_bTotDT=0,_hcDT=false;
-  sids.forEach(function(sid){(consoData[sid]||[]).forEach(function(f){if(f.cout!=null){_cTotDT+=f.cout;_hcDT=true;}if(f.budget!=null)_bTotDT+=f.budget;});});
+  sids.forEach(function(sid){
+    (consoData[sid]||[]).forEach(function(f){if(f.cout!=null){_cTotDT+=f.cout;_hcDT=true;}if(f.budget!=null)_bTotDT+=f.budget;});
+    if(coutInstantBySite[sid]){_cTotDT+=coutInstantBySite[sid];_hcDT=true;}
+  });
   if(_hcDT){
     function _fmtDT(v){if(v==null)return'—';var a=Math.abs(v),s=v<0?'-':'';if(a>=1e6)return s+(a/1e6).toFixed(1).replace('.',',')+' M';if(a>=1e3)return s+Math.round(a/1e3)+' k';return s+Math.round(a);}
     var _eDT=_bTotDT?_cTotDT-_bTotDT:null;
@@ -9835,7 +9857,7 @@ async function _dtEnergie(sids,session){
       '</div>'+
       rows+
       (function(){
-        var _cS=0,_bS=0,_hcS=false;items.forEach(function(f){if(f.cout!=null){_cS+=f.cout;_hcS=true;}if(f.budget!=null)_bS+=f.budget;});
+        var _cS=0,_bS=0,_hcS=false;items.forEach(function(f){if(f.cout!=null){_cS+=f.cout;_hcS=true;}if(f.budget!=null)_bS+=f.budget;});if(coutInstantBySite[sid]){_cS+=coutInstantBySite[sid];_hcS=true;}
         if(!_hcS)return '';
         var _fS=function(v){if(v==null)return'—';var a=Math.abs(v),s=v<0?'-':'';if(a>=1e6)return s+(a/1e6).toFixed(1).replace('.',',')+' M';if(a>=1e3)return s+Math.round(a/1e3)+' k';return s+Math.round(a);};
         var _ecS=_bS?_cS-_bS:null,_epS=_ecS!=null&&_bS?Math.round(_ecS/_bS*100):null;
