@@ -1800,19 +1800,39 @@ async function _marquerTraite(table,id,fromNav){
 }
 
 /* ── Historique (30j avec sélecteur de période) ── */
+var _histMonthOffset=0;
+function _histNavMonth(delta){_histMonthOffset+=delta;if(_session)renderRespTech(_session,'historique');}
+
 async function _rtHistorique(sid){
-  var period=_histPeriod||30;
-  var since30=dateNJours(30);
-  var cutoff=dateNJours(period);
+  // Navigation par mois
+  var now=new Date();
+  var displayDate=new Date(now.getFullYear(),now.getMonth()+_histMonthOffset,1);
+  var moisDebut=new Date(displayDate.getFullYear(),displayDate.getMonth(),1);
+  moisDebut.setHours(0,0,0,0);
+  var moisFin=new Date(displayDate.getFullYear(),displayDate.getMonth()+1,0);
+  moisFin.setHours(23,59,59,999);
+  var moisDebutStr=moisDebut.toISOString().substring(0,10);
+  var moisFinStr=moisFin.toISOString().substring(0,10);
+  var isCurrentMonth=_histMonthOffset===0;
+
   var[rondes,pannes]=await Promise.all([
-    supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+since30+'&select=id,date_ronde,frequence&order=date_ronde.desc&limit=90'),
-    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&created_at=gte.'+since30+'T00:00:00&select=id,description,statut,created_at,equipement_id,equipements(nom)&order=created_at.desc&limit=60')
+    supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+moisDebutStr+'&date_ronde=lte.'+moisFinStr+'&select=id,date_ronde,frequence&order=date_ronde.desc&limit=90'),
+    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&created_at=gte.'+moisDebut.toISOString()+'&created_at=lte.'+moisFin.toISOString()+'&select=id,description,statut,created_at,equipement_id,equipements(nom)&order=created_at.desc&limit=60')
   ]);
-  var rondesFilt=rondes.filter(function(r){return r.date_ronde>=cutoff;});
-  var pannesFilt=pannes.filter(function(p){return!p.created_at||p.created_at>=cutoff+'T00:00:00';});
-  var h=_buildPeriodSelector(period);
+  var rondesFilt=rondes;
+  var pannesFilt=pannes;
+
+  var monthLabel=displayDate.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  monthLabel=monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1);
+  var h='<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">'+
+    '<button onclick="_histNavMonth(-1)" style="width:32px;height:32px;border:1.5px solid var(--border);border-radius:8px;background:white;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--dark)">‹</button>'+
+    '<div style="flex:1;text-align:center;font-size:13px;font-weight:700;color:var(--dark)">'+monthLabel+'</div>'+
+    (isCurrentMonth
+      ? '<div style="width:32px;height:32px"></div>'
+      : '<button onclick="_histNavMonth(1)" style="width:32px;height:32px;border:1.5px solid var(--border);border-radius:8px;background:white;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--dark)">›</button>')+
+  '</div>';
   if(rondesFilt.length===0&&pannesFilt.length===0){
-    return h+'<div class="placeholder-card"><div class="placeholder-icon">📊</div>Aucune donnée sur les '+period+' derniers jours</div>';
+    return h+'<div class="placeholder-card"><div class="placeholder-icon">📊</div>Aucune donnée pour '+monthLabel+'</div>';
   }
   // Rondes
   if(rondesFilt.length>0){
@@ -1853,7 +1873,7 @@ async function _rtHistorique(sid){
     h+='</div>';
   }
   // Pannes
-  h+='<div class="section-title">Pannes <span style="font-size:12px;font-weight:400;color:var(--text3)">— '+period+' jours</span></div>';
+  h+='<div class="section-title">Pannes <span style="font-size:12px;font-weight:400;color:var(--text3)">— '+monthLabel+'</span></div>';
   if(pannesFilt.length===0){
     h+='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Aucune panne sur cette période</div></div></div>';
   }else{
