@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack — Proposition King Fahd Palace</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --creme: #F5F0E8;
+  --dark: #1C1917;
+  --amber: #C49A3C;
+  --amber-light: #F0E4C0;
+  --red: #DC2626;
+  --green: #16A34A;
+  --muted: #78716C;
+  --border: #E7E0D3;
+  --blue: #2563EB;
+  --wa-green: #25D366;
+  --wa-bg: #ECE5DD;
+  --wa-bubble-out: #DCF8C6;
+  --wa-bubble-in: #ffffff;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  font-size: 11pt;
+  color: var(--dark);
+  background: #fff;
+  line-height: 1.6;
+}
+
+/* ===== LAYOUT ===== */
+.wrapper { max-width: 860px; margin: 0 auto; }
+
+/* ===== HERO COVER ===== */
+.hero {
+  background: var(--dark);
+  padding: 60px 48px 48px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -80px; right: -80px;
+  width: 320px; height: 320px;
+  border-radius: 50%;
+  background: rgba(196,154,60,0.08);
+}
+
+.hero-logo { font-size: 22pt; font-weight: 800; color: var(--amber); margin-bottom: 4px; }
+.hero-logo span { color: #fff; }
+.hero-tagline { font-size: 8pt; color: rgba(255,255,255,0.4); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 36px; }
+
+.hero-label { font-size: 8pt; font-weight: 700; color: var(--amber); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; }
+.hero-title { font-size: 34pt; font-weight: 800; color: #fff; line-height: 1.1; margin-bottom: 12px; }
+.hero-title .hl { color: var(--amber); }
+.hero-sub { font-size: 12pt; color: rgba(255,255,255,0.6); margin-bottom: 36px; max-width: 500px; }
+
+.hero-meta { display: flex; gap: 32px; flex-wrap: wrap; }
+.hero-meta-item label { display: block; font-size: 7pt; font-weight: 700; color: var(--amber); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px; }
+.hero-meta-item .val { font-size: 10pt; color: rgba(255,255,255,0.85); font-weight: 500; }
+
+.hero-badge {
+  position: absolute; top: 40px; right: 48px;
+  background: var(--amber); color: var(--dark);
+  font-size: 8pt; font-weight: 800; padding: 6px 16px; border-radius: 4px;
+  letter-spacing: 0.5px; text-transform: uppercase;
+}
+
+/* ===== SECTION ===== */
+.section { padding: 48px 48px 36px; border-bottom: 1px solid var(--border); }
+.section:last-child { border-bottom: none; }
+
+.section-label {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 20px;
+}
+.section-num {
+  width: 30px; height: 30px; border-radius: 50%; background: var(--amber);
+  color: var(--dark); display: flex; align-items: center; justify-content: center;
+  font-size: 10pt; font-weight: 800; flex-shrink: 0;
+}
+.section-title { font-size: 15pt; font-weight: 700; }
+
+/* ===== STAT GRID ===== */
+.stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 24px; }
+.stat-grid-2 { grid-template-columns: repeat(2,1fr); }
+.stat-grid-4 { grid-template-columns: repeat(4,1fr); }
+
+.stat-card { border-radius: 10px; padding: 16px; }
+.stat-card.dark-bg { background: var(--dark); }
+.stat-card.creme { background: var(--creme); }
+.stat-card.red { background: #FEF2F2; border: 1px solid #FECACA; }
+.stat-card.warn { background: #FFFBEB; border: 1px solid #FDE68A; }
+.stat-card.green { background: #F0FDF4; border: 1px solid #BBF7D0; }
+.stat-card.amber-bg { background: var(--amber-light); border: 1px solid var(--amber); }
+
+.stat-label { font-size: 7.5pt; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+.stat-value { font-size: 26pt; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+.stat-card.red .stat-value { color: var(--red); }
+.stat-card.warn .stat-value { color: #D97706; }
+.stat-card.green .stat-value { color: var(--green); }
+.stat-card.amber-bg .stat-value { color: #7C5A0E; }
+.stat-card.dark-bg .stat-value { color: var(--amber); }
+.stat-sub { font-size: 8.5pt; color: var(--muted); line-height: 1.4; }
+.stat-card.dark-bg .stat-sub { color: rgba(255,255,255,0.5); }
+
+/* ===== QUOTE ===== */
+.quote {
+  background: var(--creme); border-left: 4px solid var(--amber);
+  padding: 16px 20px; border-radius: 0 8px 8px 0; margin-bottom: 24px;
+  font-style: italic; font-size: 10.5pt; color: #44403C; line-height: 1.65;
+}
+.quote cite { display:block; margin-top:8px; font-style:normal; font-size:8.5pt; font-weight:600; color:var(--muted); }
+
+/* ===== ALERT ===== */
+.alert { border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; display: flex; gap: 12px; align-items: flex-start; }
+.alert.red { background: #FEF2F2; border: 1px solid #FECACA; }
+.alert-icon { font-size: 14pt; flex-shrink: 0; margin-top: 1px; }
+.alert-body strong { display: block; font-size: 10pt; margin-bottom: 3px; color: #991B1B; }
+.alert-body p { font-size: 9pt; color: #7F1D1D; margin: 0; }
+
+/* ===== FEATURE COMPARE TABLE ===== */
+.compare-table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin-bottom: 20px; }
+.compare-table th { padding: 10px 14px; font-size: 8.5pt; font-weight: 700; text-align: left; }
+.compare-table th:first-child { border-bottom: 2px solid var(--border); }
+.compare-table th.col-before { background: #FEF2F2; color: #991B1B; border-bottom: 2px solid #FECACA; border-radius: 8px 8px 0 0; }
+.compare-table th.col-after { background: var(--amber); color: var(--dark); border-bottom: 2px solid #B8891F; border-radius: 8px 8px 0 0; }
+.compare-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.compare-table td.col-before { background: #FFF5F5; font-size: 9pt; }
+.compare-table td.col-after { background: #FFFDF5; font-weight: 600; font-size: 9pt; }
+.check { color: var(--green); font-weight: 800; }
+.cross { color: var(--red); font-weight: 800; }
+.partial { color: #D97706; }
+
+/* ===== PHONE MOCKUP (WhatsApp) ===== */
+.phone-wrapper { display: flex; justify-content: center; margin: 0 0 8px; }
+
+.phone {
+  width: 280px;
+  background: #fff;
+  border-radius: 30px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18), 0 0 0 10px #1C1917;
+  overflow: hidden;
+  position: relative;
+}
+
+.phone-notch {
+  background: #1C1917;
+  height: 28px;
+  display: flex; align-items: center; justify-content: center;
+}
+.phone-notch-dot { width: 10px; height: 10px; background: #333; border-radius: 50%; }
+
+.wa-header {
+  background: #075E54;
+  padding: 10px 12px;
+  display: flex; align-items: center; gap: 10px;
+  color: #fff;
+}
+.wa-avatar {
+  width: 34px; height: 34px; background: var(--wa-green); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15pt; flex-shrink: 0;
+}
+.wa-name { font-size: 10pt; font-weight: 700; }
+.wa-status { font-size: 7.5pt; opacity: 0.75; }
+
+.wa-body {
+  background: var(--wa-bg);
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 30L30 60L0 30Z' fill='none' stroke='%23C9B99A' stroke-width='0.3' opacity='0.3'/%3E%3C/svg%3E");
+  padding: 10px 8px;
+  min-height: 320px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+
+.wa-date-sep { text-align: center; margin: 4px 0; }
+.wa-date-sep span { background: rgba(255,255,255,0.7); font-size: 7pt; padding: 2px 10px; border-radius: 10px; color: #666; }
+
+.wa-msg { max-width: 88%; }
+.wa-msg.out { align-self: flex-end; }
+.wa-msg.in { align-self: flex-start; }
+
+.wa-bubble {
+  padding: 7px 9px 4px;
+  border-radius: 8px;
+  font-size: 8.5pt;
+  line-height: 1.4;
+  color: #111;
+  position: relative;
+}
+.wa-msg.out .wa-bubble { background: var(--wa-bubble-out); border-bottom-right-radius: 2px; }
+.wa-msg.in .wa-bubble { background: var(--wa-bubble-in); border-bottom-left-radius: 2px; }
+.wa-bubble .wa-meta { font-size: 6.5pt; color: #999; text-align: right; margin-top: 3px; }
+.wa-bubble strong { color: #1C1917; }
+
+.wa-bot-bubble {
+  background: #fff;
+  border-left: 3px solid var(--wa-green);
+  border-radius: 0 8px 8px 0;
+  padding: 7px 9px;
+  font-size: 8.5pt;
+  margin: 2px 0;
+}
+.wa-bot-bubble .bot-name { font-size: 7.5pt; font-weight: 700; color: var(--wa-green); margin-bottom: 3px; }
+.wa-choice-row { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+.wa-choice {
+  background: #E3F7E9; border: 1px solid var(--wa-green);
+  border-radius: 5px; padding: 4px 8px; font-size: 8pt;
+  color: #075E54; font-weight: 600; text-align: center;
+}
+
+/* ===== EQUIPMENT DASHBOARD MOCKUP ===== */
+.dashboard-frame {
+  background: #F8F9FA;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.07);
+}
+
+.dash-topbar {
+  background: var(--dark);
+  padding: 10px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.dash-topbar-title { color: #fff; font-size: 10pt; font-weight: 700; }
+.dash-topbar-logo { color: var(--amber); font-size: 9pt; font-weight: 800; }
+.dash-topbar-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 5px; }
+
+.dash-nav {
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  display: flex; gap: 0;
+}
+.dash-nav-item {
+  padding: 9px 14px;
+  font-size: 8.5pt;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.dash-nav-item.active { color: var(--amber); border-bottom-color: var(--amber); }
+
+.dash-body { padding: 14px 16px; }
+
+.dash-kpi-row { display: flex; gap: 10px; margin-bottom: 14px; }
+.dash-kpi {
+  flex: 1; background: #fff; border-radius: 8px; padding: 10px 12px;
+  border: 1px solid var(--border);
+}
+.dash-kpi-label { font-size: 7pt; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
+.dash-kpi-val { font-size: 16pt; font-weight: 800; }
+.dash-kpi-val.green { color: var(--green); }
+.dash-kpi-val.red { color: var(--red); }
+.dash-kpi-val.amber { color: var(--amber); }
+.dash-kpi-sub { font-size: 7pt; color: var(--muted); margin-top: 1px; }
+
+.equip-table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+.equip-table th {
+  background: var(--creme); padding: 7px 10px;
+  text-align: left; font-size: 7.5pt; font-weight: 700;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;
+}
+.equip-table td { padding: 7px 10px; border-bottom: 1px solid #F5F0E8; vertical-align: middle; }
+.equip-table tr:last-child td { border-bottom: none; }
+
+.badge { display: inline-block; font-size: 7pt; font-weight: 700; padding: 2px 7px; border-radius: 10px; }
+.badge.ok { background: #DCFCE7; color: #15803D; }
+.badge.warn { background: #FEF3C7; color: #B45309; }
+.badge.err { background: #FEE2E2; color: #991B1B; }
+.badge.na { background: #F3F4F6; color: #6B7280; }
+
+.progress-bar { height: 5px; background: #E5E7EB; border-radius: 10px; overflow: hidden; }
+.progress-fill { height: 100%; border-radius: 10px; }
+.progress-fill.green { background: var(--green); }
+.progress-fill.amber { background: var(--amber); }
+.progress-fill.red { background: var(--red); }
+
+/* ===== QR CODE FLOW ===== */
+.flow-steps { display: flex; gap: 0; align-items: stretch; margin-bottom: 8px; }
+.flow-step { flex: 1; text-align: center; position: relative; }
+.flow-step::after {
+  content: '→';
+  position: absolute; right: -12px; top: 50%; transform: translateY(-50%);
+  font-size: 16pt; color: var(--border); z-index: 1;
+}
+.flow-step:last-child::after { display: none; }
+
+.flow-icon {
+  width: 58px; height: 58px; border-radius: 14px; margin: 0 auto 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22pt;
+}
+.flow-icon.amber-bg { background: var(--amber-light); }
+.flow-icon.dark-bg { background: var(--dark); }
+.flow-icon.green-bg { background: #DCFCE7; }
+.flow-icon.blue-bg { background: #EFF6FF; }
+.flow-icon.red-bg { background: #FEE2E2; }
+
+.flow-step-title { font-size: 9pt; font-weight: 700; margin-bottom: 4px; }
+.flow-step-desc { font-size: 8pt; color: var(--muted); line-height: 1.4; }
+
+/* ===== QR CODE SVG ===== */
+.qr-demo {
+  display: flex; gap: 20px; align-items: flex-start;
+  background: var(--creme); border-radius: 12px; padding: 20px 24px;
+  margin-bottom: 16px;
+}
+.qr-box {
+  background: #fff; border-radius: 10px; padding: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08); flex-shrink: 0;
+}
+.qr-label { font-size: 7.5pt; font-weight: 700; color: var(--muted); text-align: center; margin-top: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.qr-info { flex: 1; }
+.qr-info h4 { font-size: 11pt; font-weight: 700; margin-bottom: 6px; }
+.qr-info p { font-size: 9pt; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
+.qr-steps { list-style: none; }
+.qr-steps li { display: flex; gap: 8px; font-size: 9pt; margin-bottom: 6px; align-items: flex-start; }
+.qr-step-n { background: var(--amber); color: var(--dark); width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 7.5pt; font-weight: 800; flex-shrink: 0; margin-top: 1px; }
+
+/* ===== ENERGY CHART ===== */
+.chart-container { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.chart-title { font-size: 9.5pt; font-weight: 700; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+.chart-legend { display: flex; gap: 14px; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 8pt; color: var(--muted); }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+/* ===== MTTR PANEL ===== */
+.mttr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+.mttr-card { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.mttr-card h4 { font-size: 9pt; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px; }
+
+/* ===== OFFER SECTION ===== */
+.offer-highlight {
+  border: 2.5px solid var(--amber); border-radius: 12px; overflow: hidden; margin-bottom: 24px;
+}
+.offer-head { background: var(--amber); padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; }
+.offer-head-name { font-size: 15pt; font-weight: 800; color: var(--dark); }
+.offer-head-badge { background: var(--dark); color: var(--amber); font-size: 8pt; font-weight: 700; padding: 4px 12px; border-radius: 4px; }
+.offer-body { padding: 20px; }
+.offer-price-row { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.offer-price { font-size: 30pt; font-weight: 800; line-height: 1; }
+.offer-unit { font-size: 10pt; color: var(--muted); padding-bottom: 4px; }
+.offer-annual { background: #DCFCE7; border: 1px solid #BBF7D0; border-radius: 6px; padding: 3px 10px; font-size: 10pt; font-weight: 700; color: var(--green); }
+.offer-features { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 20px; list-style: none; }
+.offer-features li { font-size: 9.5pt; display: flex; align-items: flex-start; gap: 7px; }
+.offer-features li::before { content: "✓"; color: var(--green); font-weight: 800; flex-shrink: 0; }
+
+/* ===== ROI TABLE ===== */
+.roi-table { width: 100%; border-collapse: collapse; font-size: 9.5pt; margin-bottom: 16px; }
+.roi-table th { background: var(--dark); color: #fff; padding: 10px 14px; text-align: left; font-weight: 600; font-size: 8.5pt; }
+.roi-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); }
+.roi-table tr:nth-child(even) td { background: var(--creme); }
+.roi-table tr.total td { background: var(--amber-light); font-weight: 700; border-top: 2px solid var(--amber); font-size: 10.5pt; }
+.text-right { text-align: right; }
+.pos { color: var(--green); font-weight: 700; }
+.neg { color: var(--red); font-weight: 700; }
+
+/* ===== TIMELINE ===== */
+.timeline { list-style: none; padding: 0; position: relative; }
+.timeline::before { content:''; position:absolute; left:18px; top:6px; bottom:6px; width:2px; background:var(--border); }
+.tl-item { display: flex; gap: 18px; margin-bottom: 20px; }
+.tl-dot { width: 36px; height: 36px; border-radius: 50%; background: var(--amber); color: var(--dark); display: flex; align-items: center; justify-content: center; font-size: 10pt; font-weight: 800; flex-shrink: 0; z-index:1; }
+.tl-dot.ghost { background: var(--border); color: var(--muted); }
+.tl-phase { font-size: 7.5pt; font-weight: 700; color: var(--amber); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px; }
+.tl-title { font-size: 11pt; font-weight: 700; margin-bottom: 4px; }
+.tl-desc { font-size: 9pt; color: var(--muted); line-height: 1.4; }
+
+/* ===== ONBOARDING BOX ===== */
+.onboarding-box { background: var(--dark); border-radius: 12px; padding: 24px 28px; color: #fff; margin-bottom: 20px; }
+.onboarding-box h3 { color: var(--amber); font-size: 13pt; margin-bottom: 10px; }
+.onboarding-box p { color: rgba(255,255,255,0.75); font-size: 9.5pt; margin-bottom: 14px; line-height: 1.55; }
+.onboarding-steps-list { list-style:none; margin-bottom:16px; }
+.onboarding-steps-list li { display:flex; gap:10px; margin-bottom:8px; font-size:9.5pt; color:rgba(255,255,255,0.85); align-items:flex-start; }
+.step-n { background:var(--amber); color:var(--dark); width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:8pt; font-weight:800; flex-shrink:0; margin-top:1px; }
+.onboarding-url { background:rgba(255,255,255,0.1); border:1px solid rgba(196,154,60,0.5); border-radius:8px; padding:12px 16px; font-size:10pt; color:var(--amber); font-weight:700; word-break:break-all; }
+
+/* ===== NEXT STEPS GRID ===== */
+.next-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px; }
+.next-card { border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.next-card.featured { background: var(--amber-light); border-color: var(--amber); }
+.next-card-phase { font-size: 7.5pt; font-weight: 700; color: var(--amber); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px; }
+.next-card.featured .next-card-phase { color: #7C5A0E; }
+.next-card-title { font-size: 10.5pt; font-weight: 700; margin-bottom: 5px; }
+.next-card-desc { font-size: 8.5pt; color: var(--muted); line-height: 1.4; }
+
+/* ===== SIGNATURE ===== */
+.sig-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+.sig-block { text-align: center; }
+.sig-ttl { font-size: 8pt; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 44px; }
+.sig-line { border-top: 1px solid var(--dark); margin-bottom: 7px; }
+.sig-name { font-size: 10pt; font-weight: 700; }
+.sig-role { font-size: 8.5pt; color: var(--muted); }
+
+/* ===== FOOTER ===== */
+.footer { background: var(--dark); padding: 28px 48px; text-align: center; color: rgba(255,255,255,0.45); font-size: 8.5pt; }
+.footer a { color: var(--amber); text-decoration: none; font-weight: 600; }
+
+/* ===== VISUAL SIDE-BY-SIDE ===== */
+.visual-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+.visual-caption { font-size: 8pt; color: var(--muted); text-align: center; margin-top: 6px; font-style: italic; }
+
+.section-intro { font-size: 10pt; color: #44403C; margin-bottom: 22px; line-height: 1.6; }
+
+hr.divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* ===== NAV BAR ===== */
+.nav-bar {
+  background: var(--dark); padding: 10px 48px;
+  display: flex; justify-content: space-between; align-items: center;
+  position: sticky; top: 0; z-index: 100;
+}
+.nav-logo { font-size: 14pt; font-weight: 800; color: var(--amber); }
+.nav-logo span { color: #fff; }
+.nav-links { display: flex; gap: 24px; }
+.nav-links a { color: rgba(255,255,255,0.55); font-size: 8.5pt; font-weight: 600; text-decoration: none; letter-spacing: 0.3px; transition: color 0.2s; }
+.nav-links a:hover { color: var(--amber); }
+
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<!-- NAV -->
+<nav class="nav-bar">
+  <div class="nav-logo">Gen<span>Track</span></div>
+  <div class="nav-links">
+    <a href="#constat">Constat</a>
+    <a href="#outil">L'outil</a>
+    <a href="#offre">Offre & ROI</a>
+    <a href="#start">Démarrer</a>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<div class="hero">
+  <div class="hero-badge">CONFIDENTIEL</div>
+  <div class="hero-logo">Gen<span>Track</span></div>
+  <div class="hero-tagline">Maintenance intelligente des hôtels &nbsp;·&nbsp; wilfried.gtm@gmail.com</div>
+  <div class="hero-label">Proposition Commerciale</div>
+  <div class="hero-title">Passez à la<br><span class="hl">maintenance<br>préventive</span></div>
+  <div class="hero-sub">Une plateforme conçue pour les équipes techniques des grands hôtels d'Afrique de l'Ouest</div>
+  <div class="hero-meta">
+    <div class="hero-meta-item"><label>Client</label><div class="val">King Fahd Palace Hotel — Dakar</div></div>
+    <div class="hero-meta-item"><label>Destinataire</label><div class="val">M. Daouda Geye — Ingénieur Électricien</div></div>
+    <div class="hero-meta-item"><label>Offre recommandée</label><div class="val" style="color:var(--amber);font-weight:700;">MAINTENANCE — 250 000 XOF/mois</div></div>
+    <div class="hero-meta-item"><label>Date</label><div class="val">Octobre 2026</div></div>
+  </div>
+</div>
+
+
+<!-- ===== SECTION 1 — CONSTAT ===== -->
+<div class="section" id="constat">
+  <div class="section-label">
+    <div class="section-num">1</div>
+    <div class="section-title">Constat partagé lors de notre échange</div>
+  </div>
+
+  <div class="quote">
+    "La situation actuelle est catastrophique. On n'a pas de programme de maintenance préventive, pas de rondes systématiques, et la quasi-totalité de nos interventions se font en mode urgence. On subit les pannes au lieu de les anticiper."
+    <cite>— M. Daouda Geye, Ingénieur Électricien, King Fahd Palace Hotel, octobre 2026</cite>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card red">
+      <div class="stat-label">Score audit GenTrack</div>
+      <div class="stat-value">10<span style="font-size:14pt;">/100</span></div>
+      <div class="stat-sub">Moyenne hôtels africains équipés : 48–62/100</div>
+    </div>
+    <div class="stat-card warn">
+      <div class="stat-label">Interventions réactives</div>
+      <div class="stat-value">&gt;70%</div>
+      <div class="stat-sub">du budget en urgences non planifiées</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-label">Coût inefficacité</div>
+      <div class="stat-value">8M</div>
+      <div class="stat-sub">XOF/an perdus en surcoûts et gaspillages</div>
+    </div>
+  </div>
+
+  <div class="alert red">
+    <div class="alert-icon">⚠</div>
+    <div class="alert-body">
+      <strong>Risque opérationnel majeur</strong>
+      <p>Un hôtel de 300+ chambres sans rondes structurées ni GMAO opérationnel expose la direction à des pannes critiques en pleine occupation — avec un impact direct sur la réputation et les recettes.</p>
+    </div>
+  </div>
+
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th style="width:34%;">Critère</th>
+        <th class="col-before" style="width:30%;">Aujourd'hui</th>
+        <th class="col-after" style="width:36%;">Avec GenTrack</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Rondes préventives journalières</td>
+        <td class="col-before"><span class="cross">✗</span> Inexistantes</td>
+        <td class="col-after"><span class="check">✓</span> Sur WhatsApp, tracées en temps réel</td>
+      </tr>
+      <tr>
+        <td>Suivi des interventions (GMAO)</td>
+        <td class="col-before"><span class="partial">≈</span> Installé, jamais utilisé</td>
+        <td class="col-after"><span class="check">✓</span> Tickets automatiques, zéro formation lourde</td>
+      </tr>
+      <tr>
+        <td>Signalement anomalies</td>
+        <td class="col-before"><span class="partial">≈</span> WhatsApp informel</td>
+        <td class="col-after"><span class="check">✓</span> QR code → ticket structuré + photo</td>
+      </tr>
+      <tr>
+        <td>Suivi énergie (élec, eau, gasoil)</td>
+        <td class="col-before"><span class="cross">✗</span> Pas de relevés réguliers</td>
+        <td class="col-after"><span class="check">✓</span> Relevés + alertes dépassement budget</td>
+      </tr>
+      <tr>
+        <td>Rapport direction mensuel</td>
+        <td class="col-before"><span class="cross">✗</span> Aucun reporting</td>
+        <td class="col-after"><span class="check">✓</span> PDF auto avec KPIs, MTTR, conformité</td>
+      </tr>
+      <tr>
+        <td>Visibilité sur les 30+ techniciens</td>
+        <td class="col-before"><span class="cross">✗</span> Aucune traçabilité</td>
+        <td class="col-after"><span class="check">✓</span> Tableau de bord temps réel</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ===== SECTION 2 — L'OUTIL ===== -->
+<div class="section" id="outil">
+  <div class="section-label">
+    <div class="section-num">2</div>
+    <div class="section-title">Comment fonctionne GenTrack</div>
+  </div>
+
+  <p class="section-intro">GenTrack fonctionne entièrement sur <strong>WhatsApp</strong> — aucune application à installer pour vos techniciens. Le chef d'équipe reçoit le guide de ronde sur WhatsApp, répond à chaque point, et tout se centralise automatiquement dans le tableau de bord web.</p>
+
+  <!-- ---- FEATURE 1 : WhatsApp Ronde ---- -->
+  <div style="background:var(--creme);border-radius:12px;padding:22px 24px;margin-bottom:28px;">
+    <div style="font-size:8pt;font-weight:700;color:var(--amber);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;">Fonctionnalité 1</div>
+    <div style="font-size:13pt;font-weight:700;margin-bottom:14px;">Ronde technique sur WhatsApp</div>
+
+    <div class="visual-layout" style="align-items:center;">
+      <!-- Phone mockup -->
+      <div>
+        <div class="phone-wrapper">
+          <div class="phone">
+            <div class="phone-notch"><div class="phone-notch-dot"></div></div>
+            <div class="wa-header">
+              <div class="wa-avatar">🤖</div>
+              <div>
+                <div class="wa-name">GenTrack Bot</div>
+                <div class="wa-status">Ronde quotidienne — King Fahd</div>
+              </div>
+            </div>
+            <div class="wa-body">
+              <div class="wa-date-sep"><span>Aujourd'hui 06:30</span></div>
+
+              <div class="wa-msg in">
+                <div class="wa-bubble wa-bot-bubble">
+                  <div class="bot-name">GenTrack</div>
+                  Bonjour Mamadou ! Ronde du <strong>jeudi 8 oct.</strong><br>
+                  Quelle zone aujourd'hui ?
+                  <div class="wa-choice-row">
+                    <div class="wa-choice">1 — Groupe Electrogène</div>
+                    <div class="wa-choice">2 — Climatisation centrale</div>
+                    <div class="wa-choice">3 — Plomberie Hall</div>
+                  </div>
+                  <div class="wa-meta">06:30 ✓✓</div>
+                </div>
+              </div>
+
+              <div class="wa-msg out">
+                <div class="wa-bubble">
+                  1
+                  <div class="wa-meta">06:31 ✓✓</div>
+                </div>
+              </div>
+
+              <div class="wa-msg in">
+                <div class="wa-bubble wa-bot-bubble">
+                  <div class="bot-name">GenTrack</div>
+                  <strong>Groupe Electrogène</strong><br>
+                  Niveau gasoil ?
+                  <div class="wa-choice-row">
+                    <div class="wa-choice">1 — Plein (75-100%)</div>
+                    <div class="wa-choice">2 — Moyen (30-74%)</div>
+                    <div class="wa-choice">3 — Bas (&lt;30%)</div>
+                  </div>
+                  <div class="wa-meta">06:31 ✓✓</div>
+                </div>
+              </div>
+
+              <div class="wa-msg out">
+                <div class="wa-bubble">
+                  2 — Niveau à 45%
+                  <div class="wa-meta">06:32 ✓✓</div>
+                </div>
+              </div>
+
+              <div class="wa-msg in">
+                <div class="wa-bubble wa-bot-bubble">
+                  <div class="bot-name">GenTrack</div>
+                  Noté. Anomalie à signaler ?
+                  <div class="wa-choice-row">
+                    <div class="wa-choice">1 — Aucune anomalie</div>
+                    <div class="wa-choice">2 — Signaler une anomalie</div>
+                  </div>
+                  <div class="wa-meta">06:32 ✓✓</div>
+                </div>
+              </div>
+
+              <div class="wa-msg out">
+                <div class="wa-bubble">
+                  1 — RAS
+                  <div class="wa-meta">06:33 ✓✓</div>
+                </div>
+              </div>
+
+              <div class="wa-msg in">
+                <div class="wa-bubble wa-bot-bubble">
+                  <div class="bot-name">GenTrack</div>
+                  <span style="color:var(--wa-green);font-weight:700;">✓ Ronde GE enregistrée.</span> Score : 100%<br>
+                  Prochaine zone ou fin de ronde ?
+                  <div class="wa-meta">06:33 ✓✓</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="visual-caption">Conversation WhatsApp réelle — aucune app à installer</div>
+      </div>
+
+      <!-- Explanation -->
+      <div>
+        <h4 style="font-size:12pt;font-weight:700;margin-bottom:14px;">Comment ça marche</h4>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div style="width:32px;height:32px;background:var(--amber);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--dark);flex-shrink:0;font-size:10pt;">1</div>
+            <div>
+              <div style="font-size:10pt;font-weight:700;margin-bottom:3px;">Le technicien démarre sur WhatsApp</div>
+              <div style="font-size:8.5pt;color:var(--muted);">Le bot lui propose les zones à inspecter selon le planning configuré.</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div style="width:32px;height:32px;background:var(--amber);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--dark);flex-shrink:0;font-size:10pt;">2</div>
+            <div>
+              <div style="font-size:10pt;font-weight:700;margin-bottom:3px;">Il répond point par point</div>
+              <div style="font-size:8.5pt;color:var(--muted);">Niveaux, états, anomalies — tout en chiffres ou photos directement depuis WhatsApp.</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div style="width:32px;height:32px;background:var(--amber);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--dark);flex-shrink:0;font-size:10pt;">3</div>
+            <div>
+              <div style="font-size:10pt;font-weight:700;margin-bottom:3px;">Tout remonte en temps réel</div>
+              <div style="font-size:8.5pt;color:var(--muted);">Le tableau de bord se met à jour instantanément. Vous voyez qui a fait quelle ronde, à quelle heure.</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div style="width:32px;height:32px;background:var(--green);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;flex-shrink:0;font-size:10pt;">✓</div>
+            <div>
+              <div style="font-size:10pt;font-weight:700;margin-bottom:3px;">Score de conformité automatique</div>
+              <div style="font-size:8.5pt;color:var(--muted);">100% = toutes les rondes planifiées complétées. Visible pour la direction en un coup d'oeil.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---- FEATURE 2 : QR Code Signalement ---- -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:22px 24px;margin-bottom:28px;">
+    <div style="font-size:8pt;font-weight:700;color:var(--amber);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;">Fonctionnalité 2</div>
+    <div style="font-size:13pt;font-weight:700;margin-bottom:16px;">Signalement d'anomalie par QR Code</div>
+
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="flow-icon amber-bg">&#x1F4F1;</div>
+        <div class="flow-step-title">Scanner le QR</div>
+        <div class="flow-step-desc">Chaque équipement a son QR code. Le technicien scanne depuis son téléphone.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon dark-bg" style="color:var(--amber);font-size:18pt;">💬</div>
+        <div class="flow-step-title">WhatsApp s'ouvre</div>
+        <div class="flow-step-desc">Le bot identifie l'équipement automatiquement et demande la nature du problème.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon green-bg">📸</div>
+        <div class="flow-step-title">Photo + description</div>
+        <div class="flow-step-desc">Le technicien envoie une photo et décrit le problème en quelques mots.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon blue-bg">🎫</div>
+        <div class="flow-step-title">Ticket créé</div>
+        <div class="flow-step-desc">Un ticket structuré apparaît dans le dashboard avec priorité, photo, équipement, auteur.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-icon amber-bg">🔔</div>
+        <div class="flow-step-title">Alerte responsable</div>
+        <div class="flow-step-desc">Vous recevez une notification WhatsApp avec le ticket et pouvez assigner l'intervention.</div>
+      </div>
+    </div>
+
+    <div class="qr-demo" style="margin-top:20px;">
+      <!-- QR Code SVG -->
+      <div class="qr-box">
+        <svg width="90" height="90" viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
+          <!-- QR code design representing King Fahd Palace / GenTrack -->
+          <rect width="90" height="90" fill="white"/>
+          <!-- Position detection patterns -->
+          <!-- Top-left -->
+          <rect x="5" y="5" width="25" height="25" fill="none" stroke="#1C1917" stroke-width="3"/>
+          <rect x="11" y="11" width="13" height="13" fill="#1C1917"/>
+          <!-- Top-right -->
+          <rect x="60" y="5" width="25" height="25" fill="none" stroke="#1C1917" stroke-width="3"/>
+          <rect x="66" y="11" width="13" height="13" fill="#1C1917"/>
+          <!-- Bottom-left -->
+          <rect x="5" y="60" width="25" height="25" fill="none" stroke="#1C1917" stroke-width="3"/>
+          <rect x="11" y="66" width="13" height="13" fill="#1C1917"/>
+          <!-- Data modules (random-ish pattern) -->
+          <rect x="35" y="5" width="5" height="5" fill="#1C1917"/>
+          <rect x="43" y="5" width="5" height="5" fill="#1C1917"/>
+          <rect x="51" y="5" width="5" height="5" fill="#1C1917"/>
+          <rect x="35" y="13" width="5" height="5" fill="#1C1917"/>
+          <rect x="43" y="21" width="5" height="5" fill="#1C1917"/>
+          <rect x="51" y="13" width="5" height="5" fill="#1C1917"/>
+          <rect x="5" y="35" width="5" height="5" fill="#1C1917"/>
+          <rect x="13" y="35" width="5" height="5" fill="#1C1917"/>
+          <rect x="21" y="43" width="5" height="5" fill="#1C1917"/>
+          <rect x="5" y="51" width="5" height="5" fill="#1C1917"/>
+          <rect x="13" y="51" width="5" height="5" fill="#C49A3C"/>
+          <!-- Center amber block (GenTrack branding) -->
+          <rect x="35" y="35" width="20" height="20" rx="3" fill="#C49A3C"/>
+          <text x="45" y="49" text-anchor="middle" fill="white" font-size="11" font-weight="800" font-family="Arial">GT</text>
+          <!-- More data modules -->
+          <rect x="60" y="35" width="5" height="5" fill="#1C1917"/>
+          <rect x="68" y="43" width="5" height="5" fill="#1C1917"/>
+          <rect x="76" y="35" width="5" height="5" fill="#1C1917"/>
+          <rect x="60" y="51" width="5" height="5" fill="#1C1917"/>
+          <rect x="76" y="51" width="5" height="5" fill="#C49A3C"/>
+          <rect x="35" y="60" width="5" height="5" fill="#1C1917"/>
+          <rect x="43" y="68" width="5" height="5" fill="#1C1917"/>
+          <rect x="51" y="60" width="5" height="5" fill="#1C1917"/>
+          <rect x="59" y="68" width="5" height="5" fill="#1C1917"/>
+          <rect x="67" y="60" width="5" height="5" fill="#1C1917"/>
+          <rect x="75" y="76" width="5" height="5" fill="#1C1917"/>
+          <rect x="35" y="76" width="5" height="5" fill="#C49A3C"/>
+          <rect x="51" y="76" width="5" height="5" fill="#1C1917"/>
+        </svg>
+        <div class="qr-label">Groupe Électrogène<br>King Fahd Palace</div>
+      </div>
+      <div class="qr-info">
+        <h4>Un QR code par équipement</h4>
+        <p>Chaque équipement critique de l'hôtel reçoit son QR code imprimé. N'importe quel technicien peut signaler un problème en 30 secondes, sans connaissance de l'outil, depuis son téléphone personnel.</p>
+        <ul class="qr-steps">
+          <li><div class="qr-step-n">1</div><div><strong>Colle le QR code</strong> sur la porte du groupe, du tableau élec, de la CTA…</div></li>
+          <li><div class="qr-step-n">2</div><div><strong>Scan → WhatsApp</strong> s'ouvre automatiquement avec l'équipement pré-identifié</div></li>
+          <li><div class="qr-step-n">3</div><div><strong>Ticket + photo</strong> créé instantanément dans le dashboard</div></li>
+          <li><div class="qr-step-n">4</div><div><strong>MTTR mesuré</strong> automatiquement : de la création du ticket à la clôture</div></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---- FEATURE 3 : Dashboard Équipements ---- -->
+  <div style="margin-bottom:28px;">
+    <div style="font-size:8pt;font-weight:700;color:var(--amber);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;">Fonctionnalité 3</div>
+    <div style="font-size:13pt;font-weight:700;margin-bottom:16px;">Tableau de bord équipements en temps réel</div>
+
+    <div class="dashboard-frame">
+      <div class="dash-topbar">
+        <div class="dash-topbar-title"><span class="dash-topbar-dot"></span>King Fahd Palace — Dakar</div>
+        <div class="dash-topbar-logo">GenTrack</div>
+      </div>
+      <div class="dash-nav">
+        <div class="dash-nav-item active">Équipements</div>
+        <div class="dash-nav-item">Rondes</div>
+        <div class="dash-nav-item">Signalements</div>
+        <div class="dash-nav-item">Énergie</div>
+        <div class="dash-nav-item">Rapport</div>
+      </div>
+      <div class="dash-body">
+        <!-- KPI Row -->
+        <div class="dash-kpi-row">
+          <div class="dash-kpi">
+            <div class="dash-kpi-label">Conformité rondes</div>
+            <div class="dash-kpi-val green">94%</div>
+            <div class="dash-kpi-sub">Ce mois · +12% vs M-1</div>
+          </div>
+          <div class="dash-kpi">
+            <div class="dash-kpi-label">MTTR moyen</div>
+            <div class="dash-kpi-val amber">6.2j</div>
+            <div class="dash-kpi-sub">Délai moyen résolution</div>
+          </div>
+          <div class="dash-kpi">
+            <div class="dash-kpi-label">Tickets ouverts</div>
+            <div class="dash-kpi-val red">3</div>
+            <div class="dash-kpi-sub">dont 1 critique</div>
+          </div>
+          <div class="dash-kpi">
+            <div class="dash-kpi-label">Équipements OK</div>
+            <div class="dash-kpi-val green">11/12</div>
+            <div class="dash-kpi-sub">1 en maintenance</div>
+          </div>
+        </div>
+
+        <!-- Equipment Table -->
+        <table class="equip-table">
+          <thead>
+            <tr>
+              <th>Équipement</th>
+              <th>Zone</th>
+              <th>Dernière ronde</th>
+              <th>État</th>
+              <th>Santé</th>
+              <th>Tickets</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Groupe Électrogène #1</strong></td>
+              <td>Sous-sol</td>
+              <td>Aujourd'hui 06:45</td>
+              <td><span class="badge ok">OK</span></td>
+              <td><div class="progress-bar" style="width:80px;"><div class="progress-fill green" style="width:90%;"></div></div></td>
+              <td>0</td>
+            </tr>
+            <tr>
+              <td><strong>CTA — Climatisation Centrale</strong></td>
+              <td>Toiture</td>
+              <td>Hier 07:12</td>
+              <td><span class="badge warn">Attention</span></td>
+              <td><div class="progress-bar" style="width:80px;"><div class="progress-fill amber" style="width:55%;"></div></div></td>
+              <td style="color:var(--red);font-weight:700;">2</td>
+            </tr>
+            <tr>
+              <td><strong>Tableau Élec. Général</strong></td>
+              <td>Local technique</td>
+              <td>Aujourd'hui 07:30</td>
+              <td><span class="badge ok">OK</span></td>
+              <td><div class="progress-bar" style="width:80px;"><div class="progress-fill green" style="width:95%;"></div></div></td>
+              <td>0</td>
+            </tr>
+            <tr>
+              <td><strong>Pompe piscine</strong></td>
+              <td>Extérieur</td>
+              <td>Aujourd'hui 08:00</td>
+              <td><span class="badge err">En panne</span></td>
+              <td><div class="progress-bar" style="width:80px;"><div class="progress-fill red" style="width:15%;"></div></div></td>
+              <td style="color:var(--red);font-weight:700;">1 🔴</td>
+            </tr>
+            <tr>
+              <td><strong>Réservoir eau</strong></td>
+              <td>Toiture N</td>
+              <td>Aujourd'hui 06:50</td>
+              <td><span class="badge ok">OK</span></td>
+              <td><div class="progress-bar" style="width:80px;"><div class="progress-fill green" style="width:80%;"></div></div></td>
+              <td>0</td>
+            </tr>
+            <tr>
+              <td><strong>Ascenseur A — Bloc Nord</strong></td>
+              <td>Cage N</td>
+              <td>Aujourd'hui 07:15</td>
+              <td><span class="badge ok">OK</span></td>
+              <td><div class="progress-bar" style="width:80px;"><div class="progress-fill green" style="width:88%;"></div></div></td>
+              <td>0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="visual-caption" style="margin-top:8px;">Tableau de bord web GenTrack — vue en temps réel, accessible depuis n'importe quel navigateur</div>
+  </div>
+
+  <!-- ---- FEATURE 4 : Énergie & Budget ---- -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:22px 24px;margin-bottom:16px;">
+    <div style="font-size:8pt;font-weight:700;color:var(--amber);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;">Fonctionnalité 4</div>
+    <div style="font-size:13pt;font-weight:700;margin-bottom:16px;">Suivi énergie & budget mensuel</div>
+
+    <div class="visual-layout">
+      <div>
+        <!-- Energy SVG Chart -->
+        <div class="chart-container">
+          <div class="chart-title">
+            Consommations vs Budget — 6 mois
+            <div class="chart-legend">
+              <div class="legend-item"><div class="legend-dot" style="background:var(--amber);"></div>Réel</div>
+              <div class="legend-item"><div class="legend-dot" style="background:var(--border);"></div>Budget</div>
+            </div>
+          </div>
+          <svg width="100%" viewBox="0 0 340 160" xmlns="http://www.w3.org/2000/svg">
+            <!-- Grid lines -->
+            <line x1="40" y1="10" x2="40" y2="130" stroke="#E7E0D3" stroke-width="1"/>
+            <line x1="40" y1="130" x2="330" y2="130" stroke="#E7E0D3" stroke-width="1"/>
+            <line x1="40" y1="90" x2="330" y2="90" stroke="#F3F0EB" stroke-width="1" stroke-dasharray="3,3"/>
+            <line x1="40" y1="50" x2="330" y2="50" stroke="#F3F0EB" stroke-width="1" stroke-dasharray="3,3"/>
+
+            <!-- Y labels -->
+            <text x="35" y="133" text-anchor="end" font-size="7" fill="#A8A29E">0</text>
+            <text x="35" y="93" text-anchor="end" font-size="7" fill="#A8A29E">5M</text>
+            <text x="35" y="53" text-anchor="end" font-size="7" fill="#A8A29E">10M</text>
+            <text x="35" y="14" text-anchor="end" font-size="7" fill="#A8A29E">15M</text>
+
+            <!-- Budget line -->
+            <polyline points="65,50 111,50 157,50 203,50 249,50 295,50" fill="none" stroke="#D6CFC4" stroke-width="2" stroke-dasharray="5,3"/>
+
+            <!-- Real bars (Elec) -->
+            <!-- Mai -->
+            <rect x="55" y="62" width="12" height="68" rx="2" fill="var(--amber)" opacity="0.85"/>
+            <!-- Juin -->
+            <rect x="101" y="55" width="12" height="75" rx="2" fill="var(--red)" opacity="0.75"/>
+            <!-- Juil -->
+            <rect x="147" y="68" width="12" height="62" rx="2" fill="var(--amber)" opacity="0.85"/>
+            <!-- Août -->
+            <rect x="193" y="72" width="12" height="58" rx="2" fill="var(--green)" opacity="0.8"/>
+            <!-- Sep -->
+            <rect x="239" y="65" width="12" height="65" rx="2" fill="var(--amber)" opacity="0.85"/>
+            <!-- Oct -->
+            <rect x="285" y="58" width="12" height="72" rx="2" fill="var(--red)" opacity="0.75"/>
+
+            <!-- X labels -->
+            <text x="61" y="145" text-anchor="middle" font-size="7" fill="#A8A29E">Mai</text>
+            <text x="107" y="145" text-anchor="middle" font-size="7" fill="#A8A29E">Jun</text>
+            <text x="153" y="145" text-anchor="middle" font-size="7" fill="#A8A29E">Jul</text>
+            <text x="199" y="145" text-anchor="middle" font-size="7" fill="#A8A29E">Aoû</text>
+            <text x="245" y="145" text-anchor="middle" font-size="7" fill="#A8A29E">Sep</text>
+            <text x="291" y="145" text-anchor="middle" font-size="7" fill="#A8A29E">Oct</text>
+
+            <!-- Alert annotation -->
+            <circle cx="107" cy="51" r="5" fill="var(--red)" opacity="0.9"/>
+            <text x="120" y="48" font-size="7.5" fill="var(--red)" font-weight="700">+2.1M vs budget !</text>
+          </svg>
+          <div style="font-size:8pt;color:var(--muted);text-align:center;margin-top:4px;">Électricité (en millions XOF) — GenTrack envoie une alerte WhatsApp dès dépassement</div>
+        </div>
+      </div>
+
+      <div>
+        <!-- Energy KPIs -->
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="background:var(--creme);border-radius:10px;padding:12px 14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div style="font-size:9pt;font-weight:700;">Électricité</div>
+              <span style="background:#FEE2E2;color:#991B1B;font-size:7.5pt;font-weight:700;padding:2px 8px;border-radius:10px;">+7% budget</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill red" style="width:107%;"></div>
+            </div>
+            <div style="font-size:8pt;color:var(--muted);margin-top:5px;">8.2M XOF consommé / 7.7M budgété</div>
+          </div>
+
+          <div style="background:var(--creme);border-radius:10px;padding:12px 14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div style="font-size:9pt;font-weight:700;">Eau</div>
+              <span style="background:#FEF3C7;color:#B45309;font-size:7.5pt;font-weight:700;padding:2px 8px;border-radius:10px;">+3% budget</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill amber" style="width:103%;"></div>
+            </div>
+            <div style="font-size:8pt;color:var(--muted);margin-top:5px;">1.55M XOF / 1.5M budgété</div>
+          </div>
+
+          <div style="background:var(--creme);border-radius:10px;padding:12px 14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div style="font-size:9pt;font-weight:700;">Gasoil (GE)</div>
+              <span style="background:#DCFCE7;color:#15803D;font-size:7.5pt;font-weight:700;padding:2px 8px;border-radius:10px;">-8% budget</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill green" style="width:92%;"></div>
+            </div>
+            <div style="font-size:8pt;color:var(--muted);margin-top:5px;">920K XOF / 1M budgété</div>
+          </div>
+
+          <div style="background:var(--creme);border-radius:10px;padding:12px 14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <div style="font-size:9pt;font-weight:700;">Gaz</div>
+              <span style="background:#FEE2E2;color:#991B1B;font-size:7.5pt;font-weight:700;padding:2px 8px;border-radius:10px;">Niveau bas 34%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill amber" style="width:34%;"></div>
+            </div>
+            <div style="font-size:8pt;color:var(--muted);margin-top:5px;">Réapprovisionnement recommandé</div>
+          </div>
+
+          <div style="background:var(--dark);border-radius:10px;padding:12px 14px;">
+            <div style="font-size:8pt;color:var(--amber);font-weight:700;margin-bottom:4px;">Total énergie ce mois</div>
+            <div style="font-size:16pt;font-weight:800;color:#fff;">30.3M <span style="font-size:9pt;font-weight:400;color:rgba(255,255,255,0.5);">/ 31.2M budgété</span></div>
+            <div style="font-size:8pt;color:rgba(255,255,255,0.5);margin-top:4px;">-3% vs budget — sous contrôle</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---- FEATURE 5 : MTTR ---- -->
+  <div style="background:var(--creme);border-radius:12px;padding:22px 24px;">
+    <div style="font-size:8pt;font-weight:700;color:var(--amber);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;">Fonctionnalité 5</div>
+    <div style="font-size:13pt;font-weight:700;margin-bottom:16px;">Suivi MTTR & Performance maintenance</div>
+
+    <div class="mttr-grid">
+      <div class="mttr-card">
+        <h4>MTTR — Délai moyen de résolution</h4>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <!-- MTTR bar chart SVG -->
+          <svg width="100%" viewBox="0 0 220 110" xmlns="http://www.w3.org/2000/svg">
+            <text x="0" y="12" font-size="8" fill="var(--muted)">Électricité</text>
+            <rect x="85" y="2" width="45" height="14" rx="3" fill="var(--amber)" opacity="0.8"/>
+            <text x="134" y="12" font-size="8" fill="var(--dark)" font-weight="700">4.5 jours</text>
+
+            <text x="0" y="32" font-size="8" fill="var(--muted)">Climatisation</text>
+            <rect x="85" y="22" width="72" height="14" rx="3" fill="var(--amber)" opacity="0.8"/>
+            <text x="162" y="32" font-size="8" fill="var(--dark)" font-weight="700">7.2 j</text>
+
+            <text x="0" y="52" font-size="8" fill="var(--muted)">Plomberie</text>
+            <rect x="85" y="42" width="36" height="14" rx="3" fill="var(--green)" opacity="0.8"/>
+            <text x="126" y="52" font-size="8" fill="var(--dark)" font-weight="700">3.6 j</text>
+
+            <text x="0" y="72" font-size="8" fill="var(--muted)">Structure</text>
+            <rect x="85" y="62" width="90" height="14" rx="3" fill="var(--red)" opacity="0.7"/>
+            <text x="180" y="72" font-size="8" fill="var(--dark)" font-weight="700">9.0 j</text>
+
+            <text x="0" y="92" font-size="8" fill="var(--muted)">Ascenseurs</text>
+            <rect x="85" y="82" width="54" height="14" rx="3" fill="var(--amber)" opacity="0.8"/>
+            <text x="144" y="92" font-size="8" fill="var(--dark)" font-weight="700">5.4 j</text>
+
+            <line x1="85" y1="0" x2="85" y2="105" stroke="var(--border)" stroke-width="1"/>
+          </svg>
+          <div style="font-size:7.5pt;color:var(--muted);margin-top:-4px;">Objectif cible avec GenTrack : &lt; 3 jours sur tous les postes</div>
+        </div>
+      </div>
+
+      <div class="mttr-card">
+        <h4>Taux de conformité rondes — 30 derniers jours</h4>
+        <svg width="100%" viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg">
+          <!-- Calendar-style grid -->
+          <text x="10" y="12" font-size="7" fill="var(--muted)">L</text>
+          <text x="38" y="12" font-size="7" fill="var(--muted)">M</text>
+          <text x="66" y="12" font-size="7" fill="var(--muted)">M</text>
+          <text x="94" y="12" font-size="7" fill="var(--muted)">J</text>
+          <text x="122" y="12" font-size="7" fill="var(--muted)">V</text>
+          <text x="150" y="12" font-size="7" fill="var(--muted)">S</text>
+          <text x="178" y="12" font-size="7" fill="var(--muted)">D</text>
+
+          <!-- Week 1 -->
+          <rect x="4" y="17" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="32" y="17" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="60" y="17" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="88" y="17" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="116" y="17" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="144" y="17" width="20" height="20" rx="3" fill="var(--amber)" opacity="0.7"/>
+          <rect x="172" y="17" width="20" height="20" rx="3" fill="#E5E7EB"/>
+
+          <!-- Week 2 -->
+          <rect x="4" y="41" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="32" y="41" width="20" height="20" rx="3" fill="var(--red)" opacity="0.7"/>
+          <rect x="60" y="41" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="88" y="41" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="116" y="41" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="144" y="41" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="172" y="41" width="20" height="20" rx="3" fill="#E5E7EB"/>
+
+          <!-- Week 3 -->
+          <rect x="4" y="65" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="32" y="65" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="60" y="65" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="88" y="65" width="20" height="20" rx="3" fill="var(--amber)" opacity="0.7"/>
+          <rect x="116" y="65" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="144" y="65" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="172" y="65" width="20" height="20" rx="3" fill="#E5E7EB"/>
+
+          <!-- Week 4 -->
+          <rect x="4" y="89" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="32" y="89" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="60" y="89" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="88" y="89" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="116" y="89" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="144" y="89" width="20" height="20" rx="3" fill="var(--green)" opacity="0.8"/>
+          <rect x="172" y="89" width="20" height="20" rx="3" fill="#E5E7EB"/>
+        </svg>
+        <div style="display:flex;gap:14px;margin-top:8px;">
+          <div style="display:flex;align-items:center;gap:5px;font-size:7.5pt;color:var(--muted);">
+            <div style="width:10px;height:10px;background:var(--green);opacity:0.8;border-radius:2px;"></div>OK (100%)
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:7.5pt;color:var(--muted);">
+            <div style="width:10px;height:10px;background:var(--amber);opacity:0.7;border-radius:2px;"></div>Partielle
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:7.5pt;color:var(--muted);">
+            <div style="width:10px;height:10px;background:var(--red);opacity:0.7;border-radius:2px;"></div>Manquée
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#fff;border-radius:10px;padding:14px 16px;border:1px solid var(--border);">
+      <div style="font-size:9pt;font-weight:700;margin-bottom:10px;">Ce que voit votre direction chaque mois dans le rapport PDF automatique</div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:7px;font-size:9pt;"><span style="color:var(--green);font-weight:800;">✓</span> Taux de conformité rondes</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:9pt;"><span style="color:var(--green);font-weight:800;">✓</span> MTTR par catégorie d'équipement</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:9pt;"><span style="color:var(--green);font-weight:800;">✓</span> Suivi budget énergie vs réel</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:9pt;"><span style="color:var(--green);font-weight:800;">✓</span> Anomalies et signalements traités</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:9pt;"><span style="color:var(--green);font-weight:800;">✓</span> Interventions préventives vs curatives</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:9pt;"><span style="color:var(--green);font-weight:800;">✓</span> Niveaux gasoil, gaz, eau</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== SECTION 3 — OFFRE & ROI ===== -->
+<div class="section" id="offre">
+  <div class="section-label">
+    <div class="section-num">3</div>
+    <div class="section-title">Offre recommandée & Retour sur investissement</div>
+  </div>
+
+  <div class="offer-highlight">
+    <div class="offer-head">
+      <div class="offer-head-name">MAINTENANCE</div>
+      <div class="offer-head-badge">Recommandé pour King Fahd Palace</div>
+    </div>
+    <div class="offer-body">
+      <div class="offer-price-row">
+        <div class="offer-price">250 000</div>
+        <div class="offer-unit">XOF / mois</div>
+        <div style="display:flex;flex-direction:column;gap:4px;padding-bottom:4px;">
+          <div class="offer-annual">2 500 000 XOF / an <span style="font-weight:500;font-size:8.5pt;">— 2 mois offerts</span></div>
+          <div style="font-size:8pt;color:var(--muted);">vs 3 000 000 XOF en mensuel — économie de 500 000 XOF</div>
+        </div>
+      </div>
+      <ul class="offer-features">
+        <li>Rondes techniques WhatsApp quotidiennes</li>
+        <li>Suivi maintenances préventives & curatives</li>
+        <li>Signalements & anomalies par QR code</li>
+        <li>Relevés énergétiques + alertes budget</li>
+        <li>Tableau de bord web en temps réel</li>
+        <li>Rapport PDF mensuel pour la direction</li>
+        <li>Suivi MTTR & conformité automatique</li>
+        <li>Jusqu'à 50 équipements / zones</li>
+        <li>30+ techniciens sans app à installer</li>
+        <li>Onboarding & formation inclus</li>
+      </ul>
+    </div>
+  </div>
+
+  <table class="roi-table">
+    <thead>
+      <tr>
+        <th>Poste</th>
+        <th>Hypothèse</th>
+        <th class="text-right">Impact XOF/an</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Abonnement GenTrack MAINTENANCE (annuel)</strong></td>
+        <td>2 500 000 XOF/an — 2 mois offerts (vs 3M en mensuel)</td>
+        <td class="text-right neg">– 2 500 000</td>
+      </tr>
+      <tr>
+        <td>Réduction surcoûts d'urgence</td>
+        <td>Réactif 70% → 40% (–30% du budget urgences)</td>
+        <td class="text-right pos">+ 2 500 000</td>
+      </tr>
+      <tr>
+        <td>Optimisation consommation énergie</td>
+        <td>Alertes dépassement + relevés hebdo</td>
+        <td class="text-right pos">+ 1 500 000</td>
+      </tr>
+      <tr>
+        <td>Réduction pannes équipements critiques</td>
+        <td>Maintenance préventive systématique</td>
+        <td class="text-right pos">+ 800 000</td>
+      </tr>
+      <tr>
+        <td>Gain productivité équipe technique</td>
+        <td>Moins de coordination informelle</td>
+        <td class="text-right pos">+ 500 000</td>
+      </tr>
+      <tr class="total">
+        <td colspan="2"><strong>Bénéfice net estimé — Année 1 (abonnement annuel)</strong></td>
+        <td class="text-right pos">+ 2 800 000 XOF</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="stat-grid stat-grid-4" style="margin-bottom:0;">
+    <div class="stat-card amber-bg">
+      <div class="stat-label">Investissement</div>
+      <div class="stat-value" style="font-size:18pt;">250K</div>
+      <div class="stat-sub">XOF / mois</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">ROI estimé an 1</div>
+      <div class="stat-value">+165%</div>
+      <div class="stat-sub">Retour sur investissement</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">Payback</div>
+      <div class="stat-value">5 mois</div>
+      <div class="stat-sub">Délai de remboursement</div>
+    </div>
+    <div class="stat-card dark-bg">
+      <div class="stat-label">Économies an 1</div>
+      <div class="stat-value">5.3M</div>
+      <div class="stat-sub">XOF économisés bruts</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== SECTION 4 — DÉMARRER ===== -->
+<div class="section" id="start">
+  <div class="section-label">
+    <div class="section-num">4</div>
+    <div class="section-title">De 0 à opérationnel en 48h</div>
+  </div>
+
+  <!-- Fast deployment timeline -->
+  <div style="background:var(--amber-light);border:1.5px solid var(--amber);border-radius:10px;padding:12px 18px;margin-bottom:24px;display:flex;align-items:center;gap:12px;">
+    <div style="font-size:22pt;">⚡</div>
+    <div>
+      <div style="font-size:11pt;font-weight:800;color:var(--dark);">Déploiement ultra-rapide — opérationnel en 48h</div>
+      <div style="font-size:9pt;color:#7C5A0E;">Aucune intégration IT requise. Aucune app à installer. Vos équipes démarrent sur WhatsApp dès le premier jour.</div>
+    </div>
+  </div>
+
+  <ul class="timeline" style="margin-bottom:28px;">
+    <li class="tl-item">
+      <div class="tl-dot">J1</div>
+      <div>
+        <div class="tl-phase">Jour 1 — Signature &amp; Onboarding</div>
+        <div class="tl-title">Compte configuré en quelques heures</div>
+        <div class="tl-desc">Vous remplissez le formulaire d'onboarding (15 min). Notre équipe configure votre compte King Fahd Palace — zones, équipements, fréquences de rondes — et vous envoie les accès dans la journée.</div>
+      </div>
+    </li>
+    <li class="tl-item">
+      <div class="tl-dot" style="background:var(--green);color:#fff;">48h</div>
+      <div>
+        <div class="tl-phase" style="color:var(--green);">Jour 2 — Premières rondes</div>
+        <div class="tl-title">Vos équipes font leur première ronde sur WhatsApp</div>
+        <div class="tl-desc">Le chef d'équipe reçoit le guide de démarrage sur WhatsApp (5 min de lecture). Il lance la première ronde. Tout remonte en temps réel dans votre tableau de bord. <strong>Support disponible sur WhatsApp 7j/7.</strong></div>
+      </div>
+    </li>
+    <li class="tl-item">
+      <div class="tl-dot">S1</div>
+      <div>
+        <div class="tl-phase">Semaine 1 — Signalements &amp; Rapports</div>
+        <div class="tl-title">Tous les signalements passent par GenTrack</div>
+        <div class="tl-desc">Pose des QR codes sur les équipements critiques. Les techniciens signalent les anomalies directement via WhatsApp. Les rapports d'intervention sont créés automatiquement à chaque ticket résolu.</div>
+      </div>
+    </li>
+    <li class="tl-item">
+      <div class="tl-dot ghost">M1</div>
+      <div>
+        <div class="tl-phase">Fin du mois 1</div>
+        <div class="tl-title">Premier rapport direction PDF automatique</div>
+        <div class="tl-desc">Rapport complet : conformité des rondes, MTTR, énergie vs budget, signalements traités — prêt pour votre comité de direction ou votre DGA.</div>
+      </div>
+    </li>
+  </ul>
+
+  <div class="onboarding-box">
+    <h3>Démarrez votre compte dès maintenant</h3>
+    <p>Pour accélérer le déploiement, vous pouvez renseigner les informations de l'hôtel et télécharger les modèles de configuration dès aujourd'hui — pendant que la validation interne est en cours.</p>
+    <ol class="onboarding-steps-list">
+      <li><div class="step-n">1</div><div>Accédez au lien d'onboarding ci-dessous</div></li>
+      <li><div class="step-n">2</div><div>Renseignez les informations de King Fahd Palace (nom, adresse, nb de chambres, contacts)</div></li>
+      <li><div class="step-n">3</div><div><strong>Téléchargez les modèles Excel</strong> (zones, équipements) et complétez-les avec votre liste d'équipements techniques</div></li>
+      <li><div class="step-n">4</div><div>Notre équipe configure votre compte <strong>dans la journée</strong>. Premières rondes dès le lendemain matin.</div></li>
+    </ol>
+    <div class="onboarding-url">https://gen-track.vercel.app/onboarding.html</div>
+  </div>
+
+  <div class="next-grid">
+    <div class="next-card">
+      <div class="next-card-phase">Étape 1 — Vous</div>
+      <div class="next-card-title">Présenter à la direction / finance</div>
+      <div class="next-card-desc">Utilisez cette proposition pour votre présentation interne. Nous pouvons adapter les chiffres ou fournir des données supplémentaires sur demande.</div>
+    </div>
+    <div class="next-card">
+      <div class="next-card-phase">Étape 2 — Cette semaine</div>
+      <div class="next-card-title">Remplir le formulaire d'onboarding</div>
+      <div class="next-card-desc">Téléchargez et commencez à remplir les modèles zones/équipements pendant que la validation interne est en cours.</div>
+    </div>
+    <div class="next-card">
+      <div class="next-card-phase">Étape 3 — Appel de suivi</div>
+      <div class="next-card-title">Échange de validation semaine prochaine</div>
+      <div class="next-card-desc">Retour sur les questions de la direction, ajustements si nécessaire, et confirmation du démarrage.</div>
+    </div>
+    <div class="next-card featured">
+      <div class="next-card-phase">Offre Pilot → Annuel</div>
+      <div class="next-card-title">Pilot 3 mois, puis 2 mois offerts sur l'annuel</div>
+      <div class="next-card-desc">
+        Démarrez en mensuel (250 000 XOF/mois). Si vous passez à l'abonnement annuel après le pilot :<br><br>
+        <strong>Au lieu de 3 000 000 XOF</strong> (12 × 250K)<br>
+        <strong style="color:var(--green);">→ 2 500 000 XOF / an</strong> — 2 mois offerts<br><br>
+        Soit <strong>~208 000 XOF/mois</strong> sur l'annuel.
+      </div>
+    </div>
+  </div>
+
+  <div class="sig-row">
+    <div class="sig-block">
+      <div class="sig-ttl">Pour GenTrack</div>
+      <div class="sig-line"></div>
+      <div class="sig-name">Wilfried Tchinda</div>
+      <div class="sig-role">Fondateur — GenTrack</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-ttl">Pour King Fahd Palace Hotel</div>
+      <div class="sig-line"></div>
+      <div class="sig-name">M. Daouda Geye</div>
+      <div class="sig-role">Ingénieur Électricien — Responsable Énergie</div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div style="font-size:15pt;font-weight:800;color:var(--amber);margin-bottom:6px;">Gen<span style="color:rgba(255,255,255,0.7);">Track</span></div>
+  <div style="margin-bottom:4px;">Maintenance intelligente des hôtels d'Afrique de l'Ouest</div>
+  <div><a href="https://gen-track.vercel.app">gen-track.vercel.app</a> &nbsp;·&nbsp; wilfried.gtm@gmail.com &nbsp;·&nbsp; <span style="color:var(--amber);">Proposition valable 30 jours</span></div>
+</div>
+
+</div>
+</body>
+</html>

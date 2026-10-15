@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rapport — Hôtel Madame T Dakar — Démo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cream: #F5F0E8;
+    --dark: #1C1917;
+    --muted: #78716C;
+    --border: #E2DDD5;
+    --bg: #F9F7F4;
+    --amber: #C49A3C;
+    --green: #047857;
+    --red: #DC2626;
+    --orange: #D97706;
+    --green-light: #D1FAE5;
+    --green-text: #065F46;
+    --yellow-light: #FEF3C7;
+    --yellow-text: #92400E;
+    --red-light: #FEE2E2;
+    --red-text: #991B1B;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 13px;
+    color: var(--dark);
+    background: #EDEBE6;
+    line-height: 1.5;
+  }
+
+  /* ── PAGE WRAPPER ── */
+  .page {
+    width: 900px;
+    margin: 32px auto;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 24px rgba(0,0,0,.10);
+    padding: 48px 52px 44px;
+    position: relative;
+  }
+  .page + .page { margin-top: 24px; }
+
+  /* ── PAGE LABEL ── */
+  .page-label {
+    position: absolute;
+    top: -26px;
+    left: 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: #A8A29E;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 20px;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 28px;
+  }
+  .logo-text { font-size: 15px; font-weight: 800; letter-spacing: .22em; color: var(--dark); }
+  .logo-sub  { font-size: 9px;  font-weight: 600; letter-spacing: .13em; color: var(--muted); margin-top: 4px; text-transform: uppercase; }
+  .header-right { text-align: right; }
+  .hotel-name { font-size: 22px; font-weight: 800; color: var(--dark); letter-spacing: -.3px; }
+  .hotel-meta { font-size: 11.5px; color: var(--muted); margin-top: 5px; line-height: 1.7; }
+
+  /* ── SECTION TITLE ── */
+  .section-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--dark);
+    margin: 28px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* ── NARRATIVE ── */
+  .narrative {
+    background: var(--bg);
+    border-left: 3.5px solid var(--amber);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    font-size: 12.5px;
+    color: #44403C;
+    margin-bottom: 18px;
+    line-height: 1.6;
+  }
+
+  /* ── KPI GRID ── */
+  .kpi-row { display: flex; gap: 12px; margin-bottom: 24px; }
+  .kpi {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    min-width: 0;
+  }
+  .kpi-label { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; line-height: 1.4; }
+  .kpi-val   { font-size: 30px; font-weight: 800; color: var(--dark); font-variant-numeric: tabular-nums; letter-spacing: -1px; }
+  .kpi-sub   { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+  /* ── TABLES ── */
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
+  thead tr { background: var(--cream); }
+  th {
+    font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--muted); padding: 10px 12px; text-align: left;
+    border-bottom: 1.5px solid var(--border);
+  }
+  td { padding: 11px 12px; border-bottom: 1px solid #F0EDE8; vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #FAFAF9; }
+
+  .cell-name  { font-weight: 700; font-size: 13px; color: var(--dark); }
+  .cell-sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .cell-ok    { font-weight: 700; color: var(--green); font-size: 12px; }
+
+  /* ── BADGES ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .badge-ok   { background: var(--green-light);  color: var(--green-text); }
+  .badge-warn { background: var(--yellow-light); color: var(--yellow-text); }
+  .badge-red  { background: var(--red-light);    color: var(--red-text); }
+
+  /* ── PROGRESS ── */
+  .prog-wrap  { display: flex; align-items: center; gap: 10px; }
+  .prog-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .prog-fill  { height: 100%; background: var(--green); border-radius: 3px; }
+  .prog-lbl   { font-size: 11px; color: var(--muted); white-space: nowrap; min-width: 32px; }
+
+  /* ── ENERGY CARDS ── */
+  .energy-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 14px;
+  }
+  .ecard-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .ecard-title { font-size: 14px; font-weight: 700; color: var(--dark); }
+  .ecard-sub   { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+  .ecard-val   { font-size: 26px; font-weight: 800; color: var(--dark); text-align: right; font-variant-numeric: tabular-nums; }
+  .ecard-vsub  { font-size: 10px; color: var(--muted); text-align: right; margin-top: 1px; }
+  .ecard-status { font-size: 11px; font-weight: 700; text-align: right; margin-top: 3px; }
+  .s-red    { color: var(--red); }
+  .s-green  { color: var(--green); }
+  .s-orange { color: var(--orange); }
+
+  .ecard-meta { display: flex; flex-wrap: wrap; gap: 20px; font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+  .ecard-meta b { color: var(--dark); font-weight: 600; }
+
+  /* ── CHART AREA ── */
+  .chart-area { background: var(--bg); border-radius: 8px; padding: 12px 16px 8px; }
+
+  /* ── TANK BAR ── */
+  .tank-wrap { margin: 8px 0 4px; }
+  .tank-track { height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; margin-bottom: 4px; }
+  .tank-fill  { height: 100%; border-radius: 5px; }
+  .tank-alert { font-size: 10px; color: var(--red); font-weight: 600; }
+
+  /* ── ENERGY KPI ROW ── */
+  .ekpi-row { display: flex; gap: 12px; margin: 20px 0; }
+  .ekpi {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .ekpi-label { font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+  .ekpi-val   { font-size: 22px; font-weight: 800; color: var(--dark); font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+  .ekpi-sub   { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+  /* ── SIGNATURE ── */
+  .sig-row { display: flex; gap: 60px; margin-top: 28px; }
+  .sig-block { flex: 1; }
+  .sig-prereq { font-size: 11px; color: var(--muted); margin-bottom: 32px; }
+  .sig-line  { border-top: 1.5px solid var(--dark); margin-bottom: 8px; }
+  .sig-name  { font-size: 12px; font-weight: 600; color: var(--dark); }
+  .sig-role  { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+
+  /* ── OBS BOX ── */
+  .obs-box {
+    border: 1.5px dashed var(--border);
+    border-radius: 8px;
+    min-height: 80px;
+    padding: 14px;
+    margin-bottom: 28px;
+    color: var(--muted);
+    font-size: 12px;
+    font-style: italic;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    margin-top: 36px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    color: #A8A29E;
+  }
+
+  /* ── DIVIDER ── */
+  hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+  /* ── ICON DOT ── */
+  .icon-dot {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; flex-shrink: 0;
+  }
+  .icon-dot-amber { background: #FEF3C7; color: #92400E; }
+  .icon-dot-green { background: var(--green-light); color: var(--green-text); }
+  .icon-dot-red   { background: var(--red-light); color: var(--red-text); }
+
+  @media print {
+    body { background: white; }
+    .page { box-shadow: none; border-radius: 0; margin: 0; width: 100%; padding: 32px 40px; }
+    .page + .page { page-break-before: always; }
+    .page-label { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ PAGE 1 — COUVERTURE + KPI + ÉQUIPEMENTS ═══════════════ -->
+<div class="page">
+  <span class="page-label">Page 1 / 5</span>
+
+  <div class="header">
+    <div>
+      <div class="logo-text">G E N T R A C K</div>
+      <div class="logo-sub">Rapport mensuel · Responsable Technique</div>
+    </div>
+    <div class="header-right">
+      <div class="hotel-name">Hôtel Madame T Dakar — Démo</div>
+      <div class="hotel-meta">
+        Période : 7 septembre – 7 octobre 2026<br>
+        Responsable : Wilfried Tchinda — GenTrack<br>
+        Généré le mercredi 7 octobre 2026
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Conformité<br>Rondes</div>
+      <div class="kpi-val">100%</div>
+      <div class="kpi-sub">30 rondes / mois</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Signalements<br>Actifs</div>
+      <div class="kpi-val">1</div>
+      <div class="kpi-sub">1 résolu cette période</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Interventions</div>
+      <div class="kpi-val">2</div>
+      <div class="kpi-sub">Aucun coût enregistré</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Équipements<br>Actifs</div>
+      <div class="kpi-val">12</div>
+      <div class="kpi-sub">2 groupes · 1 cuve</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">MTTR Moyen</div>
+      <div class="kpi-val" style="font-size:26px">6.2j</div>
+      <div class="kpi-sub">1 résolution</div>
+    </div>
+  </div>
+
+  <!-- Synthèse -->
+  <div class="section-title">Synthèse du mois</div>
+  <div class="narrative">
+    Mois du 7 septembre au 7 octobre 2026. Taux de conformité des rondes : <strong>100%</strong>. 2 signalements enregistrés dont 1 en cours et 1 résolu. Coût total énergie sous budget de 3%.
+  </div>
+
+  <!-- État équipements -->
+  <div class="section-title">État des équipements</div>
+  <div class="narrative">
+    G1 – CAT 1100 kVA : 72.3 h au compteur. G2 – CAT 1100 kVA : 90.4 h au compteur. Tous les équipements froids dans les seuils réglementaires. Niveaux cuves détaillés en page 3.
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:18%">Équipement</th>
+        <th style="width:14%">Type</th>
+        <th>Dernier relevé</th>
+        <th style="width:12%">Date</th>
+        <th style="width:12%">État</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><div class="cell-name">G1 – CAT 1100 kVA</div><div class="cell-sub">Groupe électrogène</div></td>
+        <td>Groupe élec.</td>
+        <td>Compteur horaire : <strong>72.3 h</strong> · Huile moteur : <strong>Bon</strong></td>
+        <td class="cell-sub">6 oct., 08:56</td>
+        <td><span class="cell-ok">Disponible</span></td>
+      </tr>
+      <tr>
+        <td><div class="cell-name">G2 – CAT 1100 kVA</div><div class="cell-sub">Groupe électrogène</div></td>
+        <td>Groupe élec.</td>
+        <td>Compteur horaire : <strong>90.4 h</strong> · Huile moteur : <strong>Bon</strong></td>
+        <td class="cell-sub">6 oct., 08:58</td>
+        <td><span class="cell-ok">Disponible</span></td>
+      </tr>
+      <tr>
+        <td><div class="cell-name">CF Cuisine 1</div><div class="cell-sub">Chambre froide</div></td>
+        <td>Froid</td>
+        <td>Température : <strong>3 °C</strong> · Porte : <strong>Fermée correctement</strong></td>
+        <td class="cell-sub">6 oct., 09:00</td>
+        <td><span class="cell-ok">Disponible</span></td>
+      </tr>
+      <tr>
+        <td><div class="cell-name">CF Cuisine 2</div><div class="cell-sub">Chambre froide</div></td>
+        <td>Froid</td>
+        <td>Température : <strong>4 °C</strong> · Porte : <strong>Fermée correctement</strong></td>
+        <td class="cell-sub">6 oct., 09:01</td>
+        <td><span class="cell-ok">Disponible</span></td>
+      </tr>
+      <tr>
+        <td><div class="cell-name">CF Pâtisserie</div><div class="cell-sub">Chambre froide</div></td>
+        <td>Froid</td>
+        <td>Température : <strong>6 °C</strong> · Porte : <strong>Fermée correctement</strong></td>
+        <td class="cell-sub">6 oct., 09:03</td>
+        <td><span class="cell-ok">Disponible</span></td>
+      </tr>
+      <tr>
+        <td><div class="cell-name">CF Négative</div><div class="cell-sub">Chambre froide</div></td>
+        <td>Froid nég.</td>
+        <td>Température : <strong>-8.1 °C</strong> · Porte : <strong>Fermée correctement</strong></td>
+        <td class="cell-sub">6 oct., 09:04</td>
+        <td><span class="cell-ok">Disponible</span></td>
+      </tr>
+      <tr>
+        <td><div class="cell-name">CF Fruits &amp; Légumes</div><div class="cell-sub">Chambre froide</div></td>
+        <td>Froid</td>
+        <td>Température : <strong>5 °C</strong> · Porte : <strong>Fermée correctement</strong></td>
+        <td class="cell-sub">6 oct., 09:05</td>
+        <td><span class="cell-ok">Disponible</span></td>
+      </tr>
+      <tr>
+        <td><div class="cell-name">CF Mise en place</div><div class="cell-sub">Chambre froide</div></td>
+        <td>Froid</td>
+        <td>Température : <strong>6 °C</strong> · Porte : <strong>Fermée correctement</strong></td>
+        <td class="cell-sub">6 oct., 09:06</td>
+        <td><span class="cell-ok">Disponible</span></td>
+      </tr>
+      <tr>
+        <td><div class="cell-name">CF BOF</div><div class="cell-sub">Chambre froide</div></td>
+        <td>Froid</td>
+        <td>Température : <strong>6 °C</strong> · Porte : <strong>Fermée correctement</strong></td>
+        <td class="cell-sub">6 oct., 09:07</td>
+        <td><span class="cell-ok">Disponible</span></td>
+      </tr>
+      <tr>
+        <td><div class="cell-name">CF Économat</div><div class="cell-sub">Chambre froide</div></td>
+        <td>Froid</td>
+        <td>Température : <strong>6 °C</strong> · Porte : <strong>Fermée correctement</strong></td>
+        <td class="cell-sub">6 oct., 09:08</td>
+        <td><span class="cell-ok">Disponible</span></td>
+      </tr>
+      <tr>
+        <td><div class="cell-name">Groupe Eau Glacée</div><div class="cell-sub">CTA / Climatisation</div></td>
+        <td>Climatisation</td>
+        <td>Consigne : <strong>7 °C</strong> · Entrée : <strong>9 °C</strong> · Sortie : <strong>6.9 °C</strong> · Pompes &amp; variateurs : <strong>Normaux</strong></td>
+        <td class="cell-sub">6 oct., 09:10</td>
+        <td><span class="cell-ok">Disponible</span></td>
+      </tr>
+      <tr>
+        <td><div class="cell-name">Cuve carburant</div><div class="cell-sub">Citerne 8 102 L</div></td>
+        <td>Fluide</td>
+        <td>Niveau relevé : <strong>7 281 L</strong> (90%)</td>
+        <td class="cell-sub">6 oct., 09:11</td>
+        <td><span class="cell-ok">Disponible</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <span>GenTrack · Pilotage technique hôtelier</span>
+    <span>Rapport généré le 7 octobre 2026 · Page 1</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 2 — ÉNERGIE (Élec + Eau) ═══════════════ -->
+<div class="page">
+  <span class="page-label">Page 2 / 5</span>
+
+  <div class="header">
+    <div>
+      <div class="logo-text">G E N T R A C K</div>
+      <div class="logo-sub">Rapport mensuel · Responsable Technique</div>
+    </div>
+    <div class="header-right">
+      <div class="hotel-name" style="font-size:16px">Hôtel Madame T Dakar — Démo</div>
+      <div class="hotel-meta">7 sept. – 7 oct. 2026 · Wilfried Tchinda — GenTrack</div>
+    </div>
+  </div>
+
+  <div class="section-title">
+    Énergie &amp; Fluides
+    <span class="badge badge-red">2 dépassements</span>
+  </div>
+
+  <!-- Élec Jour -->
+  <div class="energy-card">
+    <div class="ecard-head">
+      <div>
+        <div class="ecard-title">Électricité Jour (K1)</div>
+        <div class="ecard-sub">Compteur kWh</div>
+      </div>
+      <div>
+        <div class="ecard-val">190 667 kWh</div>
+        <div class="ecard-vsub">consommation sur la période</div>
+        <div class="ecard-status s-red">Dépassement budgétaire</div>
+      </div>
+    </div>
+    <div class="ecard-meta">
+      <span>Objectif : <b>95 000 kWh</b></span>
+      <span>Coût réel : <b>21,3 M XOF</b></span>
+      <span>Budget : <b>14,2 M XOF</b></span>
+      <span style="color:var(--red);font-weight:700">Écart : +7,1 M XOF</span>
+    </div>
+    <div class="chart-area">
+      <svg width="100%" height="80" viewBox="0 0 760 80">
+        <!-- grid -->
+        <line x1="0" y1="70" x2="760" y2="70" stroke="#E2DDD5" stroke-width="1"/>
+        <line x1="0" y1="45" x2="760" y2="45" stroke="#C49A3C" stroke-width="1" stroke-dasharray="5,4" opacity=".7"/>
+        <!-- area fill -->
+        <path d="M 0,70 L 120,60 L 240,48 L 360,36 L 480,24 L 600,14 L 760,5 L 760,70 Z" fill="#047857" opacity=".08"/>
+        <!-- line -->
+        <polyline points="0,70 120,60 240,48 360,36 480,24 600,14 760,5" fill="none" stroke="#047857" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- dots -->
+        <circle cx="0" cy="70" r="3.5" fill="#047857"/>
+        <circle cx="120" cy="60" r="3.5" fill="#047857"/>
+        <circle cx="240" cy="48" r="3.5" fill="#047857"/>
+        <circle cx="360" cy="36" r="3.5" fill="#047857"/>
+        <circle cx="480" cy="24" r="3.5" fill="#047857"/>
+        <circle cx="600" cy="14" r="3.5" fill="#047857"/>
+        <circle cx="760" cy="5" r="3.5" fill="#047857"/>
+        <!-- budget label -->
+        <text x="4" y="42" font-size="9" fill="#C49A3C" font-family="system-ui">— Budget 95 000 kWh</text>
+        <!-- x labels -->
+        <text x="0"   y="79" font-size="9" fill="#78716C" font-family="system-ui">7 sept.</text>
+        <text x="115" y="79" font-size="9" fill="#78716C" font-family="system-ui">13 sept.</text>
+        <text x="235" y="79" font-size="9" fill="#78716C" font-family="system-ui">19 sept.</text>
+        <text x="355" y="79" font-size="9" fill="#78716C" font-family="system-ui">25 sept.</text>
+        <text x="475" y="79" font-size="9" fill="#78716C" font-family="system-ui">1 oct.</text>
+        <text x="595" y="79" font-size="9" fill="#78716C" font-family="system-ui">4 oct.</text>
+        <text x="720" y="79" font-size="9" fill="#78716C" font-family="system-ui">7 oct.</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Élec Nuit -->
+  <div class="energy-card">
+    <div class="ecard-head">
+      <div>
+        <div class="ecard-title">Électricité Nuit (K2)</div>
+        <div class="ecard-sub">Compteur kWh</div>
+      </div>
+      <div>
+        <div class="ecard-val">39 655 kWh</div>
+        <div class="ecard-vsub">consommation sur la période</div>
+        <div class="ecard-status s-green">Sous budget</div>
+      </div>
+    </div>
+    <div class="ecard-meta">
+      <span>Objectif : <b>60 000 kWh</b></span>
+      <span>Coût réel : <b>7,3 M XOF</b></span>
+      <span>Budget : <b>14,8 M XOF</b></span>
+      <span style="color:var(--green);font-weight:700">Écart : -7,5 M XOF</span>
+    </div>
+    <div class="chart-area">
+      <svg width="100%" height="80" viewBox="0 0 760 80">
+        <line x1="0" y1="70" x2="760" y2="70" stroke="#E2DDD5" stroke-width="1"/>
+        <path d="M 0,70 L 120,62 L 240,55 L 360,47 L 480,39 L 600,32 L 760,26 L 760,70 Z" fill="#047857" opacity=".08"/>
+        <polyline points="0,70 120,62 240,55 360,47 480,39 600,32 760,26" fill="none" stroke="#047857" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="0"   cy="70" r="3.5" fill="#047857"/>
+        <circle cx="120" cy="62" r="3.5" fill="#047857"/>
+        <circle cx="240" cy="55" r="3.5" fill="#047857"/>
+        <circle cx="360" cy="47" r="3.5" fill="#047857"/>
+        <circle cx="480" cy="39" r="3.5" fill="#047857"/>
+        <circle cx="600" cy="32" r="3.5" fill="#047857"/>
+        <circle cx="760" cy="26" r="3.5" fill="#047857"/>
+        <text x="0"   y="79" font-size="9" fill="#78716C" font-family="system-ui">7 sept.</text>
+        <text x="115" y="79" font-size="9" fill="#78716C" font-family="system-ui">13 sept.</text>
+        <text x="235" y="79" font-size="9" fill="#78716C" font-family="system-ui">19 sept.</text>
+        <text x="355" y="79" font-size="9" fill="#78716C" font-family="system-ui">25 sept.</text>
+        <text x="475" y="79" font-size="9" fill="#78716C" font-family="system-ui">1 oct.</text>
+        <text x="720" y="79" font-size="9" fill="#78716C" font-family="system-ui">7 oct.</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Eau -->
+  <div class="energy-card">
+    <div class="ecard-head">
+      <div>
+        <div class="ecard-title">Eau bâche potable</div>
+        <div class="ecard-sub">Compteur m³</div>
+      </div>
+      <div>
+        <div class="ecard-val">1 779 m³</div>
+        <div class="ecard-vsub">consommation sur la période</div>
+        <div class="ecard-status s-red">Dépassement budgétaire</div>
+      </div>
+    </div>
+    <div class="ecard-meta">
+      <span>Objectif : <b>850 m³</b></span>
+      <span>Coût réel : <b>1,3 M XOF</b></span>
+      <span>Budget : <b>847 k XOF</b></span>
+      <span style="color:var(--red);font-weight:700">Écart : +478 k XOF</span>
+    </div>
+    <div class="chart-area">
+      <svg width="100%" height="80" viewBox="0 0 760 80">
+        <line x1="0" y1="70" x2="760" y2="70" stroke="#E2DDD5" stroke-width="1"/>
+        <path d="M 0,70 L 120,62 L 240,53 L 360,44 L 480,34 L 600,25 L 760,17 L 760,70 Z" fill="#3B82F6" opacity=".08"/>
+        <polyline points="0,70 120,62 240,53 360,44 480,34 600,25 760,17" fill="none" stroke="#3B82F6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="0"   cy="70" r="3.5" fill="#3B82F6"/>
+        <circle cx="120" cy="62" r="3.5" fill="#3B82F6"/>
+        <circle cx="240" cy="53" r="3.5" fill="#3B82F6"/>
+        <circle cx="360" cy="44" r="3.5" fill="#3B82F6"/>
+        <circle cx="480" cy="34" r="3.5" fill="#3B82F6"/>
+        <circle cx="600" cy="25" r="3.5" fill="#3B82F6"/>
+        <circle cx="760" cy="17" r="3.5" fill="#3B82F6"/>
+        <text x="0"   y="79" font-size="9" fill="#78716C" font-family="system-ui">7 sept.</text>
+        <text x="115" y="79" font-size="9" fill="#78716C" font-family="system-ui">13 sept.</text>
+        <text x="235" y="79" font-size="9" fill="#78716C" font-family="system-ui">19 sept.</text>
+        <text x="355" y="79" font-size="9" fill="#78716C" font-family="system-ui">25 sept.</text>
+        <text x="475" y="79" font-size="9" fill="#78716C" font-family="system-ui">1 oct.</text>
+        <text x="720" y="79" font-size="9" fill="#78716C" font-family="system-ui">7 oct.</text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>GenTrack · Pilotage technique hôtelier</span>
+    <span>Rapport généré le 7 octobre 2026 · Page 2</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 3 — FLUIDES (Gasoil + Gaz + Cos phi) + RÉCAP ═══════════════ -->
+<div class="page">
+  <span class="page-label">Page 3 / 5</span>
+
+  <div class="header">
+    <div>
+      <div class="logo-text">G E N T R A C K</div>
+      <div class="logo-sub">Rapport mensuel · Responsable Technique</div>
+    </div>
+    <div class="header-right">
+      <div class="hotel-name" style="font-size:16px">Hôtel Madame T Dakar — Démo</div>
+      <div class="hotel-meta">7 sept. – 7 oct. 2026 · Wilfried Tchinda — GenTrack</div>
+    </div>
+  </div>
+
+  <div class="section-title">Niveaux Carburant &amp; Gaz</div>
+
+  <!-- Gasoil -->
+  <div class="energy-card">
+    <div class="ecard-head">
+      <div>
+        <div class="ecard-title">Niveau cuve gasoil</div>
+        <div class="ecard-sub">Citerne — capacité 8 102 L</div>
+      </div>
+      <div>
+        <div class="ecard-val">7 281 L</div>
+        <div class="ecard-vsub">90% de capacité</div>
+        <div class="ecard-status s-orange">Suivi normal</div>
+      </div>
+    </div>
+    <div class="ecard-meta">
+      <span>Conso estimée : <b>426 L</b></span>
+      <span>Coût réel : <b>320 k XOF</b></span>
+      <span>Alerte seuil bas : <b>&lt; 1 620 L</b></span>
+    </div>
+    <div class="tank-wrap">
+      <div class="tank-track">
+        <div class="tank-fill" style="width:90%;background:var(--orange)"></div>
+      </div>
+      <div class="tank-alert">Alerte &lt; 1 620 L (20%)</div>
+    </div>
+    <br>
+    <div class="chart-area">
+      <svg width="100%" height="75" viewBox="0 0 760 75">
+        <line x1="0" y1="65" x2="760" y2="65" stroke="#E2DDD5" stroke-width="1"/>
+        <!-- alert line at 20% = y ~52 -->
+        <line x1="0" y1="52" x2="760" y2="52" stroke="#DC2626" stroke-width="1" stroke-dasharray="5,4" opacity=".7"/>
+        <text x="4" y="50" font-size="8" fill="#DC2626" font-family="system-ui">— Seuil alerte</text>
+        <!-- gasoil stable haut -->
+        <polyline points="0,18 120,19 240,20 360,21 480,22 600,22 760,22" fill="none" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="0"   cy="18" r="3.5" fill="#D97706"/>
+        <circle cx="120" cy="19" r="3.5" fill="#D97706"/>
+        <circle cx="240" cy="20" r="3.5" fill="#D97706"/>
+        <circle cx="360" cy="21" r="3.5" fill="#D97706"/>
+        <circle cx="480" cy="22" r="3.5" fill="#D97706"/>
+        <circle cx="760" cy="22" r="3.5" fill="#D97706"/>
+        <text x="0"   y="74" font-size="9" fill="#78716C" font-family="system-ui">7 sept.</text>
+        <text x="115" y="74" font-size="9" fill="#78716C" font-family="system-ui">13 sept.</text>
+        <text x="235" y="74" font-size="9" fill="#78716C" font-family="system-ui">19 sept.</text>
+        <text x="355" y="74" font-size="9" fill="#78716C" font-family="system-ui">25 sept.</text>
+        <text x="475" y="74" font-size="9" fill="#78716C" font-family="system-ui">1 oct.</text>
+        <text x="720" y="74" font-size="9" fill="#78716C" font-family="system-ui">7 oct.</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Gaz -->
+  <div class="energy-card">
+    <div class="ecard-head">
+      <div>
+        <div class="ecard-title">Gaz butane (citerne)</div>
+        <div class="ecard-sub">Citerne — capacité 4 000 L</div>
+      </div>
+      <div>
+        <div class="ecard-val">1 360 L</div>
+        <div class="ecard-vsub">34% de capacité</div>
+        <div class="ecard-status s-orange">Niveau bas — à surveiller</div>
+      </div>
+    </div>
+    <div class="ecard-meta">
+      <span>Conso estimée : <b>1 720 L</b></span>
+      <span>Budget : <b>1,4 M XOF</b></span>
+      <span>Alerte seuil bas : <b>&lt; 800 L</b></span>
+    </div>
+    <div class="tank-wrap">
+      <div class="tank-track">
+        <div class="tank-fill" style="width:34%;background:var(--orange)"></div>
+      </div>
+      <div class="tank-alert">Alerte &lt; 800 L (20%)</div>
+    </div>
+    <br>
+    <div class="chart-area">
+      <svg width="100%" height="75" viewBox="0 0 760 75">
+        <line x1="0" y1="65" x2="760" y2="65" stroke="#E2DDD5" stroke-width="1"/>
+        <line x1="0" y1="52" x2="760" y2="52" stroke="#DC2626" stroke-width="1" stroke-dasharray="5,4" opacity=".7"/>
+        <text x="4" y="50" font-size="8" fill="#DC2626" font-family="system-ui">— Seuil alerte</text>
+        <!-- gaz descend -->
+        <polyline points="0,10 120,16 240,24 360,33 480,38 600,46 760,52" fill="none" stroke="#D97706" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="0"   cy="10" r="3.5" fill="#D97706"/>
+        <circle cx="120" cy="16" r="3.5" fill="#D97706"/>
+        <circle cx="240" cy="24" r="3.5" fill="#D97706"/>
+        <circle cx="360" cy="33" r="3.5" fill="#D97706"/>
+        <circle cx="480" cy="38" r="3.5" fill="#D97706"/>
+        <circle cx="600" cy="46" r="3.5" fill="#D97706"/>
+        <circle cx="760" cy="52" r="3.5" fill="#D97706"/>
+        <text x="0"   y="74" font-size="9" fill="#78716C" font-family="system-ui">7 sept.</text>
+        <text x="115" y="74" font-size="9" fill="#78716C" font-family="system-ui">13 sept.</text>
+        <text x="235" y="74" font-size="9" fill="#78716C" font-family="system-ui">19 sept.</text>
+        <text x="355" y="74" font-size="9" fill="#78716C" font-family="system-ui">25 sept.</text>
+        <text x="475" y="74" font-size="9" fill="#78716C" font-family="system-ui">1 oct.</text>
+        <text x="720" y="74" font-size="9" fill="#78716C" font-family="system-ui">7 oct.</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Cos phi -->
+  <div class="energy-card">
+    <div class="ecard-head">
+      <div>
+        <div class="ecard-title">Cos phi réseau</div>
+        <div class="ecard-sub">Facteur de puissance</div>
+      </div>
+      <div>
+        <div class="ecard-val">0,87</div>
+        <div class="ecard-vsub">moyenne période</div>
+      </div>
+    </div>
+    <div class="chart-area">
+      <svg width="100%" height="65" viewBox="0 0 760 65">
+        <line x1="0" y1="55" x2="760" y2="55" stroke="#E2DDD5" stroke-width="1"/>
+        <polyline points="0,28 90,25 180,30 270,26 360,29 450,25 540,28 630,26 760,29" fill="none" stroke="#D97706" stroke-width="2" stroke-linecap="round"/>
+        <text x="0"   y="64" font-size="9" fill="#78716C" font-family="system-ui">7 sept.</text>
+        <text x="115" y="64" font-size="9" fill="#78716C" font-family="system-ui">13 sept.</text>
+        <text x="235" y="64" font-size="9" fill="#78716C" font-family="system-ui">19 sept.</text>
+        <text x="355" y="64" font-size="9" fill="#78716C" font-family="system-ui">25 sept.</text>
+        <text x="475" y="64" font-size="9" fill="#78716C" font-family="system-ui">1 oct.</text>
+        <text x="720" y="64" font-size="9" fill="#78716C" font-family="system-ui">7 oct.</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Récap énergie -->
+  <div class="ekpi-row">
+    <div class="ekpi">
+      <div class="ekpi-label">Coût total énergie</div>
+      <div class="ekpi-val">30,3 M XOF</div>
+    </div>
+    <div class="ekpi">
+      <div class="ekpi-label">Budget pro-rata 30j</div>
+      <div class="ekpi-val">31,2 M XOF</div>
+    </div>
+    <div class="ekpi">
+      <div class="ekpi-label">Écart vs budget</div>
+      <div class="ekpi-val" style="color:var(--green)">-3%</div>
+      <div class="ekpi-sub">-907 k XOF</div>
+    </div>
+    <div class="ekpi">
+      <div class="ekpi-label">XOF / Ch. Occ. / Nuit</div>
+      <div class="ekpi-val">5 402</div>
+      <div class="ekpi-sub">Budget : 5 564 · TO 93%</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>GenTrack · Pilotage technique hôtelier</span>
+    <span>Rapport généré le 7 octobre 2026 · Page 3</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 4 — RONDES ═══════════════ -->
+<div class="page">
+  <span class="page-label">Page 4 / 5</span>
+
+  <div class="header">
+    <div>
+      <div class="logo-text">G E N T R A C K</div>
+      <div class="logo-sub">Rapport mensuel · Responsable Technique</div>
+    </div>
+    <div class="header-right">
+      <div class="hotel-name" style="font-size:16px">Hôtel Madame T Dakar — Démo</div>
+      <div class="hotel-meta">7 sept. – 7 oct. 2026 · Wilfried Tchinda — GenTrack</div>
+    </div>
+  </div>
+
+  <div class="section-title">Rondes &amp; Relevés</div>
+  <div class="narrative">30 rondes journalières effectuées sur 30 jours. <strong>Taux de conformité : 100%</strong>. Chaque ronde couvre les 12 équipements actifs du site.</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:22%">Date</th>
+        <th style="width:24%">Type</th>
+        <th>Progression</th>
+        <th style="width:16%">Résultat</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>lun. 7 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>mar. 8 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>mer. 9 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>jeu. 10 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>ven. 11 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>sam. 12 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>dim. 13 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">11/11</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>lun. 14 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>mar. 15 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>mer. 16 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>jeu. 17 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>ven. 18 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>sam. 19 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>dim. 20 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>lun. 21 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>mar. 22 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>mer. 23 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>jeu. 24 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>ven. 25 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>sam. 26 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>dim. 27 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>lun. 28 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>mar. 29 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>mer. 30 sept.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>jeu. 1 oct.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">11/11</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>ven. 2 oct.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>sam. 3 oct.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>dim. 4 oct.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>lun. 5 oct.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+      <tr><td>mar. 6 oct.</td><td>Ronde journalière</td><td><div class="prog-wrap"><div class="prog-track"><div class="prog-fill" style="width:100%"></div></div><span class="prog-lbl">12/12</span></div></td><td><span class="badge badge-ok">Validée</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <span>GenTrack · Pilotage technique hôtelier</span>
+    <span>Rapport généré le 7 octobre 2026 · Page 4</span>
+  </div>
+</div>
+
+<!-- ═══════════════ PAGE 5 — SIGNALEMENTS + MAINTENANCES + SIGNATURE ═══════════════ -->
+<div class="page">
+  <span class="page-label">Page 5 / 5</span>
+
+  <div class="header">
+    <div>
+      <div class="logo-text">G E N T R A C K</div>
+      <div class="logo-sub">Rapport mensuel · Responsable Technique</div>
+    </div>
+    <div class="header-right">
+      <div class="hotel-name" style="font-size:16px">Hôtel Madame T Dakar — Démo</div>
+      <div class="hotel-meta">7 sept. – 7 oct. 2026 · Wilfried Tchinda — GenTrack</div>
+    </div>
+  </div>
+
+  <div class="section-title">Signalements &amp; Incidents</div>
+  <div class="narrative">2 anomalies détectées lors des rondes sur la période. 1 signalement résolu, 1 en cours de traitement.</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:11%">Type</th>
+        <th>Description</th>
+        <th style="width:16%">Date</th>
+        <th style="width:14%">Statut</th>
+        <th style="width:14%">Résolution</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="badge badge-warn">Anomalie</span></td>
+        <td>
+          <div class="cell-name">Défaut fermeture des vannes</div>
+          <div class="cell-sub">Groupe Eau Glacée</div>
+        </td>
+        <td class="cell-sub">30 sept. 2026</td>
+        <td><span class="badge badge-ok">Résolu</span></td>
+        <td style="font-weight:700;color:var(--amber)">6.2 jours</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-red">Anomalie</span></td>
+        <td>
+          <div class="cell-name">Disjonction récurrente</div>
+          <div class="cell-sub">CF Négative</div>
+        </td>
+        <td class="cell-sub">30 sept. 2026</td>
+        <td><span class="badge badge-warn">En cours</span></td>
+        <td style="color:var(--muted)">—</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">Maintenances &amp; Interventions</div>
+  <div class="narrative">2 interventions réalisées sur la période. Aucun coût d'intervention enregistré.</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Intervention</th>
+        <th style="width:12%">Type</th>
+        <th style="width:18%">Intervenant</th>
+        <th style="width:13%">Date</th>
+        <th style="width:12%">Statut</th>
+        <th style="width:10%">Coût</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          <div class="cell-name">Intervention — Groupe Eau Glacée</div>
+          <div class="cell-sub">Lié au signalement : Défaut fermeture des vannes</div>
+        </td>
+        <td>Panne</td>
+        <td>Jean-Paul</td>
+        <td class="cell-sub">6 oct. 2026</td>
+        <td><span class="badge badge-ok">Réalisé</span></td>
+        <td class="cell-sub">—</td>
+      </tr>
+      <tr>
+        <td>
+          <div class="cell-name">Intervention — Panne électrique</div>
+        </td>
+        <td>Panne</td>
+        <td>Wilfried Tchinda</td>
+        <td class="cell-sub">30 sept. 2026</td>
+        <td><span class="badge badge-ok">Réalisé</span></td>
+        <td class="cell-sub">—</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">Observations du responsable</div>
+  <div class="obs-box">Espace réservé aux observations du responsable technique…</div>
+
+  <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">
+    Fait à _____________________, le 7 octobre 2026
+  </div>
+
+  <div class="sig-row">
+    <div class="sig-block">
+      <div class="sig-prereq">Signature du responsable technique</div>
+      <div class="sig-line"></div>
+      <div class="sig-name">Wilfried Tchinda — GenTrack</div>
+      <div class="sig-role">Responsable Technique</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-prereq">Visa de la direction</div>
+      <div class="sig-line"></div>
+      <div class="sig-role">Direction de l'hôtel</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>GenTrack · Pilotage technique hôtelier</span>
+    <span>Rapport généré le 7 octobre 2026 · Page 5</span>
+  </div>
+</div>
+
+</body>
+</html>

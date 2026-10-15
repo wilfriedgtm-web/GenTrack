@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>GenTrack — Video Lancement</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background:#000;
+  display:flex; align-items:center; justify-content:center;
+  min-height:100vh;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;
+  overflow:hidden;
+}
+
+/* ===== CANVAS ===== */
+#canvas {
+  width:1280px;
+  height:720px;
+  position:relative;
+  overflow:hidden;
+  background:#1C1917;
+}
+
+/* ===== SCENES ===== */
+.scene {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  opacity:0;
+  transition:opacity 0.6s ease;
+  pointer-events:none;
+}
+.scene.active { opacity:1; }
+.scene.out { opacity:0; }
+
+/* ===== GLOBAL BG EFFECTS ===== */
+.grain {
+  position:absolute; inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events:none; z-index:50; mix-blend-mode:overlay;
+}
+
+/* ===== SCENE 1 — PROBLÈME ===== */
+#s1 { background:#0D0A09; }
+#s1 .bg-grid {
+  position:absolute; inset:0;
+  background-image:
+    linear-gradient(rgba(220,38,38,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(220,38,38,0.05) 1px, transparent 1px);
+  background-size:60px 60px;
+}
+#s1 .red-vignette {
+  position:absolute; inset:0;
+  background:radial-gradient(ellipse at center, transparent 40%, rgba(220,38,38,0.12) 100%);
+}
+
+.alarm-ring {
+  width:160px; height:160px;
+  border:3px solid rgba(220,38,38,0.3);
+  border-radius:50%;
+  position:absolute;
+  animation:ring 1.8s ease-out infinite;
+}
+.alarm-ring:nth-child(2) { animation-delay:0.6s; }
+.alarm-ring:nth-child(3) { animation-delay:1.2s; }
+@keyframes ring {
+  0% { transform:scale(0.6); opacity:0.8; }
+  100% { transform:scale(2.2); opacity:0; }
+}
+
+.alarm-icon {
+  width:80px; height:80px;
+  background:rgba(220,38,38,0.15);
+  border:2px solid rgba(220,38,38,0.5);
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:32pt;
+  animation:pulse-icon 0.8s ease-in-out infinite alternate;
+  position:relative; z-index:2;
+  margin-bottom:40px;
+}
+@keyframes pulse-icon {
+  from { box-shadow:0 0 0 0 rgba(220,38,38,0.4); }
+  to { box-shadow:0 0 30px 10px rgba(220,38,38,0.1); }
+}
+
+.s1-text { text-align:center; z-index:2; }
+.s1-line1 {
+  font-size:42pt; font-weight:800; color:#fff;
+  line-height:1.1; margin-bottom:16px;
+  opacity:0;
+  animation:slideUp 0.6s 0.3s forwards;
+}
+.s1-line1 .red { color:#EF4444; }
+.s1-line2 {
+  font-size:16pt; color:rgba(255,255,255,0.45);
+  font-weight:400; line-height:1.5;
+  opacity:0;
+  animation:slideUp 0.6s 0.8s forwards;
+}
+
+/* ===== SCENE 2 — URGENCE STATS ===== */
+#s2 { background:#0D0A09; }
+#s2 .s2-bg {
+  position:absolute; inset:0;
+  background:radial-gradient(ellipse at 30% 50%, rgba(220,38,38,0.08) 0%, transparent 60%);
+}
+
+.s2-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:0; width:900px; z-index:2; }
+.s2-stat {
+  padding:40px 30px;
+  text-align:center;
+  border-right:1px solid rgba(255,255,255,0.06);
+}
+.s2-stat:last-child { border-right:none; }
+.s2-num {
+  font-size:72pt; font-weight:900; line-height:1;
+  margin-bottom:8px;
+  background:linear-gradient(135deg, #EF4444, #B91C1C);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+.s2-label { font-size:12pt; color:rgba(255,255,255,0.4); font-weight:400; line-height:1.4; }
+.s2-label strong { display:block; font-size:10pt; color:rgba(255,255,255,0.6); margin-bottom:4px; font-weight:600; text-transform:uppercase; letter-spacing:1px; }
+
+.s2-stat { opacity:0; }
+.s2-stat:nth-child(1) { animation:fadeScale 0.5s 0.2s forwards; }
+.s2-stat:nth-child(2) { animation:fadeScale 0.5s 0.5s forwards; }
+.s2-stat:nth-child(3) { animation:fadeScale 0.5s 0.8s forwards; }
+
+.s2-bottom {
+  position:absolute; bottom:60px;
+  font-size:13pt; color:rgba(255,255,255,0.25);
+  letter-spacing:0.5px;
+  opacity:0; animation:fadeIn 0.5s 1.2s forwards;
+}
+
+/* ===== SCENE 3 — GENTRACK SOLUTION ===== */
+#s3 { background:#1C1917; }
+#s3 .amber-glow {
+  position:absolute; top:-200px; left:50%; transform:translateX(-50%);
+  width:600px; height:400px;
+  background:radial-gradient(ellipse, rgba(196,154,60,0.15) 0%, transparent 70%);
+}
+
+.s3-content { display:flex; align-items:center; gap:80px; z-index:2; }
+
+/* Phone mockup */
+.phone-3d {
+  width:220px; flex-shrink:0;
+  background:#fff;
+  border-radius:26px;
+  box-shadow:0 30px 80px rgba(0,0,0,0.6), 0 0 0 8px #111, 0 0 0 10px #222;
+  overflow:hidden;
+  opacity:0;
+  transform:translateX(-60px) rotate(-5deg);
+  animation:phoneIn 0.7s 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+@keyframes phoneIn {
+  to { opacity:1; transform:translateX(0) rotate(-2deg); }
+}
+.ph-notch { background:#111; height:20px; display:flex; align-items:center; justify-content:center; }
+.ph-dot { width:7px; height:7px; background:#333; border-radius:50%; }
+.ph-hdr { background:#075E54; padding:8px 10px; display:flex; gap:8px; align-items:center; }
+.ph-av { width:28px; height:28px; background:#25D366; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12pt; }
+.ph-info { flex:1; }
+.ph-nm { color:#fff; font-size:8.5pt; font-weight:700; }
+.ph-st { color:rgba(255,255,255,0.6); font-size:6.5pt; }
+.ph-body { background:#ECE5DD; padding:8px 6px; display:flex; flex-direction:column; gap:4px; min-height:240px; }
+.ph-sep { text-align:center; }
+.ph-sep span { background:rgba(255,255,255,0.7); font-size:6pt; padding:1px 8px; border-radius:7px; color:#777; }
+.ph-msg { max-width:86%; }
+.ph-msg.in { align-self:flex-start; }
+.ph-msg.out { align-self:flex-end; }
+.ph-b { padding:5px 7px 3px; border-radius:6px; font-size:7.5pt; line-height:1.35; }
+.ph-msg.in .ph-b { background:#fff; border-bottom-left-radius:2px; }
+.ph-msg.out .ph-b { background:#DCF8C6; border-bottom-right-radius:2px; }
+.ph-b .meta { font-size:5.5pt; color:#999; text-align:right; margin-top:1px; }
+.ph-bot { background:#fff; border-left:3px solid #25D366; border-radius:0 6px 6px 0; padding:5px 7px; font-size:7.5pt; margin:1px 0; }
+.ph-bot .bn { font-size:6.5pt; font-weight:700; color:#25D366; margin-bottom:1px; }
+.ph-choice { background:#E3F7E9; border:1px solid #25D366; border-radius:4px; padding:2px 6px; font-size:6.5pt; color:#075E54; font-weight:600; text-align:center; margin-top:2px; }
+
+/* Typing animation for messages */
+.ph-msg { opacity:0; }
+.ph-msg:nth-child(2) { animation:msgIn 0.3s 0.6s forwards; }
+.ph-msg:nth-child(3) { animation:msgIn 0.3s 0.9s forwards; }
+.ph-msg:nth-child(4) { animation:msgIn 0.3s 1.2s forwards; }
+.ph-msg:nth-child(5) { animation:msgIn 0.3s 1.5s forwards; }
+.ph-msg:nth-child(6) { animation:msgIn 0.3s 1.8s forwards; }
+.ph-msg:nth-child(7) { animation:msgIn 0.3s 2.1s forwards; }
+@keyframes msgIn {
+  from { opacity:0; transform:translateY(6px); }
+  to { opacity:1; transform:translateY(0); }
+}
+
+/* Right side text */
+.s3-right { opacity:0; animation:slideLeft 0.6s 0.5s forwards; }
+@keyframes slideLeft {
+  from { opacity:0; transform:translateX(40px); }
+  to { opacity:1; transform:translateX(0); }
+}
+.s3-tag { font-size:8pt; font-weight:700; color:#C49A3C; letter-spacing:2px; text-transform:uppercase; margin-bottom:14px; }
+.s3-title { font-size:36pt; font-weight:800; color:#fff; line-height:1.1; margin-bottom:16px; }
+.s3-title .amber { color:#C49A3C; }
+.s3-sub { font-size:12pt; color:rgba(255,255,255,0.5); line-height:1.6; max-width:380px; }
+.s3-divider { width:40px; height:3px; background:#C49A3C; margin:20px 0; }
+
+/* ===== SCENE 4 — DASHBOARD + FEATURES ===== */
+#s4 { background:#1C1917; }
+#s4 .green-glow {
+  position:absolute; bottom:-200px; right:-100px;
+  width:500px; height:400px;
+  background:radial-gradient(ellipse, rgba(22,163,74,0.1) 0%, transparent 70%);
+}
+
+.s4-layout { display:flex; gap:60px; align-items:center; z-index:2; width:1100px; }
+
+/* Mini dashboard */
+.mini-dash {
+  width:480px; flex-shrink:0;
+  background:#0D0A09;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,0.08);
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+  overflow:hidden;
+  opacity:0;
+  transform:translateY(30px);
+  animation:dashIn 0.7s 0.3s cubic-bezier(0.34,1.2,0.64,1) forwards;
+}
+@keyframes dashIn {
+  to { opacity:1; transform:translateY(0); }
+}
+.md-top { background:#111; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; }
+.md-logo { font-size:9pt; font-weight:800; color:#C49A3C; }
+.md-dot { width:7px; height:7px; border-radius:50%; background:#16A34A; display:inline-block; margin-right:4px; }
+.md-status { font-size:7.5pt; color:rgba(255,255,255,0.5); }
+.md-nav { background:#0A0807; border-bottom:1px solid rgba(255,255,255,0.05); padding:0 14px; display:flex; gap:0; }
+.md-ni { padding:8px 12px; font-size:7.5pt; color:rgba(255,255,255,0.3); border-bottom:2px solid transparent; }
+.md-ni.a { color:#C49A3C; border-bottom-color:#C49A3C; }
+.md-body { padding:14px; }
+.md-kpis { display:flex; gap:8px; margin-bottom:12px; }
+.md-k { flex:1; background:rgba(255,255,255,0.04); border-radius:7px; padding:9px 10px; border:1px solid rgba(255,255,255,0.06); }
+.md-k-lbl { font-size:6pt; color:rgba(255,255,255,0.3); text-transform:uppercase; letter-spacing:0.8px; margin-bottom:3px; }
+.md-k-val { font-size:16pt; font-weight:800; line-height:1; }
+.md-k-val.g { color:#16A34A; }
+.md-k-val.a { color:#C49A3C; }
+.md-k-val.r { color:#EF4444; }
+.md-k-sub { font-size:6pt; color:rgba(255,255,255,0.25); margin-top:2px; }
+
+.md-row { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
+.md-row:last-child { border:none; }
+.md-icon { font-size:14pt; width:28px; text-align:center; flex-shrink:0; }
+.md-info { flex:1; }
+.md-name { font-size:8pt; font-weight:600; color:rgba(255,255,255,0.85); margin-bottom:1px; }
+.md-detail { font-size:6.5pt; color:rgba(255,255,255,0.3); }
+.md-badge { font-size:6.5pt; font-weight:700; padding:2px 7px; border-radius:8px; }
+.md-badge.ok { background:#DCFCE7; color:#15803D; }
+.md-badge.w { background:#FEF3C7; color:#B45309; }
+
+/* Progress bars animation */
+.md-pb { height:3px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden; width:50px; margin-top:3px; }
+.md-pbf { height:100%; border-radius:4px; width:0; transition:width 1.5s 0.8s ease; }
+.md-pbf.g { background:#16A34A; }
+.md-pbf.a { background:#C49A3C; }
+
+/* Count-up for KPIs */
+.md-k-val[data-target] { transition:all 0.1s; }
+
+/* Right features */
+.s4-features { opacity:0; animation:slideLeft 0.6s 0.5s forwards; }
+.feat-item {
+  display:flex; gap:16px; align-items:flex-start;
+  margin-bottom:24px; opacity:0;
+}
+.feat-item:nth-child(1) { animation:slideLeft 0.4s 0.6s forwards; }
+.feat-item:nth-child(2) { animation:slideLeft 0.4s 0.9s forwards; }
+.feat-item:nth-child(3) { animation:slideLeft 0.4s 1.2s forwards; }
+.feat-item:nth-child(4) { animation:slideLeft 0.4s 1.5s forwards; }
+.feat-icon {
+  width:44px; height:44px; border-radius:11px;
+  background:rgba(196,154,60,0.12); border:1px solid rgba(196,154,60,0.25);
+  display:flex; align-items:center; justify-content:center;
+  font-size:18pt; flex-shrink:0;
+}
+.feat-title { font-size:12pt; font-weight:700; color:#fff; margin-bottom:3px; }
+.feat-desc { font-size:9pt; color:rgba(255,255,255,0.4); line-height:1.4; }
+
+/* ===== SCENE 5 — CTA / LOGO ===== */
+#s5 { background:#1C1917; }
+#s5 .amber-rays {
+  position:absolute; inset:0;
+  background:conic-gradient(from 0deg at 50% 50%, transparent 0deg, rgba(196,154,60,0.03) 30deg, transparent 60deg);
+  animation:rotate-rays 8s linear infinite;
+}
+@keyframes rotate-rays {
+  to { transform:rotate(360deg); }
+}
+#s5 .center-glow {
+  position:absolute;
+  width:400px; height:400px;
+  background:radial-gradient(circle, rgba(196,154,60,0.12) 0%, transparent 70%);
+}
+
+.s5-content { text-align:center; z-index:2; }
+.s5-logo {
+  font-size:72pt; font-weight:900; line-height:1;
+  color:#C49A3C; margin-bottom:8px;
+  opacity:0; animation:logoReveal 0.8s 0.2s cubic-bezier(0.34,1.3,0.64,1) forwards;
+  letter-spacing:-2px;
+}
+.s5-logo span { color:#fff; }
+@keyframes logoReveal {
+  from { opacity:0; transform:scale(0.7) translateY(20px); filter:blur(10px); }
+  to { opacity:1; transform:scale(1) translateY(0); filter:blur(0); }
+}
+.s5-tagline {
+  font-size:14pt; color:rgba(255,255,255,0.45); letter-spacing:3px; text-transform:uppercase;
+  margin-bottom:36px;
+  opacity:0; animation:fadeIn 0.5s 0.9s forwards;
+}
+.s5-divider {
+  width:60px; height:2px; background:#C49A3C;
+  margin:0 auto 32px;
+  opacity:0; animation:lineGrow 0.5s 0.8s forwards;
+  transform-origin:center;
+}
+@keyframes lineGrow {
+  from { opacity:0; width:0; }
+  to { opacity:1; width:60px; }
+}
+.s5-clients {
+  display:flex; gap:32px; align-items:center; justify-content:center;
+  margin-bottom:36px;
+  opacity:0; animation:fadeIn 0.5s 1.2s forwards;
+}
+.s5-client { font-size:11pt; color:rgba(255,255,255,0.3); font-weight:600; letter-spacing:1px; }
+.s5-client-dot { color:rgba(196,154,60,0.4); font-size:8pt; }
+.s5-url {
+  font-size:13pt; color:#C49A3C; font-weight:700;
+  background:rgba(196,154,60,0.1); border:1px solid rgba(196,154,60,0.3);
+  padding:10px 28px; border-radius:6px;
+  opacity:0; animation:fadeIn 0.5s 1.5s forwards;
+  letter-spacing:0.5px;
+}
+
+/* ===== SHARED ANIMATIONS ===== */
+@keyframes slideUp {
+  from { opacity:0; transform:translateY(30px); }
+  to { opacity:1; transform:translateY(0); }
+}
+@keyframes fadeIn {
+  to { opacity:1; }
+}
+@keyframes fadeScale {
+  from { opacity:0; transform:scale(0.8) translateY(20px); }
+  to { opacity:1; transform:scale(1) translateY(0); }
+}
+
+/* ===== PROGRESS BAR ===== */
+#progress-bar {
+  position:absolute; bottom:0; left:0; height:3px;
+  background:linear-gradient(90deg, #C49A3C, #F0E4C0);
+  width:0; transition:width linear;
+  z-index:100;
+}
+
+/* ===== CONTROLS ===== */
+#controls {
+  position:absolute; bottom:16px; right:20px;
+  display:flex; gap:10px; z-index:200;
+}
+.ctrl-btn {
+  background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
+  color:rgba(255,255,255,0.6); font-size:9pt; padding:6px 14px;
+  border-radius:5px; cursor:pointer; font-family:inherit;
+  transition:all 0.2s;
+}
+.ctrl-btn:hover { background:rgba(196,154,60,0.2); color:#C49A3C; border-color:rgba(196,154,60,0.4); }
+
+/* ===== SCENE INDICATOR ===== */
+#scene-indicator {
+  position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
+  display:flex; gap:7px; z-index:200;
+}
+.s-dot { width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,0.15); transition:all 0.3s; }
+.s-dot.active { background:#C49A3C; width:20px; border-radius:3px; }
+
+/* ===== TIMER DISPLAY ===== */
+#timer {
+  position:absolute; top:16px; right:20px;
+  font-size:9pt; color:rgba(255,255,255,0.25);
+  font-family:monospace; z-index:200;
+  letter-spacing:1px;
+}
+</style>
+</head>
+<body>
+<div id="canvas">
+  <div class="grain"></div>
+  <div id="progress-bar"></div>
+  <div id="timer">0:00 / 0:30</div>
+
+  <!-- ===== SCENE 1 — ACCROCHE PROBLÈME (0-6s) ===== -->
+  <div class="scene" id="s1">
+    <div class="bg-grid"></div>
+    <div class="red-vignette"></div>
+    <div class="alarm-ring"></div>
+    <div class="alarm-ring"></div>
+    <div class="alarm-ring"></div>
+    <div class="alarm-icon">⚡</div>
+    <div class="s1-text">
+      <div class="s1-line1">Vos équipements<br>tombent en <span class="red">panne.</span></div>
+      <div class="s1-line2">Sans prévenir.&nbsp;&nbsp;Sans historique.&nbsp;&nbsp;Toujours en urgence.</div>
+    </div>
+  </div>
+
+  <!-- ===== SCENE 2 — STATS DOULEUR (6-12s) ===== -->
+  <div class="scene" id="s2">
+    <div class="s2-bg"></div>
+    <div class="s2-grid">
+      <div class="s2-stat">
+        <div class="s2-num" id="cnt1">70%</div>
+        <div class="s2-label"><strong>des interventions</strong>faites en urgence,<br>pas en préventif</div>
+      </div>
+      <div class="s2-stat">
+        <div class="s2-num" id="cnt2">0</div>
+        <div class="s2-label"><strong>historique</strong>aucune traçabilité,<br>les prestataires arrivent à l'aveugle</div>
+      </div>
+      <div class="s2-stat">
+        <div class="s2-num" id="cnt3">8M</div>
+        <div class="s2-label"><strong>XOF/an perdus</strong>en surcoûts d'urgence<br>et gaspillages énergie</div>
+      </div>
+    </div>
+    <div class="s2-bottom">Il existe une meilleure façon de piloter votre hôtel.</div>
+  </div>
+
+  <!-- ===== SCENE 3 — SOLUTION WHATSAPP (12-20s) ===== -->
+  <div class="scene" id="s3">
+    <div class="amber-glow"></div>
+    <div class="s3-content">
+      <!-- Phone -->
+      <div class="phone-3d">
+        <div class="ph-notch"><div class="ph-dot"></div></div>
+        <div class="ph-hdr">
+          <div class="ph-av">🤖</div>
+          <div class="ph-info">
+            <div class="ph-nm">GenTrack Bot</div>
+            <div class="ph-st">Ronde journalière</div>
+          </div>
+        </div>
+        <div class="ph-body">
+          <div class="ph-sep"><span>Aujourd'hui 06:30</span></div>
+          <div class="ph-msg in">
+            <div class="ph-bot">
+              <div class="bn">GenTrack</div>
+              Bonjour ! Ronde du <strong>jeudi 9 oct.</strong><br>
+              Quel équipement ?
+              <div class="ph-choice">1 — Groupe Electrogène</div>
+              <div class="ph-choice">2 — Piscine</div>
+            </div>
+          </div>
+          <div class="ph-msg out">
+            <div class="ph-b">1<div class="meta">06:31 ✓✓</div></div>
+          </div>
+          <div class="ph-msg in">
+            <div class="ph-bot">
+              <div class="bn">GenTrack</div>
+              <strong>GE 320 KVA</strong> — Niveau gasoil ?
+              <div class="ph-choice">1 — Plein · 2 — Moyen · 3 — Bas</div>
+            </div>
+          </div>
+          <div class="ph-msg out">
+            <div class="ph-b">2 — 55%<div class="meta">06:32 ✓✓</div></div>
+          </div>
+          <div class="ph-msg in">
+            <div class="ph-bot">
+              <div class="bn">GenTrack</div>
+              <span style="color:#25D366;font-weight:700;">✓ GE enregistré.</span><br>
+              Vous recevrez une alerte si le niveau passe sous 30%.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right text -->
+      <div class="s3-right">
+        <div class="s3-tag">La solution</div>
+        <div class="s3-title">La ronde<br>technique sur<br><span class="amber">WhatsApp</span></div>
+        <div class="s3-divider"></div>
+        <div class="s3-sub">Vos équipements suivis en temps réel. Sans application. Sans formation. Depuis n'importe quel téléphone.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCENE 4 — DASHBOARD + FEATURES (20-27s) ===== -->
+  <div class="scene" id="s4">
+    <div class="green-glow"></div>
+    <div class="s4-layout">
+      <!-- Mini dashboard -->
+      <div class="mini-dash">
+        <div class="md-top">
+          <div class="md-logo">GenTrack</div>
+          <div class="md-status"><span class="md-dot"></span>En direct</div>
+        </div>
+        <div class="md-nav">
+          <div class="md-ni a">Équipements</div>
+          <div class="md-ni">Énergie</div>
+          <div class="md-ni">Rapports</div>
+        </div>
+        <div class="md-body">
+          <div class="md-kpis">
+            <div class="md-k"><div class="md-k-lbl">Conformité</div><div class="md-k-val g" id="kpi1">0%</div></div>
+            <div class="md-k"><div class="md-k-lbl">MTTR moyen</div><div class="md-k-val a">6.2j</div></div>
+            <div class="md-k"><div class="md-k-lbl">Tickets</div><div class="md-k-val r" id="kpi2">0</div></div>
+          </div>
+          <div class="md-row">
+            <div class="md-icon">⚡</div>
+            <div class="md-info">
+              <div class="md-name">Groupe Électrogène</div>
+              <div class="md-detail">Ronde · auj. 06:45 · 226h avant vidange</div>
+              <div class="md-pb"><div class="md-pbf g" id="pb1" style="width:0"></div></div>
+            </div>
+            <div class="md-badge ok">OK</div>
+          </div>
+          <div class="md-row">
+            <div class="md-icon">🌊</div>
+            <div class="md-info">
+              <div class="md-name">Piscine</div>
+              <div class="md-detail">Filtre — alerte signalée hier</div>
+              <div class="md-pb"><div class="md-pbf a" id="pb2" style="width:0"></div></div>
+            </div>
+            <div class="md-badge w">Attention</div>
+          </div>
+          <div class="md-row">
+            <div class="md-icon">💧</div>
+            <div class="md-info">
+              <div class="md-name">Réservoir eau</div>
+              <div class="md-detail">Niveau 78% · 12j d'autonomie</div>
+              <div class="md-pb"><div class="md-pbf g" id="pb3" style="width:0"></div></div>
+            </div>
+            <div class="md-badge ok">OK</div>
+          </div>
+          <div class="md-row">
+            <div class="md-icon">❄️</div>
+            <div class="md-info">
+              <div class="md-name">Chambre froide</div>
+              <div class="md-detail">Temp. 4°C · dans les normes</div>
+              <div class="md-pb"><div class="md-pbf g" id="pb4" style="width:0"></div></div>
+            </div>
+            <div class="md-badge ok">OK</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Features -->
+      <div class="s4-features">
+        <div class="feat-item">
+          <div class="feat-icon">📱</div>
+          <div>
+            <div class="feat-title">Rondes sur WhatsApp</div>
+            <div class="feat-desc">Zéro application. Vos techniciens utilisent leur téléphone habituel.</div>
+          </div>
+        </div>
+        <div class="feat-item">
+          <div class="feat-icon">📊</div>
+          <div>
+            <div class="feat-title">Dashboard temps réel</div>
+            <div class="feat-desc">Tous vos équipements visibles en un coup d'oeil, 24h/24.</div>
+          </div>
+        </div>
+        <div class="feat-item">
+          <div class="feat-icon">⚡</div>
+          <div>
+            <div class="feat-title">Énergie & budget</div>
+            <div class="feat-desc">Relevés automatiques + alertes si vous dépassez votre budget.</div>
+          </div>
+        </div>
+        <div class="feat-item">
+          <div class="feat-icon">📄</div>
+          <div>
+            <div class="feat-title">Rapport mensuel PDF</div>
+            <div class="feat-desc">Prêt pour la direction chaque fin de mois, automatiquement.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCENE 5 — LOGO CTA (27-30s) ===== -->
+  <div class="scene" id="s5">
+    <div class="amber-rays"></div>
+    <div class="center-glow"></div>
+    <div class="s5-content">
+      <div class="s5-logo">Gen<span>Track</span></div>
+      <div class="s5-tagline">Maintenance intelligente des hôtels</div>
+      <div class="s5-divider"></div>
+      <div class="s5-clients">
+        <div class="s5-client">Azalaï</div>
+        <div class="s5-client-dot">●</div>
+        <div class="s5-client">Pullman</div>
+        <div class="s5-client-dot">●</div>
+        <div class="s5-client">Noum</div>
+        <div class="s5-client-dot">●</div>
+        <div class="s5-client">King Fahd Palace</div>
+      </div>
+      <div class="s5-url">gen-track.vercel.app/onboarding.html</div>
+    </div>
+  </div>
+
+  <!-- Scene indicator dots -->
+  <div id="scene-indicator">
+    <div class="s-dot active" id="dot0"></div>
+    <div class="s-dot" id="dot1"></div>
+    <div class="s-dot" id="dot2"></div>
+    <div class="s-dot" id="dot3"></div>
+    <div class="s-dot" id="dot4"></div>
+  </div>
+
+  <!-- Controls -->
+  <div id="controls">
+    <button class="ctrl-btn" id="btn-replay">↺ Rejouer</button>
+    <button class="ctrl-btn" id="btn-pause">⏸ Pause</button>
+  </div>
+</div>
+
+<script>
+// ===== SCENE TIMING (seconds) =====
+const scenes = [
+  { id:'s1', start:0,  end:6  },
+  { id:'s2', start:6,  end:12 },
+  { id:'s3', start:12, end:20 },
+  { id:'s4', start:20, end:27 },
+  { id:'s5', start:27, end:32 },
+];
+const TOTAL = 32;
+
+let startTime = null;
+let elapsed = 0;
+let paused = false;
+let pauseAt = 0;
+let raf = null;
+let currentScene = -1;
+let s4Triggered = false;
+
+function resetScenes() {
+  scenes.forEach(sc => {
+    const el = document.getElementById(sc.id);
+    el.className = 'scene';
+    // re-trigger animations by cloning
+    const clone = el.cloneNode(true);
+    el.parentNode.replaceChild(clone, el);
+  });
+  s4Triggered = false;
+  currentScene = -1;
+  document.querySelectorAll('.s-dot').forEach(d => d.classList.remove('active'));
+}
+
+function showScene(idx) {
+  if (idx === currentScene) return;
+  // Hide previous
+  scenes.forEach((sc, i) => {
+    const el = document.getElementById(sc.id);
+    if (el) {
+      el.classList.remove('active');
+    }
+  });
+  // Show current
+  const el = document.getElementById(scenes[idx].id);
+  if (el) el.classList.add('active');
+  // Update dots
+  document.querySelectorAll('.s-dot').forEach((d, i) => {
+    d.classList.toggle('active', i === idx);
+  });
+  currentScene = idx;
+
+  // Scene-specific JS triggers
+  if (idx === 3) triggerS4();
+}
+
+function triggerS4() {
+  if (s4Triggered) return;
+  s4Triggered = true;
+  // Animate KPI counters
+  animateCount('kpi1', 0, 94, '%', 1200);
+  animateCount('kpi2', 0, 3, '', 800);
+  // Animate progress bars
+  setTimeout(() => {
+    setBar('pb1', '90%');
+    setBar('pb2', '45%');
+    setBar('pb3', '78%');
+    setBar('pb4', '92%');
+  }, 800);
+}
+
+function animateCount(id, from, to, suffix, duration) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const start = performance.now();
+  function step(now) {
+    const p = Math.min((now - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(from + (to - from) * ease) + suffix;
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function setBar(id, width) {
+  const el = document.getElementById(id);
+  if (el) el.style.width = width;
+}
+
+function formatTime(s) {
+  const sec = Math.floor(s);
+  return '0:' + String(sec).padStart(2,'0');
+}
+
+function tick(ts) {
+  if (paused) return;
+  if (!startTime) startTime = ts;
+  elapsed = (ts - startTime) / 1000;
+
+  // Clamp
+  const t = Math.min(elapsed, TOTAL);
+
+  // Progress bar
+  const bar = document.getElementById('progress-bar');
+  bar.style.width = (t / TOTAL * 100) + '%';
+  bar.style.transition = 'width 0.1s linear';
+
+  // Timer
+  document.getElementById('timer').textContent = formatTime(t) + ' / ' + formatTime(TOTAL);
+
+  // Find active scene
+  for (let i = 0; i < scenes.length; i++) {
+    if (t >= scenes[i].start && t < scenes[i].end) {
+      showScene(i);
+      break;
+    }
+  }
+
+  if (elapsed < TOTAL + 2) {
+    raf = requestAnimationFrame(tick);
+  }
+}
+
+function start() {
+  cancelAnimationFrame(raf);
+  resetScenes();
+  // Wait a frame for DOM reset
+  requestAnimationFrame(() => {
+    startTime = null;
+    elapsed = 0;
+    paused = false;
+    raf = requestAnimationFrame(tick);
+  });
+}
+
+function togglePause() {
+  if (paused) {
+    // Resume
+    paused = false;
+    startTime = performance.now() - elapsed * 1000;
+    raf = requestAnimationFrame(tick);
+    document.getElementById('btn-pause').textContent = '⏸ Pause';
+  } else {
+    // Pause
+    paused = true;
+    cancelAnimationFrame(raf);
+    document.getElementById('btn-pause').textContent = '▶ Reprendre';
+  }
+}
+
+document.getElementById('btn-replay').addEventListener('click', start);
+document.getElementById('btn-pause').addEventListener('click', togglePause);
+
+// Auto-start
+start();
+</script>
+</body>
+</html>

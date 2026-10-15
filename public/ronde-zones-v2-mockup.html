@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>GenTrack · Ronde de zones V2</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --dark:#12151E;--dark2:#1E2332;
+  --text:#1A1D28;--text2:#5A5F78;--text3:#9AA0B8;
+  --border:#E4E6EF;--bg:#F4F5FA;--white:#fff;
+  --amber:#E8A020;--amber-pale:#FFF6E0;--amber-dark:#B87A10;
+  --vert:#1B7A4A;--vert-pale:#E8F7EE;--vert-border:#A8DEC0;--vert-text:#155F39;
+  --rouge:#C0392B;--rouge-pale:#FDF0EE;--rouge-border:#F0B8B2;--rouge-text:#9B2D22;
+  --orange:#D46B0A;--orange-pale:#FEF3E5;--orange-border:#F5C87A;
+}
+html,body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text);max-width:390px;margin:0 auto}
+
+/* ── HEADER ── */
+.header{background:linear-gradient(145deg,var(--dark),var(--dark2));padding:18px 18px 0;position:sticky;top:0;z-index:50;box-shadow:0 2px 20px rgba(0,0,0,.3)}
+.hdr-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.logo{font-size:10px;font-weight:800;letter-spacing:.2em;color:var(--amber)}
+.badge{background:rgba(232,160,32,.15);border:1px solid rgba(232,160,32,.3);border-radius:20px;padding:4px 12px;font-size:13px;font-weight:800;color:var(--amber)}
+.hdr-title{font-size:19px;font-weight:800;color:#fff;margin-bottom:3px}
+.hdr-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.hdr-site{font-size:13px;color:rgba(255,255,255,.5)}
+.hdr-tech{font-size:12px;color:rgba(255,255,255,.5);background:rgba(255,255,255,.08);border-radius:20px;padding:3px 10px}
+.prog-wrap{height:5px;background:rgba(255,255,255,.12);border-radius:3px;overflow:hidden;margin-bottom:4px}
+.prog-bar{height:100%;width:27%;background:linear-gradient(90deg,var(--amber),#F5C040);border-radius:3px}
+.prog-labels{display:flex;justify-content:space-between;margin-bottom:0}
+.prog-lbl{font-size:10px;color:rgba(255,255,255,.4)}
+.prog-lbl.on{color:rgba(255,255,255,.75);font-weight:700}
+
+/* ── FLOOR TABS ── */
+.floor-tabs{background:var(--dark2);display:flex;overflow-x:auto;gap:0;padding:10px 14px 0;scrollbar-width:none;border-top:1px solid rgba(255,255,255,.06)}
+.floor-tabs::-webkit-scrollbar{display:none}
+.ftab{flex-shrink:0;min-width:44px;padding:8px 14px;font-size:13px;font-weight:700;color:rgba(255,255,255,.4);cursor:pointer;border-bottom:3px solid transparent;text-align:center;transition:all .15s}
+.ftab.active{color:#fff;border-bottom-color:var(--amber)}
+.ftab .ftab-done{display:block;font-size:8px;font-weight:700;color:rgba(255,255,255,.25);letter-spacing:.02em;margin-top:1px}
+.ftab.active .ftab-done{color:rgba(232,160,32,.6)}
+.ftab.all-done{color:rgba(100,255,150,.5)}
+.ftab.all-done.active{color:#4ADE80;border-bottom-color:#4ADE80}
+
+/* ── CONTENT ── */
+.content{padding:14px 14px 110px}
+
+/* ── ZONE CARD ── */
+.zone-card{display:flex;align-items:center;background:var(--white);border:1.5px solid var(--border);border-radius:12px;margin-bottom:8px;overflow:hidden;cursor:pointer;position:relative;transition:border-color .1s}
+.zone-card:active{opacity:.85}
+.zone-card.ok{border-color:var(--vert-border)}
+.zone-card.incident{border-color:var(--rouge-border)}
+.zone-card.focus{box-shadow:0 0 0 2.5px #2B5BA8;border-color:#2B5BA8}
+.zc-bar{width:4px;align-self:stretch;flex-shrink:0}
+.zc-icon{width:40px;height:40px;margin:10px 8px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.zc-body{flex:1;padding:12px 0}
+.zc-name{font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.01em}
+.zone-card.ok .zc-name{color:var(--vert-text)}
+.zone-card.incident .zc-name{color:var(--rouge-text)}
+.zc-meta{font-size:11px;color:var(--text3);margin-top:2px}
+.zc-right{padding:12px 14px;text-align:right;flex-shrink:0}
+.zc-chip{display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;line-height:1.3;margin-bottom:3px}
+.chip-ok{background:var(--vert-pale);color:var(--vert-text);border:1px solid var(--vert-border)}
+.chip-late{background:var(--rouge-pale);color:var(--rouge-text);border:1px solid var(--rouge-border)}
+.chip-warn{background:var(--orange-pale);color:var(--orange);border:1px solid var(--orange-border)}
+.chip-never{background:var(--bg);color:var(--text3);border:1px solid var(--border)}
+.chip-done{background:var(--vert);color:#fff;border:1px solid var(--vert)}
+.chip-inc{background:var(--rouge);color:#fff;border:1px solid var(--rouge)}
+.zc-last{font-size:10px;color:var(--text3)}
+.alert-dot{position:absolute;top:8px;right:8px;width:8px;height:8px;border-radius:50%;background:var(--rouge);border:1.5px solid white}
+
+/* ── SECTION HEADER ── */
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;padding:4px 2px 8px}
+.sec-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--text3)}
+.sec-right{display:flex;align-items:center;gap:8px}
+.sec-count{font-size:11px;font-weight:700;color:var(--text2)}
+.btn-tout-ok{padding:5px 12px;border-radius:8px;background:var(--vert-pale);border:1px solid var(--vert-border);color:var(--vert-text);font-size:12px;font-weight:700;cursor:pointer}
+.btn-tout-ok:active{background:var(--vert);color:#fff}
+
+/* ── FOOTER ── */
+.footer{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:390px;background:var(--white);border-top:1.5px solid var(--border);padding:12px 16px 20px;box-shadow:0 -4px 20px rgba(18,21,30,.1)}
+.footer-info{font-size:12px;color:var(--text2);text-align:center;margin-bottom:9px;font-weight:500}
+.btn-valider{width:100%;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--vert),#24A060);border:none;color:#fff;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 4px 20px rgba(27,122,74,.3);letter-spacing:-.01em}
+.btn-valider:active{transform:scale(.98)}
+
+/* ── PANEL ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:60;opacity:0;pointer-events:none;transition:opacity .25s}
+.overlay.show{opacity:1;pointer-events:auto}
+.panel{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);width:100%;max-width:390px;background:var(--white);border-radius:20px 20px 0 0;z-index:70;transition:transform .3s cubic-bezier(.4,0,.2,1);max-height:85vh;display:flex;flex-direction:column}
+.panel.open{transform:translateX(-50%) translateY(0)}
+.panel-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 0;flex-shrink:0}
+.panel-head{padding:14px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0;position:relative}
+.panel-close{position:absolute;top:12px;right:14px;width:28px;height:28px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px;color:var(--text2);border:1px solid var(--border)}
+.panel-nom{font-size:20px;font-weight:800;color:var(--text)}
+.panel-sub{font-size:12px;color:var(--text2);margin-top:2px}
+.panel-body{overflow-y:auto;padding:14px 16px 0;flex:1}
+.sec-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px}
+.lv-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;background:var(--bg);border:1px solid var(--border);margin-bottom:14px}
+.lv-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.lv-text{font-size:13px;font-weight:600;color:var(--text)}
+.lv-sub{font-size:11px;color:var(--text2);margin-top:1px}
+.status-btns{display:flex;gap:8px;margin-bottom:14px}
+.status-btn{flex:1;height:52px;border-radius:12px;border:1.5px solid var(--border);background:var(--white);font-size:15px;font-weight:700;cursor:pointer;color:var(--text2)}
+.status-btn.ok-on{background:var(--vert-pale);border-color:var(--vert-border);color:var(--vert-text)}
+.status-btn.inc-on{background:var(--rouge-pale);border-color:var(--rouge-border);color:var(--rouge-text)}
+.panel-foot{padding:12px 16px 20px;border-top:1px solid var(--border);flex-shrink:0}
+.btn-confirm{width:100%;height:50px;border-radius:13px;border:none;font-size:16px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--vert),#24A060);color:#fff;box-shadow:0 3px 14px rgba(27,122,74,.3)}
+.btn-confirm.inc{background:linear-gradient(135deg,var(--rouge),#E05040);box-shadow:0 3px 14px rgba(192,57,43,.3)}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="hdr-top">
+    <div class="logo">GENTRACK ✦</div>
+    <div class="badge" id="badge">27%</div>
+  </div>
+  <div class="hdr-title">🏠 Ronde de zones</div>
+  <div class="hdr-meta">
+    <div class="hdr-site">ATAF — Plateau</div>
+    <div class="hdr-tech">👤 Jean-Paul K.</div>
+  </div>
+  <div class="prog-labels">
+    <span class="prog-lbl on" id="prog-lbl">8 / 30 zones</span>
+    <span class="prog-lbl">27%</span>
+  </div>
+  <div class="prog-wrap" style="margin-bottom:10px">
+    <div class="prog-bar" id="prog-bar"></div>
+  </div>
+
+  <!-- FLOOR TABS -->
+  <div class="floor-tabs" id="floor-tabs">
+    <div class="ftab" onclick="setFloor('all',this)">Tous<span class="ftab-done">8/30</span></div>
+    <div class="ftab all-done active" onclick="setFloor(1,this)">1<span class="ftab-done">3/3 ✓</span></div>
+    <div class="ftab all-done" onclick="setFloor(2,this)">2<span class="ftab-done">3/3 ✓</span></div>
+    <div class="ftab" onclick="setFloor(3,this)">3<span class="ftab-done">2/3</span></div>
+    <div class="ftab" onclick="setFloor(4,this)">4<span class="ftab-done">0/3</span></div>
+    <div class="ftab" onclick="setFloor(5,this)">5<span class="ftab-done">0/3</span></div>
+    <div class="ftab" onclick="setFloor(6,this)">6<span class="ftab-done">0/3</span></div>
+    <div class="ftab" onclick="setFloor(7,this)">7<span class="ftab-done">0/3</span></div>
+    <div class="ftab" onclick="setFloor(8,this)">8<span class="ftab-done">0/3</span></div>
+    <div class="ftab" onclick="setFloor(9,this)">9<span class="ftab-done">0/3</span></div>
+    <div class="ftab" onclick="setFloor(10,this)">10<span class="ftab-done">0/3</span></div>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content" id="content">
+
+  <div class="sec-hdr">
+    <span class="sec-title">Étage 1 — Tour A</span>
+    <div class="sec-right">
+      <span class="sec-count" style="color:var(--vert)">3/3 ✓</span>
+    </div>
+  </div>
+
+  <!-- Zone validée OK -->
+  <div class="zone-card ok" onclick="openPanel('0101')">
+    <div class="zc-bar" style="background:var(--vert)"></div>
+    <div class="zc-icon" style="background:var(--vert-pale)">🛏️</div>
+    <div class="zc-body">
+      <div class="zc-name">Appt 0101</div>
+      <div class="zc-meta">Tour A · Étage 1</div>
+    </div>
+    <div class="zc-right">
+      <div class="zc-chip chip-done">✅ OK</div>
+      <div class="zc-last">Validé ce matin</div>
+    </div>
+  </div>
+
+  <div class="zone-card ok" onclick="openPanel('0102')">
+    <div class="zc-bar" style="background:var(--vert)"></div>
+    <div class="zc-icon" style="background:var(--vert-pale)">🛏️</div>
+    <div class="zc-body">
+      <div class="zc-name">Appt 0102</div>
+      <div class="zc-meta">Tour A · Étage 1</div>
+    </div>
+    <div class="zc-right">
+      <div class="zc-chip chip-done">✅ OK</div>
+      <div class="zc-last">Validé ce matin</div>
+    </div>
+  </div>
+
+  <div class="zone-card ok" onclick="openPanel('0103')">
+    <div class="zc-bar" style="background:var(--vert)"></div>
+    <div class="zc-icon" style="background:var(--vert-pale)">🛏️</div>
+    <div class="zc-body">
+      <div class="zc-name">Appt 0103</div>
+      <div class="zc-meta">Tour A · Étage 1</div>
+    </div>
+    <div class="zc-right">
+      <div class="zc-chip chip-done">✅ OK</div>
+      <div class="zc-last">Validé ce matin</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-info" id="footer-info">8 / 30 zones contrôlées</div>
+  <button class="btn-valider">Valider la ronde →</button>
+</div>
+
+<!-- PANEL -->
+<div class="overlay" id="overlay" onclick="closePanel()"></div>
+<div class="panel" id="panel">
+  <div class="panel-handle"></div>
+  <div class="panel-close" onclick="closePanel()">✕</div>
+  <div class="panel-head">
+    <div class="panel-nom" id="panel-nom">Appt 0302</div>
+    <div class="panel-sub" id="panel-sub">Tour A · Étage 3</div>
+  </div>
+  <div class="panel-body">
+    <div class="sec-label">Dernière visite</div>
+    <div class="lv-row">
+      <div class="lv-dot" style="background:#C0392B"></div>
+      <div>
+        <div class="lv-text">En retard de 5j</div>
+        <div class="lv-sub">Dernier passage il y a 35 jours</div>
+      </div>
+    </div>
+    <div class="sec-label">Statut</div>
+    <div class="status-btns">
+      <button class="status-btn ok-on" id="btn-ok" onclick="setStatus('ok')">✅ Zone OK</button>
+      <button class="status-btn" id="btn-inc" onclick="setStatus('incident')">⚠️ Incident</button>
+    </div>
+  </div>
+  <div class="panel-foot">
+    <button class="btn-confirm" id="btn-confirm" onclick="closePanel()">✅ Confirmer — Zone OK</button>
+  </div>
+</div>
+
+<script>
+var _floor=1;
+var _status='ok';
+
+function setFloor(f,el){
+  _floor=f;
+  document.querySelectorAll('.ftab').forEach(function(t){t.classList.remove('active')});
+  if(el)el.classList.add('active');
+
+  // Rebuild content based on floor
+  var content=document.getElementById('content');
+
+  if(f==='all'){
+    content.innerHTML=`
+      <div style="text-align:center;padding:30px 20px;color:var(--text3)">
+        <div style="font-size:32px;margin-bottom:10px">🏢</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">Vue globale</div>
+        <div style="font-size:13px">Sélectionnez un étage<br>pour voir ses zones</div>
+      </div>
+    `;
+    return;
+  }
+
+  if(f<=2){
+    // étages validés
+    var zones=['0'+f+'01','0'+f+'02','0'+f+'03'];
+    content.innerHTML='<div class="sec-hdr"><span class="sec-title">Étage '+f+' — Tour A</span><div class="sec-right"><span class="sec-count" style="color:var(--vert)">3/3 ✓</span></div></div>'+
+      zones.map(function(z){return `
+        <div class="zone-card ok" onclick="openPanel('${z}')">
+          <div class="zc-bar" style="background:var(--vert)"></div>
+          <div class="zc-icon" style="background:var(--vert-pale)">🛏️</div>
+          <div class="zc-body"><div class="zc-name">Appt ${z}</div><div class="zc-meta">Tour A · Étage ${f}</div></div>
+          <div class="zc-right"><div class="zc-chip chip-done">✅ OK</div><div class="zc-last">Validé ce matin</div></div>
+        </div>`;}).join('');
+  } else if(f===3){
+    // étage en cours
+    content.innerHTML=`
+      <div class="sec-hdr">
+        <span class="sec-title">Étage 3 — Tour A</span>
+        <div class="sec-right">
+          <span class="sec-count">2/3</span>
+          <button class="btn-tout-ok" onclick="markAllOk()">✓ Tout OK</button>
+        </div>
+      </div>
+      <div class="zone-card ok" onclick="openPanel('0301')">
+        <div class="zc-bar" style="background:var(--vert)"></div>
+        <div class="zc-icon" style="background:var(--vert-pale)">🛏️</div>
+        <div class="zc-body"><div class="zc-name">Appt 0301</div><div class="zc-meta">Tour A · Étage 3</div></div>
+        <div class="zc-right"><div class="zc-chip chip-done">✅ OK</div><div class="zc-last">Validé ce matin</div></div>
+      </div>
+      <div class="zone-card ok" onclick="openPanel('0302')">
+        <div class="zc-bar" style="background:var(--vert)"></div>
+        <div class="zc-icon" style="background:var(--vert-pale)">🛏️</div>
+        <div class="zc-body"><div class="zc-name">Appt 0302</div><div class="zc-meta">Tour A · Étage 3</div></div>
+        <div class="zc-right"><div class="zc-chip chip-done">✅ OK</div><div class="zc-last">Validé ce matin</div></div>
+      </div>
+      <div class="zone-card" id="card-0303" onclick="openPanel('0303')">
+        <div class="zc-bar" style="background:var(--rouge)"></div>
+        <div class="zc-icon" style="background:var(--rouge-pale)">🛏️</div>
+        <div class="zc-body"><div class="zc-name">Appt 0303</div><div class="zc-meta">Tour A · Étage 3</div></div>
+        <div class="zc-right"><div class="zc-chip chip-late">Retard 5j</div><div class="zc-last">Vu le 09 oct.</div></div>
+      </div>`;
+  } else {
+    // étages pas encore faits
+    var zns=['01','02','03'];
+    content.innerHTML='<div class="sec-hdr"><span class="sec-title">Étage '+f+' — Tour A</span><div class="sec-right"><span class="sec-count">0/3</span><button class="btn-tout-ok" onclick="markAllOk()">✓ Tout OK</button></div></div>'+
+      zns.map(function(n){
+        var zid='0'+f+n;
+        var chip=f<=5?'<div class="zc-chip chip-warn">Dans '+(f-3)+'j</div>':'<div class="zc-chip chip-never">Jamais</div>';
+        var last=f<=5?'<div class="zc-last">Vu le 09 oct.</div>':'<div class="zc-last">— premier passage</div>';
+        var barColor=f<=5?'var(--orange)':'var(--text3)';
+        var iconBg=f<=5?'var(--orange-pale)':'var(--bg)';
+        return `<div class="zone-card" onclick="openPanel('${zid}')">
+          <div class="zc-bar" style="background:${barColor}"></div>
+          <div class="zc-icon" style="background:${iconBg}">🛏️</div>
+          <div class="zc-body"><div class="zc-name">Appt ${zid}</div><div class="zc-meta">Tour A · Étage ${f}</div></div>
+          <div class="zc-right">${chip}${last}</div>
+        </div>`;}).join('');
+  }
+}
+
+function openPanel(zid){
+  document.getElementById('panel-nom').textContent='Appt '+zid;
+  document.getElementById('panel-sub').textContent='Tour A · Étage '+zid[1];
+  _status='ok';
+  document.getElementById('btn-ok').className='status-btn ok-on';
+  document.getElementById('btn-inc').className='status-btn';
+  document.getElementById('btn-confirm').className='btn-confirm';
+  document.getElementById('btn-confirm').textContent='✅ Confirmer — Zone OK';
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('panel').classList.add('open');
+}
+
+function closePanel(){
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('panel').classList.remove('open');
+}
+
+function setStatus(s){
+  _status=s;
+  document.getElementById('btn-ok').className='status-btn'+(s==='ok'?' ok-on':'');
+  document.getElementById('btn-inc').className='status-btn'+(s==='incident'?' inc-on':'');
+  var btn=document.getElementById('btn-confirm');
+  if(s==='ok'){btn.className='btn-confirm';btn.textContent='✅ Confirmer — Zone OK';}
+  else{btn.className='btn-confirm inc';btn.textContent='⚠️ Confirmer l\'incident';}
+}
+
+function markAllOk(){
+  document.querySelectorAll('.zone-card').forEach(function(c){
+    c.className='zone-card ok';
+    var chip=c.querySelector('.zc-chip');
+    var last=c.querySelector('.zc-last');
+    var bar=c.querySelector('.zc-bar');
+    var icon=c.querySelector('.zc-icon');
+    if(chip){chip.className='zc-chip chip-done';chip.textContent='✅ OK';}
+    if(last)last.textContent='Validé à l\'instant';
+    if(bar)bar.style.background='var(--vert)';
+    if(icon){icon.style.background='var(--vert-pale)';icon.textContent='🛏️';}
+  });
+}
+
+// Init floor 1 as active
+</script>
+</body>
+</html>

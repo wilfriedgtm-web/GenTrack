@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack × Groupe Accor Abidjan</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #F5F0E8;
+  color: #1C1917;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.page { max-width: 800px; margin: 0 auto; padding-bottom: 60px; }
+
+/* HEADER */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 52px;
+  border-bottom: 0.5px solid #E2DDD5;
+}
+.logo { font-size: 15px; font-weight: 900; color: #1C1917; }
+.logo span { color: #C49A3C; }
+.top-meta { font-size: 9px; color: #78716C; letter-spacing: .8px; text-align: right; line-height: 1.7; }
+
+/* COVER */
+.cover {
+  padding: 80px 52px 60px;
+  border-bottom: 0.5px solid #E2DDD5;
+}
+.eyebrow {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #C49A3C;
+  border-bottom: 2px solid #C49A3C;
+  padding-bottom: 2px;
+  margin-bottom: 18px;
+}
+.cover h1 { font-size: 52px; font-weight: 900; line-height: 1.05; color: #1C1917; margin-bottom: 20px; }
+.cover .sub { font-size: 11px; color: #78716C; line-height: 1.8; max-width: 480px; }
+.cover .sub strong { color: #1C1917; }
+
+/* SECTIONS */
+.section { padding: 32px 52px; border-bottom: 0.5px solid #E2DDD5; }
+.section-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #C49A3C;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.section-label::after { content: ''; flex: 1; height: 1px; background: #E2DDD5; }
+h2 { font-size: 34px; font-weight: 900; line-height: 1.1; color: #1C1917; margin-bottom: 12px; }
+h3 { font-size: 20px; font-weight: 800; color: #C49A3C; margin-bottom: 6px; }
+.lead { font-size: 11px; color: #78716C; line-height: 1.75; margin-bottom: 20px; }
+
+/* CARDS */
+.card { background: #FDFAF5; border: 0.5px solid #E2DDD5; border-radius: 6px; padding: 18px 20px; }
+.card-dark { background: #1C1917; border-radius: 6px; padding: 18px 20px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* COMPARISON TABLE */
+.comp-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.comp-table th { text-align: left; font-size: 10px; font-weight: 700; padding: 8px 12px; border-bottom: 1px solid #E2DDD5; }
+.comp-table th:last-child { color: #C49A3C; }
+.comp-table td { font-size: 9.5px; padding: 9px 12px; border-bottom: 0.3px solid #E2DDD5; color: #44403C; }
+.comp-table td:first-child { color: #78716C; }
+.comp-table td:last-child { color: #C49A3C; font-weight: 600; }
+.comp-table tr:last-child td { border-bottom: none; }
+.comp-table tr:nth-child(even) td { background: #F8F4EE; }
+
+/* TESTIMONIALS */
+.testimonial-main {
+  background: #1C1917;
+  border-radius: 8px;
+  padding: 22px 26px;
+  margin-bottom: 12px;
+}
+.t-name { font-size: 8.5px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #C49A3C; margin-bottom: 2px; }
+.t-role { font-size: 8px; color: #78716C; margin-bottom: 12px; }
+.t-quote { font-size: 11px; font-style: italic; color: #E9E5DF; line-height: 1.7; margin-bottom: 8px; }
+.testimonial-small { background: #FDFAF5; border: 0.5px solid #E2DDD5; border-radius: 6px; padding: 16px 18px; }
+.testimonial-small .t-name { color: #C49A3C; }
+.testimonial-small .t-quote { font-size: 10px; color: #44403C; }
+
+/* DASHBOARD MOCKUP */
+.dashboard {
+  background: #1C1917;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.dash-header {
+  padding: 10px 16px;
+  border-bottom: 1px solid #2D2520;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.dash-header span { font-size: 8px; font-weight: 700; letter-spacing: 1px; color: #C49A3C; }
+.dash-header time { font-size: 8px; color: #78716C; }
+.dash-hotels { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: #2D2520; }
+.dash-hotel { background: #1C1917; padding: 12px 14px; }
+.dash-hotel-name { font-size: 8.5px; font-weight: 700; color: white; margin-bottom: 8px; }
+.dash-kpi { display: flex; justify-content: space-between; font-size: 8px; margin-bottom: 4px; }
+.dash-kpi span:first-child { color: #78716C; }
+.dash-kpi .ok { color: #86EFAC; font-weight: 700; }
+.dash-kpi .warn { color: #FCA5A5; font-weight: 700; }
+.dash-kpi .neutral { color: #E9E5DF; font-weight: 600; }
+.dash-alert {
+  margin: 1px 0 0;
+  background: #2D1515;
+  border-top: 1px solid #7F1D1D;
+  padding: 10px 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 12px;
+}
+.dash-alert-label { font-size: 7px; color: #FCA5A5; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; grid-column: 1/-1; margin-bottom: 2px; }
+.dash-alert-item { }
+.dash-alert-item .k { font-size: 7px; color: #78716C; }
+.dash-alert-item .v { font-size: 14px; font-weight: 800; color: #FCA5A5; }
+.dash-alert-item .vw { font-size: 11px; font-weight: 700; color: #E9E5DF; }
+
+/* WA + RAPPORT */
+.wa-rapport { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.wa-box { background: #0B141A; border-radius: 6px; overflow: hidden; }
+.wa-box-header { background: #075E54; padding: 8px 12px; font-size: 8.5px; font-weight: 700; color: white; }
+.wa-messages { padding: 10px; display: flex; flex-direction: column; gap: 5px; }
+.wa-bot { align-self: flex-start; max-width: 90%; }
+.wa-bot-bubble { background: #202C33; border-radius: 0 6px 6px 6px; padding: 6px 10px; font-size: 8px; color: #E9EDEF; line-height: 1.5; }
+.wa-bot-bubble .tag { color: #C49A3C; font-weight: 700; font-size: 7.5px; margin-bottom: 2px; display: block; }
+.wa-user { align-self: flex-end; max-width: 70%; }
+.wa-user-bubble { background: #005C4B; border-radius: 6px 0 6px 6px; padding: 6px 10px; font-size: 8px; color: #E9EDEF; }
+.wa-alert-bubble { background: #3D1515; border: 1px solid #7F1D1D; border-radius: 0 6px 6px 6px; padding: 6px 10px; font-size: 7.5px; color: #FCA5A5; line-height: 1.5; }
+.rapport-box { background: white; border-radius: 6px; overflow: hidden; border: 0.5px solid #E2DDD5; }
+.rapport-header { background: #1C1917; padding: 10px 14px; }
+.rapport-header .rtag { font-size: 7px; font-weight: 700; color: #C49A3C; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 3px; }
+.rapport-header .rname { font-size: 10px; font-weight: 700; color: white; }
+.rapport-body { padding: 10px 14px; }
+.rapport-kpis { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 10px; }
+.rapport-kpi { text-align: center; background: #F5F0E8; border-radius: 4px; padding: 6px; }
+.rapport-kpi .rv { font-size: 14px; font-weight: 800; color: #166534; }
+.rapport-kpi .rl { font-size: 6.5px; color: #78716C; }
+.rapport-feat { font-size: 8px; color: #44403C; padding: 5px 0; border-bottom: 0.3px solid #E2DDD5; display: flex; gap: 6px; }
+.rapport-feat::before { content: '✓'; color: #C49A3C; font-weight: 700; flex-shrink: 0; }
+.rapport-feat:last-child { border-bottom: none; }
+
+/* DEPLOY */
+.deploy-steps { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.deploy-step { background: #FDFAF5; border: 0.5px solid #E2DDD5; border-radius: 6px; padding: 14px 16px; }
+.step-num { width: 24px; height: 24px; background: #C49A3C; border-radius: 50%; color: white; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+.deploy-step h4 { font-size: 10.5px; font-weight: 700; color: #1C1917; margin-bottom: 4px; }
+.deploy-step p { font-size: 9px; color: #78716C; line-height: 1.5; }
+.deploy-step .duration { font-size: 8.5px; font-weight: 700; color: #C49A3C; margin-top: 6px; }
+
+.timeline { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0; margin-bottom: 16px; position: relative; }
+.timeline::before { content: ''; position: absolute; top: 11px; left: 14%; right: 14%; height: 1px; background: #E2DDD5; }
+.tl-step { text-align: center; padding: 0 6px; }
+.tl-dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #E2DDD5; background: #F5F0E8; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; position: relative; z-index: 1; }
+.tl-dot.active { background: #C49A3C; border-color: #C49A3C; }
+.tl-label { font-size: 8px; font-weight: 700; color: #C49A3C; margin-bottom: 3px; }
+.tl-title { font-size: 8.5px; font-weight: 700; color: #1C1917; margin-bottom: 3px; }
+.tl-sub { font-size: 7.5px; color: #78716C; line-height: 1.4; }
+
+.deploy-note { background: #FDFAF5; border: 0.5px solid #E2DDD5; border-radius: 5px; padding: 12px 16px; font-size: 9.5px; color: #44403C; line-height: 1.6; }
+.deploy-note strong { color: #C49A3C; }
+
+/* PRICING */
+.pricing-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.plan { border-radius: 8px; overflow: hidden; border: 0.5px solid #E2DDD5; }
+.plan-head { padding: 16px 16px 12px; background: #FDFAF5; }
+.plan-head.featured { background: #1C1917; }
+.plan-head.recommended { background: #FDFAF5; border: 2px solid #C49A3C; border-bottom: none; border-radius: 8px 8px 0 0; }
+.plan-name { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #C49A3C; margin-bottom: 8px; }
+.plan-price { font-size: 26px; font-weight: 900; color: #1C1917; line-height: 1; }
+.plan-head.featured .plan-price { color: white; }
+.plan-unit { font-size: 8px; color: #78716C; margin-top: 3px; }
+.plan-annual { font-size: 8px; color: #A8A29E; margin-top: 2px; }
+.plan-badge { display: inline-block; background: #C49A3C; color: white; font-size: 7px; font-weight: 700; padding: 2px 8px; border-radius: 2px; letter-spacing: .8px; margin-top: 8px; }
+.plan-rec-badge { display: inline-block; background: #1C1917; color: #C49A3C; font-size: 7px; font-weight: 700; padding: 2px 8px; border-radius: 2px; letter-spacing: .8px; margin-top: 8px; border: 1px solid #C49A3C; }
+.plan-body { background: #FDFAF5; padding: 10px 14px; border-top: 0.5px solid #E2DDD5; }
+.plan-body.featured { background: #252117; border-top-color: #333; }
+.plan-body.recommended { background: #FDFAF5; border: 2px solid #C49A3C; border-top: 0.5px solid #E2DDD5; border-radius: 0 0 8px 8px; }
+.plan-feat { display: flex; gap: 7px; align-items: flex-start; padding: 5px 0; border-bottom: 0.3px solid #E2DDD5; font-size: 8.5px; color: #44403C; line-height: 1.4; }
+.plan-body.featured .plan-feat { color: #A8A29E; border-bottom-color: #2D2520; }
+.plan-feat:last-child { border-bottom: none; }
+.plan-feat::before { content: '✓'; color: #C49A3C; font-weight: 700; flex-shrink: 0; }
+.plan-feat.gray::before { content: '·'; color: #78716C; }
+.plan-feat.gray { color: #78716C; }
+
+.itis-note { background: #FBF3DC; border: 0.5px solid #C49A3C; border-radius: 5px; padding: 12px 16px; font-size: 9.5px; color: #44403C; line-height: 1.65; margin-bottom: 12px; }
+.itis-note strong { color: #C49A3C; }
+
+.roi-box { background: #FDFAF5; border: 0.5px solid #E2DDD5; border-radius: 5px; padding: 14px 16px; }
+.roi-label { font-size: 8px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #C49A3C; margin-bottom: 10px; }
+.roi-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 0.3px solid #E2DDD5; font-size: 9px; }
+.roi-row:last-child { border-bottom: none; }
+.roi-row .key { color: #44403C; }
+.roi-row .val { font-weight: 700; color: #1C1917; }
+
+/* VISION */
+.checklist { list-style: none; }
+.checklist li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 0.3px solid #E2DDD5; font-size: 10px; color: #44403C; }
+.checklist li:last-child { border-bottom: none; }
+.checklist li::before { content: '✓'; color: #C49A3C; font-weight: 700; flex-shrink: 0; }
+
+/* NEXT STEP */
+.next-box {
+  background: #1C1917;
+  border-radius: 6px;
+  padding: 20px 24px;
+}
+.next-box h4 { font-size: 13px; font-weight: 700; color: white; margin-bottom: 10px; }
+.next-box ul { list-style: none; }
+.next-box ul li { font-size: 9.5px; color: #A8A29E; padding: 5px 0; border-bottom: 0.3px solid #2D2520; display: flex; gap: 8px; }
+.next-box ul li:last-child { border-bottom: none; }
+.next-box ul li::before { content: '→'; color: #C49A3C; flex-shrink: 0; }
+
+/* FOOTER */
+.footer {
+  padding: 16px 52px;
+  border-top: 0.5px solid #E2DDD5;
+  display: flex;
+  justify-content: space-between;
+  font-size: 8.5px;
+  color: #78716C;
+  margin-top: 32px;
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="top-bar">
+    <div class="logo">GEN<span>TRACK</span></div>
+    <div class="top-meta">CONFIDENTIEL · OCTOBRE 2026</div>
+  </div>
+
+  <!-- COVER -->
+  <div class="cover">
+    <div class="eyebrow">Proposition Commerciale</div>
+    <h1>GenTrack<br>× Groupe<br>Accor Abidjan</h1>
+    <p class="sub">
+      Suite à la présentation du 22 septembre 2026 et aux échanges avec
+      <strong>M. Libasse Ndiaye</strong>, Directeur Technique des hôtels Accor Abidjan —
+      Novotel Abidjan, Pullman Abidjan, Hôtel Kasada.
+    </p>
+  </div>
+
+  <!-- 01 RÉSUMÉ EXÉCUTIF -->
+  <div class="section">
+    <div class="section-label">01 / Résumé exécutif</div>
+    <h2>Ce que nous<br>proposons.</h2>
+    <p class="lead">GenTrack digitalise les rondes techniques via WhatsApp et fournit à la direction une visibilité consolidée en temps réel — en complément de votre GMAO ITIS existant.</p>
+
+    <div class="grid-2" style="margin-bottom:20px;">
+      <div class="card">
+        <div class="section-label" style="margin-bottom:8px;">Notre positionnement</div>
+        <h3>On intervient avant la GMAO.</h3>
+        <p style="font-size:9.5px;color:#78716C;line-height:1.65;">GenTrack fiabilise la collecte de données terrain — rondes, relevés, anomalies, alertes. Ces données viennent enrichir votre ITIS existant. Aucune rupture, aucune migration.</p>
+      </div>
+      <div class="card">
+        <div class="section-label" style="margin-bottom:8px;">Ce qui change pour vous</div>
+        <h3>De la donnée terrain exploitable.</h3>
+        <p style="font-size:9.5px;color:#78716C;line-height:1.65;">Fini les photos non commentées. Fini les relevés sans traçabilité. Chaque ronde devient une donnée structurée, horodatée et exploitable par votre direction.</p>
+      </div>
+    </div>
+
+    <table class="comp-table">
+      <thead>
+        <tr>
+          <th>Aujourd'hui</th>
+          <th>Avec GenTrack</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Rondes photos non commentées sur WhatsApp</td><td>Rondes WhatsApp structurées, données instantanées</td></tr>
+        <tr><td>Horodatage incertain, difficile à prouver</td><td>Relevés horodatés à la minute, traçables et vérifiables</td></tr>
+        <tr><td>Rapports manuels sans synthèse ni analyse</td><td>Rapport automatique + dashboard groupe 3–4 hôtels</td></tr>
+        <tr><td>Appels pour savoir "si ça va" sur chaque hôtel</td><td>Vue consolidée de tous vos sites en un clic</td></tr>
+        <tr><td>Données terrain non formalisées</td><td>100% formalisé — WhatsApp que tout le monde utilise</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 02 TÉMOIGNAGES -->
+  <div class="section">
+    <div class="section-label">02 / Ce que disent nos clients actifs</div>
+    <h2>Ils l'utilisent.<br>Ils en parlent.</h2>
+    <p class="lead">GenTrack est actuellement déployé en phase pilote dans deux groupes hôteliers partenaires en Afrique de l'Ouest.</p>
+
+    <div class="testimonial-main" style="margin-bottom:12px;">
+      <div class="t-name">M. Ahmed Boussaïd · Directeur Technique, Groupe Azalaï</div>
+      <div class="t-role">9 hôtels · Dakar, Abidjan, Cotonou, Ouaga, Bamako, Bissau</div>
+      <div class="t-quote">« Clairement, je suis très satisfait. Ça marche bien. C'est ça qu'on cherche — c'est facile, c'est agile, c'est exploitable. »</div>
+      <div class="t-quote">« Si le système nous donne ces rondes avec les notifications, c'est une bonne chose pour nous — ça va nous soulager. »</div>
+    </div>
+
+    <div class="grid-2">
+      <div class="testimonial-small">
+        <div class="t-name">Groupe Azalaï · Dakar</div>
+        <div class="t-role">M. Modeste Adolgli, Responsable Technique</div>
+        <div class="t-quote">« Tu ne peux pas fabriquer un relevé. Ils font le tour — on sait qu'ils sont en train de faire le travail qu'il faut. »</div>
+        <div class="t-quote" style="margin-top:6px;">« C'est ancré dans leur routine quotidienne. Ça nous confirme qu'ils sont passés par le coin où ils devaient passer. »</div>
+      </div>
+      <div class="testimonial-small">
+        <div class="t-name">Noom Hotel Abidjan</div>
+        <div class="t-role">Équipe technique · Pilote actif</div>
+        <div class="t-quote">« Ça veut dire que dans six jours, il faut commencer à réfléchir. » <span style="color:#78716C;font-style:normal;">— autonomie carburant</span></div>
+        <div class="t-quote" style="margin-top:6px;">« Une fois que j'ai ouvert cette page, je peux faire mon relevé sans connexion même. »</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 03 L'OUTIL EN SITUATION -->
+  <div class="section">
+    <div class="section-label">03 / L'outil en situation — aperçu simulé pour Accor Abidjan</div>
+    <h2>Ce que ça donne<br>avec vos hôtels.</h2>
+    <p class="lead">Données fictives — illustration du tableau de bord directeur technique et d'une ronde WhatsApp dans votre contexte.</p>
+
+    <div class="dashboard">
+      <div class="dash-header">
+        <span>Tableau de bord · M. Libasse Ndiaye · DT Groupe Accor Abidjan</span>
+        <time>22 sept. 2026 · 08h15</time>
+      </div>
+      <div class="dash-hotels">
+        <div class="dash-hotel">
+          <div class="dash-hotel-name">Novotel Abidjan</div>
+          <div class="dash-kpi"><span>Conformité rondes</span><span class="ok">100%</span></div>
+          <div class="dash-kpi"><span>Alertes actives</span><span class="ok">0</span></div>
+          <div class="dash-kpi"><span>Dernière ronde</span><span class="neutral">05h58</span></div>
+        </div>
+        <div class="dash-hotel">
+          <div class="dash-hotel-name">Pullman Abidjan</div>
+          <div class="dash-kpi"><span>Conformité rondes</span><span class="ok">94%</span></div>
+          <div class="dash-kpi"><span>Alertes actives</span><span class="warn">1 ⚠</span></div>
+          <div class="dash-kpi"><span>Dernière ronde</span><span class="neutral">07h03</span></div>
+        </div>
+        <div class="dash-hotel">
+          <div class="dash-hotel-name">Hôtel Kasada</div>
+          <div class="dash-kpi"><span>Conformité rondes</span><span class="ok">98%</span></div>
+          <div class="dash-kpi"><span>Alertes actives</span><span class="ok">0</span></div>
+          <div class="dash-kpi"><span>Dernière ronde</span><span class="neutral">06h12</span></div>
+        </div>
+      </div>
+      <div class="dash-alert">
+        <div class="dash-alert-label">⚠ Pullman Abidjan — CF Cuisine Négative · Alerte active</div>
+        <div class="dash-alert-item"><div class="k">Température relevée</div><div class="v">-7°C</div></div>
+        <div class="dash-alert-item"><div class="k">Seuil configuré</div><div class="v">-18°C</div></div>
+        <div class="dash-alert-item"><div class="k">Technicien notifié</div><div class="vw">Kouamé J.</div></div>
+        <div class="dash-alert-item"><div class="k">Signalé à</div><div class="vw">07h04</div></div>
+      </div>
+    </div>
+
+    <div class="wa-rapport">
+      <div class="wa-box">
+        <div class="wa-box-header">📱 Ronde journalière — Pullman Abidjan · 07:03</div>
+        <div class="wa-messages">
+          <div class="wa-bot"><div class="wa-bot-bubble"><span class="tag">GenTrack 🔧</span>Groupe électrogène — Niveau cuve actuel (litres) ?</div></div>
+          <div class="wa-user"><div class="wa-user-bubble">2 850</div></div>
+          <div class="wa-bot"><div class="wa-bot-bubble" style="color:#86EFAC;">✓ Autonomie estimée : 14 jours<br><span style="color:#8696A0;">Compteur horaire (h) ?</span></div></div>
+          <div class="wa-user"><div class="wa-user-bubble">4 238</div></div>
+          <div class="wa-bot"><div class="wa-bot-bubble"><span style="color:#8696A0;">CF Cuisine négative — Température (°C) ?</span></div></div>
+          <div class="wa-user"><div class="wa-user-bubble">-7</div></div>
+          <div class="wa-bot"><div class="wa-alert-bubble">⚠ ALERTE — Seuil : -18°C<br>La porte est-elle bien fermée ?<br>L'évaporateur est-il dégagé ?</div></div>
+        </div>
+      </div>
+      <div class="rapport-box">
+        <div class="rapport-header">
+          <div class="rtag">Rapport WhatsApp — RT Novotel Abidjan</div>
+          <div class="rname">Ronde validée · 22/09/2026 05h58</div>
+        </div>
+        <div class="rapport-body">
+          <div class="rapport-feat">Groupe électrogène — Cuve : 3 100 L (18 j autonomie) · Compteur : 6 122 h</div>
+          <div class="rapport-feat">CF Poissonnerie — Temp : -19°C · Seuil : -18°C</div>
+          <div class="rapport-feat">CF Légumes — Temp : +4°C · Seuil : +6°C</div>
+          <div class="rapport-feat">Groupe froid piscine — Temp sortie : 26°C · Pression : normale</div>
+          <p style="font-size:8.5px;color:#78716C;margin-top:10px;line-height:1.5;font-style:italic;">Vous, en tant que DT — vous recevez ce rapport sur WhatsApp immédiatement après chaque ronde. Sans appel, sans email, sans attendre.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 04 DÉPLOIEMENT -->
+  <div class="section">
+    <div class="section-label">04 / Plan de déploiement progressif</div>
+    <h2>Un hôtel d'abord.<br>Puis le groupe.</h2>
+    <p class="lead">Déploiement progressif selon votre propre logique : valider sur un hôtel pilote, étendre au groupe, puis intégrer à vos processus budgétaires 2027.</p>
+
+    <div class="timeline" style="margin-bottom:20px;">
+      <div class="tl-step">
+        <div class="tl-dot active"></div>
+        <div class="tl-label">Étape 1</div>
+        <div class="tl-title">Hôtel pilote</div>
+        <div class="tl-sub">Novotel, Pullman ou Kasada · 3 semaines</div>
+      </div>
+      <div class="tl-step">
+        <div class="tl-dot"></div>
+        <div class="tl-label">Étape 2</div>
+        <div class="tl-title">Extension</div>
+        <div class="tl-sub">2 hôtels supplémentaires</div>
+      </div>
+      <div class="tl-step">
+        <div class="tl-dot"></div>
+        <div class="tl-label">Étape 3</div>
+        <div class="tl-title">Groupe complet</div>
+        <div class="tl-sub">4 hôtels Accor Abidjan</div>
+      </div>
+      <div class="tl-step">
+        <div class="tl-dot"></div>
+        <div class="tl-label">Étape 4</div>
+        <div class="tl-title">Standard groupe</div>
+        <div class="tl-sub">Budget 2027 intégré</div>
+      </div>
+    </div>
+
+    <div class="deploy-steps">
+      <div class="deploy-step">
+        <div class="step-num">1</div>
+        <h4>Collecte des équipements</h4>
+        <p>Le responsable technique remplit une fiche simple : équipements à suivre, numéros WhatsApp, fréquences de ronde.</p>
+        <div class="duration">Durée : 1 semaine</div>
+      </div>
+      <div class="deploy-step">
+        <div class="step-num">2</div>
+        <h4>Configuration & seuils en 30 min</h4>
+        <p>On paramètre ensemble les seuils de chaque équipement. Tout est ajustable à tout moment selon les retours terrain.</p>
+        <div class="duration">Durée : 3 à 5 jours</div>
+      </div>
+      <div class="deploy-step">
+        <div class="step-num">3</div>
+        <h4>Formation terrain (30 min)</h4>
+        <p>Première ronde WhatsApp faite ensemble. Aucun background technique requis — si un gardien peut l'utiliser, c'est réussi.</p>
+        <div class="duration">30 min à 1h</div>
+      </div>
+      <div class="deploy-step">
+        <div class="step-num">4</div>
+        <h4>Suivi J+7 et J+30 inclus</h4>
+        <p>Check-in avec le responsable technique pour ajuster les seuils. Rapport J+30 envoyé automatiquement à la direction.</p>
+        <div class="duration">Inclus dans l'abonnement</div>
+      </div>
+    </div>
+
+    <div class="deploy-note">
+      Pour démarrer, nous avons besoin de : la liste de vos équipements critiques, les numéros WhatsApp de vos techniciens, et 30 minutes pour la première ronde ensemble.
+      <strong>Zéro installation. Zéro IT. Zéro friction.</strong>
+    </div>
+  </div>
+
+  <!-- 05 OFFRE COMMERCIALE -->
+  <div class="section">
+    <div class="section-label">05 / Offre commerciale</div>
+    <h2>Un tarif qui évolue<br>avec le groupe.</h2>
+    <p class="lead">Démarrez sur un hôtel avec le plan Ronde — sans engagement fort. Évoluez vers Maintenance ou Performance au rythme de vos besoins.</p>
+
+    <div class="pricing-grid">
+
+      <!-- RONDE — RECOMMANDÉ -->
+      <div class="plan">
+        <div class="plan-head recommended">
+          <div class="plan-name">Ronde</div>
+          <div class="plan-price">50 000</div>
+          <div class="plan-unit">FCFA / hôtel / mois</div>
+          <div class="plan-annual">500 000 FCFA / an</div>
+          <div class="plan-rec-badge">✦ RECOMMANDÉ POUR DÉMARRER</div>
+        </div>
+        <div class="plan-body recommended">
+          <div class="plan-feat">Rondes digitales illimitées via WhatsApp</div>
+          <div class="plan-feat">Dashboard équipements temps réel</div>
+          <div class="plan-feat">Alertes automatiques sur seuils</div>
+          <div class="plan-feat">Vue groupe consolidée (multi-hôtels)</div>
+          <div class="plan-feat">Rapport mensuel PDF automatique</div>
+          <div class="plan-feat">Historique complet des rondes</div>
+          <div class="plan-feat">Support WhatsApp dédié · Suivi J+7 J+30</div>
+        </div>
+      </div>
+
+      <!-- MAINTENANCE -->
+      <div class="plan">
+        <div class="plan-head featured">
+          <div class="plan-name">Maintenance</div>
+          <div class="plan-price">250 000</div>
+          <div class="plan-unit">FCFA / hôtel / mois</div>
+          <div class="plan-annual">2 000 000 FCFA / an</div>
+          <div class="plan-badge">LE PLUS COMPLET</div>
+        </div>
+        <div class="plan-body featured">
+          <div class="plan-feat gray">Tout RONDE, plus :</div>
+          <div class="plan-feat">Fiches équipements & historique pannes</div>
+          <div class="plan-feat">Gestion des interventions (création, suivi)</div>
+          <div class="plan-feat">KPI : MTBF, MTTR, TTR</div>
+          <div class="plan-feat">QR Code signalement rapide</div>
+          <div class="plan-feat">Suivi énergie par fluide</div>
+          <div class="plan-feat">Budget mensuel vs réalisé + alertes</div>
+        </div>
+      </div>
+
+      <!-- PERFORMANCE -->
+      <div class="plan">
+        <div class="plan-head">
+          <div class="plan-name">Performance</div>
+          <div class="plan-price">350 000</div>
+          <div class="plan-unit">FCFA / hôtel / mois</div>
+          <div class="plan-annual">3 000 000 FCFA / an</div>
+        </div>
+        <div class="plan-body">
+          <div class="plan-feat gray">Tout MAINTENANCE, plus :</div>
+          <div class="plan-feat">Ratios énergie / chambre occupée</div>
+          <div class="plan-feat">Dashboard multi-sites & benchmark groupe</div>
+          <div class="plan-feat">Comparaison inter-hôtels Accor</div>
+          <div class="plan-feat">Consolidation export Direction Générale</div>
+          <div class="plan-feat">Rapport énergie & budget groupe</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="itis-note">
+      <strong>Compatibilité avec ITIS :</strong> GenTrack ne remplace pas votre GMAO ITIS — il améliore son exploitation en fiabilisant la donnée terrain. <strong>Aucune migration, aucune rupture.</strong> Les deux sont complémentaires. Paramétrage, cartographie et formation inclus lors du pilote.
+    </div>
+
+    <div class="roi-box">
+      <div class="roi-label">Retour sur investissement estimé</div>
+      <div class="roi-row"><span class="key">Abonnement GenTrack RONDE / hôtel / mois</span><span class="val">50 000 FCFA</span></div>
+      <div class="roi-row"><span class="key">Coût moyen d'une panne non anticipée</span><span class="val">> 500 000 FCFA</span></div>
+      <div class="roi-row"><span class="key">Achat carburant en urgence</span><span class="val">Coût & friction</span></div>
+      <div class="roi-row"><span class="key">4 hôtels Accor Abidjan en plan Ronde</span><span class="val">200 000 FCFA / mois</span></div>
+    </div>
+  </div>
+
+  <!-- 06 VISION & PROCHAINES ÉTAPES -->
+  <div class="section" style="border-bottom:none;">
+    <div class="section-label">06 / Vision & prochaines étapes</div>
+    <h2>Notre ambition<br>avec Accor Abidjan.</h2>
+    <p class="lead">Un standard commun de suivi technique pour les 4 hôtels du groupe — des données terrain fiables, une visibilité groupe en temps réel, des décisions basées sur des faits.</p>
+
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="card">
+        <div class="section-label" style="margin-bottom:10px;">Ce que vous obtenez à terme</div>
+        <ul class="checklist">
+          <li>Vue consolidée des 4 hôtels Accor Abidjan en temps réel</li>
+          <li>Rondes formalisées et horodatées — plus de litige sur la traçabilité</li>
+          <li>Alertes équipements avant toute rupture ou urgence</li>
+          <li>Historique complet de toutes les rondes par hôtel</li>
+          <li>Évaluation objectivée des techniciens par les données</li>
+          <li>Rapport mensuel automatique transmis à la direction et aux propriétaires</li>
+          <li>Complémentarité totale avec votre GMAO ITIS existant</li>
+        </ul>
+      </div>
+      <div class="next-box">
+        <h4>Prochaines étapes proposées</h4>
+        <ul>
+          <li>Vous prenez connaissance de cette proposition</li>
+          <li>Un point de 30 minutes pour répondre à vos questions</li>
+          <li>Validation interne avec votre direction et vos propriétaires</li>
+          <li>Lancement du pilote sur l'hôtel de votre choix (3 semaines)</li>
+          <li>Bilan pilote et intégration au budget 2027</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span><strong style="color:#1C1917;">GEN<span style="color:#C49A3C;">TRACK</span></strong> · Wilfried Tchinda · +33 6 58 15 06 28 · wilfried.gtm@gmail.com</span>
+    <span>Document confidentiel · Groupe Accor Abidjan · Octobre 2026</span>
+  </div>
+
+</div>
+</body>
+</html>

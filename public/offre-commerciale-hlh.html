@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack — Proposition Commerciale | HLH</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --dark:#1C1917;--dark2:#2D2A26;--amber:#C49A3C;--amber-light:#F0E4C0;--amber-pale:#FFFDF5;
+  --creme:#F5F0E8;--border:#E7E0D3;--muted:#78716C;--green:#16A34A;--red:#DC2626;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:var(--dark);background:#f5f5f5;line-height:1.6}
+.page{max-width:900px;margin:0 auto;background:#fff;box-shadow:0 4px 40px rgba(0,0,0,.12)}
+
+/* COVER */
+.cover{background:var(--dark);padding:64px 56px 52px;position:relative;overflow:hidden}
+.cover::before{content:'';position:absolute;right:-80px;top:-80px;width:380px;height:380px;border-radius:50%;background:rgba(196,154,60,.06)}
+.cover::after{content:'';position:absolute;left:-40px;bottom:-60px;width:200px;height:200px;border-radius:50%;background:rgba(196,154,60,.04)}
+.logo-row{display:flex;align-items:center;gap:10px;margin-bottom:56px}
+.logo-icon{width:38px;height:38px;background:var(--amber);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.logo-icon svg{width:20px;height:20px}
+.logo-name{font-size:20px;font-weight:800;color:#fff;letter-spacing:.3px}
+.cover-badge{display:inline-block;background:rgba(196,154,60,.15);border:1px solid rgba(196,154,60,.35);padding:5px 14px;border-radius:3px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:20px}
+.cover h1{font-size:38px;font-weight:800;line-height:1.15;color:#fff;margin-bottom:14px}
+.cover h1 span{color:var(--amber)}
+.cover-sub{font-size:16px;color:rgba(255,255,255,.6);max-width:480px;margin-bottom:44px}
+.cover-meta{display:flex;gap:40px;flex-wrap:wrap}
+.meta-item label{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--amber);font-weight:700;display:block;margin-bottom:3px}
+.meta-item span{font-size:14px;font-weight:600;color:rgba(255,255,255,.85)}
+
+/* DIVIDER */
+.divider{height:3px;background:linear-gradient(90deg,var(--amber),#E8D5A0,var(--amber))}
+
+/* SECTIONS */
+.section{padding:52px 56px}
+.section+.section{border-top:1px solid var(--border)}
+.section-label{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.section-num{width:28px;height:28px;border-radius:50%;background:var(--amber);color:var(--dark);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+.section-title{font-size:22px;font-weight:800}
+.section-sub{font-size:15px;color:var(--muted);margin-bottom:32px;max-width:600px;line-height:1.6}
+
+/* CONTEXT CARDS */
+.ctx-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ctx-card{background:var(--creme);border:1px solid var(--border);border-radius:10px;padding:18px 20px;display:flex;gap:14px;align-items:flex-start}
+.ctx-icon{font-size:20px;flex-shrink:0;margin-top:1px}
+.ctx-card h4{font-size:13px;font-weight:700;margin-bottom:4px}
+.ctx-card p{font-size:12px;color:var(--muted);line-height:1.5}
+
+/* SOLUTION BANNER */
+.solution-banner{background:var(--dark);border-radius:12px;padding:28px 32px;margin-bottom:28px;display:flex;gap:24px;align-items:center;color:#fff}
+.solution-banner .emoji{font-size:44px;flex-shrink:0}
+.solution-banner h3{font-size:18px;font-weight:800;color:var(--amber);margin-bottom:8px}
+.solution-banner p{font-size:13px;color:rgba(255,255,255,.75);line-height:1.6}
+
+/* FEATURES GRID */
+.feat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.feat-card{border:1px solid var(--border);border-radius:10px;padding:18px;background:#fff}
+.feat-card.hl{background:var(--creme);border-color:#D4C4A0}
+.feat-icon{font-size:24px;margin-bottom:10px}
+.feat-card h4{font-size:13px;font-weight:700;margin-bottom:5px}
+.feat-card p{font-size:12px;color:var(--muted);line-height:1.5}
+
+/* HOTELS */
+.hotels-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+.hotel-card{border-radius:12px;overflow:hidden;border:1px solid var(--border)}
+.hotel-header{padding:18px 20px 14px;color:#fff;position:relative}
+.hotel-header.ataf{background:linear-gradient(135deg,var(--dark),var(--dark2))}
+.hotel-header.zi{background:linear-gradient(135deg,#7B3F00,#A85400)}
+.hotel-header.pal{background:linear-gradient(135deg,#1a237e,#283593)}
+.hotel-cat{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--amber);font-weight:700;margin-bottom:4px}
+.hotel-header h3{font-size:15px;font-weight:800;margin-bottom:8px}
+.hotel-rooms{font-size:24px;font-weight:800;line-height:1;color:var(--amber)}
+.hotel-rooms span{font-size:11px;font-weight:400;color:rgba(255,255,255,.6);margin-left:2px}
+.hotel-body{padding:14px 18px}
+.hotel-feat{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;font-size:12px;color:#44403C}
+.hotel-dot{width:5px;height:5px;border-radius:50%;background:var(--amber);flex-shrink:0;margin-top:5px}
+
+/* PRICING */
+.pricing-box{background:var(--dark);border-radius:16px;padding:44px;color:#fff;text-align:center;position:relative;overflow:hidden;margin-bottom:28px}
+.pricing-box::before{content:'';position:absolute;right:-40px;top:-40px;width:200px;height:200px;border-radius:50%;background:rgba(196,154,60,.08)}
+.pricing-badge{display:inline-block;background:rgba(196,154,60,.2);border:1px solid rgba(196,154,60,.4);padding:5px 16px;border-radius:3px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:18px}
+.pricing-amount{font-size:68px;font-weight:900;line-height:1;margin-bottom:4px;color:var(--amber)}
+.pricing-amount sup{font-size:24px;font-weight:700;vertical-align:super;color:rgba(255,255,255,.6)}
+.pricing-period{font-size:15px;color:rgba(255,255,255,.6);margin-bottom:18px}
+.pricing-desc{font-size:14px;color:rgba(255,255,255,.8);max-width:400px;margin:0 auto 28px}
+.pricing-includes{display:grid;grid-template-columns:1fr 1fr;gap:7px;text-align:left;background:rgba(255,255,255,.07);border-radius:10px;padding:20px}
+.inc-item{display:flex;align-items:center;gap:8px;font-size:12px;color:rgba(255,255,255,.85)}
+.inc-item::before{content:'✓';font-weight:800;color:var(--amber);flex-shrink:0}
+
+/* LAUNCH OFFER */
+.launch-offer{background:var(--amber-light);border:2px solid var(--amber);border-radius:12px;padding:24px 28px;margin-bottom:0}
+.launch-offer .launch-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.launch-offer .launch-emoji{font-size:24px}
+.launch-offer h3{font-size:16px;font-weight:800;color:var(--dark)}
+.launch-offer p{font-size:13px;color:#5C4A1E;line-height:1.6}
+.launch-offer strong{color:#3D2E07}
+.deadline-badge{display:inline-block;background:var(--amber);color:var(--dark);font-size:11px;font-weight:800;padding:3px 10px;border-radius:3px;margin-left:6px}
+
+/* TIMELINE */
+.timeline{display:flex;gap:0;margin-bottom:8px}
+.tl-step{flex:1;text-align:center;position:relative}
+.tl-step::before{content:'';position:absolute;top:18px;left:50%;right:-50%;height:2px;background:var(--border);z-index:0}
+.tl-step:last-child::before{display:none}
+.tl-num{width:36px;height:36px;border-radius:50%;background:var(--amber);color:var(--dark);font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;position:relative;z-index:1}
+.tl-done .tl-num{background:var(--amber-light);color:var(--amber);border:2px solid var(--amber)}
+.tl-step h4{font-size:12px;font-weight:700;margin-bottom:3px}
+.tl-step p{font-size:10px;color:var(--muted)}
+.next-steps-note{background:var(--creme);border-left:3px solid var(--amber);border-radius:0 8px 8px 0;padding:16px 20px;font-size:13px;color:#44403C;line-height:1.6}
+
+/* FOOTER */
+.footer{background:var(--dark);padding:36px 56px;display:flex;justify-content:space-between;align-items:flex-start;gap:32px}
+.footer-brand .logo-name{color:#fff;font-size:16px;margin-bottom:6px}
+.footer-brand p{font-size:12px;color:rgba(255,255,255,.45);max-width:260px;line-height:1.5}
+.footer-contact h4{font-size:12px;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+.footer-contact p{font-size:12px;color:rgba(255,255,255,.55);margin-bottom:3px}
+.footer-contact strong{color:rgba(255,255,255,.9)}
+
+@media print{body{background:#fff}.page{box-shadow:none;max-width:100%}.section{padding:40px 48px}.cover{padding:52px 48px 44px}.footer{padding:28px 48px}}
+@media(max-width:680px){.cover{padding:40px 28px}.section{padding:36px 28px}.cover h1{font-size:26px}.ctx-grid,.hotels-grid,.feat-grid{grid-template-columns:1fr}.cover-meta{gap:20px}.pricing-includes{grid-template-columns:1fr}.footer{flex-direction:column;padding:28px}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- COVER -->
+<div class="cover">
+  <div class="logo-row">
+    <div class="logo-icon">
+      <svg viewBox="0 0 20 20" fill="none">
+        <rect x="1" y="1" width="8" height="8" rx="1.5" fill="#1C1917"/>
+        <rect x="11" y="1" width="8" height="8" rx="1.5" fill="#1C1917"/>
+        <rect x="1" y="11" width="8" height="8" rx="1.5" fill="#1C1917"/>
+        <rect x="11" y="11" width="8" height="8" rx="1.5" fill="#1C1917" opacity=".5"/>
+      </svg>
+    </div>
+    <div class="logo-name">GenTrack</div>
+  </div>
+  <div class="cover-badge">Proposition Commerciale Personnalisée</div>
+  <h1>La gestion technique <span>pensée pour HLH</span></h1>
+  <p class="cover-sub">3 établissements, 1 responsable technique, une visibilité totale — au prix d'un seul hôtel.</p>
+  <div class="cover-meta">
+    <div class="meta-item"><label>Destinataire</label><span>Maryse IBO — DOP</span></div>
+    <div class="meta-item"><label>Groupe</label><span>HLH — Abidjan</span></div>
+    <div class="meta-item"><label>Date</label><span>Octobre 2026</span></div>
+    <div class="meta-item"><label>Offre valable jusqu'au</label><span style="color:var(--amber)">1er novembre 2026</span></div>
+  </div>
+</div>
+<div class="divider"></div>
+
+<!-- CONTEXTE -->
+<div class="section">
+  <div class="section-label">
+    <div class="section-num">1</div>
+    <div class="section-title">Ce que nous avons compris</div>
+  </div>
+  <p class="section-sub">Suite à notre échange du 14 octobre, voici comment nous avons compris vos enjeux — et comment GenTrack y répond.</p>
+  <div class="ctx-grid">
+    <div class="ctx-card">
+      <div class="ctx-icon">📊</div>
+      <div><h4>Gestion sur Excel et WhatsApp informel</h4><p>Relevés d'énergie manuels, PMS utilisé à moitié. La donnée existe, elle n'est pas exploitable.</p></div>
+    </div>
+    <div class="ctx-card">
+      <div class="ctx-icon">🏃</div>
+      <div><h4>Courir derrière les rapports</h4><p>Pas de visibilité en temps réel sans relancer les équipes. Réunions hebdo comme seul point de contrôle.</p></div>
+    </div>
+    <div class="ctx-card">
+      <div class="ctx-icon">⚡</div>
+      <div><h4>Groupe électrogène actif (Zone Industrielle)</h4><p>Délestage régulier. Le suivi de la consommation carburant et des heures de marche est critique.</p></div>
+    </div>
+    <div class="ctx-card">
+      <div class="ctx-icon">🏠</div>
+      <div><h4>Planning de passage clims (ATAF)</h4><p>57 appartements, des clims individuelles à entretenir. Aucun outil pour suivre les passages par appartement.</p></div>
+    </div>
+    <div class="ctx-card">
+      <div class="ctx-icon">👤</div>
+      <div><h4>1 responsable technique pour 3 sites</h4><p>Modèle mutualisé par nécessité économique. Il lui faut une vue multi-sites depuis un seul endroit.</p></div>
+    </div>
+    <div class="ctx-card">
+      <div class="ctx-icon">🔍</div>
+      <div><h4>Pas de statistiques de résolution</h4><p>Aucun historique exploitable sur les délais de panne, ni sur la fiabilité des équipements.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- SOLUTION -->
+<div class="section" style="background:var(--creme)">
+  <div class="section-label">
+    <div class="section-num">2</div>
+    <div class="section-title">GenTrack, taillé pour votre groupe</div>
+  </div>
+  <p class="section-sub">Nous avons conçu une offre groupe qui correspond à votre modèle : 3 sites mutualisés, 1 équipe technique partagée, un tarif unique.</p>
+
+  <div class="solution-banner">
+    <div class="emoji">🎯</div>
+    <div>
+      <h3>Un compte groupe, 3 établissements, tout compris</h3>
+      <p>Votre responsable technique accède aux 3 sites depuis un seul tableau de bord. Vous, en tant que DOP, avez une vue consolidée du groupe en temps réel — rondes, signalements, énergie, alertes — sans relancer personne.</p>
+    </div>
+  </div>
+
+  <div class="feat-grid">
+    <div class="feat-card hl">
+      <div class="feat-icon">📱</div>
+      <h4>Rondes via WhatsApp</h4>
+      <p>Pas de formation requise. Questions guidées, relevés chiffrés, anomalies signalées en temps réel depuis le terrain.</p>
+    </div>
+    <div class="feat-card hl">
+      <div class="feat-icon">⛽</div>
+      <h4>Suivi groupe électrogène</h4>
+      <p>Relevé horaire, niveau carburant, heures de marche, coût de fonctionnement. Alerte automatique avant rupture.</p>
+    </div>
+    <div class="feat-card hl">
+      <div class="feat-icon">🏠</div>
+      <h4>Planning passage résidence</h4>
+      <p>Configurez vos 57 appartements ATAF. Le tech coche les passages, vous avez l'historique complet par appartement.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">💡</div>
+      <h4>Suivi énergie & fluides</h4>
+      <p>Électricité, eau, carburant avec objectifs et réalisé. Ratios par chambre. Détection des dérives.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🚨</div>
+      <h4>Signalements QR code</h4>
+      <p>Affiche scannée par les résidents ou équipes. Notification WhatsApp immédiate avec REF, commandes PEC et AFFECTER.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📈</div>
+      <h4>Rapport directeur multi-sites</h4>
+      <p>Vue consolidée HLH + détail par établissement. Pannes, rondes, énergie, budget. PDF exportable.</p>
+    </div>
+  </div>
+</div>
+
+<!-- HOTELS -->
+<div class="section">
+  <div class="section-label">
+    <div class="section-num">3</div>
+    <div class="section-title">Vos 3 établissements</div>
+  </div>
+  <p class="section-sub">Chaque hôtel a ses spécificités. Voici comment GenTrack s'adapte à chacun.</p>
+  <div class="hotels-grid">
+    <div class="hotel-card">
+      <div class="hotel-header ataf">
+        <div class="hotel-cat">Résidence Hôtelière</div>
+        <h3>ATAF — Plateau</h3>
+        <div class="hotel-rooms">57 <span>appartements</span></div>
+      </div>
+      <div class="hotel-body">
+        <div class="hotel-feat"><div class="hotel-dot"></div><div>Planning passage clims par appartement avec historique</div></div>
+        <div class="hotel-feat"><div class="hotel-dot"></div><div>Suivi ascenseurs Tour A &amp; B (IGH 18 et 25 étages)</div></div>
+        <div class="hotel-feat"><div class="hotel-dot"></div><div>Signalements résidents via QR code en chambre</div></div>
+        <div class="hotel-feat"><div class="hotel-dot"></div><div>Suivi pompes eau, énergie parties communes</div></div>
+      </div>
+    </div>
+    <div class="hotel-card">
+      <div class="hotel-header zi">
+        <div class="hotel-cat">★★★ Zone Industrielle</div>
+        <h3>Hôtel Industriel</h3>
+        <div class="hotel-rooms">29 <span>chambres</span></div>
+      </div>
+      <div class="hotel-body">
+        <div class="hotel-feat"><div class="hotel-dot"></div><div>Suivi GE : heures, carburant, coût, alertes niveau bas</div></div>
+        <div class="hotel-feat"><div class="hotel-dot"></div><div>Relevé compteur électrique + comparaison réseau/GE</div></div>
+        <div class="hotel-feat"><div class="hotel-dot"></div><div>Rondes journalières équipements critiques</div></div>
+        <div class="hotel-feat"><div class="hotel-dot"></div><div>Signalements techniciens de passage (clients)</div></div>
+      </div>
+    </div>
+    <div class="hotel-card">
+      <div class="hotel-header pal">
+        <div class="hotel-cat">★★★★★ Boutique Hôtel</div>
+        <h3>Palévia</h3>
+        <div class="hotel-rooms">9 <span>chambres</span></div>
+      </div>
+      <div class="hotel-body">
+        <div class="hotel-feat"><div class="hotel-dot"></div><div>Suivi cuisine professionnelle &amp; restauration</div></div>
+        <div class="hotel-feat"><div class="hotel-dot"></div><div>Clims chambre par chambre (9 unités individuelles)</div></div>
+        <div class="hotel-feat"><div class="hotel-dot"></div><div>Signalements guests via QR code discret</div></div>
+        <div class="hotel-feat"><div class="hotel-dot"></div><div>Énergie avec ratios par couvert servi</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRICING -->
+<div class="section" style="background:var(--creme)">
+  <div class="section-label">
+    <div class="section-num">4</div>
+    <div class="section-title">Tarification</div>
+  </div>
+  <p class="section-sub">Un forfait groupe, fixe, tout compris. Pas de mauvaises surprises.</p>
+
+  <div class="pricing-box">
+    <div class="pricing-badge">Offre Groupe HLH — Package Complet</div>
+    <div class="pricing-amount"><sup>FCFA </sup>150 000</div>
+    <div class="pricing-period">par mois · 3 établissements · tout compris</div>
+    <p class="pricing-desc">Rondes, maintenance, résidence, énergie, multi-sites — pour l'ensemble du groupe HLH.</p>
+    <div class="pricing-includes">
+      <div class="inc-item">Rondes WhatsApp (3 sites)</div>
+      <div class="inc-item">Suivi groupe électrogène</div>
+      <div class="inc-item">Module maintenance &amp; KPIs</div>
+      <div class="inc-item">Planning passage résidence</div>
+      <div class="inc-item">Suivi énergie &amp; fluides</div>
+      <div class="inc-item">Signalements QR code</div>
+      <div class="inc-item">Vue directeur multi-sites</div>
+      <div class="inc-item">Rapports PDF mensuels</div>
+      <div class="inc-item">1 resp. tech. multi-sites</div>
+      <div class="inc-item">Configuration &amp; onboarding</div>
+    </div>
+  </div>
+
+  <div class="launch-offer">
+    <div class="launch-head">
+      <div class="launch-emoji">🎁</div>
+      <h3>Offre de lancement <span class="deadline-badge">avant le 1er novembre 2026</span></h3>
+    </div>
+    <p>L'onboarding et la configuration initiale (import de vos équipements, création des comptes, paramétrage des 3 sites) sont <strong>offerts</strong> pour toute signature avant le 1er novembre 2026. Valeur estimée : <strong>80 000 FCFA</strong>. Nous configurons tout, vous êtes opérationnels en 7 jours.</p>
+  </div>
+</div>
+
+<!-- NEXT STEPS -->
+<div class="section">
+  <div class="section-label">
+    <div class="section-num">5</div>
+    <div class="section-title">Prochaines étapes</div>
+  </div>
+  <p class="section-sub">De la démo à la signature en 2 semaines.</p>
+  <div class="timeline">
+    <div class="tl-step tl-done">
+      <div class="tl-num">✓</div>
+      <h4>Échange initial</h4>
+      <p>14 oct. 2026</p>
+    </div>
+    <div class="tl-step">
+      <div class="tl-num">2</div>
+      <h4>Accès démo</h4>
+      <p>Cette semaine</p>
+    </div>
+    <div class="tl-step">
+      <div class="tl-num">3</div>
+      <h4>Validation interne</h4>
+      <p>Fin semaine prochaine</p>
+    </div>
+    <div class="tl-step">
+      <div class="tl-num">4</div>
+      <h4>Signature</h4>
+      <p>Avant le 1er nov.</p>
+    </div>
+    <div class="tl-step">
+      <div class="tl-num">5</div>
+      <h4>Go live</h4>
+      <p>J+7 après signature</p>
+    </div>
+  </div>
+  <div style="margin-top:28px" class="next-steps-note">
+    <strong>Notre engagement :</strong> Dans les 7 jours suivant la signature, vos 3 sites sont configurés, vos comptes créés, et votre responsable technique peut lancer sa première ronde. Nous restons disponibles pendant les 30 premiers jours pour tout ajustement.
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-brand">
+    <div class="logo-row" style="margin-bottom:6px">
+      <div class="logo-icon" style="width:28px;height:28px">
+        <svg viewBox="0 0 20 20" fill="none" style="width:14px;height:14px">
+          <rect x="1" y="1" width="8" height="8" rx="1.5" fill="#1C1917"/>
+          <rect x="11" y="1" width="8" height="8" rx="1.5" fill="#1C1917"/>
+          <rect x="1" y="11" width="8" height="8" rx="1.5" fill="#1C1917"/>
+          <rect x="11" y="11" width="8" height="8" rx="1.5" fill="#1C1917" opacity=".5"/>
+        </svg>
+      </div>
+      <div class="logo-name">GenTrack</div>
+    </div>
+    <p>La gestion technique hôtelière digitalisée — rondes WhatsApp, suivi énergie, rapports en temps réel.</p>
+  </div>
+  <div class="footer-contact">
+    <h4>Votre interlocuteur</h4>
+    <p><strong>Wilfried Tchinda</strong></p>
+    <p>Fondateur — GenTrack</p>
+    <p style="margin-top:8px">📍 Paris &amp; Dakar</p>
+    <p>🌐 gen-track.vercel.app</p>
+  </div>
+</div>
+
+</div>
+</body>
+</html>

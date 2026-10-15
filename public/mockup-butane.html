@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Butane accueil</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --creme:#F5F0E8;--dark:#1C1917;--amber:#C49A3C;
+  --vert:#1a7a4a;--orange:#c0641a;--rouge:#b91c1c;
+  --card:#fff;--border:#e5e0d8;--text1:#1C1917;--text2:#6b6560;--text3:#9b9590;
+  --surface1:#f9f6f0;--bg-success:#dcfce7;--text-success:#15803d;
+  --bg-accent:#eff6ff;--text-accent:#1d4ed8;
+}
+body{background:var(--creme);font-family:'Inter',system-ui,sans-serif;color:var(--text1);padding:0;min-height:100vh}
+.page{max-width:420px;margin:0 auto;padding:16px}
+.section-title{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin:20px 0 10px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:12px}
+.card-title{font-size:14px;font-weight:600;color:var(--text1);display:flex;align-items:center;gap:8px}
+.card-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;display:inline-block}
+.badge-suivi{color:var(--amber);background:#fdf5e0}
+.badge-livraison{color:var(--text-success);background:var(--bg-success)}
+.kpi-row{display:flex;gap:8px;margin:12px 0 8px}
+.kpi{flex:1;background:var(--surface1);border-radius:8px;padding:8px 10px}
+.kpi-label{font-size:11px;color:var(--text3)}
+.kpi-val{font-size:14px;font-weight:600;color:var(--text1);margin-top:2px}
+.bar-wrap{height:6px;background:var(--surface1);border-radius:3px;margin:10px 0 4px;overflow:hidden}
+.bar{height:100%;border-radius:3px;transition:width .4s,background .4s}
+.bar-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:10px}
+.chart-area{height:72px;margin:8px 0}
+.btn-plein{width:100%;margin-top:8px;padding:9px;border:1px solid var(--border);border-radius:10px;background:var(--surface1);color:var(--text1);font-size:12px;font-weight:600;cursor:pointer;transition:background .15s}
+.btn-plein:hover{background:#ede8e0}
+.hist-row{font-size:12px;color:var(--text2);padding:6px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:6px}
+.niv-big{font-size:26px;font-weight:700;color:var(--text1);line-height:1}
+.header-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+/* Modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;z-index:100}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:14px;border:1px solid var(--border);padding:22px;width:320px}
+.modal h3{font-size:14px;font-weight:600;color:var(--text1);margin-bottom:14px}
+.modal label{font-size:12px;color:var(--text3);display:block;margin-bottom:5px}
+.modal input{width:100%;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:14px;color:var(--text1);background:#fff;outline:none;margin-bottom:8px}
+.modal input:focus{border-color:var(--amber)}
+.modal-preview{font-size:12px;color:var(--text2);min-height:18px;margin-bottom:6px}
+.modal-tag{min-height:22px;margin-bottom:10px}
+.modal-btns{display:flex;gap:8px}
+.modal-btns button{flex:1;padding:9px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border)}
+.btn-cancel{background:var(--surface1);color:var(--text2)}
+.btn-confirm{background:var(--dark);color:#fff;border-color:var(--dark)}
+.err{font-size:11px;color:var(--rouge);margin-top:-4px;margin-bottom:6px;display:none}
+</style>
+</head>
+<body>
+<div class="page">
+  <div style="font-size:16px;font-weight:700;color:var(--text1);padding:8px 0 4px">Accueil · King Fahd Palace</div>
+  <div style="font-size:12px;color:var(--text3);margin-bottom:4px">13 oct. 2026</div>
+
+  <div class="section-title">Carburant</div>
+
+  <!-- GASOIL -->
+  <div class="card">
+    <div class="header-row">
+      <div>
+        <div class="card-title">💧 Niveau cuve gasoil</div>
+        <div class="card-sub">Citerne 8 102 L</div>
+      </div>
+      <div style="text-align:right">
+        <div class="niv-big">6 372 L</div>
+        <div style="font-size:12px;color:var(--text3)">79% de capacité</div>
+        <div style="margin-top:4px"><span class="badge badge-suivi">Suivi</span></div>
+      </div>
+    </div>
+    <div class="bar-wrap"><div class="bar" style="width:79%;background:var(--vert)"></div></div>
+    <div class="bar-labels"><span>alerte &lt; 1 620 L</span><span>79%</span></div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">Conso estimée</div><div class="kpi-val">910 L</div></div>
+      <div class="kpi"><div class="kpi-label">Coût réel</div><div class="kpi-val">683 k XOF</div></div>
+    </div>
+    <canvas id="c1" class="chart-area"></canvas>
+    <button class="btn-plein">⛽ Déclarer ravitaillement</button>
+    <div class="hist-row"><span>12 oct.</span><span>+1 850 L → 6 372 L</span><span style="color:var(--text3)">750 k XOF</span></div>
+  </div>
+
+  <!-- BUTANE -->
+  <div class="card">
+    <div class="header-row">
+      <div>
+        <div class="card-title">🔥 Gaz butane (citerne)</div>
+        <div class="card-sub">Citerne 4 000 L</div>
+      </div>
+      <div style="text-align:right">
+        <div class="niv-big" id="but-litres">2 960 L</div>
+        <div style="font-size:12px;color:var(--text3)" id="but-pct-label">74% de capacité</div>
+        <div style="margin-top:4px"><span class="badge badge-suivi">Suivi</span></div>
+      </div>
+    </div>
+    <div class="bar-wrap"><div class="bar" id="but-bar" style="width:74%;background:var(--vert)"></div></div>
+    <div class="bar-labels"><span>alerte &lt; 800 L</span><span id="but-pct-right">74%</span></div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-label">Conso estimée</div><div class="kpi-val">680 L</div></div>
+      <div class="kpi"><div class="kpi-label">Coût réel</div><div class="kpi-val">401 k XOF</div></div>
+    </div>
+    <canvas id="c2" class="chart-area"></canvas>
+    <button class="btn-plein" onclick="openModal()">🔥 Déclarer ravitaillement</button>
+    <div id="but-hist"></div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h3>Déclarer un ravitaillement — butane</h3>
+    <label for="new-litres">Litres ajoutés</label>
+    <input type="number" id="new-litres" placeholder="ex: 2040" min="1" />
+    <div class="err" id="modal-err">Entrez une quantité valide</div>
+    <div class="modal-preview" id="modal-preview"></div>
+    <div class="modal-tag" id="modal-tag"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Annuler</button>
+      <button class="btn-confirm" onclick="confirmPlein()">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var CAP = 4000;
+var curPct = 74;
+
+function drawChart(id, data) {
+  var ctx = document.getElementById(id).getContext('2d');
+  var labels = data.map(function(d) { return d.label || ''; });
+  var vals = data.map(function(d) { return d.v; });
+  var pointR = data.map(function(d) { return d.delivery ? 5 : 0; });
+  var pointBg = data.map(function(d) { return d.delivery ? '#1a7a4a' : 'transparent'; });
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: vals,
+        borderColor: '#C49A3C',
+        borderWidth: 2,
+        fill: true,
+        backgroundColor: 'rgba(196,154,60,0.07)',
+        tension: 0.3,
+        pointRadius: pointR,
+        pointBackgroundColor: pointBg,
+        pointBorderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      scales: { x: { display: false }, y: { display: false, min: 0, max: 100 } },
+      animation: { duration: 0 }
+    }
+  });
+}
+
+drawChart('c1', [
+  {v:82},{v:80},{v:79},{v:78},{v:77},{v:76},{v:75},{v:75},{v:74},{v:79,delivery:true},{v:79},{v:79}
+]);
+drawChart('c2', [
+  {v:81},{v:80},{v:78},{v:76},{v:75},{v:73},{v:51},{v:74,delivery:true},{v:74},{v:74}
+]);
+
+function openModal() {
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('new-litres').value = '';
+  document.getElementById('modal-preview').textContent = '';
+  document.getElementById('modal-tag').innerHTML = '';
+  document.getElementById('modal-err').style.display = 'none';
+}
+
+document.getElementById('new-litres').addEventListener('input', function() {
+  var delta = parseInt(this.value);
+  document.getElementById('modal-err').style.display = 'none';
+  if (isNaN(delta) || delta <= 0) {
+    document.getElementById('modal-preview').textContent = '';
+    document.getElementById('modal-tag').innerHTML = '';
+    return;
+  }
+  var curL = Math.round(curPct / 100 * CAP);
+  var newL = Math.min(CAP, curL + delta);
+  var newPct = Math.round(newL / CAP * 100);
+  document.getElementById('modal-preview').textContent =
+    curL.toLocaleString('fr-FR') + ' L + ' + delta.toLocaleString('fr-FR') + ' L → ' + newL.toLocaleString('fr-FR') + ' L (' + newPct + '%)';
+  if (delta >= 500) {
+    document.getElementById('modal-tag').innerHTML =
+      '<span class="badge badge-livraison">Livraison enregistrée</span>';
+  } else {
+    document.getElementById('modal-tag').innerHTML =
+      '<span style="font-size:11px;color:var(--text3)">Ajustement de niveau</span>';
+  }
+});
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+}
+
+function confirmPlein() {
+  var delta = parseInt(document.getElementById('new-litres').value);
+  if (isNaN(delta) || delta <= 0) {
+    document.getElementById('modal-err').style.display = 'block';
+    return;
+  }
+  var curL = Math.round(curPct / 100 * CAP);
+  var newL = Math.min(CAP, curL + delta);
+  var v = Math.round(newL / CAP * 100);
+  curPct = v;
+
+  var col = v <= 20 ? 'var(--rouge)' : v <= 40 ? 'var(--orange)' : 'var(--vert)';
+  document.getElementById('but-litres').textContent = newL.toLocaleString('fr-FR') + ' L';
+  document.getElementById('but-pct-label').textContent = v + '% de capacité';
+  document.getElementById('but-bar').style.width = v + '%';
+  document.getElementById('but-bar').style.background = col;
+  document.getElementById('but-pct-right').textContent = v + '%';
+
+  var tag = delta >= 500
+    ? '<span class="badge badge-livraison" style="margin-left:6px">livraison</span>'
+    : '<span style="font-size:10px;color:var(--text3);margin-left:6px">ajustement</span>';
+  document.getElementById('but-hist').innerHTML =
+    '<div class="hist-row">' +
+    '<span>13 oct.</span>' +
+    '<span>+' + delta.toLocaleString('fr-FR') + ' L → ' + newL.toLocaleString('fr-FR') + ' L' + tag + '</span>' +
+    '</div>';
+
+  closeModal();
+}
+
+document.getElementById('modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+</script>
+</body>
+</html>

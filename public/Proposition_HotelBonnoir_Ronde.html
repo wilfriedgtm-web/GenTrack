@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack — Proposition Yam's Hotel</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --creme:#F5F0E8; --dark:#1C1917; --amber:#C49A3C; --amber-light:#F0E4C0;
+  --red:#DC2626; --green:#16A34A; --muted:#78716C; --border:#E7E0D3;
+  --wa-green:#25D366; --wa-bg:#ECE5DD; --wa-out:#DCF8C6;
+}
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif; font-size:11pt; color:var(--dark); background:#fff; line-height:1.6; }
+.wrapper { max-width:840px; margin:0 auto; }
+
+/* NAV */
+.nav { background:var(--dark); padding:10px 44px; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:100; }
+.nav-logo { font-size:14pt; font-weight:800; color:var(--amber); }
+.nav-logo span { color:#fff; }
+.nav-right { font-size:8pt; color:rgba(255,255,255,0.4); text-align:right; }
+
+/* HERO */
+.hero { background:var(--dark); padding:52px 44px 44px; position:relative; overflow:hidden; }
+.hero::before { content:''; position:absolute; bottom:-60px; right:-60px; width:260px; height:260px; border-radius:50%; background:rgba(196,154,60,0.07); }
+.hero-badge { position:absolute; top:36px; right:44px; background:var(--amber); color:var(--dark); font-size:8pt; font-weight:800; padding:5px 14px; border-radius:4px; text-transform:uppercase; letter-spacing:0.5px; }
+.hero-logo { font-size:20pt; font-weight:800; color:var(--amber); margin-bottom:2px; }
+.hero-logo span { color:#fff; }
+.hero-tag { font-size:7.5pt; color:rgba(255,255,255,0.35); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:32px; }
+.hero-pre { font-size:8pt; font-weight:700; color:var(--amber); letter-spacing:2px; text-transform:uppercase; margin-bottom:10px; }
+.hero-title { font-size:30pt; font-weight:800; color:#fff; line-height:1.1; margin-bottom:10px; }
+.hero-title .hl { color:var(--amber); }
+.hero-sub { font-size:11pt; color:rgba(255,255,255,0.55); margin-bottom:34px; max-width:480px; line-height:1.55; }
+.hero-meta { display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px; }
+.hm label { display:block; font-size:7pt; font-weight:700; color:var(--amber); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:3px; }
+.hm .v { font-size:9.5pt; color:rgba(255,255,255,0.8); font-weight:500; }
+
+/* SECTION */
+.section { padding:40px 44px 32px; border-bottom:1px solid var(--border); }
+.section:last-child { border-bottom:none; }
+.sec-lbl { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+.sec-num { width:28px; height:28px; border-radius:50%; background:var(--amber); color:var(--dark); display:flex; align-items:center; justify-content:center; font-size:10pt; font-weight:800; flex-shrink:0; }
+.sec-title { font-size:14pt; font-weight:700; }
+.sec-intro { font-size:9.5pt; color:#44403C; margin-bottom:20px; line-height:1.6; }
+
+/* QUOTE */
+.quote { background:var(--creme); border-left:4px solid var(--amber); padding:14px 18px; border-radius:0 8px 8px 0; margin-bottom:22px; font-style:italic; font-size:10pt; color:#44403C; line-height:1.65; }
+.quote cite { display:block; margin-top:6px; font-style:normal; font-size:8pt; font-weight:600; color:var(--muted); }
+
+/* ALERT */
+.alert { border-radius:8px; padding:13px 16px; margin-bottom:18px; display:flex; gap:10px; align-items:flex-start; }
+.alert.amber { background:var(--amber-light); border:1px solid var(--amber); }
+.alert.red { background:#FEF2F2; border:1px solid #FECACA; }
+.alert-icon { font-size:14pt; flex-shrink:0; }
+.alert strong { display:block; font-size:9.5pt; font-weight:700; margin-bottom:2px; }
+.alert p { font-size:8.5pt; color:var(--muted); margin:0; line-height:1.4; }
+.alert.amber strong { color:#7C5A0E; }
+.alert.red strong { color:#991B1B; }
+.alert.red p { color:#7F1D1D; }
+
+/* STAT GRID */
+.sg { display:grid; gap:12px; margin-bottom:20px; }
+.sg-2 { grid-template-columns:1fr 1fr; }
+.sg-3 { grid-template-columns:repeat(3,1fr); }
+.sg-4 { grid-template-columns:repeat(4,1fr); }
+.sc { border-radius:10px; padding:14px 16px; }
+.sc.creme { background:var(--creme); }
+.sc.red { background:#FEF2F2; border:1px solid #FECACA; }
+.sc.warn { background:#FFFBEB; border:1px solid #FDE68A; }
+.sc.green { background:#F0FDF4; border:1px solid #BBF7D0; }
+.sc.amber-b { background:var(--amber-light); border:1px solid var(--amber); }
+.sc.dark { background:var(--dark); }
+.sc-lbl { font-size:7.5pt; font-weight:700; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:5px; }
+.sc.dark .sc-lbl { color:rgba(255,255,255,0.45); }
+.sc-val { font-size:22pt; font-weight:800; line-height:1; margin-bottom:3px; }
+.sc.red .sc-val { color:var(--red); }
+.sc.warn .sc-val { color:#D97706; }
+.sc.green .sc-val { color:var(--green); }
+.sc.amber-b .sc-val { color:#7C5A0E; }
+.sc.dark .sc-val { color:var(--amber); }
+.sc-sub { font-size:8pt; color:var(--muted); line-height:1.35; }
+.sc.dark .sc-sub { color:rgba(255,255,255,0.4); }
+
+/* PAIN POINTS */
+.pain-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:22px; }
+.pain-card { background:var(--creme); border-radius:10px; padding:14px 16px; display:flex; gap:12px; align-items:flex-start; }
+.pain-icon { font-size:18pt; flex-shrink:0; }
+.pain-title { font-size:9.5pt; font-weight:700; margin-bottom:3px; }
+.pain-desc { font-size:8.5pt; color:var(--muted); line-height:1.4; }
+
+/* EQUIP LIST */
+.equip-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:20px; }
+.equip-card { background:#fff; border:1px solid var(--border); border-radius:9px; padding:12px 14px; }
+.equip-card .e-icon { font-size:18pt; margin-bottom:5px; }
+.equip-card .e-name { font-size:9pt; font-weight:700; margin-bottom:2px; }
+.equip-card .e-desc { font-size:7.5pt; color:var(--muted); line-height:1.35; }
+
+/* PHONE MOCKUP */
+.phone-wrap { display:flex; justify-content:center; margin-bottom:8px; }
+.phone { width:265px; background:#fff; border-radius:28px; box-shadow:0 8px 36px rgba(0,0,0,0.17),0 0 0 9px #1C1917; overflow:hidden; }
+.p-notch { background:#1C1917; height:24px; display:flex; align-items:center; justify-content:center; }
+.p-notch-d { width:8px; height:8px; background:#333; border-radius:50%; }
+.wa-hdr { background:#075E54; padding:9px 11px; display:flex; align-items:center; gap:9px; color:#fff; }
+.wa-av { width:32px; height:32px; background:var(--wa-green); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14pt; flex-shrink:0; }
+.wa-nm { font-size:9.5pt; font-weight:700; }
+.wa-st { font-size:7pt; opacity:.7; }
+.wa-body { background:var(--wa-bg); padding:8px 7px; min-height:300px; display:flex; flex-direction:column; gap:4px; }
+.wa-sep { text-align:center; margin:3px 0; }
+.wa-sep span { background:rgba(255,255,255,0.7); font-size:6.5pt; padding:2px 9px; border-radius:8px; color:#777; }
+.wm { max-width:87%; }
+.wm.out { align-self:flex-end; }
+.wm.in { align-self:flex-start; }
+.wb { padding:6px 8px 3px; border-radius:7px; font-size:8pt; line-height:1.4; color:#111; position:relative; }
+.wm.out .wb { background:var(--wa-out); border-bottom-right-radius:2px; }
+.wm.in .wb { background:#fff; border-bottom-left-radius:2px; }
+.wb-meta { font-size:6pt; color:#999; text-align:right; margin-top:2px; }
+.wb-bot { background:#fff; border-left:3px solid var(--wa-green); border-radius:0 7px 7px 0; padding:6px 8px; font-size:8pt; margin:1px 0; }
+.wb-bot .bot-n { font-size:7pt; font-weight:700; color:var(--wa-green); margin-bottom:2px; }
+.wc-row { display:flex; flex-direction:column; gap:3px; margin-top:5px; }
+.wc { background:#E3F7E9; border:1px solid var(--wa-green); border-radius:4px; padding:3px 7px; font-size:7.5pt; color:#075E54; font-weight:600; text-align:center; }
+
+/* FLOW */
+.flow { display:flex; gap:0; align-items:stretch; margin-bottom:8px; }
+.flow-step { flex:1; text-align:center; position:relative; padding:0 6px; }
+.flow-step::after { content:'→'; position:absolute; right:-10px; top:30px; font-size:14pt; color:var(--border); }
+.flow-step:last-child::after { display:none; }
+.f-icon { width:52px; height:52px; border-radius:12px; margin:0 auto 8px; display:flex; align-items:center; justify-content:center; font-size:20pt; }
+.f-icon.ab { background:var(--amber-light); }
+.f-icon.db { background:var(--dark); color:var(--amber); font-size:16pt; }
+.f-icon.gb { background:#DCFCE7; }
+.f-icon.bb { background:#EFF6FF; }
+.f-title { font-size:8.5pt; font-weight:700; margin-bottom:3px; }
+.f-desc { font-size:7.5pt; color:var(--muted); line-height:1.35; }
+
+/* OFFER CARD */
+.offer-wrap { border:2.5px solid var(--amber); border-radius:12px; overflow:hidden; margin-bottom:22px; }
+.offer-hd { background:var(--amber); padding:13px 20px; display:flex; justify-content:space-between; align-items:center; }
+.offer-name { font-size:16pt; font-weight:800; color:var(--dark); }
+.offer-badge { background:var(--dark); color:var(--amber); font-size:7.5pt; font-weight:700; padding:4px 11px; border-radius:4px; text-transform:uppercase; }
+.offer-body { padding:18px 20px; }
+.price-row { display:flex; align-items:flex-end; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+.price { font-size:28pt; font-weight:800; line-height:1; }
+.price-unit { font-size:10pt; color:var(--muted); padding-bottom:3px; }
+.price-col { display:flex; flex-direction:column; gap:4px; padding-bottom:3px; }
+.price-annual { background:#DCFCE7; border:1px solid #BBF7D0; border-radius:5px; padding:3px 10px; font-size:9.5pt; font-weight:700; color:var(--green); }
+.price-saving { font-size:8pt; color:var(--muted); }
+.offer-feats { list-style:none; display:grid; grid-template-columns:1fr 1fr; gap:6px 18px; }
+.offer-feats li { font-size:9pt; display:flex; gap:6px; align-items:flex-start; }
+.offer-feats li::before { content:'✓'; color:var(--green); font-weight:800; flex-shrink:0; }
+
+/* PILOT BOX */
+.pilot-box { background:var(--dark); border-radius:12px; padding:22px 26px; margin-bottom:20px; }
+.pilot-box h3 { color:var(--amber); font-size:12pt; font-weight:700; margin-bottom:10px; }
+.pilot-box p { color:rgba(255,255,255,0.75); font-size:9.5pt; margin-bottom:14px; line-height:1.55; }
+.pilot-timeline { display:grid; grid-template-columns:1fr auto 1fr; gap:0; align-items:center; margin-bottom:14px; }
+.pilot-step { background:rgba(255,255,255,0.08); border-radius:10px; padding:14px 16px; }
+.pilot-step .ps-phase { font-size:7pt; font-weight:700; color:var(--amber); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+.pilot-step .ps-title { font-size:10pt; font-weight:700; color:#fff; margin-bottom:3px; }
+.pilot-step .ps-amount { font-size:9pt; color:rgba(255,255,255,0.6); }
+.pilot-arrow { font-size:22pt; color:var(--amber); text-align:center; font-weight:300; }
+.pilot-step.highlight { background:rgba(196,154,60,0.2); border:1px solid rgba(196,154,60,0.4); }
+.pilot-step.highlight .ps-title { color:var(--amber); }
+.pilot-calc { background:rgba(255,255,255,0.06); border-radius:8px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; }
+.pilot-calc .sans { font-size:8.5pt; color:rgba(255,255,255,0.4); text-decoration:line-through; }
+.pilot-calc .avec { font-size:11pt; font-weight:700; color:var(--green); }
+.pilot-calc .eco { font-size:8pt; color:rgba(255,255,255,0.5); }
+
+/* ONBOARDING */
+.onboarding-box { background:var(--creme); border-radius:12px; padding:20px 24px; margin-bottom:18px; }
+.onboarding-box h3 { font-size:11pt; font-weight:700; margin-bottom:8px; }
+.onboarding-box p { font-size:9pt; color:var(--muted); margin-bottom:12px; line-height:1.5; }
+.ob-steps { list-style:none; margin-bottom:14px; }
+.ob-steps li { display:flex; gap:9px; margin-bottom:7px; font-size:9pt; align-items:flex-start; }
+.ob-n { background:var(--amber); color:var(--dark); width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:7.5pt; font-weight:800; flex-shrink:0; margin-top:1px; }
+.ob-url { background:#fff; border:1px solid var(--amber); border-radius:7px; padding:10px 14px; font-size:9.5pt; color:var(--amber); font-weight:700; }
+
+/* NEXT STEPS */
+.ns-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:22px; }
+.ns-card { border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+.ns-card.feat { background:var(--amber-light); border-color:var(--amber); }
+.ns-phase { font-size:7.5pt; font-weight:700; color:var(--amber); letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; }
+.ns-card.feat .ns-phase { color:#7C5A0E; }
+.ns-title { font-size:10pt; font-weight:700; margin-bottom:4px; }
+.ns-desc { font-size:8.5pt; color:var(--muted); line-height:1.4; }
+
+/* VISUAL LAYOUT */
+.vl { display:grid; grid-template-columns:1fr 1fr; gap:22px; align-items:start; }
+.vcap { font-size:7.5pt; color:var(--muted); text-align:center; margin-top:5px; font-style:italic; }
+
+/* DASHBOARD MOCKUP */
+.dash { background:#F8F9FA; border:1px solid var(--border); border-radius:11px; overflow:hidden; box-shadow:0 3px 16px rgba(0,0,0,0.06); }
+.dash-top { background:var(--dark); padding:9px 14px; display:flex; justify-content:space-between; align-items:center; }
+.dash-top-t { color:#fff; font-size:9.5pt; font-weight:700; }
+.dash-top-l { color:var(--amber); font-size:8.5pt; font-weight:800; }
+.dash-nav { background:#fff; border-bottom:1px solid var(--border); padding:0 14px; display:flex; gap:0; }
+.dn-item { padding:8px 12px; font-size:8pt; font-weight:600; color:var(--muted); border-bottom:2px solid transparent; }
+.dn-item.active { color:var(--amber); border-bottom-color:var(--amber); }
+.dash-body { padding:12px 14px; }
+.dash-kpi-row { display:flex; gap:8px; margin-bottom:12px; }
+.dk { flex:1; background:#fff; border-radius:7px; padding:9px 10px; border:1px solid var(--border); }
+.dk-lbl { font-size:6.5pt; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:3px; }
+.dk-val { font-size:14pt; font-weight:800; }
+.dk-val.g { color:var(--green); }
+.dk-val.a { color:var(--amber); }
+.dk-val.r { color:var(--red); }
+.dk-sub { font-size:6.5pt; color:var(--muted); margin-top:1px; }
+.e-tbl { width:100%; border-collapse:collapse; font-size:7.5pt; }
+.e-tbl th { background:var(--creme); padding:6px 8px; text-align:left; font-size:7pt; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; }
+.e-tbl td { padding:6px 8px; border-bottom:1px solid #F5F0E8; vertical-align:middle; }
+.e-tbl tr:last-child td { border-bottom:none; }
+.badge { display:inline-block; font-size:6.5pt; font-weight:700; padding:2px 6px; border-radius:8px; }
+.badge.ok { background:#DCFCE7; color:#15803D; }
+.badge.w { background:#FEF3C7; color:#B45309; }
+.badge.er { background:#FEE2E2; color:#991B1B; }
+.pb { height:4px; background:#E5E7EB; border-radius:8px; overflow:hidden; width:60px; }
+.pbf { height:100%; border-radius:8px; }
+.pbf.g { background:var(--green); }
+.pbf.a { background:var(--amber); }
+
+/* COMPARE TABLE */
+.cmp-tbl { width:100%; border-collapse:collapse; font-size:9pt; margin-bottom:18px; }
+.cmp-tbl th { padding:9px 12px; font-size:8pt; font-weight:700; text-align:left; }
+.cmp-tbl th.before { background:#FEF2F2; color:#991B1B; border-bottom:2px solid #FECACA; border-radius:6px 6px 0 0; }
+.cmp-tbl th.after { background:var(--amber); color:var(--dark); border-bottom:2px solid #B8891F; border-radius:6px 6px 0 0; }
+.cmp-tbl th.criteria { border-bottom:2px solid var(--border); }
+.cmp-tbl td { padding:8px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+.cmp-tbl td.before { background:#FFF5F5; }
+.cmp-tbl td.after { background:#FFFDF5; font-weight:600; }
+.chk { color:var(--green); font-weight:800; }
+.crs { color:var(--red); font-weight:800; }
+
+/* SIGNATURE */
+.sig-row { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:22px; padding-top:18px; border-top:1px solid var(--border); }
+.sig-block { text-align:center; }
+.sig-ttl { font-size:7.5pt; font-weight:700; color:var(--muted); letter-spacing:1px; text-transform:uppercase; margin-bottom:40px; }
+.sig-line { border-top:1px solid var(--dark); margin-bottom:6px; }
+.sig-name { font-size:9.5pt; font-weight:700; }
+.sig-role { font-size:8pt; color:var(--muted); }
+
+/* FOOTER */
+.footer { background:var(--dark); padding:24px 44px; text-align:center; color:rgba(255,255,255,0.4); font-size:8pt; }
+.footer a { color:var(--amber); text-decoration:none; font-weight:600; }
+
+hr { border:none; border-top:1px solid var(--border); margin:18px 0; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">Gen<span>Track</span></div>
+  <div class="nav-right">Yam's Hotel — Côte d'Ivoire<br><span style="color:var(--amber);font-weight:700;">Offre RONDE</span></div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">CONFIDENTIEL</div>
+  <div class="hero-logo">Gen<span>Track</span></div>
+  <div class="hero-tag">Maintenance intelligente des hôtels &nbsp;·&nbsp; wilfried.gtm@gmail.com</div>
+  <div class="hero-pre">Proposition Commerciale</div>
+  <div class="hero-title">Sachez ce qui se passe<br><span class="hl">avant que ça tombe<br>en panne</span></div>
+  <div class="hero-sub">Une ronde technique sur WhatsApp pour suivre vos équipements en temps réel — sans technicien sur place, sans application à installer.</div>
+  <div class="hero-meta">
+    <div class="hm"><label>Client</label><div class="v">Yam's Hotel — Côte d'Ivoire</div></div>
+    <div class="hm"><label>Destinataire</label><div class="v">M. Nathanael Akintola<br><span style="font-size:8.5pt;color:rgba(255,255,255,0.45);">Directeur — 1 an en poste</span></div></div>
+    <div class="hm"><label>Offre recommandée</label><div class="v" style="color:var(--amber);font-weight:700;">RONDE — 50 000 XOF/mois</div></div>
+  </div>
+</div>
+
+
+<!-- ===== SECTION 1 — CONSTAT ===== -->
+<div class="section">
+  <div class="sec-lbl">
+    <div class="sec-num">1</div>
+    <div class="sec-title">Ce que vous nous avez dit</div>
+  </div>
+
+  <div class="quote">
+    "Il y a beaucoup de choses à rattraper. Quand on règle un problème, tout de suite, c'est un autre problème qui vient. Ce sont des choses récurrentes. Les prestataires reviennent toujours pour la même chose."
+    <cite>— M. Nathanael Akintola, Directeur, Yam's Hotel, octobre 2026</cite>
+  </div>
+
+  <p class="sec-intro">Hôtel ouvert depuis décembre 2023, encore en phase de finalisation. 32 chambres sur une presqu'île, accès unique par une piste à 3-4 km de la ville. Une situation qui rend chaque panne plus coûteuse : les prestataires mettent du temps à venir, et rien ne permet aujourd'hui de voir les problèmes venir avant qu'ils arrivent.</p>
+
+  <div class="pain-grid">
+    <div class="pain-card">
+      <div class="pain-icon">📍</div>
+      <div>
+        <div class="pain-title">Localisation isolée</div>
+        <div class="pain-desc">3-4 km de la ville sur une piste. Quand une panne arrive, il faut attendre que le prestataire fasse le déplacement — parfois plusieurs heures.</div>
+      </div>
+    </div>
+    <div class="pain-card">
+      <div class="pain-icon">🔁</div>
+      <div>
+        <div class="pain-title">Pannes récurrentes</div>
+        <div class="pain-desc">Les prestataires reviennent toujours pour les mêmes problèmes. Sans historique, impossible de savoir pourquoi ni d'anticiper.</div>
+      </div>
+    </div>
+    <div class="pain-card">
+      <div class="pain-icon">🔧</div>
+      <div>
+        <div class="pain-title">100% prestataires externes</div>
+        <div class="pain-desc">Aucun technicien sur place. Tout est déclenché en mode urgence, sans plan préventif, sans suivi entre les passages.</div>
+      </div>
+    </div>
+    <div class="pain-card">
+      <div class="pain-icon">⚡</div>
+      <div>
+        <div class="pain-title">Énergie non pilotée</div>
+        <div class="pain-desc">Factures CIE tous les 2 mois (~1M XOF). Aucun relevé régulier pour savoir où vous en êtes avant la facture.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="alert amber">
+    <div class="alert-icon">💡</div>
+    <div>
+      <strong>Ce que GenTrack change</strong>
+      <p>Avec une ronde hebdomadaire sur WhatsApp — même faite par un gardien — vous savez en temps réel l'état du groupe électrogène, du niveau de cuve, de la piscine. Vos prestataires arrivent briefés, avec un historique complet. Vous voyez les signaux d'alerte avant la panne.</p>
+    </div>
+  </div>
+
+  <table class="cmp-tbl">
+    <thead>
+      <tr>
+        <th class="criteria" style="width:34%;">Situation</th>
+        <th class="before" style="width:30%;">Aujourd'hui</th>
+        <th class="after" style="width:36%;">Avec GenTrack RONDE</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Suivi du groupe électrogène</td>
+        <td class="before"><span class="crs">✗</span> Aucun — prestataire à la demande</td>
+        <td class="after"><span class="chk">✓</span> Relevé compteur + niveau huile/gasoil chaque semaine sur WhatsApp</td>
+      </tr>
+      <tr>
+        <td>Piscine & équipements extérieurs</td>
+        <td class="before"><span class="crs">✗</span> 2 passages/sem. sans historique</td>
+        <td class="after"><span class="chk">✓</span> Rapport à chaque passage, anomalie remontée + photo</td>
+      </tr>
+      <tr>
+        <td>Signalement d'anomalie en chambre</td>
+        <td class="before"><span class="crs">✗</span> WhatsApp informel, pas tracé</td>
+        <td class="after"><span class="chk">✓</span> QR code → ticket structuré en 30 secondes</td>
+      </tr>
+      <tr>
+        <td>Historique pour les prestataires</td>
+        <td class="before"><span class="crs">✗</span> Aucun — ils arrivent à l'aveugle</td>
+        <td class="after"><span class="chk">✓</span> Historique complet des problèmes → interventions plus rapides</td>
+      </tr>
+      <tr>
+        <td>Suivi des consommations d'énergie</td>
+        <td class="before"><span class="crs">✗</span> Estimation à la facture CIE</td>
+        <td class="after"><span class="chk">✓</span> Relevés + comparaison au budget en temps réel</td>
+      </tr>
+      <tr>
+        <td>Rapport pour les propriétaires</td>
+        <td class="before"><span class="crs">✗</span> Pas de reporting structuré</td>
+        <td class="after"><span class="chk">✓</span> Rapport PDF mensuel automatique</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ===== SECTION 2 — L'OUTIL ===== -->
+<div class="section">
+  <div class="sec-lbl">
+    <div class="sec-num">2</div>
+    <div class="sec-title">Comment fonctionne la ronde GenTrack</div>
+  </div>
+
+  <p class="sec-intro">Tout fonctionne sur <strong>WhatsApp</strong>. La personne qui fait la ronde — un gardien, un prestataire, ou vous-même — reçoit les questions via WhatsApp et répond en quelques minutes. Tout remonte automatiquement dans votre tableau de bord.</p>
+
+  <div class="vl" style="margin-bottom:24px;">
+    <!-- Phone mockup -->
+    <div>
+      <div class="phone-wrap">
+        <div class="phone">
+          <div class="p-notch"><div class="p-notch-d"></div></div>
+          <div class="wa-hdr">
+            <div class="wa-av">🤖</div>
+            <div>
+              <div class="wa-nm">GenTrack Bot</div>
+              <div class="wa-st">Yam's Hotel — Ronde hebdo</div>
+            </div>
+          </div>
+          <div class="wa-body">
+            <div class="wa-sep"><span>Vendredi 09 oct. 07:15</span></div>
+
+            <div class="wm in">
+              <div class="wb-bot">
+                <div class="bot-n">GenTrack</div>
+                Bonjour ! Ronde <strong>vendredi 9 oct.</strong><br>
+                Quel équipement commencer ?
+                <div class="wc-row">
+                  <div class="wc">1 — Groupe électrogène</div>
+                  <div class="wc">2 — Piscine</div>
+                  <div class="wc">3 — Réservoirs</div>
+                </div>
+                <div class="wb-meta">07:15 ✓✓</div>
+              </div>
+            </div>
+
+            <div class="wm out">
+              <div class="wb">1<div class="wb-meta">07:16 ✓✓</div></div>
+            </div>
+
+            <div class="wm in">
+              <div class="wb-bot">
+                <div class="bot-n">GenTrack</div>
+                <strong>GE 320 KVA</strong> — Relevé compteur horaire ?
+                <div class="wb-meta">07:16 ✓✓</div>
+              </div>
+            </div>
+
+            <div class="wm out">
+              <div class="wb">1248<div class="wb-meta">07:17 ✓✓</div></div>
+            </div>
+
+            <div class="wm in">
+              <div class="wb-bot">
+                <div class="bot-n">GenTrack</div>
+                Niveau gasoil ?
+                <div class="wc-row">
+                  <div class="wc">1 — Plein (75-100%)</div>
+                  <div class="wc">2 — Moyen (30-74%)</div>
+                  <div class="wc">3 — Bas (&lt;30%)</div>
+                </div>
+                <div class="wb-meta">07:17 ✓✓</div>
+              </div>
+            </div>
+
+            <div class="wm out">
+              <div class="wb">2 — environ 55%<div class="wb-meta">07:17 ✓✓</div></div>
+            </div>
+
+            <div class="wm in">
+              <div class="wb-bot">
+                <div class="bot-n">GenTrack</div>
+                Niveau huile ?
+                <div class="wc-row">
+                  <div class="wc">1 — Bon</div>
+                  <div class="wc">2 — Moyen</div>
+                  <div class="wc">3 — Bas</div>
+                </div>
+                <div class="wb-meta">07:18 ✓✓</div>
+              </div>
+            </div>
+
+            <div class="wm out">
+              <div class="wb">1<div class="wb-meta">07:18 ✓✓</div></div>
+            </div>
+
+            <div class="wm in">
+              <div class="wb-bot">
+                <div class="bot-n">GenTrack</div>
+                <span style="color:var(--wa-green);font-weight:700;">✓ GE enregistré.</span> Prochain équipement ou fin ?
+                <div class="wb-meta">07:18 ✓✓</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="vcap">Ronde sur WhatsApp — 5 min, même pour un gardien</div>
+    </div>
+
+    <!-- Dashboard mockup -->
+    <div>
+      <div class="dash">
+        <div class="dash-top">
+          <div class="dash-top-t">&#x25CF; Yam's Hotel</div>
+          <div class="dash-top-l">GenTrack</div>
+        </div>
+        <div class="dash-nav">
+          <div class="dn-item active">Équipements</div>
+          <div class="dn-item">Énergie</div>
+          <div class="dn-item">Rapports</div>
+        </div>
+        <div class="dash-body">
+          <div class="dash-kpi-row">
+            <div class="dk"><div class="dk-lbl">Rondes ce mois</div><div class="dk-val g">8/8</div><div class="dk-sub">100% conformité</div></div>
+            <div class="dk"><div class="dk-lbl">Tickets ouverts</div><div class="dk-val r">1</div><div class="dk-sub">Piscine — filtre</div></div>
+            <div class="dk"><div class="dk-lbl">GE — autonomie</div><div class="dk-val a">~9j</div><div class="dk-sub">55% cuve · ravitailler</div></div>
+          </div>
+          <table class="e-tbl">
+            <thead>
+              <tr>
+                <th>Équipement</th>
+                <th>Dernière ronde</th>
+                <th>État</th>
+                <th>Santé</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>GE 320 KVA</strong></td>
+                <td style="color:var(--muted);">Auj. 07:18</td>
+                <td><span class="badge ok">OK</span></td>
+                <td><div class="pb"><div class="pbf g" style="width:75%;"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>Piscine</strong></td>
+                <td style="color:var(--muted);">Hier 08:30</td>
+                <td><span class="badge w">Attention</span></td>
+                <td><div class="pb"><div class="pbf a" style="width:45%;"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>Réservoir eau</strong></td>
+                <td style="color:var(--muted);">Auj. 07:25</td>
+                <td><span class="badge ok">OK</span></td>
+                <td><div class="pb"><div class="pbf g" style="width:80%;"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>Élec. générale</strong></td>
+                <td style="color:var(--muted);">Auj. 07:30</td>
+                <td><span class="badge ok">OK</span></td>
+                <td><div class="pb"><div class="pbf g" style="width:90%;"></div></div></td>
+              </tr>
+              <tr>
+                <td><strong>Réfrig. cuisine</strong></td>
+                <td style="color:var(--muted);">Auj. 07:35</td>
+                <td><span class="badge ok">OK</span></td>
+                <td><div class="pb"><div class="pbf g" style="width:85%;"></div></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="vcap">Tableau de bord web — vue en temps réel</div>
+    </div>
+  </div>
+
+  <!-- QR CODE FLOW -->
+  <div style="background:var(--creme);border-radius:12px;padding:20px 22px;margin-bottom:8px;">
+    <div style="font-size:8pt;font-weight:700;color:var(--amber);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;">Fonctionnalité incluse</div>
+    <div style="font-size:12pt;font-weight:700;margin-bottom:14px;">Signalement QR Code — pour la réception et le personnel</div>
+    <div class="flow">
+      <div class="flow-step">
+        <div class="f-icon ab">📱</div>
+        <div class="f-title">Scanner le QR</div>
+        <div class="f-desc">Affiche dans chaque chambre, à la réception, à la piscine</div>
+      </div>
+      <div class="flow-step">
+        <div class="f-icon db">💬</div>
+        <div class="f-title">WhatsApp s'ouvre</div>
+        <div class="f-desc">La zone est pré-identifiée, le bot guide en 3 questions</div>
+      </div>
+      <div class="flow-step">
+        <div class="f-icon gb">📸</div>
+        <div class="f-title">Photo + description</div>
+        <div class="f-desc">30 secondes depuis n'importe quel téléphone</div>
+      </div>
+      <div class="flow-step">
+        <div class="f-icon ab">🎫</div>
+        <div class="f-title">Ticket créé</div>
+        <div class="f-desc">Vous recevez une alerte WhatsApp avec tous les détails</div>
+      </div>
+      <div class="flow-step">
+        <div class="f-icon db" style="font-size:14pt;">👷</div>
+        <div class="f-title">Prestataire briefé</div>
+        <div class="f-desc">Envoyez le ticket directement au prestataire avant qu'il arrive</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KEY INSIGHT for isolated hotel -->
+  <div class="alert amber" style="margin-top:14px;">
+    <div class="alert-icon">🗺️</div>
+    <div>
+      <strong>Particulièrement utile pour un hôtel isolé</strong>
+      <p>Votre prestataire est à 3-4 km. Avant même qu'il parte, vous lui envoyez depuis GenTrack l'historique du problème, les photos, et les derniers relevés. Il arrive préparé, avec les bonnes pièces. Moins de déplacements inutiles, moins d'attente pour vos clients.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== SECTION 3 — OFFRE ===== -->
+<div class="section">
+  <div class="sec-lbl">
+    <div class="sec-num">3</div>
+    <div class="sec-title">Offre recommandée & Tarif</div>
+  </div>
+
+  <p class="sec-intro">Vous nous avez dit que votre premier besoin, c'est d'avoir une ronde WhatsApp et un tableau de bord équipements en temps réel. C'est exactement ce que couvre l'offre <strong>RONDE</strong>.</p>
+
+  <div class="offer-wrap">
+    <div class="offer-hd">
+      <div class="offer-name">RONDE</div>
+      <div class="offer-badge">Recommandé — votre choix</div>
+    </div>
+    <div class="offer-body">
+      <div class="price-row">
+        <div class="price">50 000</div>
+        <div class="price-unit">XOF / mois</div>
+        <div class="price-col">
+          <div class="price-annual">500 000 XOF / an — 2 mois offerts</div>
+          <div class="price-saving">vs 600 000 XOF en mensuel — économie de 100 000 XOF</div>
+        </div>
+      </div>
+      <ul class="offer-feats">
+        <li>Rondes techniques sur WhatsApp</li>
+        <li>Tableau de bord équipements temps réel</li>
+        <li>Signalement anomalies par QR code</li>
+        <li>Alertes automatiques par WhatsApp</li>
+        <li>Historique des rondes & incidents</li>
+        <li>Rapport mensuel PDF automatique</li>
+        <li>Jusqu'à 10 équipements suivis</li>
+        <li>Nombre d'utilisateurs illimité</li>
+        <li>Support WhatsApp inclus</li>
+        <li>Onboarding & configuration inclus</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- PILOT OFFER -->
+  <div class="pilot-box">
+    <h3>Offre Pilot — Sans engagement, sans risque</h3>
+    <p>Démarrez avec 3 mois de pilot pour tester l'outil dans vos conditions réelles. Si vous passez à l'abonnement annuel à l'issue du pilot, vous bénéficiez de <strong>2 mois offerts</strong>.</p>
+
+    <div class="pilot-timeline">
+      <div class="pilot-step">
+        <div class="ps-phase">Pilot — 3 mois</div>
+        <div class="ps-title">Testez en conditions réelles</div>
+        <div class="ps-amount">3 × 50 000 = 150 000 XOF</div>
+      </div>
+      <div class="pilot-arrow">→</div>
+      <div class="pilot-step highlight">
+        <div class="ps-phase">Abonnement annuel</div>
+        <div class="ps-title">2 mois offerts sur l'annuel</div>
+        <div class="ps-amount" style="color:rgba(196,154,60,0.8);">500 000 XOF / an au lieu de 600 000</div>
+      </div>
+    </div>
+
+    <div class="pilot-calc">
+      <div>
+        <div class="sans">12 × 50 000 = 600 000 XOF en mensuel</div>
+        <div class="avec">500 000 XOF / an avec l'offre annuelle</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="eco">Vous économisez</div>
+        <div style="font-size:16pt;font-weight:800;color:var(--green);">100 000 XOF</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAT ROW -->
+  <div class="sg sg-4">
+    <div class="sc amber-b">
+      <div class="sc-lbl">Pilot mensuel</div>
+      <div class="sc-val" style="font-size:16pt;">50 000</div>
+      <div class="sc-sub">XOF / mois</div>
+    </div>
+    <div class="sc green">
+      <div class="sc-lbl">Annuel (2 mois offerts)</div>
+      <div class="sc-val" style="font-size:16pt;">500 000</div>
+      <div class="sc-sub">XOF / an (~41 667/mois)</div>
+    </div>
+    <div class="sc creme">
+      <div class="sc-lbl">Équipements à configurer</div>
+      <div class="sc-val">5–6</div>
+      <div class="sc-sub">GE, piscine, réservoirs, élec, cuisine</div>
+    </div>
+    <div class="sc dark">
+      <div class="sc-lbl">Opérationnel en</div>
+      <div class="sc-val">48h</div>
+      <div class="sc-sub">Après réception de vos équipements</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== SECTION 4 — DÉMARRER ===== -->
+<div class="section">
+  <div class="sec-lbl">
+    <div class="sec-num">4</div>
+    <div class="sec-title">Démarrer — ce qu'il faut faire</div>
+  </div>
+
+  <div class="onboarding-box">
+    <h3>Préparez votre compte dès maintenant</h3>
+    <p>Il suffit de renseigner vos informations et vos équipements. En moins de 48h, votre compte est configuré et vos équipes peuvent faire la première ronde.</p>
+    <ol class="ob-steps">
+      <li><div class="ob-n">1</div><div>Accédez au lien d'onboarding ci-dessous (15 min)</div></li>
+      <li><div class="ob-n">2</div><div>Renseignez les informations de l'hôtel et listez vos 5-6 équipements (GE, piscine, réservoirs…)</div></li>
+      <li><div class="ob-n">3</div><div><strong>Téléchargez le modèle Excel équipements</strong>, complétez-le et renvoyez-le</div></li>
+      <li><div class="ob-n">4</div><div>Votre compte est configuré sous 48h — première ronde dès le lendemain matin</div></li>
+    </ol>
+    <div class="ob-url">https://gen-track.vercel.app/onboarding.html</div>
+  </div>
+
+  <div class="ns-grid">
+    <div class="ns-card">
+      <div class="ns-phase">Étape 1 — Vous</div>
+      <div class="ns-title">Partager avec les propriétaires</div>
+      <div class="ns-desc">Transmettez cette proposition pour validation. Nous pouvons participer à un appel avec les propriétaires si besoin — avec plaisir.</div>
+    </div>
+    <div class="ns-card">
+      <div class="ns-phase">Étape 2 — Cette semaine</div>
+      <div class="ns-title">Lister vos 5-6 équipements</div>
+      <div class="ns-desc">GE 320 KVA, piscine, réservoirs, tableau électrique général, réfrigérateurs cuisine. Envoyez-nous la liste par WhatsApp ou via l'onboarding.</div>
+    </div>
+    <div class="ns-card">
+      <div class="ns-phase">Follow-up — Milieu de semaine</div>
+      <div class="ns-title">Appel de suivi convenu</div>
+      <div class="ns-desc">Suite à votre échange avec les propriétaires lundi. Nous nous rappelons en milieu de semaine pour aligner la suite.</div>
+    </div>
+    <div class="ns-card feat">
+      <div class="ns-phase">Engagement</div>
+      <div class="ns-title">Pilot 3 mois sans engagement</div>
+      <div class="ns-desc">Aucun engagement annuel avant la fin du pilot. Vous testez en conditions réelles et décidez en connaissance de cause.</div>
+    </div>
+  </div>
+
+  <div class="sig-row">
+    <div class="sig-block">
+      <div class="sig-ttl">Pour GenTrack</div>
+      <div class="sig-line"></div>
+      <div class="sig-name">Wilfried Tchinda</div>
+      <div class="sig-role">Fondateur — GenTrack</div>
+    </div>
+    <div class="sig-block">
+      <div class="sig-ttl">Pour Yam's Hotel</div>
+      <div class="sig-line"></div>
+      <div class="sig-name">M. Nathanael Akintola</div>
+      <div class="sig-role">Directeur — Yam's Hotel, Côte d'Ivoire</div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div style="font-size:15pt;font-weight:800;color:var(--amber);margin-bottom:5px;">Gen<span style="color:rgba(255,255,255,0.6);">Track</span></div>
+  <div style="margin-bottom:4px;">Maintenance intelligente des hôtels d'Afrique de l'Ouest</div>
+  <div><a href="https://gen-track.vercel.app">gen-track.vercel.app</a> &nbsp;·&nbsp; wilfried.gtm@gmail.com &nbsp;·&nbsp; <span style="color:var(--amber);">Proposition valable 30 jours</span></div>
+</div>
+
+</div>
+</body>
+</html>

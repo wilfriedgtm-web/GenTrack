@@ -189,8 +189,8 @@ async function load(){
 
   var[siteRows,relRows,budgetRows]=await Promise.all([
     supaGet('sites','id=eq.'+_sid+'&select=nom,nb_chambres&limit=1'),
-    supaGet('releves_energie','site_id=eq.'+_sid+'&date_releve=gte.'+since8jStr+'&select=id,date_releve,to_percent,nb_couverts&order=date_releve.desc&limit=9'),
-    supaGet('energie_budget_mensuel','site_id=eq.'+_sid+'&annee=eq.'+now.getFullYear()+'&mois=eq.'+(now.getMonth()+1)+'&select=to_pct,nb_couverts_budget,nb_chambres_budget&limit=1')
+    supaGet('releves_energie','site_id=eq.'+_sid+'&date_releve=gte.'+since8jStr+'&select=id,date_releve,to_percent,nb_couverts,nb_chambres_occupees&order=date_releve.desc&limit=9'),
+    supaGet('energie_budget_mensuel','site_id=eq.'+_sid+'&annee=eq.'+now.getFullYear()+'&mois=eq.'+(now.getMonth()+1)+'&select=nb_couverts_budget,nb_chambres_budget&limit=1')
   ]);
 
   if(!siteRows||!siteRows.length){showError('Site introuvable','L\'identifiant site est invalide.');return;}
@@ -209,11 +209,11 @@ function renderForm(){
 
   // Trouver le relevé d'hier s'il existe
   var hierReleve=_releves.find(function(r){return r.date_releve===hier;});
-  var toVal=hierReleve&&hierReleve.to_percent!=null?hierReleve.to_percent:'';
+  var chambresVal=hierReleve&&hierReleve.nb_chambres_occupees!=null?hierReleve.nb_chambres_occupees:'';
   var cvtVal=hierReleve&&hierReleve.nb_couverts!=null?hierReleve.nb_couverts:'';
 
   // Budget hints
-  var budgetToPct=_budget&&_budget.to_pct!=null?_budget.to_pct:null;
+  var budgetChambres=_budget&&_budget.nb_chambres_budget!=null?_budget.nb_chambres_budget:null;
   var budgetCvt=_budget&&_budget.nb_couverts_budget!=null?_budget.nb_couverts_budget:null;
 
   var html='';
@@ -239,15 +239,15 @@ function renderForm(){
   html+='<input type="date" id="saisie-date" value="'+hier+'" max="'+today+'" onchange="onDateChange()">';
   html+='</div>';
 
-  // Champs TO% + Couverts
+  // Champs Chambres occupées + Couverts
   html+='<div class="fields-grid">';
 
-  // TO%
+  // Chambres occupées
   html+='<div class="field-group">';
-  html+='<label>TO% <span style="font-weight:400;color:var(--text3)">(0–100)</span></label>';
-  html+='<div class="field-wrap"><input class="big-input'+(toVal!==''?' filled':'')+'" type="number" id="inp-to" min="0" max="100" step="1" placeholder="—" value="'+toVal+'" oninput="onToInput(this)"><span class="field-unit">%</span></div>';
-  html+='<div class="chambres-calc" id="calc-chambres">'+calcChambresText(toVal,nb)+'</div>';
-  if(budgetToPct!=null) html+='<div style="font-size:10px;color:var(--text3);text-align:center;margin-top:2px">Budget : '+budgetToPct+'%</div>';
+  html+='<label>Chambres occupées</label>';
+  html+='<div class="field-wrap"><input class="big-input'+(chambresVal!==''?' filled':'')+'" type="number" id="inp-chambres" min="0" step="1" placeholder="—" value="'+chambresVal+'" oninput="onChambresInput(this)"><span class="field-unit">ch</span></div>';
+  html+='<div class="chambres-calc" id="calc-to">'+calcToText(chambresVal,nb)+'</div>';
+  if(budgetChambres!=null) html+='<div style="font-size:10px;color:var(--text3);text-align:center;margin-top:2px">Budget : '+budgetChambres+' ch</div>';
   html+='</div>';
 
   // Couverts
@@ -274,19 +274,19 @@ function renderForm(){
   document.getElementById('main-wrap').innerHTML=html;
 }
 
-function calcChambresText(val,nb){
+function calcToText(val,nb){
   if(val===''||val==null||!nb)return'';
-  var pct=parseFloat(val);
-  if(isNaN(pct))return'';
-  var ch=Math.round(nb*pct/100);
-  return '= '+ch+' ch / '+nb;
+  var ch=parseInt(val);
+  if(isNaN(ch)||ch<0)return'';
+  var to=Math.round(ch/nb*100);
+  return '= '+to+'% TO / '+nb+' ch';
 }
 
-function onToInput(inp){
+function onChambresInput(inp){
   inp.classList.toggle('filled',inp.value!=='');
   var nb=_site.nb_chambres?parseInt(_site.nb_chambres):null;
-  var el=document.getElementById('calc-chambres');
-  if(el)el.textContent=calcChambresText(inp.value,nb);
+  var el=document.getElementById('calc-to');
+  if(el)el.textContent=calcToText(inp.value,nb);
 }
 
 function onDateChange(){
@@ -297,9 +297,10 @@ function onDateChange(){
   var toInp=document.getElementById('inp-to');
   var cvtInp=document.getElementById('inp-cvt');
   var btnSave=document.getElementById('btn-save');
-  if(toInp){
-    toInp.value=releve&&releve.to_percent!=null?releve.to_percent:'';
-    toInp.classList.toggle('filled',toInp.value!=='');
+  var chambresInp=document.getElementById('inp-chambres');
+  if(chambresInp){
+    chambresInp.value=releve&&releve.nb_chambres_occupees!=null?releve.nb_chambres_occupees:'';
+    chambresInp.classList.toggle('filled',chambresInp.value!=='');
   }
   if(cvtInp){
     cvtInp.value=releve&&releve.nb_couverts!=null?releve.nb_couverts:'';
@@ -307,8 +308,8 @@ function onDateChange(){
   }
   if(btnSave)btnSave.textContent='Enregistrer la nuit du '+fmtDate(d);
   var nb=_site.nb_chambres?parseInt(_site.nb_chambres):null;
-  var el=document.getElementById('calc-chambres');
-  if(el&&toInp)el.textContent=calcChambresText(toInp.value,nb);
+  var el=document.getElementById('calc-to');
+  if(el&&chambresInp)el.textContent=calcToText(chambresInp.value,nb);
 }
 
 function renderHist(nb){
@@ -322,17 +323,17 @@ function renderHist(nb){
   _releves.forEach(function(r){releveMap[r.date_releve]=r;});
 
   var html='<table class="hist-table">';
-  html+='<thead><tr><th>Nuit</th><th>TO%</th><th>Couverts</th><th></th></tr></thead>';
+  html+='<thead><tr><th>Nuit</th><th>Ch. occ.</th><th>Couverts</th><th></th></tr></thead>';
   html+='<tbody>';
 
   dates.forEach(function(d){
     var r=releveMap[d];
-    var hasSaisie=r&&(r.to_percent!=null||r.nb_couverts!=null);
+    var hasSaisie=r&&(r.nb_chambres_occupees!=null||r.nb_couverts!=null);
     var isJustSaved=(_savedDate===d);
     html+='<tr>';
     html+='<td><span class="hist-date">'+fmtDate(d)+'</span></td>';
     if(hasSaisie){
-      html+='<td class="hist-val">'+(r.to_percent!=null?r.to_percent+'%':'<span class="hist-empty">—</span>')+'</td>';
+      html+='<td class="hist-val">'+(r.nb_chambres_occupees!=null?r.nb_chambres_occupees+' ch':'<span class="hist-empty">—</span>')+'</td>';
       html+='<td class="hist-val">'+(r.nb_couverts!=null?r.nb_couverts:'<span class="hist-empty">—</span>')+'</td>';
       html+='<td>'+(isJustSaved?'<span class="badge-saved">Sauvegardé</span>':'<button class="edit-link" onclick="editDate(\''+d+'\')">Modifier</button>')+'</td>';
     }else{
@@ -354,34 +355,39 @@ function editDate(d){
 
 async function save(){
   var dateEl=document.getElementById('saisie-date');
-  var toEl=document.getElementById('inp-to');
+  var chambresEl=document.getElementById('inp-chambres');
   var cvtEl=document.getElementById('inp-cvt');
   var btn=document.getElementById('btn-save');
   var msgOk=document.getElementById('msg-ok');
   var msgErr=document.getElementById('msg-err');
 
-  if(!dateEl||!toEl||!cvtEl)return;
+  if(!dateEl||!chambresEl||!cvtEl)return;
   var dateVal=dateEl.value;
-  var toRaw=toEl.value.trim();
+  var chambresRaw=chambresEl.value.trim();
   var cvtRaw=cvtEl.value.trim();
 
   // Validation
-  if(toRaw===''&&cvtRaw===''){
-    showMsg('err','Saisissez au moins le TO% ou le nombre de couverts.');return;
+  if(chambresRaw===''&&cvtRaw===''){
+    showMsg('err','Saisissez au moins le nombre de chambres ou de couverts.');return;
   }
-  var toNum=toRaw!==''?parseFloat(toRaw):null;
+  var chambresNum=chambresRaw!==''?parseInt(chambresRaw,10):null;
   var cvtNum=cvtRaw!==''?parseInt(cvtRaw,10):null;
-  if(toNum!=null&&(toNum<0||toNum>100)){showMsg('err','Le TO% doit être entre 0 et 100.');return;}
+  if(chambresNum!=null&&chambresNum<0){showMsg('err','Le nombre de chambres ne peut pas être négatif.');return;}
   if(cvtNum!=null&&cvtNum<0){showMsg('err','Le nombre de couverts ne peut pas être négatif.');return;}
 
   btn.disabled=true;
   btn.innerHTML='<span class="spinner"></span>Enregistrement…';
 
   // Chercher relevé existant pour cette date
-  var existing=await supaGet('releves_energie','site_id=eq.'+_sid+'&date_releve=eq.'+dateVal+'&select=id,to_percent,nb_couverts&limit=1');
+  var existing=await supaGet('releves_energie','site_id=eq.'+_sid+'&date_releve=eq.'+dateVal+'&select=id,nb_chambres_occupees,nb_couverts&limit=1');
   var ok=false;
+  var nb=_site.nb_chambres?parseInt(_site.nb_chambres):null;
   var data={updated_at:new Date().toISOString()};
-  if(toNum!=null)data.to_percent=toNum;
+  if(chambresNum!=null){
+    data.nb_chambres_occupees=chambresNum;
+    // Calcul to_percent pour compatibilité avec les autres vues
+    if(nb&&nb>0)data.to_percent=Math.round(chambresNum/nb*100);
+  }
   if(cvtNum!=null)data.nb_couverts=cvtNum;
 
   if(existing&&existing.length){

@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>GenTrack · Planning de passage — UX V2</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --dark:#12151E;--dark2:#1E2332;
+  --text:#1A1D28;--text2:#5A5F78;--text3:#9AA0B8;
+  --border:#E4E6EF;--bg:#F4F5FA;--white:#fff;
+  --amber:#E8A020;--amber-pale:#FFF6E0;--amber-border:#F5D080;--amber-dark:#B87A10;
+  --vert:#1B7A4A;--vert-pale:#E8F7EE;--vert-border:#A8DEC0;--vert-text:#155F39;
+  --rouge:#C0392B;--rouge-pale:#FDF0EE;--rouge-border:#F0B8B2;--rouge-text:#9B2D22;
+  --orange:#D46B0A;--orange-pale:#FEF3E5;--orange-border:#F5C87A;--orange-text:#A85200;
+}
+html,body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text)}
+body{max-width:390px;margin:0 auto;position:relative;min-height:100vh}
+
+/* ── HEADER ── */
+.header{background:linear-gradient(145deg,var(--dark),var(--dark2));padding:14px 16px 0;position:sticky;top:0;z-index:50;box-shadow:0 2px 20px rgba(0,0,0,.3)}
+.hdr-top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.hdr-back{font-size:18px;color:rgba(255,255,255,.6);cursor:pointer;padding:2px}
+.hdr-title{font-size:17px;font-weight:800;color:#fff;flex:1}
+.hdr-site{font-size:11px;color:var(--amber);font-weight:600}
+
+/* STAT ROW */
+.stat-row{display:flex;gap:6px;margin-bottom:12px}
+.stat-card{flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:8px 6px;text-align:center;cursor:pointer}
+.stat-card.active-rouge{background:rgba(192,57,43,.25);border-color:rgba(192,57,43,.5)}
+.stat-card.active-amber{background:rgba(232,160,32,.2);border-color:rgba(232,160,32,.4)}
+.stat-card.active-vert{background:rgba(27,122,74,.2);border-color:rgba(27,122,74,.4)}
+.stat-val{font-size:20px;font-weight:900;line-height:1;margin-bottom:2px}
+.stat-val.rouge{color:var(--rouge);filter:brightness(1.4)}
+.stat-val.amber{color:var(--amber)}
+.stat-val.vert{color:#4ADE80}
+.stat-val.grey{color:rgba(255,255,255,.4)}
+.stat-label{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.4)}
+.stat-card.active-rouge .stat-label{color:rgba(255,200,200,.7)}
+.stat-card.active-amber .stat-label{color:rgba(255,220,100,.7)}
+.stat-card.active-vert .stat-label{color:rgba(150,255,180,.7)}
+
+/* FILTER TABS */
+.filter-tabs{display:flex;gap:0;overflow-x:auto;border-bottom:1px solid rgba(255,255,255,.1)}
+.filter-tabs::-webkit-scrollbar{display:none}
+.ftab{flex-shrink:0;padding:8px 14px;font-size:12px;font-weight:600;color:rgba(255,255,255,.45);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.ftab.active{color:#fff;border-bottom-color:var(--amber)}
+
+/* ── CONTENT ── */
+.content{padding:12px 14px 100px}
+
+/* Section header */
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 0 7px;position:sticky;top:110px;background:var(--bg);z-index:10}
+.sec-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--text3)}
+.sec-stats{font-size:11px;font-weight:600}
+.sec-stats .ok{color:var(--vert-text)}
+.sec-stats .bad{color:var(--rouge-text)}
+.sec-stats .warn{color:var(--orange-text)}
+
+/* ZONE CARD */
+.zone-card{background:var(--white);border:1.5px solid var(--border);border-radius:11px;padding:10px 12px;display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:5px;position:relative;overflow:hidden;transition:border-color .1s}
+.zone-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:11px 0 0 11px}
+.zone-card.late{border-color:var(--rouge-border)}.zone-card.late::before{background:var(--rouge)}
+.zone-card.warn{border-color:var(--amber-border)}.zone-card.warn::before{background:var(--amber)}
+.zone-card.ok{border-color:var(--vert-border)}.zone-card.ok::before{background:var(--vert)}
+.zone-card.never{}.zone-card.never::before{background:var(--text3)}
+.zone-card:active{opacity:.85}
+.zc-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.late .zc-icon{background:var(--rouge-pale)}
+.warn .zc-icon{background:var(--amber-pale)}
+.ok .zc-icon{background:var(--vert-pale)}
+.never .zc-icon{background:var(--bg)}
+.zc-body{flex:1;min-width:0}
+.zc-name{font-size:13px;font-weight:700;color:var(--text)}
+.zc-meta{font-size:11px;color:var(--text2);margin-top:1px}
+.zc-right{text-align:right;flex-shrink:0}
+.due-chip{display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;line-height:1.3}
+.chip-late{background:var(--rouge-pale);color:var(--rouge-text)}
+.chip-warn{background:var(--amber-pale);color:var(--amber-dark)}
+.chip-ok{background:var(--vert-pale);color:var(--vert-text)}
+.chip-never{background:var(--bg);color:var(--text3);border:1px solid var(--border)}
+.zc-lastvisit{font-size:10px;color:var(--text3);margin-top:3px}
+.zc-nextvisit{font-size:10px;color:var(--text3);margin-top:1px}
+
+/* ÉTAGE SUB-HEADER */
+.et-hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 2px 4px;margin-top:8px}
+.et-title{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em}
+.et-cfg-btn{font-size:11px;background:none;border:1px solid var(--border);border-radius:20px;padding:3px 10px;cursor:pointer;color:var(--text3)}
+
+/* GROUPE FREQ PANEL */
+.grp-panel{background:#FFFDF6;border:1.5px solid var(--amber-border);border-radius:10px;padding:13px 14px;margin-bottom:8px}
+.grp-panel-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px}
+.grp-section-label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.grp-chips{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+.grp-chip{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:white;color:var(--text2)}
+.grp-chip.active{border-color:var(--amber);background:var(--amber-pale);color:var(--amber-dark)}
+.grp-apply{width:100%;padding:9px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;background:var(--amber);color:white}
+
+/* HISTORIQUE */
+.histo-item{background:var(--white);border:1.5px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:6px}
+.histo-top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.histo-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;background:var(--amber-pale);color:var(--amber-dark)}
+.histo-title{flex:1;font-size:13px;font-weight:700}
+.histo-date{font-size:11px;color:var(--text2);font-weight:500}
+.histo-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.htag{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700}
+.htag-ok{background:var(--vert-pale);color:var(--vert-text);border:1px solid var(--vert-border)}
+.htag-bad{background:var(--rouge-pale);color:var(--rouge-text);border:1px solid var(--rouge-border)}
+.htag-partial{background:var(--orange-pale);color:var(--orange-text);border:1px solid var(--orange-border)}
+.htag-neutral{background:var(--bg);color:var(--text2);border:1px solid var(--border)}
+.histo-prog{margin-top:8px}
+.histo-prog-wrap{height:4px;background:var(--bg);border-radius:2px;overflow:hidden;margin-top:3px}
+.histo-prog-bar{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--vert),#22C55E)}
+
+/* CTA RONDE */
+.cta-ronde{width:100%;height:46px;border-radius:12px;border:none;font-size:14px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--dark),var(--dark2));color:var(--amber);margin-bottom:16px;letter-spacing:-.01em;box-shadow:0 4px 16px rgba(18,21,30,.2)}
+
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:390px;background:var(--white);border-top:1.5px solid var(--border);display:flex;padding:8px 0 16px;box-shadow:0 -4px 20px rgba(18,21,30,.08);z-index:40}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:4px 0}
+.nav-icon{font-size:20px}
+.nav-label{font-size:10px;font-weight:600;color:var(--text3)}
+.nav-item.active .nav-label{color:var(--amber-dark)}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="hdr-top">
+    <div class="hdr-back">←</div>
+    <div>
+      <div class="hdr-title">Planning de passage</div>
+      <div class="hdr-site">ATAF — Plateau</div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stat-row">
+    <div class="stat-card" onclick="setFilter('late')">
+      <div class="stat-val rouge">4</div>
+      <div class="stat-label">En retard</div>
+    </div>
+    <div class="stat-card" onclick="setFilter('warn')">
+      <div class="stat-val amber">7</div>
+      <div class="stat-label">Bientôt</div>
+    </div>
+    <div class="stat-card" onclick="setFilter('ok')">
+      <div class="stat-val vert">16</div>
+      <div class="stat-label">Zones OK</div>
+    </div>
+    <div class="stat-card" onclick="setFilter('never')">
+      <div class="stat-val grey">33</div>
+      <div class="stat-label">Jamais</div>
+    </div>
+  </div>
+
+  <!-- FILTER TABS -->
+  <div class="filter-tabs" id="filters">
+    <div class="ftab active" onclick="setFilter('all',this)">Toutes (60)</div>
+    <div class="ftab" onclick="setFilter('late',this)">🔴 En retard (4)</div>
+    <div class="ftab" onclick="setFilter('warn',this)">🟡 Bientôt (7)</div>
+    <div class="ftab" onclick="setFilter('ok',this)">✅ OK (16)</div>
+    <div class="ftab" onclick="setFilter('never',this)">⬜ Jamais (33)</div>
+    <div class="ftab" onclick="setFilter('histo',this)">📅 Historique</div>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content" id="content">
+
+  <!-- CTA -->
+  <button class="cta-ronde" onclick="alert('Ouvre ronde-zones.html')">🏘️ Lancer la ronde de zones →</button>
+
+  <!-- SECTION EN RETARD -->
+  <div class="sec-hdr">
+    <span class="sec-title">🔴 En retard — Tour A</span>
+    <span class="sec-stats"><span class="bad">4 zones</span></span>
+  </div>
+
+  <!-- Étage sub-header avec bouton config groupe -->
+  <div class="et-hdr">
+    <span class="et-title">Étage 3</span>
+    <button class="et-cfg-btn" onclick="document.getElementById('grp-panel-demo').style.display=document.getElementById('grp-panel-demo').style.display==='none'?'block':'none'">⚙️ Configurer l'étage</button>
+  </div>
+
+  <!-- Panneau config fréquence groupe (démo interactif) -->
+  <div class="grp-panel" id="grp-panel-demo" style="display:none">
+    <div class="grp-panel-title">⚙️ Fréquence par groupe</div>
+    <div class="grp-section-label">Périmètre</div>
+    <div class="grp-chips" id="scope-chips">
+      <button class="grp-chip active" onclick="setScope(this,'etage')">Cet étage (Ét. 3)</button>
+      <button class="grp-chip" onclick="setScope(this,'bat')">Tout le bâtiment (Tour A)</button>
+      <button class="grp-chip" onclick="setScope(this,'site')">Tout le site</button>
+    </div>
+    <div class="grp-section-label">Nouvelle fréquence</div>
+    <div class="grp-chips" id="freq-chips">
+      <button class="grp-chip" onclick="setFreq(this,'7j')">7j – Hebdo</button>
+      <button class="grp-chip" onclick="setFreq(this,'14j')">14j</button>
+      <button class="grp-chip active" onclick="setFreq(this,'30j')">30j – Mensuel</button>
+      <button class="grp-chip" onclick="setFreq(this,'60j')">60j</button>
+      <button class="grp-chip" onclick="setFreq(this,'90j')">90j – Trimestriel</button>
+    </div>
+    <button class="grp-apply" onclick="alert('Fréquence 30j appliquée à l\'étage 3 (Tour A) — 12 zones mises à jour ✓')">Appliquer</button>
+  </div>
+
+  <div class="zone-card late">
+    <div class="zc-icon">🛏️</div>
+    <div class="zc-body">
+      <div class="zc-name">Appt 0302</div>
+      <div class="zc-meta">Tour A · Étage 3 · 30 j</div>
+    </div>
+    <div class="zc-right">
+      <div class="due-chip chip-late">Retard 5j</div>
+      <div class="zc-lastvisit">Vu le 09 oct.</div>
+      <div class="zc-nextvisit">Dû le 09 oct.</div>
+    </div>
+  </div>
+
+  <div class="et-hdr">
+    <span class="et-title">Étage 5</span>
+    <button class="et-cfg-btn">⚙️ Configurer l'étage</button>
+  </div>
+
+  <div class="zone-card late">
+    <div class="zc-icon">🛏️</div>
+    <div class="zc-body">
+      <div class="zc-name">Appt 0501</div>
+      <div class="zc-meta">Tour A · Étage 5 · 30 j</div>
+    </div>
+    <div class="zc-right">
+      <div class="due-chip chip-late">Retard 3j</div>
+      <div class="zc-lastvisit">Vu le 11 oct.</div>
+      <div class="zc-nextvisit">Dû le 11 oct.</div>
+    </div>
+  </div>
+
+  <div class="zone-card late">
+    <div class="zc-icon">🏗️</div>
+    <div class="zc-body">
+      <div class="zc-name">Ascenseur Tour B</div>
+      <div class="zc-meta">Commun · RDC-Top · 30 j</div>
+    </div>
+    <div class="zc-right">
+      <div class="due-chip chip-late">Retard 2j</div>
+      <div class="zc-lastvisit">Vu le 12 oct.</div>
+      <div class="zc-nextvisit">Dû le 12 oct.</div>
+    </div>
+  </div>
+
+  <div class="et-hdr">
+    <span class="et-title">Étage 9</span>
+    <button class="et-cfg-btn">⚙️ Configurer l'étage</button>
+  </div>
+
+  <div class="zone-card late">
+    <div class="zc-icon">🛏️</div>
+    <div class="zc-body">
+      <div class="zc-name">Appt 0901</div>
+      <div class="zc-meta">Tour A · Étage 9 · 30 j</div>
+    </div>
+    <div class="zc-right">
+      <div class="due-chip chip-late">Retard 1j</div>
+      <div class="zc-lastvisit">Vu le 13 oct.</div>
+      <div class="zc-nextvisit">Dû le 13 oct.</div>
+    </div>
+  </div>
+
+  <!-- SECTION BIENTÔT -->
+  <div class="sec-hdr">
+    <span class="sec-title">🟡 Dans 1–5 jours</span>
+    <span class="sec-stats"><span class="warn">7 zones</span></span>
+  </div>
+
+  <div class="et-hdr">
+    <span class="et-title">Étage 1</span>
+    <button class="et-cfg-btn">⚙️ Configurer l'étage</button>
+  </div>
+
+  <div class="zone-card warn">
+    <div class="zc-icon">🛏️</div>
+    <div class="zc-body">
+      <div class="zc-name">Appt 0101</div>
+      <div class="zc-meta">Tour A · Étage 1 · 30 j</div>
+    </div>
+    <div class="zc-right">
+      <div class="due-chip chip-warn">Dans 2j</div>
+      <div class="zc-lastvisit">Vu le 12 oct.</div>
+      <div class="zc-nextvisit">Prochain le 16 oct.</div>
+    </div>
+  </div>
+
+  <div class="et-hdr">
+    <span class="et-title">Étage 2</span>
+    <button class="et-cfg-btn">⚙️ Configurer l'étage</button>
+  </div>
+
+  <div class="zone-card warn">
+    <div class="zc-icon">🛏️</div>
+    <div class="zc-body">
+      <div class="zc-name">Appt 0203</div>
+      <div class="zc-meta">Tour A · Étage 2 · 30 j</div>
+    </div>
+    <div class="zc-right">
+      <div class="due-chip chip-warn">Dans 4j</div>
+      <div class="zc-lastvisit">Vu le 10 oct.</div>
+      <div class="zc-nextvisit">Prochain le 18 oct.</div>
+    </div>
+  </div>
+
+  <div class="et-hdr">
+    <span class="et-title">Étage 4</span>
+    <button class="et-cfg-btn">⚙️ Configurer l'étage</button>
+  </div>
+
+  <div class="zone-card warn">
+    <div class="zc-icon">🛏️</div>
+    <div class="zc-body">
+      <div class="zc-name">Appt 0401</div>
+      <div class="zc-meta">Tour A · Étage 4 · 30 j</div>
+    </div>
+    <div class="zc-right">
+      <div class="due-chip chip-warn">Dans 5j</div>
+      <div class="zc-lastvisit">Vu le 09 oct.</div>
+      <div class="zc-nextvisit">Prochain le 19 oct.</div>
+    </div>
+  </div>
+
+  <!-- SECTION OK (quelques exemples) -->
+  <div class="sec-hdr">
+    <span class="sec-title">✅ Zones OK — Tour A</span>
+    <span class="sec-stats"><span class="ok">16 / 30</span></span>
+  </div>
+
+  <div class="et-hdr">
+    <span class="et-title">Étage 6</span>
+    <button class="et-cfg-btn">⚙️ Configurer l'étage</button>
+  </div>
+
+  <div class="zone-card ok">
+    <div class="zc-icon">🛏️</div>
+    <div class="zc-body">
+      <div class="zc-name">Appt 0601</div>
+      <div class="zc-meta">Tour A · Étage 6 · 30 j</div>
+    </div>
+    <div class="zc-right">
+      <div class="due-chip chip-ok">Il y a 16j</div>
+      <div class="zc-lastvisit">Vu le 28 sept.</div>
+      <div class="zc-nextvisit">Prochain le 28 oct.</div>
+    </div>
+  </div>
+
+  <div class="zone-card ok">
+    <div class="zc-icon">⚡</div>
+    <div class="zc-body">
+      <div class="zc-name">Groupe Électrogène</div>
+      <div class="zc-meta">Spécial · 7j · fréquence hebdo</div>
+    </div>
+    <div class="zc-right">
+      <div class="due-chip chip-ok">Il y a 4j</div>
+      <div class="zc-lastvisit">Vu le 10 oct.</div>
+      <div class="zc-nextvisit">Prochain le 17 oct.</div>
+    </div>
+  </div>
+
+  <!-- SECTION JAMAIS -->
+  <div class="sec-hdr">
+    <span class="sec-title">⬜ Jamais inspecté — Tour B</span>
+    <span class="sec-stats">33 zones</span>
+  </div>
+
+  <div class="zone-card never">
+    <div class="zc-icon">🛏️</div>
+    <div class="zc-body">
+      <div class="zc-name">Appt 0101 <span style="font-size:10px;color:var(--text3)">Tour B</span></div>
+      <div class="zc-meta">Tour B · Étage 1 · fréquence 30j</div>
+    </div>
+    <div class="zc-right">
+      <div class="due-chip chip-never">Jamais</div>
+      <div class="zc-lastvisit">— premier passage</div>
+    </div>
+  </div>
+
+  <div class="zone-card never">
+    <div class="zc-icon">🛏️</div>
+    <div class="zc-body">
+      <div class="zc-name">Appt 0102 <span style="font-size:10px;color:var(--text3)">Tour B</span></div>
+      <div class="zc-meta">Tour B · Étage 1 · fréquence 30j</div>
+    </div>
+    <div class="zc-right">
+      <div class="due-chip chip-never">Jamais</div>
+      <div class="zc-lastvisit">— premier passage</div>
+    </div>
+  </div>
+
+  <div style="text-align:center;padding:10px 0;font-size:12px;color:var(--text3);cursor:pointer">+ 31 autres zones Tour B →</div>
+
+  <!-- HISTORIQUE (section séparée, visible via tab) -->
+  <div class="sec-hdr" id="histo-sec">
+    <span class="sec-title">📅 Passages récents</span>
+    <span class="sec-stats" style="color:var(--text2)">30 derniers jours</span>
+  </div>
+
+  <div class="histo-item">
+    <div class="histo-top">
+      <div class="histo-avatar">JP</div>
+      <div>
+        <div class="histo-title">Jean-Paul Kouassi</div>
+        <div class="histo-date">Aujourd'hui · 07:34 → 08:12</div>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--vert)">16/60</div>
+    </div>
+    <div class="histo-tags">
+      <span class="htag htag-ok">16 zones OK</span>
+      <span class="htag htag-partial">Partiel</span>
+      <span class="htag htag-neutral">Tour A · Étages 1–6</span>
+    </div>
+    <div class="histo-prog">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:2px"><span>Progression</span><span>27%</span></div>
+      <div class="histo-prog-wrap"><div class="histo-prog-bar" style="width:27%"></div></div>
+    </div>
+  </div>
+
+  <div class="histo-item">
+    <div class="histo-top">
+      <div class="histo-avatar" style="background:var(--vert-pale);color:var(--vert-text)">JP</div>
+      <div>
+        <div class="histo-title">Jean-Paul Kouassi</div>
+        <div class="histo-date">11 oct. · durée ~45 min</div>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--vert)">20/30</div>
+    </div>
+    <div class="histo-tags">
+      <span class="htag htag-ok">19 zones OK</span>
+      <span class="htag htag-bad">1 incident — Clim 0302</span>
+      <span class="htag htag-neutral">Tour A</span>
+    </div>
+    <div class="histo-prog">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:2px"><span>Tour A couverte</span><span>67%</span></div>
+      <div class="histo-prog-wrap"><div class="histo-prog-bar" style="width:67%;background:linear-gradient(90deg,var(--amber),var(--vert))"></div></div>
+    </div>
+  </div>
+
+  <div class="histo-item">
+    <div class="histo-top">
+      <div class="histo-avatar" style="background:var(--bleu,#EFF6FF);color:#1D4ED8">JP</div>
+      <div>
+        <div class="histo-title">Jean-Paul Kouassi</div>
+        <div class="histo-date">09 oct. · durée ~55 min</div>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:var(--vert)">28/30</div>
+    </div>
+    <div class="histo-tags">
+      <span class="htag htag-ok">28 zones OK</span>
+      <span class="htag htag-neutral">Tour A complète</span>
+    </div>
+    <div class="histo-prog">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:2px"><span>Tour A couverte</span><span>93%</span></div>
+      <div class="histo-prog-wrap"><div class="histo-prog-bar" style="width:93%"></div></div>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <div class="nav-item">
+    <div class="nav-icon">🏠</div>
+    <div class="nav-label">Accueil</div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-icon">🚨</div>
+    <div class="nav-label">Alertes</div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-icon">📋</div>
+    <div class="nav-label">Signalements</div>
+  </div>
+  <div class="nav-item active">
+    <div class="nav-icon">📅</div>
+    <div class="nav-label" style="color:var(--amber-dark)">Planning</div>
+  </div>
+  <div class="nav-item">
+    <div class="nav-icon">⋯</div>
+    <div class="nav-label">Plus</div>
+  </div>
+</div>
+
+<script>
+var ZONES_DATA = [
+  // late
+  {name:'Appt 0302',meta:'Tour A · Étage 3',type:'bed',cls:'late',chip:'Retard 5j',chipCls:'chip-late',lastVisit:'Vu le 09 oct.'},
+  {name:'Appt 0501',meta:'Tour A · Étage 5',type:'bed',cls:'late',chip:'Retard 3j',chipCls:'chip-late',lastVisit:'Vu le 11 oct.'},
+  {name:'Ascenseur Tour B',meta:'Commun · RDC-Top',type:'lift',cls:'late',chip:'Retard 2j',chipCls:'chip-late',lastVisit:'Vu le 12 oct.'},
+  {name:'Appt 0901',meta:'Tour A · Étage 9',type:'bed',cls:'late',chip:'Retard 1j',chipCls:'chip-late',lastVisit:'Vu le 13 oct.'},
+  // warn
+  {name:'Appt 0101',meta:'Tour A · Étage 1',type:'bed',cls:'warn',chip:'Dans 2j',chipCls:'chip-warn',lastVisit:'Vu le 12 oct.'},
+  {name:'Appt 0203',meta:'Tour A · Étage 2',type:'bed',cls:'warn',chip:'Dans 4j',chipCls:'chip-warn',lastVisit:'Vu le 10 oct.'},
+  {name:'Appt 0401',meta:'Tour A · Étage 4',type:'bed',cls:'warn',chip:'Dans 5j',chipCls:'chip-warn',lastVisit:'Vu le 09 oct.'},
+];
+var ICONS={'bed':'🛏️','lift':'🏗️','pump':'💧','ge':'⚡'};
+
+function setFilter(f, el) {
+  document.querySelectorAll('.ftab').forEach(function(t){t.classList.remove('active')});
+  if(el) el.classList.add('active');
+  if(f === 'histo'){
+    document.getElementById('histo-sec').scrollIntoView({behavior:'smooth'});
+    return;
+  }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function setScope(btn, scope) {
+  document.querySelectorAll('#scope-chips .grp-chip').forEach(function(b){b.classList.remove('active')});
+  btn.classList.add('active');
+}
+
+function setFreq(btn, freq) {
+  document.querySelectorAll('#freq-chips .grp-chip').forEach(function(b){b.classList.remove('active')});
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>
