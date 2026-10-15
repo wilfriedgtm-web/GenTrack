@@ -716,6 +716,7 @@ async function _submitReleve(){
   try{
     var nbAlertes=0;
     var alertePosts=[];
+    var sgPosts=[]; // signalements à créer (observations + OUI/NON avec alerte_severite)
     var posts=_questions.map(function(q){
       var val=String(_answers[q.id]!=null?_answers[q.id]:'');
       // Ne pas sauvegarder les questions sans réponse (évite d'écraser la vraie dernière valeur)
@@ -745,6 +746,10 @@ async function _submitReleve(){
           }
         }
       }
+      if(q.type_reponse==='oui_non'&&val==='Oui'&&q.alerte_severite){
+        var eq2=_equips.find(function(e){return e.id===q.equipement_id;});
+        sgPosts.push({groupe_id:_releve.site_id,equipement_id:q.equipement_id,type:'anomalie',description:(eq2?eq2.nom+' — ':'')+q.texte+' : Oui',statut:'ouvert',source:'releve_horaire'});
+      }
       return supaUpsert('reponses',{
         question_id:q.id,valeur:val,
         releve_id:_releve.id,ronde_equipement_id:null
@@ -758,6 +763,13 @@ async function _submitReleve(){
     await Promise.all(obsKeys.map(function(eqId){
       return supaPost('releve_observations',{releve_id:_releve.id,equipement_id:eqId,texte:_obs[eqId]});
     }));
+
+    // Signalements : observations texte + OUI/NON avec alerte_severite
+    obsKeys.forEach(function(eqId){
+      var eq=_equips.find(function(e){return e.id===eqId;});
+      sgPosts.push({groupe_id:_releve.site_id,equipement_id:eqId,type:'anomalie',description:(eq?eq.nom+' — ':'')+_obs[eqId],statut:'ouvert',source:'releve_horaire'});
+    });
+    if(sgPosts.length)await Promise.all(sgPosts.map(function(sg){return supaPost('signalements',sg);}));
 
     var filled=_questions.filter(function(q){return _answers[q.id]!=null&&String(_answers[q.id]).trim()!=='';}).length;
     var isComplete=filled>=_questions.length;
