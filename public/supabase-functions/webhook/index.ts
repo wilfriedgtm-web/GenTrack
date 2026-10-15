@@ -606,12 +606,21 @@ async function demarrerReleveEnergie(phone: string, contact: any, site: any): Pr
   if (!Array.isArray(fluides) || !fluides.length) {
     return sendWA(phone, `⚠️ Aucun fluide configuré pour le relevé énergie.\nContactez votre responsable.`);
   }
-  // Récupérer le dernier relevé pour afficher les valeurs précédentes
+  // Récupérer les derniers relevés et construire un map par fluide (dernière valeur non-nulle)
+  // Fetch 10 rows pour couvrir les lignes partielles (ex: ravitaillement gaz crée une ligne sans les autres fluides)
   const lastReleveRaw = await db('releves_energie', {
-    query: `&site_id=eq.${site.id}&order=date_releve.desc&limit=1`
+    query: `&site_id=eq.${site.id}&order=date_releve.desc&limit=10`
   });
-  const lastRow = Array.isArray(lastReleveRaw) && lastReleveRaw.length > 0 ? lastReleveRaw[0] : null;
-  const lastReleve: Record<string, any> = lastRow?.valeurs || {};
+  const lastReleve: Record<string, any> = {};
+  if (Array.isArray(lastReleveRaw)) {
+    for (const row of lastReleveRaw) {
+      if (row.valeurs && typeof row.valeurs === 'object') {
+        for (const [flId, val] of Object.entries(row.valeurs)) {
+          if (!(flId in lastReleve) && val !== null && val !== '') lastReleve[flId] = val;
+        }
+      }
+    }
+  }
 
   const f = fluides[0];
   const sd = {
@@ -639,9 +648,17 @@ async function demarrerReleveEnergieDepuisRonde(phone: string, contact: any, sit
   if (!Array.isArray(fluides) || !fluides.length) {
     return sendWA(phone, `⚠️ Aucun fluide configuré pour le relevé énergie.\nContactez votre responsable.`);
   }
-  const lastReleveRaw = await db('releves_energie', { query: `&site_id=eq.${site.id}&order=date_releve.desc&limit=1` });
-  const lastRow = Array.isArray(lastReleveRaw) && lastReleveRaw.length > 0 ? lastReleveRaw[0] : null;
-  const lastReleve: Record<string, any> = lastRow?.valeurs || {};
+  const lastReleveRaw2 = await db('releves_energie', { query: `&site_id=eq.${site.id}&order=date_releve.desc&limit=10` });
+  const lastReleve2: Record<string, any> = {};
+  if (Array.isArray(lastReleveRaw2)) {
+    for (const row of lastReleveRaw2) {
+      if (row.valeurs && typeof row.valeurs === 'object') {
+        for (const [flId, val] of Object.entries(row.valeurs)) {
+          if (!(flId in lastReleve2) && val !== null && val !== '') lastReleve2[flId] = val;
+        }
+      }
+    }
+  }
   const f = fluides[0];
   const sd = {
     site_id: site.id, site_nom: site.nom,
@@ -655,7 +672,7 @@ async function demarrerReleveEnergieDepuisRonde(phone: string, contact: any, sit
     reponses: {} as Record<string, number>,
     anomalies: {} as Record<string, string>,
     field_idx: 0,
-    last_releve: lastReleve,
+    last_releve: lastReleve2,
     ronde_context: {
       ronde_id: rondeCtx.ronde_id,
       site_id: rondeCtx.site_id,
@@ -667,7 +684,7 @@ async function demarrerReleveEnergieDepuisRonde(phone: string, contact: any, sit
     }
   };
   await setSession(phone, 'energie_saisie', sd);
-  return sendWA(phone, fmtFluidQuestion(f, lastReleve[f.id] ?? null, 1, fluides.length));
+  return sendWA(phone, fmtFluidQuestion(f, lastReleve2[f.id] ?? null, 1, fluides.length));
 }
 
 async function demarrerRonde(phone: string, contact: any, site: any, sd: any, frequence: string): Promise<any> {
