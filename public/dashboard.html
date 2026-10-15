@@ -891,24 +891,35 @@ async function _rtAccueil(session,sid,cid){
       supaGet('releves_energie','site_id=eq.'+sid+'&select=date_releve,valeurs&order=date_releve.desc&limit=30')
     ]);
     var autresFluides=[];
-    if(gasoilFluides&&gasoilFluides.length&&lastReleve&&lastReleve.length){
-      var lr=lastReleve[0];
-      var _gasoilFound=false;
+    if(gasoilFluides&&gasoilFluides.length){
+      var lr=lastReleve&&lastReleve.length?lastReleve[0]:null;
+      // Le PREMIER fluide (ordre le plus bas) est toujours le carburant cuve.
+      // On le "réserve" même s'il n'a pas de valeur dans releves_energie
+      // (dans ce cas gasoilNiveau reste null → fallback vers pleinsHist).
+      // Les fluides suivants (gaz butane etc.) ne vont dans autresFluides
+      // que s'ils ont une valeur — ils ne peuvent jamais devenir gasoilNiveau.
+      var _gasoilFluideConsumed=false;
       for(var _gi=0;_gi<gasoilFluides.length;_gi++){
         var gf=gasoilFluides[_gi];
-        var rawVal=lr.valeurs&&lr.valeurs[gf.id]!=null?parseFloat(lr.valeurs[gf.id]):null;
-        if(rawVal==null)continue;
-        // capacite : depuis energie_config, fallback equipements.capacite_litres
-        var cap=parseFloat(gf.capacite)||(cuveEquips.length?parseFloat(cuveEquips[0].capacite_litres):0)||8000;
-        // Si valeur > 100 c'est des litres, sinon c'est un pourcentage (ancien format)
-        var isLitres=rawVal>100;
-        var litres=isLitres?Math.round(rawVal):Math.round(rawVal/100*cap);
-        var pct=isLitres?Math.min(100,Math.round(rawVal/cap*100)):Math.min(100,Math.round(rawVal));
-        if(!_gasoilFound){
-          gasoilNiveau={pct:pct,litres:litres,cap:cap,date:lr.date_releve,saisi_par:lr.saisi_par};
-          _gasoilFound=true;
-        } else if(gf.capacite!=null&&parseFloat(gf.capacite)>0){
-          autresFluides.push({fluide:gf,litres:litres,pct:pct,cap:cap,date:lr.date_releve});
+        var rawVal=lr&&lr.valeurs&&lr.valeurs[gf.id]!=null?parseFloat(lr.valeurs[gf.id]):null;
+        if(!_gasoilFluideConsumed){
+          // Premier fluide = carburant cuve : consommé ici, qu'il ait une valeur ou non
+          _gasoilFluideConsumed=true;
+          if(rawVal!=null){
+            var cap=parseFloat(gf.capacite)||(cuveEquips.length?parseFloat(cuveEquips[0].capacite_litres):0)||8000;
+            var isLitres=rawVal>100;
+            var litres=isLitres?Math.round(rawVal):Math.round(rawVal/100*cap);
+            var pct=isLitres?Math.min(100,Math.round(rawVal/cap*100)):Math.min(100,Math.round(rawVal));
+            gasoilNiveau={pct:pct,litres:litres,cap:cap,date:lr.date_releve,saisi_par:lr.saisi_par};
+          }
+          // Si rawVal==null : gasoilNiveau reste null → _resolveCuveNivFromSources utilisera pleinsHist
+        } else if(rawVal!=null&&gf.capacite!=null&&parseFloat(gf.capacite)>0){
+          // Fluides suivants (gaz butane etc.) → section 🔥 Gaz
+          var cap2=parseFloat(gf.capacite);
+          var isLitres2=rawVal>100;
+          var litres2=isLitres2?Math.round(rawVal):Math.round(rawVal/100*cap2);
+          var pct2=isLitres2?Math.min(100,Math.round(rawVal/cap2*100)):Math.min(100,Math.round(rawVal));
+          autresFluides.push({fluide:gf,litres:litres2,pct:pct2,cap:cap2,date:lr?lr.date_releve:null});
         }
       }
     }
