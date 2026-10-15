@@ -1045,7 +1045,7 @@ async function _rtAccueil(session,sid,cid){
         '</div>'+
         (ls?'<div style="font-size:11px;color:'+(lsOld?'var(--orange)':'var(--text3)')+';padding-left:28px">'+
           (lsOld?'⚠ ':'')+
-          'Dernière valeur : '+ls.v+(ls.unite?' '+ls.unite:'')+' · '+_timeAgo(ls.t)+
+          'Dernière valeur : '+(ls.v!=null&&!isNaN(ls.v)?ls.v:'—')+(ls.unite?' '+ls.unite:'')+' · '+_timeAgo(ls.t)+
         '</div>':'')+
         (topReco?_buildRecoTag(topReco,e.id,e.nom,sid):'')+
       '</div>';
@@ -10899,8 +10899,11 @@ async function _fetchRecoEquipements(sid){
     var q=r.questions;
     // Dernière saisie numérique (toutes questions)
     if(q&&q.type_reponse==='numerique'){
-      if(!lastSaisieByEq[eqId]||r.created_at>lastSaisieByEq[eqId].t){
-        lastSaisieByEq[eqId]={v:parseFloat(r.valeur),t:r.created_at,unite:q.unite||''};
+      var _numV=parseFloat(r.valeur);
+      if(!isNaN(_numV)&&r.valeur!=null&&r.valeur!==''){
+        if(!lastSaisieByEq[eqId]||r.created_at>lastSaisieByEq[eqId].t){
+          lastSaisieByEq[eqId]={v:_numV,t:r.created_at,unite:q.unite||''};
+        }
       }
     }
     // Pour les recos : numérique + seuils définis
@@ -10918,8 +10921,11 @@ async function _fetchRecoEquipements(sid){
       var q=r.questions;if(!q)return;
       var eqId=q.equipement_id;if(!eqId)return;
       if(q.type_reponse==='numerique'){
-        if(!lastSaisieByEq[eqId]||r.created_at>lastSaisieByEq[eqId].t){
-          lastSaisieByEq[eqId]={v:parseFloat(r.valeur),t:r.created_at,unite:q.unite||''};
+        var _numVR=parseFloat(r.valeur);
+        if(!isNaN(_numVR)&&r.valeur!=null&&r.valeur!==''){
+          if(!lastSaisieByEq[eqId]||r.created_at>lastSaisieByEq[eqId].t){
+            lastSaisieByEq[eqId]={v:_numVR,t:r.created_at,unite:q.unite||''};
+          }
         }
         if(q.seuil_min!==null||q.seuil_max!==null){
           if(!repByEqQ[eqId])repByEqQ[eqId]={};
