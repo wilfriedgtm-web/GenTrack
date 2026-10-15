@@ -6413,7 +6413,17 @@ async function _buildResPlanningHtml(sid){
   // ── Chargement relevés (180j pour statut, 30j pour historique) ──────────────
   var dateStatus=new Date(Date.now()-180*24*60*60*1000).toISOString().split('T')[0];
   var dateHisto=new Date(Date.now()-30*24*60*60*1000).toISOString().split('T')[0];
-  var releves=await supaGet('releves_zones','site_id=eq.'+sid+'&zone_id=in.('+zoneIds.join(',')+')'+'&date=gte.'+dateStatus+'&select=zone_id,date,technicien,statut,nb_anomalies&order=date.desc,zone_id.asc')||[];
+  var _rzFetches=await Promise.all([
+    supaGet('releves_zones','site_id=eq.'+sid+'&zone_id=in.('+zoneIds.join(',')+')'+'&date=gte.'+dateStatus+'&select=zone_id,date,technicien,statut,nb_anomalies&order=date.desc,zone_id.asc'),
+    supaGet('signalements','site_id=eq.'+sid+'&zone_id=in.('+zoneIds.join(',')+')'+'&created_at=gte.'+dateHisto+'T00:00:00&select=zone_id,description,created_at&order=created_at.desc')
+  ]);
+  var releves=_rzFetches[0]||[];
+  // Index signalements par zone_id+date pour affichage dans historique
+  var sgByZoneDate={};
+  (_rzFetches[1]||[]).forEach(function(sg){
+    var d=sg.created_at?sg.created_at.split('T')[0]:null;
+    if(d&&sg.zone_id){var k=sg.zone_id+'|'+d;if(!sgByZoneDate[k])sgByZoneDate[k]=sg.description;}
+  });
 
   var lastRel={};
   releves.forEach(function(r){if(!lastRel[r.zone_id])lastRel[r.zone_id]=r;});
@@ -6565,10 +6575,10 @@ async function _buildResPlanningHtml(sid){
   var sessMap={};
   recentRel.forEach(function(r){
     var key=r.date+'|'+(r.technicien||'?');
-    if(!sessMap[key])sessMap[key]={date:r.date,tech:r.technicien||'?',zoneIds:[],anomalies:0,hasIncident:false};
+    if(!sessMap[key])sessMap[key]={date:r.date,tech:r.technicien||'?',zoneIds:[],incidentZoneIds:[],anomalies:0,hasIncident:false};
     sessMap[key].zoneIds.push(r.zone_id);
     sessMap[key].anomalies+=(r.nb_anomalies||0);
-    if(r.statut==='incident')sessMap[key].hasIncident=true;
+    if(r.statut==='incident'){sessMap[key].hasIncident=true;sessMap[key].incidentZoneIds.push(r.zone_id);}
   });
   var sessions=Object.values(sessMap).sort(function(a,b){return b.date.localeCompare(a.date);});
 
@@ -6618,6 +6628,16 @@ async function _buildResPlanningHtml(sid){
       if(isPartial)
         h+='<span style="background:var(--orange-pale);border:1px solid var(--orange-border);border-radius:20px;padding:2px 8px;font-size:10px;font-weight:600;color:var(--orange)">Partiel</span>';
       h+='</div>';
+      // zones incidentées avec description signalement
+      if(sess.hasIncident&&sess.incidentZoneIds.length){
+        h+='<div style="margin-top:4px;margin-bottom:4px">';
+        sess.incidentZoneIds.forEach(function(zid){
+          var z=zoneMap[zid];var nom=z?z.nom:zid;
+          var desc=sgByZoneDate[zid+'|'+sess.date]||'';
+          h+='<div style="font-size:11px;color:var(--rouge);font-weight:500;margin-bottom:2px">⚠️ '+escape_html(nom)+(desc?' — '+escape_html(desc):'')+'</div>';
+        });
+        h+='</div>';
+      }
       // barre progression
       h+='<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:3px"><span>'+escape_html(batParts)+'</span><span>'+pct+'%</span></div>';
       h+='<div style="height:4px;background:var(--bg);border-radius:2px;overflow:hidden"><div style="height:100%;width:'+pct+'%;border-radius:2px;background:'+barColor+'"></div></div>';

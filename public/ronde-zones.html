@@ -729,7 +729,10 @@ async function submitRonde(){
     var incidents=done.filter(function(z){return _checks[z.id]==='incident';});
     if(incidents.length){
       await Promise.all(incidents.map(function(z){
-        var desc=(_incDesc[z.id]||'').trim()||('Incident constaté lors de la ronde — '+z.nom);
+        var selEqId=_incEquip[z.id]||null;
+        var selEq=selEqId?(_equipements[z.id]||[]).find(function(e){return e.id===selEqId;}):null;
+        var eqSuffix=selEq?' · '+selEq.nom:'';
+        var desc=(_incDesc[z.id]||'').trim()||('Incident — '+z.nom+eqSuffix);
         return supaPost('signalements',{
           groupe_id:_site.id,site_id:_site.id,
           zone_id:z.id,
