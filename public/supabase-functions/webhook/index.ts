@@ -530,21 +530,14 @@ async function sendRapportRonde(rondeId: string, phone: string, techNom: string,
     groupLines[typeNom].push(ligne.trim());
   }
 
-  const typeEmoji: Record<string, string> = { 'Groupes électrogènes': '⚡', 'Cuve carburant': '⛽', 'Autres équipements': '🔧' };
-  const messages: string[] = [];
-  let intro = `📋 *Rapport ronde ${frequence} — ${today}*\n${siteNom} · ${heure}\nTechnicien : ${techNom}`;
-  if (anomalies.length > 0) { intro += `\n\n⚠️ *Anomalies*`; for (const a of anomalies) intro += `\n• ${a.equip} — ${a.desc}`; }
-  if (alertesSeuils.length > 0) { intro += `\n\n🌡️ *Seuils dépassés*`; for (const a of alertesSeuils) intro += `\n• ${a}`; }
-  if (!anomalies.length && !alertesSeuils.length) intro += `\n\n✅ Aucune anomalie`;
-  messages.push(intro);
-  for (const typeNom of groupOrder) {
-    const emoji = typeEmoji[typeNom] || '🔧';
-    for (const m of chunkJoin(`${emoji} *${typeNom}*`, groupLines[typeNom])) messages.push(m);
-  }
-  if (recommandations.length > 0) for (const m of chunkJoin('💡 *Recommandations*', recommandations)) messages.push(m);
-
   const lienRapport = `https://gen-track.vercel.app/rapport-ronde.html?ronde_id=${rondeId}`;
-  messages.push(`📊 *Rapport complet :*\n${lienRapport}`);
+  let résumé = `✅ *Ronde ${frequence} terminée — ${siteNom}*\n_${today} · ${heure} · ${techNom}_\n\n`;
+  résumé += `📊 ${rondeEquipements.length} équipement(s) validé(s)`;
+  if (anomalies.length > 0) { résumé += `\n⚠️ ${anomalies.length} anomalie(s) : `; résumé += anomalies.map(a => a.equip).join(', '); }
+  if (alertesSeuils.length > 0) { résumé += `\n🌡️ ${alertesSeuils.length} seuil(s) dépassé(s)`; }
+  if (!anomalies.length && !alertesSeuils.length) résumé += `\n✅ Aucune anomalie`;
+  résumé += `\n\n📋 *Rapport complet :*\n${lienRapport}`;
+  const messages: string[] = [résumé];
 
   const dejaEnvoyes = new Set<string>([phone]);
   for (const m of messages) await sendWA(phone, m);
