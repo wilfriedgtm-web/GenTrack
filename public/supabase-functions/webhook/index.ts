@@ -703,12 +703,36 @@ async function demarrerRonde(phone: string, contact: any, site: any, sd: any, fr
 async function continuerRonde(phone: string, sd: any, contact: any, site: any): Promise<any> {
   const restants = await getEquipementsRestants(sd.ronde_id, sd.site_id, sd.frequence);
   if (!restants.length) {
-    await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
-    return sendRapportRonde(sd.ronde_id, phone, contact.nom, site?.nom || sd.site_nom, sd.client_id || '', sd.site_id, sd.frequence);
+    await sendRapportRonde(sd.ronde_id, phone, contact.nom, site?.nom || sd.site_nom, sd.client_id || '', sd.site_id, sd.frequence);
+    return sendMenuPostAction(phone, site?.nom || sd.site_nom, sd.active_site_id || sd.site_id, 'ronde');
   }
   const liste = restants.map((e: any, i: number) => `*${i + 1}* — ${e.nom}`).join('\n');
   await setSession(phone, 'saisie_choix_equip', { ...sd, restants: restants.map((e: any) => ({ id: e.id, nom: e.nom })) });
   return sendWA(phone, `${restants.length} équipement(s) restant(s) :\n\n${liste}\n\nLequel faire ?`);
+}
+
+// ── Menu contextuel post-action (session persistante) ─────────────────────────
+async function sendMenuPostAction(
+  phone: string,
+  siteNom: string,
+  activeSiteId: string,
+  contexte: 'ronde' | 'panne' | 'suivi' | 'plein' | 'vidange' | 'resolu' | 'energie' | 'bilan'
+): Promise<any> {
+  type MenuOption = { label: string; action: string };
+  const menus: Record<string, MenuOption[]> = {
+    ronde:   [{ label: '📋 Suivi signalements', action: 'suivi' }, { label: '🚨 Signaler une panne', action: 'panne' }, { label: '⛽ Ravitaillement cuve', action: 'plein' }, { label: '🌙 Bilan de fin de journée', action: 'bilan' }],
+    panne:   [{ label: '📋 Suivi signalements', action: 'suivi' }, { label: '🚀 Lancer une ronde', action: 'saisie' }, { label: '🌙 Bilan de fin de journée', action: 'bilan' }],
+    suivi:   [{ label: '🚨 Signaler une panne', action: 'panne' }, { label: '🚀 Lancer une ronde', action: 'saisie' }, { label: '🌙 Bilan de fin de journée', action: 'bilan' }],
+    plein:   [{ label: '🚀 Lancer une ronde', action: 'saisie' }, { label: '📋 Suivi signalements', action: 'suivi' }, { label: '🔧 Déclarer une vidange', action: 'vidange' }],
+    vidange: [{ label: '⛽ Ravitaillement cuve', action: 'plein' }, { label: '🚀 Lancer une ronde', action: 'saisie' }, { label: '📋 Suivi signalements', action: 'suivi' }],
+    resolu:  [{ label: '📋 Suivi signalements', action: 'suivi' }, { label: '🚨 Signaler une panne', action: 'panne' }, { label: '🌙 Bilan de fin de journée', action: 'bilan' }],
+    energie: [{ label: '🚀 Lancer une ronde', action: 'saisie' }, { label: '📋 Suivi signalements', action: 'suivi' }, { label: '🌙 Bilan de fin de journée', action: 'bilan' }],
+    bilan:   [{ label: '📋 Suivi signalements', action: 'suivi' }, { label: '🚨 Signaler une panne', action: 'panne' }, { label: '🚀 Lancer une ronde', action: 'saisie' }],
+  };
+  const options = menus[contexte] || menus.ronde;
+  const liste = options.map((o: MenuOption, i: number) => `*${i + 1}* — ${o.label}`).join('\n');
+  await setSession(phone, 'menu_post', { active_site_id: activeSiteId, menu_options: options.map((o: MenuOption) => o.action) });
+  return sendWA(phone, `*${siteNom}* — Que faire ensuite ?\n\n${liste}\n\n_Ou tapez *aide* pour toutes les commandes._`);
 }
 
 // ── Panne → signalement ───────────────────────────────────────────────────────
@@ -987,9 +1011,8 @@ async function envoyerBilan(phone: string, contact: any, sd: any, blocages: stri
       if (r.whatsapp && r.whatsapp !== phone) { await sendWA(r.whatsapp, recapMsg); envoyeCount++; }
     }
   }
-  await setSession(phone, 'idle', { active_site_id: sd.active_site_id });
-  const notif = envoyeCount > 0 ? `✅ Bilan envoyé à votre responsable. 📲` : `⚠️ Bilan enregistré — aucun responsable configuré.`;
-  return sendWA(phone, notif);
+  await sendWA(phone, envoyeCount > 0 ? `✅ Bilan envoyé à votre responsable. 📲` : `⚠️ Bilan enregistré — aucun responsable configuré.`);
+  return sendMenuPostAction(phone, sd.site_nom || '', sd.active_site_id, 'bilan');
 }
 
 // ── Bilans du jour pour resp_tech ──────────────────────────────────────────────
@@ -1368,8 +1391,6 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       message: `PANNE — ${sd.equip_nom} — ${sd.panne_type_label}`,
       resolue: false,
     }}).catch(() => {});
-    await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
-
     // Notifier resp_tech + dir_tech + technicien du site (multi-site inclus)
     const responsables = await getResponsablesForSite(sd.site_id);
     const techniciens = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=eq.technicien&actif=eq.true` });
@@ -1387,7 +1408,8 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       }
     }
     const notifTxt = dejaEnvoyes.size > 1 ? `Les responsables ont été alertés. 📲` : `_Aucun responsable configuré._`;
-    return sendWA(phone, `🚨 *Signalement enregistré !*\n\n🔧 ${sd.equip_nom}\n⚠️ ${sd.panne_type_label}${desc ? `\n📝 ${desc}` : ''}${publicPhotoUrl ? '\n📷 Photo enregistrée' : ''}\n\n${notifTxt}`);
+    await sendWA(phone, `🚨 *Signalement enregistré !*\n\n🔧 ${sd.equip_nom}\n⚠️ ${sd.panne_type_label}${desc ? `\n📝 ${desc}` : ''}${publicPhotoUrl ? '\n📷 Photo enregistrée' : ''}\n\n${notifTxt}`);
+    return sendMenuPostAction(phone, siteNom, sd.active_site_id || sd.site_id, 'panne');
   }
 
   // ── Suivi choix — PEC groupée + liens rapport ─────────────
@@ -1432,8 +1454,8 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       responseMsg += `*${s.ref_code || s.id}* — ${s.desc.substring(0, 40)}\n${appUrl}/rapport.html?sg=${s.id}\n\n`;
     }
 
-    await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
-    return sendWA(phone, responseMsg.trim());
+    await sendWA(phone, responseMsg.trim());
+    return sendMenuPostAction(phone, sd.site_nom || siteNom, sd.active_site_id || sd.site_id, 'suivi');
   }
 
   // ── Rapport choix (resp_tech) ──────────────────────────────
@@ -1521,8 +1543,6 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       prestataire: sd.intervenant || contact.nom,
       created_by: contact.nom,
     }}).catch(() => {});
-    await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
-
     // Notifier resp_tech (multi-site inclus)
     const responsables = await getResponsablesForSite(sd.site_id);
     const notifMsg = `✅ *Panne résolue — GenTrack*\n*${siteNom}*\n\n📝 ${sd.sg_label}\n${sd.resolution_note ? '🔧 ' + sd.resolution_note + '\n' : ''}${sd.intervenant ? '👷 ' + sd.intervenant + '\n' : ''}${cout > 0 ? '💰 ' + cout.toLocaleString('fr-FR') + ' FCFA\n' : ''}\n_Résolu par ${contact.nom} · ${today}_`;
@@ -1559,7 +1579,8 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       }
     }
 
-    return sendWA(phone, `✅ *Clôturé !*\n\n${sd.sg_label}\n${sd.resolution_note ? '🔧 ' + sd.resolution_note + '\n' : ''}${cout > 0 ? '💰 ' + cout.toLocaleString('fr-FR') + ' FCFA\n' : ''}\n_Responsable notifié. 📲_`);
+    await sendWA(phone, `✅ *Clôturé !*\n\n${sd.sg_label}\n${sd.resolution_note ? '🔧 ' + sd.resolution_note + '\n' : ''}${cout > 0 ? '💰 ' + cout.toLocaleString('fr-FR') + ' FCFA\n' : ''}\n_Responsable notifié. 📲_`);
+    return sendMenuPostAction(phone, siteNom, sd.active_site_id || sd.site_id, 'resolu');
   }
 
   // ── Vidange flow ──────────────────────────────────────────
@@ -1589,13 +1610,13 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       heures_au_moment: sd.heures_total,
       intervenant: sd.intervenant || contact.nom
     }}).catch(() => {});
-    await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
     const responsables = await getResponsablesForSite(sd.site_id);
-    const vidangeMsg = `🔧 *Vidange effectuée*\n*${siteNom}*\n\n📝 ${sd.equip_nom}\n🕐 ${sd.heures_total}h\n👤 ${sd.intervenant || contact.nom}\n\n_Prochaine : ~${prochainSeuil}h_`;
+    const vidangeMsg =`🔧 *Vidange effectuée*\n*${siteNom}*\n\n📝 ${sd.equip_nom}\n🕐 ${sd.heures_total}h\n👤 ${sd.intervenant || contact.nom}\n\n_Prochaine : ~${prochainSeuil}h_`;
     if (Array.isArray(responsables)) {
       for (const r of responsables) if (r.whatsapp && r.whatsapp !== phone) await sendWA(r.whatsapp, vidangeMsg);
     }
-    return sendWA(phone, `✅ *Vidange enregistrée !*\n\n📝 ${sd.equip_nom}\n🕐 ${sd.heures_total}h\n👤 ${sd.intervenant || contact.nom}\n\n_Prochaine vidange : ~${prochainSeuil}h_ 📲`);
+    await sendWA(phone, `✅ *Vidange enregistrée !*\n\n📝 ${sd.equip_nom}\n🕐 ${sd.heures_total}h\n👤 ${sd.intervenant || contact.nom}\n\n_Prochaine vidange : ~${prochainSeuil}h_ 📲`);
+    return sendMenuPostAction(phone, siteNom, sd.active_site_id || sd.site_id, 'vidange');
   }
 
   // ── Plein carburant flow ──────────────────────────────────
@@ -1671,14 +1692,13 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     } else {
       await db('alertes', { method: 'PATCH', query: `&groupe_id=eq.${sd.site_id}&type=eq.carburant_bas&resolue=eq.false`, body: { resolue: true } }).catch(() => {});
     }
-    await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
-
     const notifMsg = `⛽ *Ravitaillement effectué*\n*${siteNom}*\n\n🛢️ ${sd.cuve_nom}\n💧 *${sd.litres_ajoutes}L* ajoutés\n📊 Niveau : *${niveauL}L / ${cap}L* (${pct}%) ${col}${autoJ ? `\n⏱️ Autonomie : ~${autoJ}j` : ''}${coutTxt}\n👤 ${operateur}`;
     const responsables = await getResponsablesForSite(sd.site_id);
     if (Array.isArray(responsables)) {
       for (const r of responsables) if (r.whatsapp && r.whatsapp !== phone) await sendWA(r.whatsapp, notifMsg);
     }
-    return sendWA(phone, `✅ *Ravitaillement enregistré !*\n\n🛢️ ${sd.cuve_nom}\n💧 ${sd.litres_ajoutes}L ajoutés — ${niveauL}L / ${cap}L (${pct}%) ${col}${autoJ ? `\n⏱️ Autonomie : ~${autoJ}j` : ''}${coutTxt}\n\n_Équipe notifiée 📲_`);
+    await sendWA(phone, `✅ *Ravitaillement enregistré !*\n\n🛢️ ${sd.cuve_nom}\n💧 ${sd.litres_ajoutes}L ajoutés — ${niveauL}L / ${cap}L (${pct}%) ${col}${autoJ ? `\n⏱️ Autonomie : ~${autoJ}j` : ''}${coutTxt}\n\n_Équipe notifiée 📲_`);
+    return sendMenuPostAction(phone, siteNom, sd.active_site_id || sd.site_id, 'plein');
   }
 
   // ── Relevé énergie — saisie des fluides ──────────────────────────────────
@@ -1850,8 +1870,6 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
         body: { site_id: sd.site_id, date_releve: dateReleve, valeurs, saisi_par: contact.nom, anomalies }
       });
     }
-    await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
-
     // Notifier resp_tech
     const fluides: any[] = sd.fluides || [];
     const lastReleve: Record<string, any> = sd.last_releve || {};
@@ -1878,7 +1896,8 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       const siteObj = Array.isArray(siteRaw) ? siteRaw[0] : null;
       return continuerRonde(phone, sd.ronde_context, contact, siteObj);
     }
-    return sendWA(phone, `✅ *Relevé énergie validé !*\n_Consommation du ${dateReleve} · ${siteNom}_\n\n_Responsable notifié 📲_`);
+    await sendWA(phone, `✅ *Relevé énergie validé !*\n_Consommation du ${dateReleve} · ${siteNom}_\n\n_Responsable notifié 📲_`);
+    return sendMenuPostAction(phone, siteNom, sd.active_site_id || sd.site_id, 'energie');
   }
 
   // ── Affectation interactive : choix du tech ──────────────────────────────
@@ -1914,8 +1933,25 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       ].filter((l): l is string => l !== null).join('\n');
       await sendWA(tech.whatsapp, missionLines);
     }
-    await setSession(phone, 'idle', { active_site_id: sd.active_site_id || sd.site_id });
-    return sendWA(phone, `✅ *${sd.sg_ref}* affecté à *${tech.nom}*${tech.whatsapp ? ' — notifié 📲' : ' ⚠️ pas de WA configuré'}.`);
+    await sendWA(phone, `✅ *${sd.sg_ref}* affecté à *${tech.nom}*${tech.whatsapp ? ' — notifié 📲' : ' ⚠️ pas de WA configuré'}.`);
+    return sendMenuPostAction(phone, sd.site_nom || siteNom, sd.active_site_id || sd.site_id, 'suivi');
+  }
+
+  // ── Menu post-action (session persistante) ────────────────
+  if (state === 'menu_post') {
+    const options: string[] = sd.menu_options || [];
+    const idx = parseInt(msg.trim()) - 1;
+    if (!isNaN(idx) && idx >= 0 && idx < options.length) {
+      const action = options[idx];
+      await setSession(phone, 'idle', { active_site_id: sd.active_site_id });
+      if (action === 'saisie') return demarrerSaisie(phone, contact, site);
+      if (action === 'panne') return demarrerPanne(phone, contact, site);
+      if (action === 'suivi') return demarrerSuivi(phone, contact, site);
+      if (action === 'bilan') return demarrerBilan(phone, contact, site);
+      if (action === 'plein') return demarrerPlein(phone, contact, site);
+      if (action === 'vidange') return demarrerVidange(phone, contact, site);
+    }
+    return sendWA(phone, `Répondez avec un numéro (1–${options.length}), ou tapez *aide* pour toutes les commandes.`);
   }
 
   return sendWA(phone, `Tapez *aide* pour les commandes.`);
@@ -2179,6 +2215,7 @@ async function handleMessage(from: string, bodyText: string, mediaUrl: string = 
       'plein_litres','plein_confirm_litres','plein_operateur',
       'affecter_choix',
       'rapport_choix','bilan_recap','bilan_blocages','suivi_choix',
+      'menu_post',
     ];
     if (activeStates.includes(state)) {
       return handleStates(phone, msg, bodyText, contact, site, state, sd, mediaUrl);
