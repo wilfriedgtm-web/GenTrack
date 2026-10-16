@@ -543,6 +543,9 @@ async function sendRapportRonde(rondeId: string, phone: string, techNom: string,
   }
   if (recommandations.length > 0) for (const m of chunkJoin('💡 *Recommandations*', recommandations)) messages.push(m);
 
+  const lienRapport = `https://gen-track.vercel.app/rapport-ronde.html?ronde_id=${rondeId}`;
+  messages.push(`📊 *Rapport complet :*\n${lienRapport}`);
+
   const dejaEnvoyes = new Set<string>([phone]);
   for (const m of messages) await sendWA(phone, m);
   const responsables = await getResponsablesForSite(siteId);
@@ -722,7 +725,7 @@ async function sendMenuPostAction(
   const menus: Record<string, MenuOption[]> = {
     ronde:   [{ label: '📋 Suivi signalements', action: 'suivi' }, { label: '🚨 Signaler une panne', action: 'panne' }, { label: '⛽ Ravitaillement cuve', action: 'plein' }, { label: '🌙 Bilan de fin de journée', action: 'bilan' }],
     panne:   [{ label: '📋 Suivi signalements', action: 'suivi' }, { label: '🚀 Lancer une ronde', action: 'saisie' }, { label: '🌙 Bilan de fin de journée', action: 'bilan' }],
-    suivi:   [{ label: '🚨 Signaler une panne', action: 'panne' }, { label: '🚀 Lancer une ronde', action: 'saisie' }, { label: '🌙 Bilan de fin de journée', action: 'bilan' }],
+    suivi:   [{ label: '📋 Suivi signalements', action: 'suivi' }, { label: '🚨 Signaler une panne', action: 'panne' }, { label: '🌙 Bilan de fin de journée', action: 'bilan' }],
     plein:   [{ label: '🚀 Lancer une ronde', action: 'saisie' }, { label: '📋 Suivi signalements', action: 'suivi' }, { label: '🔧 Déclarer une vidange', action: 'vidange' }],
     vidange: [{ label: '⛽ Ravitaillement cuve', action: 'plein' }, { label: '🚀 Lancer une ronde', action: 'saisie' }, { label: '📋 Suivi signalements', action: 'suivi' }],
     resolu:  [{ label: '📋 Suivi signalements', action: 'suivi' }, { label: '🚨 Signaler une panne', action: 'panne' }, { label: '🌙 Bilan de fin de journée', action: 'bilan' }],
