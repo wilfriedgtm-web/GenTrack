@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>GenTrack · Rapport de ronde</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --creme:#F5F0E8;--surface:#FDFAF5;--border:#DDD0BC;
+  --dark:#111110;--text:#1A1A18;--text2:#6B5E4A;--text3:#A8957E;
+  --amber:#C49A1C;--amber-pale:#FBF5E0;--amber-border:#E8D080;
+  --vert:#2D6A4F;--vert-pale:#E8F5EE;--vert-border:#A8D8BC;
+  --rouge:#C0392B;--rouge-pale:#FDEEED;--rouge-border:#F0B8B0;
+  --orange:#E07B2A;--orange-pale:#FEF3E8;--orange-border:#F5C890;
+  --radius:14px;--radius-sm:9px;
+  --shadow:0 2px 10px rgba(17,17,16,.07);
+  --shadow-md:0 4px 20px rgba(17,17,16,.11);
+}
+body{background:var(--creme);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;color:var(--text);min-height:100vh}
+
+/* ── HEADER ── */
+.rr-header{
+  background:var(--dark);
+  padding:calc(env(safe-area-inset-top,0px)+18px) 20px 22px;
+  box-shadow:0 2px 18px rgba(0,0,0,.3);
+}
+.rr-logo{font-size:10px;font-weight:800;letter-spacing:.2em;color:var(--amber);text-transform:uppercase;margin-bottom:14px}
+.rr-header-title{font-size:20px;font-weight:800;color:#fff;letter-spacing:-.02em;margin-bottom:3px}
+.rr-header-sub{font-size:13px;color:rgba(255,255,255,.5)}
+.rr-header-meta{display:flex;align-items:center;justify-content:space-between;margin-top:12px;gap:8px;flex-wrap:wrap}
+.rr-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);
+  border-radius:20px;padding:4px 11px;font-size:12px;color:rgba(255,255,255,.65);
+}
+.rr-badge-amber{background:rgba(196,154,28,.15);border-color:rgba(196,154,28,.35);color:var(--amber)}
+
+/* ── BODY ── */
+.rr-body{padding:18px 16px 40px;max-width:520px;margin:0 auto}
+
+/* ── KPIs ── */
+.rr-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.rr-kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 10px;text-align:center;box-shadow:var(--shadow)}
+.rr-kpi-val{font-size:26px;font-weight:800;color:var(--dark);letter-spacing:-.02em;line-height:1}
+.rr-kpi-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-top:5px}
+.rr-kpi.ok .rr-kpi-val{color:var(--vert)}
+.rr-kpi.warn .rr-kpi-val{color:var(--orange)}
+.rr-kpi.danger .rr-kpi-val{color:var(--rouge)}
+
+/* ── SECTION ── */
+.rr-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0;margin-bottom:14px;box-shadow:var(--shadow);overflow:hidden}
+.rr-section-head{padding:13px 16px;background:rgba(17,17,16,.03);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.rr-section-icon{font-size:18px}
+.rr-section-title{font-size:14px;font-weight:700;color:var(--dark);flex:1}
+.rr-section-count{font-size:11px;font-weight:600;color:var(--text3);background:var(--creme);border:1px solid var(--border);border-radius:20px;padding:2px 9px}
+
+/* ── EQUIPMENT CARD ── */
+.rr-equip{border-bottom:1px solid var(--border)}
+.rr-equip:last-child{border-bottom:none}
+.rr-equip-head{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.rr-equip-name{font-size:14px;font-weight:700;color:var(--dark)}
+.rr-equip-status{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+.rr-equip-status.ok{background:var(--vert-pale);color:var(--vert);border:1px solid var(--vert-border)}
+.rr-equip-status.warn{background:var(--orange-pale);color:var(--orange);border:1px solid var(--orange-border)}
+.rr-equip-status.danger{background:var(--rouge-pale);color:var(--rouge);border:1px solid var(--rouge-border)}
+
+.rr-equip-rows{padding:0 16px 14px}
+.rr-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(221,208,188,.5)}
+.rr-row:last-child{border-bottom:none}
+.rr-row-label{font-size:12px;color:var(--text2);flex:1}
+.rr-row-val{font-size:13px;font-weight:700;color:var(--dark);text-align:right;margin-left:8px}
+.rr-row-val.ok{color:var(--vert)}
+.rr-row-val.warn{color:var(--orange)}
+.rr-row-val.danger{color:var(--rouge)}
+
+/* ── ANOMALIES ── */
+.rr-anomaly{display:flex;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);align-items:flex-start}
+.rr-anomaly:last-child{border-bottom:none}
+.rr-anomaly-dot{width:7px;height:7px;border-radius:50%;background:var(--orange);flex-shrink:0;margin-top:5px}
+.rr-anomaly-equip{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+.rr-anomaly-desc{font-size:13px;color:var(--text)}
+
+/* ── RECOMMANDATIONS ── */
+.rr-reco{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:10px;align-items:center}
+.rr-reco:last-child{border-bottom:none}
+.rr-reco-icon{font-size:16px;flex-shrink:0}
+.rr-reco-text{font-size:13px;color:var(--text)}
+
+/* ── ALERTES SEUIL ── */
+.rr-alerte{padding:10px 16px;border-bottom:1px solid var(--rouge-border);display:flex;gap:10px;align-items:center;background:var(--rouge-pale)}
+.rr-alerte:last-child{border-bottom:none}
+.rr-alerte-text{font-size:13px;color:var(--rouge);font-weight:600}
+
+/* ── ÉTATS ── */
+.rr-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:12px;padding:32px 24px;text-align:center}
+.rr-state-emoji{font-size:48px;margin-bottom:4px}
+.rr-state-title{font-size:18px;font-weight:700;color:var(--dark)}
+.rr-state-sub{font-size:14px;color:var(--text3);max-width:300px}
+.rr-spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── PRINT ── */
+.rr-print-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text2);margin-bottom:18px;width:100%}
+.rr-print-btn:hover{background:var(--creme)}
+@media print{.rr-print-btn{display:none}.rr-header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="rr-header"><div class="rr-logo">GenTrack ✦</div></div>
+  <div class="rr-body"><div class="rr-state"><div class="rr-spinner"></div><div class="rr-state-sub">Chargement du rapport…</div></div></div>
+</div>
+<script>
+var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+
+function h(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+async function supa(table,filter){
+  var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+(filter||''),{
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+  });
+  if(!r.ok)return[];
+  var d=await r.json();
+  return Array.isArray(d)?d:[];
+}
+
+function showError(msg){
+  document.getElementById('app').innerHTML=
+    '<div class="rr-header"><div class="rr-logo">GenTrack ✦</div></div>'+
+    '<div class="rr-body"><div class="rr-state"><div class="rr-state-emoji">⚠️</div>'+
+    '<div class="rr-state-title">Rapport introuvable</div>'+
+    '<div class="rr-state-sub">'+h(msg)+'</div></div></div>';
+}
+
+function calcCuveAuto(niveau,cap,consoH){
+  if(!consoH||consoH<=0)return null;
+  return Math.round(niveau/(consoH*8)*10)/10;
+}
+
+function seuilCol(pct){
+  if(pct<20)return'🔴';
+  if(pct<40)return'🟡';
+  return'🟢';
+}
+
+async function init(){
+  var params=new URLSearchParams(location.search);
+  var rondeId=params.get('ronde_id')||params.get('ronde');
+  if(!rondeId){showError('Aucun identifiant de ronde dans l\'URL.');return;}
+
+  // 1. Ronde
+  var rondes=await supa('rondes','id=eq.'+rondeId+'&select=*');
+  if(!rondes||!rondes.length){showError('Ronde introuvable ('+rondeId+').');return;}
+  var ronde=rondes[0];
+
+  // 2. Site
+  var sites=await supa('sites','id=eq.'+ronde.site_id+'&select=nom,client_id');
+  var site=sites&&sites[0]||{nom:''};
+
+  // 3. Technicien
+  var techNom='—';
+  if(ronde.technicien_id){
+    var contacts=await supa('contacts','id=eq.'+ronde.technicien_id+'&select=nom');
+    if(contacts&&contacts[0])techNom=contacts[0].nom;
+  }
+
+  // 4. Rondes équipements validés
+  var reRows=await supa('rondes_equipements','ronde_id=eq.'+rondeId+'&statut=eq.valide&select=*');
+  if(!reRows||!reRows.length){showError('Aucun équipement validé pour cette ronde.');return;}
+
+  // 5. Tous les équipements du site
+  var allEquips=await supa('equipements','site_id=eq.'+ronde.site_id+'&actif=eq.true&order=ordre_ronde.asc&select=*');
+  var equipMap={};
+  (allEquips||[]).forEach(function(e){equipMap[e.id]=e;});
+
+  // 6. Questions par équipement (fréquence)
+  var freq=ronde.frequence||'journalier';
+  var allEquipIds=[...new Set(reRows.map(function(re){return re.equipement_id;}))].filter(Boolean);
+  var questionsAll=[];
+  if(allEquipIds.length){
+    var qRows=await supa('questions',
+      'equipement_id=in.('+allEquipIds.join(',')+')'+'&actif=eq.true'+'&frequence=in.('+freq+',toutes)'+'&order=ordre.asc&select=*'
+    );
+    questionsAll=qRows||[];
+  }
+  var questionsByEquip={};
+  questionsAll.forEach(function(q){
+    if(!questionsByEquip[q.equipement_id])questionsByEquip[q.equipement_id]=[];
+    questionsByEquip[q.equipement_id].push(q);
+  });
+
+  // 7. Réponses + anomalies par ronde_equipement
+  var reIds=reRows.map(function(re){return re.id;});
+  var repsAll=[],anosAll=[];
+  if(reIds.length){
+    var repsRaw=await supa('reponses','ronde_equipement_id=in.('+reIds.join(',')+')'+'&select=*');
+    repsAll=repsRaw||[];
+    var anosRaw=await supa('anomalies','ronde_equipement_id=in.('+reIds.join(',')+')'+'&select=*');
+    anosAll=anosRaw||[];
+  }
+
+  // Index par ronde_equipement_id
+  var repsByRE={},anosByRE={};
+  repsAll.forEach(function(r){if(!repsByRE[r.ronde_equipement_id])repsByRE[r.ronde_equipement_id]=[];repsByRE[r.ronde_equipement_id].push(r);});
+  anosAll.forEach(function(a){if(!anosByRE[a.ronde_equipement_id])anosByRE[a.ronde_equipement_id]=[];anosByRE[a.ronde_equipement_id].push(a);});
+
+  // 8. Grouper équipements par type
+  var groupes={
+    'Groupes électrogènes':{icon:'⚡',equips:[]},
+    'Cuve carburant':{icon:'⛽',equips:[]},
+    'Autres équipements':{icon:'🔧',equips:[]}
+  };
+  var allAnomalies=[];
+  var allAlertesSeuil=[];
+  var allRecos=[];
+  var totalEquips=0;
+
+  reRows.forEach(function(re){
+    var equip=equipMap[re.equipement_id];
+    if(!equip)return;
+    totalEquips++;
+    var reps=repsByRE[re.id]||[];
+    var anos=anosByRE[re.id]||[];
+    var questions=questionsByEquip[equip.id]||[];
+
+    // Anomalies
+    anos.forEach(function(a){allAnomalies.push({equip:equip.nom,desc:a.description});});
+
+    // Lignes questions/réponses avec seuil check
+    var lignes=[];
+    var equipHasAlert=false;
+    var equipHasWarn=false;
+    reps.forEach(function(r){
+      var q=questions.find(function(qq){return qq.id===r.question_id;});
+      var label=q?q.texte:r.question_id;
+      var unite=q&&q.unite?' '+q.unite:'';
+      var valeur=r.valeur;
+      var cls='';
+      if(q&&q.type_reponse==='numerique'){
+        var val=parseFloat(valeur);
+        if(!isNaN(val)){
+          var ko=(q.seuil_min!=null&&val<q.seuil_min)||(q.seuil_max!=null&&val>q.seuil_max);
+          if(ko){cls='danger';equipHasAlert=true;allAlertesSeuil.push(equip.nom+' — '+label+' : '+val+unite);}
+          else cls='ok';
+        }
+      }
+      lignes.push({label:label,valeur:valeur+unite,cls:cls});
+
+      // Recommandation vidange
+      if(equip.seuil_vidange_heures&&q&&q.texte.toLowerCase().includes('compteur')){
+        var compteur=parseFloat(valeur);
+        var seuil=parseFloat(equip.seuil_vidange_heures);
+        if(!isNaN(compteur)&&seuil>0){
+          var typeC=equip.type_compteur_heures||'cumule';
+          var hDepuis,prochain;
+          if(typeC==='depuis_entretien'){hDepuis=Math.max(0,compteur);prochain=seuil;}
+          else{var base=equip.heures_dernier_vidange!=null?parseFloat(equip.heures_dernier_vidange):0;hDepuis=Math.max(0,compteur-base);prochain=base+seuil;}
+          var hRestantes=Math.max(0,Math.round(seuil-hDepuis));
+          var pctV=Math.round(hDepuis/seuil*100);
+          var emV=pctV>=100?'🔴':pctV>=80?'🟡':'🟢';
+          if(pctV>=80)equipHasWarn=true;
+          allRecos.push(emV+' <strong>'+h(equip.nom)+'</strong> — Vidange dans ~'+hRestantes+'h ('+Math.round(hDepuis)+'h / '+Math.round(seuil)+'h)');
+        }
+      }
+      // Recommandation cuve
+      if(equip.capacite_litres&&q&&q.texte.toLowerCase().includes('niveau')){
+        var niveau=parseFloat(valeur);
+        var cap=parseFloat(equip.capacite_litres);
+        if(!isNaN(niveau)&&cap>0){
+          var pctC=Math.round(niveau/cap*100);
+          var consoH=equip.conso_theorique_lh?parseFloat(equip.conso_theorique_lh):
+            (allEquips||[]).filter(function(e){return e.id!==equip.id&&e.conso_theorique_lh;})
+              .reduce(function(s,e){return s+parseFloat(e.conso_theorique_lh);},0);
+          var autoJ=calcCuveAuto(niveau,cap,consoH);
+          var emC=seuilCol(pctC);
+          allRecos.push(emC+' <strong>'+h(equip.nom)+'</strong> — '+niveau+'L / '+cap+'L ('+pctC+'%)'+( autoJ?' · Autonomie ~'+autoJ+'j':''));
+        }
+      }
+    });
+
+    var statusCls=equipHasAlert?'danger':equipHasWarn?'warn':'ok';
+    var statusTxt=equipHasAlert?'⚠️ Alerte':equipHasWarn?'🟡 Attention':'✅ OK';
+
+    var typeKey=equip.capacite_litres?'Cuve carburant':equip.conso_theorique_lh?'Groupes électrogènes':'Autres équipements';
+    groupes[typeKey].equips.push({equip:equip,lignes:lignes,statusCls:statusCls,statusTxt:statusTxt,re:re});
+  });
+
+  // ── Render ────────────────────────────────────────────────
+  var freqLabel={journalier:'Ronde journalière',hebdo:'Ronde hebdomadaire',mensuel:'Ronde mensuelle'}[freq]||freq;
+  var dateStr=ronde.date_ronde||ronde.created_at.substring(0,10);
+  var dateFmt=new Date(dateStr+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  var html='<div class="rr-header">';
+  html+='<div class="rr-logo">GenTrack ✦</div>';
+  html+='<div class="rr-header-title">'+h(freqLabel)+'</div>';
+  html+='<div class="rr-header-sub">'+h(site.nom)+'</div>';
+  html+='<div class="rr-header-meta">';
+  html+='<span class="rr-badge">📅 '+h(dateFmt)+'</span>';
+  html+='<span class="rr-badge">👷 '+h(techNom)+'</span>';
+  html+='</div></div>';
+
+  html+='<div class="rr-body">';
+
+  // Bouton impression
+  html+='<button class="rr-print-btn" onclick="window.print()">🖨️ Imprimer / Exporter PDF</button>';
+
+  // KPIs
+  var nAlerte=allAlertesSeuil.length;
+  var nAnomalie=allAnomalies.length;
+  html+='<div class="rr-kpis">';
+  html+='<div class="rr-kpi ok"><div class="rr-kpi-val">'+totalEquips+'</div><div class="rr-kpi-label">Validés</div></div>';
+  html+='<div class="rr-kpi '+(nAnomalie>0?'warn':'ok')+'"><div class="rr-kpi-val">'+nAnomalie+'</div><div class="rr-kpi-label">Anomalies</div></div>';
+  html+='<div class="rr-kpi '+(nAlerte>0?'danger':'ok')+'"><div class="rr-kpi-val">'+nAlerte+'</div><div class="rr-kpi-label">Alertes seuil</div></div>';
+  html+='</div>';
+
+  // Alertes seuil
+  if(allAlertesSeuil.length){
+    html+='<div class="rr-section" style="border-color:var(--rouge-border)">';
+    html+='<div class="rr-section-head" style="background:var(--rouge-pale)"><span class="rr-section-icon">🌡️</span><span class="rr-section-title" style="color:var(--rouge)">Seuils dépassés</span></div>';
+    allAlertesSeuil.forEach(function(a){html+='<div class="rr-alerte"><span class="rr-alerte-text">'+h(a)+'</span></div>';});
+    html+='</div>';
+  }
+
+  // Sections par type
+  var ordre=['Groupes électrogènes','Cuve carburant','Autres équipements'];
+  ordre.forEach(function(typeKey){
+    var grp=groupes[typeKey];
+    if(!grp.equips.length)return;
+    html+='<div class="rr-section">';
+    html+='<div class="rr-section-head"><span class="rr-section-icon">'+grp.icon+'</span><span class="rr-section-title">'+h(typeKey)+'</span><span class="rr-section-count">'+grp.equips.length+'</span></div>';
+    grp.equips.forEach(function(item){
+      html+='<div class="rr-equip">';
+      html+='<div class="rr-equip-head">';
+      html+='<span class="rr-equip-name">'+h(item.equip.nom)+'</span>';
+      html+='<span class="rr-equip-status '+item.statusCls+'">'+item.statusTxt+'</span>';
+      html+='</div>';
+      if(item.lignes.length){
+        html+='<div class="rr-equip-rows">';
+        item.lignes.forEach(function(l){
+          html+='<div class="rr-row"><span class="rr-row-label">'+h(l.label)+'</span><span class="rr-row-val '+l.cls+'">'+h(l.valeur)+'</span></div>';
+        });
+        html+='</div>';
+      }
+      html+='</div>';
+    });
+    html+='</div>';
+  });
+
+  // Anomalies
+  if(allAnomalies.length){
+    html+='<div class="rr-section" style="border-color:var(--orange-border)">';
+    html+='<div class="rr-section-head" style="background:var(--orange-pale)"><span class="rr-section-icon">⚠️</span><span class="rr-section-title" style="color:var(--orange)">Anomalies signalées</span><span class="rr-section-count">'+allAnomalies.length+'</span></div>';
+    allAnomalies.forEach(function(a){
+      html+='<div class="rr-anomaly"><div class="rr-anomaly-dot"></div><div><div class="rr-anomaly-equip">'+h(a.equip)+'</div><div class="rr-anomaly-desc">'+h(a.desc)+'</div></div></div>';
+    });
+    html+='</div>';
+  }
+
+  // Recommandations
+  if(allRecos.length){
+    html+='<div class="rr-section">';
+    html+='<div class="rr-section-head"><span class="rr-section-icon">💡</span><span class="rr-section-title">Recommandations</span></div>';
+    allRecos.forEach(function(r){html+='<div class="rr-reco"><span class="rr-reco-icon"></span><span class="rr-reco-text">'+r+'</span></div>';});
+    html+='</div>';
+  }
+
+  // Footer propre
+  html+='<div style="text-align:center;font-size:11px;color:var(--text3);margin-top:24px">GenTrack · '+h(freqLabel)+' · '+h(dateStr)+'</div>';
+
+  html+='</div>'; // body
+  document.getElementById('app').innerHTML=html;
+}
+
+init().catch(function(e){showError('Erreur : '+e.message);});
+</script>
+</body>
+</html>
