@@ -19,6 +19,27 @@ const PROSPECT_NOTIFY  = Deno.env.get('PROSPECT_NOTIFY_NUMBER')  || '';
 const WEBHOOK_URL      = Deno.env.get('WEBHOOK_URL')             || '';
 const BASE_URL         = 'https://gen-track.vercel.app';
 
+// ── Supabase Storage — URL signée (bucket privé) ─────────────────────────────
+async function getSignedUrl(path: string, expiresIn = 31536000): Promise<string | null> {
+  try {
+    const res = await fetch(`${SUPA_URL}/storage/v1/object/sign/gentrack-photos/${path}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPA_KEY}`,
+        'apikey': SUPA_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ expiresIn }),
+    });
+    if (!res.ok) { console.error('getSignedUrl failed', res.status, await res.text()); return null; }
+    const data = await res.json();
+    return data.signedURL ? `${SUPA_URL}${data.signedURL}` : null;
+  } catch (e) {
+    console.error('getSignedUrl error:', e);
+    return null;
+  }
+}
+
 // ── Supabase Storage upload ───────────────────────────────────────────────────
 async function uploadTwilioPhoto(twilioUrl: string, prefix: string = 'panne'): Promise<string | null> {
   try {
@@ -31,7 +52,7 @@ async function uploadTwilioPhoto(twilioUrl: string, prefix: string = 'panne'): P
     const ext = contentType.includes('png') ? 'png' : contentType.includes('gif') ? 'gif' : 'jpg';
     const blob = await imgRes.arrayBuffer();
 
-    // 2. Upload vers Supabase Storage bucket gentrack-photos
+    // 2. Upload vers Supabase Storage bucket gentrack-photos (bucket privé)
     const filename = `${prefix}/${Date.now()}.${ext}`;
     const upRes = await fetch(`${SUPA_URL}/storage/v1/object/gentrack-photos/${filename}`, {
       method: 'POST',
@@ -45,8 +66,8 @@ async function uploadTwilioPhoto(twilioUrl: string, prefix: string = 'panne'): P
     });
     if (!upRes.ok) { const err = await upRes.text(); console.error('uploadTwilioPhoto: storage upload failed', err); return null; }
 
-    // 3. Retourner l'URL publique
-    return `${SUPA_URL}/storage/v1/object/public/gentrack-photos/${filename}`;
+    // 3. Retourner une URL signée (1 an) — le bucket doit être privé dans Supabase
+    return await getSignedUrl(filename);
   } catch (e) {
     console.error('uploadTwilioPhoto error:', e);
     return null;
