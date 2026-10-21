@@ -1966,7 +1966,8 @@ async function _rtReleves(session,sid){
     var alertBadge=r.nb_alertes>0?'<span style="font-size:10px;font-weight:700;color:var(--rouge);background:var(--rouge-pale);border:1px solid var(--rouge-border);padding:2px 8px;border-radius:10px;margin-left:6px">⚠️ '+r.nb_alertes+' alerte'+(r.nb_alertes>1?'s':'')+'</span>':'';
     var isOpen=r.statut==='ouvert'&&new Date(r.expires_at)>new Date();
     var linkBtn=isOpen?'<a href="'+BASE_URL+'releve.html?token='+r.token+'" target="_blank" style="font-size:11px;color:var(--bleu);text-decoration:none;font-weight:600;white-space:nowrap" onclick="event.stopPropagation()">🔗 Ouvrir</a>':'';
-    var clickable=r.statut==='validé';
+    var isExpired=r.statut==='expiré'||(r.statut==='ouvert'&&new Date(r.expires_at)<=new Date());
+    var clickable=r.statut==='validé'||(isExpired&&r.nb_valeurs>=1);
     return '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);cursor:'+(clickable?'pointer':'default')+';transition:background .15s" '+
       (clickable?'onclick="_openReleveDetail(\''+r.id+'\')" onmouseenter="this.style.background=\'var(--creme)\'" onmouseleave="this.style.background=\'\'"':'')+'>'+
       '<div style="flex:1;min-width:0">'+
