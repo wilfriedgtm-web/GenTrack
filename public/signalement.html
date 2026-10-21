@@ -690,13 +690,18 @@ async function _submit(){
     var photoUrl=null;
     if(_photoFile){
       var ext=_photoFile.name.split('.').pop()||'jpg';
-      var fname='signalements/'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.'+ext;
-      var upRes=await fetch(SUPA_URL+'/storage/v1/object/gentrack-photos/'+fname,{
+      var fname=Date.now()+'-'+Math.random().toString(36).slice(2)+'.'+ext;
+      var upRes=await fetch(SUPA_URL+'/storage/v1/object/signalements/'+fname,{
         method:'POST',
         headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':_photoFile.type||'image/jpeg'},
         body:_photoFile
       });
-      if(upRes.ok)photoUrl=SUPA_URL+'/storage/v1/object/public/gentrack-photos/'+fname;
+      if(upRes.ok){
+        photoUrl=SUPA_URL+'/storage/v1/object/public/signalements/'+fname;
+      }else{
+        var errBody=await upRes.text().catch(function(){return'';});
+        console.warn('Photo upload failed ('+upRes.status+'):', errBody);
+      }
     }
 
     var waRaw=(document.getElementById('sg-wa-input')||{}).value||'';

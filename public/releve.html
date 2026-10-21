@@ -247,6 +247,7 @@ var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
 var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
 
 var _releve=null,_equips=[],_questions=[],_answers={},_obs={},_clock=null;
+var _autoSaveTimers={};
 var _lastReponses={};  // question_id → {valeur, created_at}
 var _lastByEquip={};   // equip_id → ISO string dernière saisie
 
@@ -283,7 +284,7 @@ async function supaPost(table,data){
 async function supaUpsert(table,data,onConflict){
   var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?on_conflict='+onConflict,{
     method:'POST',
-    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=ignore-duplicates,return=representation'},
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=representation'},
     body:JSON.stringify(data)
   });
   if(!r.ok){var err=await r.text();throw new Error('UPSERT /'+table+' → '+r.status+': '+err);}
@@ -609,6 +610,7 @@ function _onNum(qId,seuilMin,seuilMax){
   var row=document.getElementById('qrow-'+qId);
   if(row)row.className='rh-q-row'+(warn?' alerted':(val!==null&&!isNaN(val)?' answered':''));
   _updateProgress();
+  _autoSave(qId);
 }
 
 function _onYN(qId,val){
@@ -620,6 +622,7 @@ function _onYN(qId,val){
   var row=document.getElementById('qrow-'+qId);
   if(row)row.className='rh-q-row answered';
   _updateProgress();
+  _autoSaveNow(qId);
 }
 
 function _onChoix(qId,val){
@@ -634,6 +637,7 @@ function _onChoix(qId,val){
   var row=document.getElementById('qrow-'+qId);
   if(row)row.className='rh-q-row answered';
   _updateProgress();
+  _autoSaveNow(qId);
 }
 
 function _onTexte(qId){
@@ -645,11 +649,37 @@ function _onTexte(qId){
   var row=document.getElementById('qrow-'+qId);
   if(row)row.className='rh-q-row'+(val?' answered':'');
   _updateProgress();
+  _autoSave(qId);
 }
 
 function _onObs(eqId){
   var inp=document.getElementById('obs-'+eqId);
   if(inp)_obs[eqId]=inp.value.trim()||undefined;
+}
+
+// ── Auto-save : persiste chaque valeur en base dès la saisie ─────────────────
+function _autoSave(qId){
+  if(_autoSaveTimers[qId])clearTimeout(_autoSaveTimers[qId]);
+  _autoSaveTimers[qId]=setTimeout(function(){_doAutoSave(qId);},600);
+}
+function _autoSaveNow(qId){
+  if(_autoSaveTimers[qId])clearTimeout(_autoSaveTimers[qId]);
+  _doAutoSave(qId);
+}
+async function _doAutoSave(qId){
+  if(!_releve||!_releve.id)return;
+  var val=_answers[qId];
+  if(val==null||String(val).trim()==='')return;
+  try{
+    await supaUpsert('reponses',{
+      question_id:qId,valeur:String(val),
+      releve_id:_releve.id,ronde_equipement_id:null
+    },'releve_id,question_id');
+    var filled=_questions.filter(function(q){
+      var a=_answers[q.id];return a!=null&&String(a).trim()!=='';
+    }).length;
+    await supaPatch('releves_horaires',_releve.id,{nb_valeurs:filled});
+  }catch(e){console.warn('Auto-save failed:',e);}
 }
 
 function _toggleObs(eqId){
