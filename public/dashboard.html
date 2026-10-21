@@ -11899,7 +11899,7 @@ async function _openRapportHebdoMois(offset){
       }
     }
     var cuveHistory={};var rondeExportRows=[];var releveExportRows=[];
-    var relevesH=await supaGet('releves_horaires','site_id=eq.'+sid+'&created_at=gte.'+moisDebut+'T00:00:00&created_at=lte.'+moisFin+'T23:59:59&select=id,created_at&order=created_at.asc&limit=500');
+    var relevesH=await supaGet('releves_horaires','site_id=eq.'+sid+'&created_at=gte.'+moisDebut+'T00:00:00&created_at=lte.'+moisFin+'T23:59:59&select=id,created_at,statut,nb_valeurs,nb_alertes,expires_at&order=created_at.asc&limit=500');
     if(relevesH.length){
       var relDateMap={};relevesH.forEach(function(r){relDateMap[r.id]=r.created_at;});
       var relIds=relevesH.map(function(r){return r.id;});
@@ -11939,7 +11939,7 @@ async function _openRapportHebdoMois(offset){
       _relevesZones=rzData[0]||[];
       _zonesRes=rzData[1]||[];
     }
-    var html=_buildRapportPro(siteNom,periodeStr,daysInMonth,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[],_nbCh,_budgetMensuel,_budgetFluides,_relevesZones,_zonesRes);
+    var html=_buildRapportPro(siteNom,periodeStr,daysInMonth,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[],_nbCh,_budgetMensuel,_budgetFluides,_relevesZones,_zonesRes,relevesH||[]);
     var w=window.open('','_blank');
     if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
     w.document.write(html);w.document.close();
@@ -12069,8 +12069,8 @@ function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,relev
   return h;
 }
 
-function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides,relevesEnergie,pleinsSite,nbChambres,budgetMensuel,budgetFluides,relevesZones,zonesRes){
-  relevesZones=relevesZones||[];zonesRes=zonesRes||[];
+function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides,relevesEnergie,pleinsSite,nbChambres,budgetMensuel,budgetFluides,relevesZones,zonesRes,relevesHoraires){
+  relevesZones=relevesZones||[];zonesRes=zonesRes||[];relevesHoraires=relevesHoraires||[];
   var respNom=(session.contact&&session.contact.nom)||'Responsable technique';
   var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -12652,6 +12652,39 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     });
     h+='</tbody></table>';
   }else{h+='<div class="empty-msg">Aucune ronde enregistrée sur la période</div>';}
+
+  // ── Relevés horaires ──
+  if(relevesHoraires.length>0){
+    var _rhNow=new Date();
+    var _rhValides=relevesHoraires.filter(function(r){return r.statut==='validé';}).length;
+    var _rhAlertesTotal=relevesHoraires.reduce(function(s,r){return s+(r.nb_alertes||0);},0);
+    var _rhValeursTotal=relevesHoraires.reduce(function(s,r){return s+(r.nb_valeurs||0);},0);
+    h+='<h2>Relevés horaires</h2>';
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:12px">';
+    h+='<div class="fluid-card" style="margin:0;padding:10px 12px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Total</div><div style="font-size:18px;font-weight:700">'+relevesHoraires.length+'</div></div>';
+    h+='<div class="fluid-card" style="margin:0;padding:10px 12px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Validés</div><div style="font-size:18px;font-weight:700;color:var(--vert)">'+_rhValides+'</div></div>';
+    h+='<div class="fluid-card" style="margin:0;padding:10px 12px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Valeurs saisies</div><div style="font-size:18px;font-weight:700">'+_rhValeursTotal+'</div></div>';
+    h+='<div class="fluid-card" style="margin:0;padding:10px 12px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Alertes</div><div style="font-size:18px;font-weight:700;color:'+(_rhAlertesTotal>0?'var(--rouge)':'var(--vert)')+'">'+_rhAlertesTotal+'</div></div>';
+    h+='</div>';
+    h+='<table><thead><tr><th>Date</th><th style="text-align:center">Valeurs</th><th style="text-align:center">Alertes</th><th>Statut</th></tr></thead><tbody>';
+    relevesHoraires.slice(0,50).forEach(function(r){
+      var _isExp=r.statut==='expiré'||(r.statut==='ouvert'&&r.expires_at&&new Date(r.expires_at)<=_rhNow);
+      var _statut,_statCls;
+      if(r.statut==='validé'){_statut='✓ Validé';_statCls='badge-ok';}
+      else if(_isExp&&(r.nb_valeurs||0)>=1){_statut='Expiré partiel';_statCls='badge-warn';}
+      else if(_isExp){_statut='Expiré (vide)';_statCls='badge-ko';}
+      else{_statut='En cours';_statCls='badge-warn';}
+      var _rhDate=new Date(r.created_at).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+      h+='<tr>'+
+        '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+_rhDate+'</td>'+
+        '<td style="text-align:center">'+((r.nb_valeurs||0))+'</td>'+
+        '<td style="text-align:center;color:'+((r.nb_alertes||0)>0?'var(--rouge)':'var(--text3)')+'">'+((r.nb_alertes||0))+'</td>'+
+        '<td><span class="badge '+_statCls+'">'+_statut+'</span></td>'+
+      '</tr>';
+    });
+    if(relevesHoraires.length>50)h+='<tr><td colspan="4" style="text-align:center;font-size:11px;color:#9AA0B8">…et '+(relevesHoraires.length-50)+' relevé(s) supplémentaire(s)</td></tr>';
+    h+='</tbody></table>';
+  }
 
   // Signalements
   h+='<h2>Signalements & Incidents</h2>'+
