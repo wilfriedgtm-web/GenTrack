@@ -70,16 +70,8 @@ async function sendWA(to: string, message: string): Promise<boolean> {
 }
 
 function getUTCHour(): number { return new Date().getUTCHours(); }
-function getUTCDay(): number { return new Date().getUTCDay(); } // 0=dim, 1=lun
 function getToday(): string {
   return new Date().toLocaleDateString('fr-CA', { timeZone: 'Africa/Dakar' });
-}
-function getStartOfWeek(): string {
-  const d = new Date();
-  const day = d.getUTCDay(); // 0=dim
-  const diff = (day === 0 ? -6 : 1 - day); // lundi = début de semaine
-  d.setUTCDate(d.getUTCDate() + diff);
-  return d.toISOString().slice(0, 10);
 }
 
 // Dernière valeur enregistrée pour une question contenant un mot-clé
@@ -96,28 +88,13 @@ async function getDerniereReponse(equipementId: string, motCle: string): Promise
   return isNaN(val) ? null : val;
 }
 
-// Lien relevé horaire — crée ou réutilise un token valide 8h
-async function getReleveLink(siteId: string): Promise<string | null> {
-  const now = new Date().toISOString();
-  const rows = await dbGet('releves_horaires',
-    `&site_id=eq.${siteId}&statut=eq.ouvert&expires_at=gt.${now}&order=expires_at.desc&limit=1`
-  );
-  let token = rows[0]?.token || null;
-  if (!token) {
-    const expires = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
-    const created = await dbPost('releves_horaires', { site_id: siteId, statut: 'ouvert', expires_at: expires });
-    token = created?.token || null;
-  }
-  return token ? `${BASE_URL}/releve.html?token=${token}` : null;
-}
 
 // ── Handler principal ─────────────────────────────────────────────────────────
 
 serve(async (_req) => {
   const heureUTC = getUTCHour();
-  const jourUTC  = getUTCDay();
   const today    = getToday();
-  const stats    = { rappels_ronde: 0, rappels_releve: 0, rappels_hebdo: 0, alertes_carburant: 0, erreurs: 0, rappels_skipped: 0 };
+  const stats    = { rappels_ronde: 0, alertes_carburant: 0, erreurs: 0, rappels_skipped: 0 };
 
   // ── Techniciens actifs récemment (session bot dans les 7 derniers jours) ──────
   // Un tech "actif" = a envoyé au moins un message au bot dans les 7 jours
@@ -220,56 +197,8 @@ serve(async (_req) => {
       }
     }
 
-    // ── 3. RAPPEL RONDE HEBDOMADAIRE (lundi 7h UTC) ───────────────
-    if (site.hebdo_actif && heureUTC === 7 && jourUTC === 1 && techniciens.length) {
-      const debutSemaine = getStartOfWeek();
-      const rondesHebdo  = await dbGet('rondes',
-        `&site_id=eq.${site.id}&date_ronde=gte.${debutSemaine}&frequence=eq.hebdo&order=created_at.desc&limit=1`
-      );
-      let rondeComplete = false;
-      if (rondesHebdo.length) {
-        const valides       = await dbGet('rondes_equipements', `&ronde_id=eq.${rondesHebdo[0].id}&statut=eq.valide`);
-        const nbEquipsRonde = equipements.filter((e: any) => e.actif_ronde !== false && e.capacite_litres == null).length;
-        if (valides.length >= nbEquipsRonde) rondeComplete = true;
-      }
-
-      if (!rondeComplete) {
-        const equipsRonde = equipements.filter((e: any) => e.actif_ronde !== false && e.capacite_litres == null);
-        const listeEquip  = equipsRonde.map((e: any) => `📟 ${e.nom}`).join('\n');
-
-        for (const tech of techniciens) {
-          if (!estActif(tech.whatsapp)) { stats.rappels_skipped++; continue; }
-          const msg =
-            `📅 *GenTrack — Ronde hebdomadaire*\n\n` +
-            `Bonjour ${tech.nom || ''} ! *${site.nom}*\n\n` +
-            `C'est le début de semaine — pensez à la ronde hebdo :\n${listeEquip}\n\n` +
-            `• *saisie* — Lancer la ronde\n` +
-            `• *aide* — Toutes les commandes`;
-          const ok = await sendWA(tech.whatsapp, msg);
-          if (ok) stats.rappels_hebdo++; else stats.erreurs++;
-        }
-      }
-    }
-
-    // ── 4. RAPPEL RELEVÉ HORAIRE (10h, 14h, 18h UTC) ─────────────
-    if ([10, 14, 18].includes(heureUTC)) {
-      const equipsReleve = equipements.filter((e: any) => e.actif_releve);
-      if (equipsReleve.length && techniciens.length) {
-        const link = await getReleveLink(site.id);
-        if (link) {
-          for (const tech of techniciens) {
-            if (!estActif(tech.whatsapp)) { stats.rappels_skipped++; continue; }
-            const msg =
-              `📊 *GenTrack — Relevé horaire*\n\n` +
-              `Bonjour ${tech.nom || ''} ! *${site.nom}*\n\n` +
-              `Il est l'heure du relevé horaire :\n${link}\n\n` +
-              `_Lien valable jusqu'à la prochaine rotation._`;
-            const ok = await sendWA(tech.whatsapp, msg);
-            if (ok) stats.rappels_releve++; else stats.erreurs++;
-          }
-        }
-      }
-    }
+    // Rappel ronde hebdomadaire supprimé (doublon avec rappel journalier)
+    // Rappel relevé horaire 10h/14h/18h supprimé (réduction coût WhatsApp — lien accessible depuis l'app)
   }
 
   console.log('[rappel] Stats :', stats);

@@ -82,29 +82,38 @@ async function sendNotifications(payload: any) {
     lieu,
     ref_code,
     signaleur_whatsapp,
+    signaleur_contact_id, // présent = créé par un contact interne ; absent = QR code / résident
     photo_url,
   } = payload;
 
-  const typeLabel  = TYPE_LABELS[type] || type || 'Signalement';
-  const heure      = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Dakar' });
-  const suiviUrl   = ref_code ? `${BASE_URL}/suivi-signalement.html?ref=${encodeURIComponent(ref_code)}` : null;
-  // dejaEnvoyes = anti-doublon alertes équipe
-  // dejaConfirms = indépendant : un resp_tech signaleur reçoit bien les deux messages
+  const typeLabel = TYPE_LABELS[type] || type || 'Signalement';
+  const heure     = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Dakar' });
   const dejaEnvoyes = new Set<string>();
-  const dejaConfirms = new Set<string>();
 
-  console.log(`notify: site=${site_id} ref=${ref_code} type=${type}`);
+  console.log(`notify: site=${site_id} ref=${ref_code} type=${type} internal=${!!signaleur_contact_id}`);
 
-  // ── Nom du site (pour affichage dans la notif) ──────────────────────────
+  // ── Nom du site ─────────────────────────────────────────────────────────
   let site_nom = '';
   if (site_id) {
     const sites = await db('sites', { query: `&id=eq.${site_id}&limit=1`, select: 'nom' });
     site_nom = Array.isArray(sites) && sites[0]?.nom ? sites[0].nom : '';
   }
 
-  // ── 1. Resp_tech + dir_tech + technicien ────────────────────────────────
-  const responsables = await db('contacts', {
-    query: `&site_id=eq.${site_id}&role=in.(resp_tech,dir_tech,technicien)&actif=eq.true`,
+  // ── Matrice destinataires ────────────────────────────────────────────────
+  // Externe (QR code / résident) : tout le monde (resp_tech + dir_tech + technicien)
+  // Interne panne / fuite / seuil : resp_tech + dir_tech
+  // Interne anomalie / bruit / odeur / autre : resp_tech seulement
+  const isExternal = !signaleur_contact_id;
+  const isUrgent   = ['panne', 'fuite', 'seuil'].includes(type);
+
+  const roleFilter = isExternal
+    ? 'role=in.(resp_tech,dir_tech,technicien)'
+    : isUrgent
+      ? 'role=in.(resp_tech,dir_tech)'
+      : 'role=eq.resp_tech';
+
+  const destinataires = await db('contacts', {
+    query: `&site_id=eq.${site_id}&${roleFilter}&actif=eq.true`,
     select: 'whatsapp',
   });
 
@@ -114,40 +123,22 @@ async function sendNotifications(payload: any) {
     `${typeLabel}${equipement_nom ? ' — ' + equipement_nom : ''}` +
     `${lieu ? '\n📍 ' + lieu : ''}` +
     `${signale_par ? '\n👤 ' + signale_par : ''}` +
-    `${signaleur_whatsapp ? '\n📞 ' + signaleur_whatsapp : ''}` +
+    `${signaleur_whatsapp && isExternal ? '\n📞 ' + signaleur_whatsapp : ''}` +
     `\n\n📝 ${description}` +
     `${photo_url ? '\n📷 Photo : ' + photo_url : ''}` +
     `${ref_code ? '\n\n_Réf : ' + ref_code + '_\n_Répondre *OK ' + ref_code + '* pour PEC · ou *AFFECTER ' + ref_code + ' NomTech* pour assigner._' : ''}` +
     `\n_${heure}_`;
 
-  if (Array.isArray(responsables)) {
-    for (const r of responsables) {
+  if (Array.isArray(destinataires)) {
+    for (const r of destinataires) {
       if (r.whatsapp && !dejaEnvoyes.has(r.whatsapp)) {
         dejaEnvoyes.add(r.whatsapp);
         await sendWA(r.whatsapp, msgResp);
       }
     }
   }
-  console.log(`notify: ${responsables?.length ?? 0} contacts → ${dejaEnvoyes.size} envoyés`);
 
-  // ── 2. Signaleur — confirmation + lien de suivi ──────────────────────────
-  // Le formulaire pré-remplit sg-wa-input avec le WA du contact connu si disponible.
-  // Tout passe par signaleur_whatsapp — pas besoin de lookup séparé par contact_id.
-  if (signaleur_whatsapp && !dejaConfirms.has(signaleur_whatsapp)) {
-    dejaConfirms.add(signaleur_whatsapp);
-    const msgResident =
-      `✅ *Votre signalement a bien été enregistré*\n\n` +
-      `📋 Référence : *${ref_code || '—'}*\n` +
-      `📝 ${description}` +
-      `${lieu ? '\n📍 ' + lieu : ''}` +
-      `\n\nL'équipe technique a été notifiée.` +
-      `${suiviUrl ? `\n\n🔗 Suivez l'avancement de votre demande :\n${suiviUrl}` : ''}` +
-      `\n\n_Merci d'avoir utilisé GenTrack._`;
-    await sendWA(signaleur_whatsapp, msgResident);
-    console.log(`notify: résident envoyé → ${signaleur_whatsapp.slice(0,8)}...`);
-  }
-
-  console.log(`notify: DONE — resp=${dejaEnvoyes.size} confirms=${dejaConfirms.size}`);
+  console.log(`notify: DONE — roleFilter=${roleFilter} → ${dejaEnvoyes.size} envoyés`);
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
