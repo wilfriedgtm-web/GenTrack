@@ -836,6 +836,16 @@ async function demarrerSuivi(phone: string, contact: any, site: any): Promise<an
   const enCours = sigs.filter((s: any) => s.statut === 'en_cours');
   const resolus = sigs.filter((s: any) => s.statut === 'resolu');
 
+  // Helper : supprime le nom de l'équipement en début de description s'il est déjà affiché
+  const cleanDesc = (raw: string, eqNom: string, maxLen = 30): string => {
+    let d = (raw || '').trim();
+    // Supprime le préfixe "[eqNom] — " généré par les anomalies de ronde
+    if (eqNom && eqNom !== '—' && d.toLowerCase().startsWith(eqNom.toLowerCase())) {
+      d = d.slice(eqNom.length).replace(/^\s*—\s*/, '').trim();
+    }
+    return d.substring(0, maxLen);
+  };
+
   // Construire la liste numérotée en continu (ouverts → en_cours → résolus)
   const indexed: Array<{ num: number; id: string; ref_code: string; statut: string; desc: string }> = [];
   let num = 1;
@@ -845,7 +855,7 @@ async function demarrerSuivi(phone: string, contact: any, site: any): Promise<an
     msg += `\n🔴 *Non pris en charge (${ouverts.length})*\n`;
     for (const s of ouverts) {
       const eq = s.equipement_id ? (equipMap[s.equipement_id] || '—') : '—';
-      const desc = (s.description || '').substring(0, 45);
+      const desc = cleanDesc(s.description, eq);
       msg += `*${num}* — ${s.ref_code || '—'} · ${eq} — ${desc}\n`;
       indexed.push({ num, id: s.id, ref_code: s.ref_code || '', statut: s.statut, desc: (s.description || '').substring(0, 60) });
       num++;
@@ -855,8 +865,8 @@ async function demarrerSuivi(phone: string, contact: any, site: any): Promise<an
     msg += `\n🟡 *En cours (${enCours.length})*\n`;
     for (const s of enCours) {
       const eq = s.equipement_id ? (equipMap[s.equipement_id] || '—') : '—';
-      const desc = (s.description || '').substring(0, 45);
-      const par = s.assigne_a || s.pris_en_charge_par || '—';
+      const desc = cleanDesc(s.description, eq);
+      const par = s.assigne_a || s.pris_en_charge_par || 'Non assigné';
       msg += `*${num}* — ${s.ref_code || '—'} · ${eq} — ${desc} _(${par})_\n`;
       indexed.push({ num, id: s.id, ref_code: s.ref_code || '', statut: s.statut, desc: (s.description || '').substring(0, 60) });
       num++;
@@ -866,7 +876,7 @@ async function demarrerSuivi(phone: string, contact: any, site: any): Promise<an
     msg += `\n✅ *Résolus aujourd'hui (${resolus.length})*\n`;
     for (const s of resolus) {
       const eq = s.equipement_id ? (equipMap[s.equipement_id] || '—') : '—';
-      const desc = (s.description || '').substring(0, 45);
+      const desc = cleanDesc(s.description, eq);
       msg += `*${num}* — ${s.ref_code || '—'} · ${eq} — ${desc}\n`;
       indexed.push({ num, id: s.id, ref_code: s.ref_code || '', statut: s.statut, desc: (s.description || '').substring(0, 60) });
       num++;
@@ -876,7 +886,16 @@ async function demarrerSuivi(phone: string, contact: any, site: any): Promise<an
   // Footer interactif uniquement si des signalements actifs existent
   const nonResolus = indexed.filter(i => i.statut !== 'resolu');
   if (nonResolus.length > 0) {
-    msg += `\n_Tapez un ou plusieurs numéros pour prendre en charge et recevoir le lien rapport._\n_Ex : *1 2* ou *3*_`;
+    msg += `\n_Numéro(s) pour PEC → lien rapport (ex : *1 2*)_`;
+    // Hint AFFECTER pour resp_tech et dir_tech
+    const isResponsable = ['resp_tech', 'dir_tech'].includes(contact?.role || '');
+    if (isResponsable) {
+      const nonAssignes = [...ouverts, ...enCours].filter(s => !s.assigne_a && !s.pris_en_charge_par);
+      if (nonAssignes.length > 0) {
+        const refs = nonAssignes.slice(0, 3).map(s => s.ref_code).filter(Boolean).join(', ');
+        if (refs) msg += `\n_Ou : *AFFECTER ${nonAssignes[0].ref_code}* pour assigner_`;
+      }
+    }
   }
 
   await setSession(phone, 'suivi_choix', {
