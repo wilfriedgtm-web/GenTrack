@@ -812,15 +812,16 @@ async function demarrerSuivi(phone: string, contact: any, site: any): Promise<an
   const siteNom = site?.nom || '';
   const today = getToday();
 
-  const signalements = await db('signalements', {
-    query: `&groupe_id=eq.${siteId}&statut=in.(ouvert,en_cours,resolu)&order=created_at.asc&limit=50`
-  });
-  const allSigs = Array.isArray(signalements) ? signalements : [];
-
-  const sigs = allSigs.filter((s: any) =>
-    s.statut === 'ouvert' || s.statut === 'en_cours' ||
-    (s.statut === 'resolu' && (s.resolved_at || '').substring(0, 10) === today)
-  );
+  // Deux requêtes séparées pour garantir que les actifs apparaissent toujours,
+  // même si le site a des centaines de signalements résolus en base.
+  const [sigsActifs, sigsResolusAujourdhui] = await Promise.all([
+    db('signalements', { query: `&groupe_id=eq.${siteId}&statut=in.(ouvert,en_cours)&order=created_at.desc&limit=50` }),
+    db('signalements', { query: `&groupe_id=eq.${siteId}&statut=eq.resolu&resolved_at=gte.${today}T00:00:00&order=resolved_at.desc&limit=20` }),
+  ]);
+  const sigs = [
+    ...(Array.isArray(sigsActifs) ? sigsActifs : []),
+    ...(Array.isArray(sigsResolusAujourdhui) ? sigsResolusAujourdhui : []),
+  ];
 
   if (!sigs.length) return sendWA(phone, `✅ *${siteNom}*\n\nAucun signalement en cours ni résolu aujourd'hui.`);
 
