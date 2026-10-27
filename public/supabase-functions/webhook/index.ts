@@ -1161,7 +1161,7 @@ async function demarrerPlein(phone: string, contact: any, site: any): Promise<an
 }
 
 // ── Gestionnaire des états partagés ──────────────────────────────────────────
-async function handleStates(phone: string, msg: string, bodyText: string, contact: any, site: any, state: string, sd: any, mediaUrl: string = ''): Promise<any> {
+async function handleStates(phone: string, msg: string, bodyText: string, contact: any, site: any, state: string, sd: any, mediaUrl: string = '', phoneSiteIds: string[] = []): Promise<any> {
   const siteNom = site?.nom || sd.site_nom || '';
   const today = getToday();
 
@@ -2276,7 +2276,7 @@ async function handleMessage(from: string, bodyText: string, mediaUrl: string = 
       'menu_post',
     ];
     if (activeStates.includes(state)) {
-      return handleStates(phone, msg, bodyText, contact, site, state, sd, mediaUrl);
+      return handleStates(phone, msg, bodyText, contact, site, state, sd, mediaUrl, phoneSiteIds);
     }
 
     // Annuler / retour — disponible à tout moment dans n'importe quel flux
