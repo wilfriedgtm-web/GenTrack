@@ -2478,7 +2478,7 @@ function _sgBuildCard(r,zones,colKey){
   var accent=colKey==='ouvert'?'var(--rouge)':colKey==='en_cours'?'var(--orange)':'var(--vert)';
   var icon=_SG_ICONS[r.type]||'📝';
   var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
-  var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
+  var eqNom=(r.equipements&&r.equipements.nom)?r.equipements.nom:(r.equipements_zone&&r.equipements_zone.nom?r.equipements_zone.nom:'');
   var z=r.zone_id?zones.find(function(z){return z.id===r.zone_id;}):null;
   var lieuLabel=z?z.nom:(r.lieu||'');
   var isSel=(_sgSelected===r.id);
@@ -2520,7 +2520,7 @@ function _sgBuildCard(r,zones,colKey){
 function _sgBuildDetail(r,zones,sid){
   var icon=_SG_ICONS[r.type]||'📝';
   var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
-  var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
+  var eqNom=(r.equipements&&r.equipements.nom)?r.equipements.nom:(r.equipements_zone&&r.equipements_zone.nom?r.equipements_zone.nom:'');
   var z=r.zone_id?zones.find(function(z){return z.id===r.zone_id;}):null;
   var lieuLabel=z?z.nom:(r.lieu||'');
   var statut=_SG_STATUTS[r.statut]||{label:r.statut,color:'var(--text3)',bg:'var(--bg)'};
@@ -2682,7 +2682,7 @@ async function _sgCreerMaintenance(sgId){
   var dureeValStr=document.getElementById('sg-mnt-duree-val').value;
   var dureeVal=dureeValStr&&!isNaN(parseFloat(dureeValStr))?parseFloat(dureeValStr):null;
   var dureeUnite=(document.getElementById('sg-mnt-duree-unite')||{}).value||'heures';
-  var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:'';
+  var eqNom=(r.equipements&&r.equipements.nom)?r.equipements.nom:(r.equipements_zone&&r.equipements_zone.nom?r.equipements_zone.nom:'');
   await supaPost('maintenances',{
     groupe_id:sid,
     equipement_id:r.equipement_id||null,
