@@ -1497,8 +1497,17 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
 
   // ── Rapport choix (resp_tech) ──────────────────────────────
   if (state === 'rapport_choix') {
+    const isMultiRapport = !!sd.multi_site;
+    const maxOptRapport = isMultiRapport ? 4 : 3;
     const n = parseInt(msg.trim());
-    if (isNaN(n) || n < 1 || n > 3) return sendWA(phone, `Répondez avec *1*, *2* ou *3*.`);
+    if (isNaN(n) || n < 1 || n > maxOptRapport) return sendWA(phone, `Répondez avec *1*, *2* ou *3*${isMultiRapport ? ' ou *4*' : ''}.`);
+    if (n === 4) {
+      // Changer d'hôtel depuis le menu rapport
+      const allSitesSwitch = await getSitesForContact(contact.id, contact.site_id || undefined, phoneSiteIds);
+      const listeSwitch = allSitesSwitch.map((s: any, i: number) => `*${i + 1}* — ${s.nom}${s.id === sd.active_site_id ? ' ✓' : ''}`).join('\n');
+      await setSession(phone, 'choix_site', { sites: allSitesSwitch.map((s: any) => ({ id: s.id, nom: s.nom })), pending_msg: 'rapport' });
+      return sendWA(phone, `📍 *Rapport — Quel hôtel ?*\n\n${listeSwitch}`);
+    }
     const siteObj = site || { id: sd.site_id, nom: sd.site_nom };
     await setSession(phone, 'idle', { active_site_id: sd.active_site_id });
     if (n === 1) {
@@ -2060,6 +2069,18 @@ async function handleMessage(from: string, bodyText: string, mediaUrl: string = 
       if (pendingMsg === 'plein' || pendingMsg === 'ravitaillement') return demarrerPlein(phone, contact, site);
       if (pendingMsg === 'vidange') return demarrerVidange(phone, contact, site);
       if (pendingMsg === 'resolu' || pendingMsg === 'résolu') return demarrerResolu(phone, contact, site);
+      if (pendingMsg === 'suivi') return demarrerSuivi(phone, contact, site);
+      if (pendingMsg === 'rapport') {
+        const isResp = ['resp_tech', 'dir_tech'].includes(contact.role || '');
+        if (isResp) {
+          await setSession(phone, 'rapport_choix', { active_site_id: site.id, site_id: site.id, site_nom: site.nom, multi_site: true });
+          return sendWA(phone, `📊 *Rapport — ${site.nom}*\n\nQue souhaitez-vous consulter ?\n\n*1* — 📋 Dernière ronde journalière\n*2* — 🔴 Suivi des signalements\n*3* — 🌙 Bilans de fin de journée\n*4* — 🏨 Changer d'hôtel`);
+        }
+        const rondesResp = await db('rondes', { query: `&site_id=eq.${site.id}&order=date_ronde.desc,created_at.desc&limit=1` });
+        if (!Array.isArray(rondesResp) || !rondesResp.length) return sendWA(phone, `Aucune ronde enregistrée pour *${site.nom}*.`);
+        const rondeResp = rondesResp[0];
+        return sendRapportRonde(rondeResp.id, phone, contact.nom, site.nom, '', site.id, rondeResp.frequence);
+      }
       return sendWA(phone, `✅ *${site.nom}* sélectionné.\n\nTapez *saisie* pour commencer.`);
     }
 
@@ -2277,8 +2298,11 @@ async function handleMessage(from: string, bodyText: string, mediaUrl: string = 
       if (!site) return sendWA(phone, `Aucun site configuré.`);
       const isResp = ['resp_tech', 'dir_tech'].includes(contact.role || '');
       if (isResp) {
-        await setSession(phone, 'rapport_choix', { active_site_id: site.id, site_id: site.id, site_nom: site.nom });
-        return sendWA(phone, `📊 *Rapport — ${site.nom}*\n\nQue souhaitez-vous consulter ?\n\n*1* — 📋 Dernière ronde journalière\n*2* — 🔴 Suivi des signalements\n*3* — 🌙 Bilans de fin de journée`);
+        const allSitesResp = await getSitesForContact(contact.id, contact.site_id || undefined, phoneSiteIds);
+        const isMulti = allSitesResp.length > 1;
+        const extraOption = isMulti ? `\n*4* — 🏨 Changer d'hôtel` : '';
+        await setSession(phone, 'rapport_choix', { active_site_id: site.id, site_id: site.id, site_nom: site.nom, multi_site: isMulti });
+        return sendWA(phone, `📊 *Rapport — ${site.nom}*\n\nQue souhaitez-vous consulter ?\n\n*1* — 📋 Dernière ronde journalière\n*2* — 🔴 Suivi des signalements\n*3* — 🌙 Bilans de fin de journée${extraOption}`);
       }
       // Technicien → rapport direct
       const rondes = await db('rondes', { query: `&site_id=eq.${site.id}&order=date_ronde.desc,created_at.desc&limit=1` });
