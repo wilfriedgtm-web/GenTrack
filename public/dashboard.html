@@ -12238,6 +12238,18 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     });
   }
 
+  // ── Synthèse Électricité totale K1+K2 ───────────────────────────────────────
+  var _elecDataPdf=energieData.filter(function(d){return d.f.unite==='kWh'&&!d.isInstant;});
+  var elecSynthPdf=null;
+  if(_elecDataPdf.length>=2){
+    var _epCout=_elecDataPdf.reduce(function(s,d){return d.cout!=null?s+d.cout:s;},0);
+    var _epBudget=_elecDataPdf.reduce(function(s,d){return d.budget!=null?s+d.budget:s;},0);
+    var _epConso=_elecDataPdf.reduce(function(s,d){return d.conso!=null?s+d.conso:s;},0);
+    var _epVs=_epCout&&_epBudget?_epCout-_epBudget:null;
+    var _epVsPct=_epVs!=null&&_epBudget?Math.round(_epVs/_epBudget*100):null;
+    elecSynthPdf={cout:_epCout||null,budget:_epBudget||null,conso:Math.round(_epConso)||null,vs:_epVs,vsPct:_epVsPct,noms:_elecDataPdf.map(function(d){return d.f.nom;})};
+  }
+
   function fmtCout(v,devise){
     if(v==null||isNaN(v))return'—';
     var d=devise||'XOF';
@@ -12508,6 +12520,33 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     var nbDep=energieData.filter(function(d){return d.vs!=null&&d.vs>0;}).length;
     h+='<h2>Énergie &amp; Fluides'+(nbDep?' <span style="font-size:11px;font-weight:600;color:#C0392B;background:#FDECEA;padding:2px 8px;border-radius:10px;vertical-align:middle">'+nbDep+' dépassement'+(nbDep>1?'s':'')+'</span>':'')+'</h2>';
 
+    // ── Carte synthèse K1+K2 (avant les cartes individuelles) ───────────────────
+    if(elecSynthPdf&&elecSynthPdf.cout){
+      var _epCol=elecSynthPdf.vsPct!=null&&elecSynthPdf.vsPct>5?'#C0392B':elecSynthPdf.vsPct!=null&&elecSynthPdf.vsPct>0?'#C49A1C':'#2D7A4F';
+      h+='<div class="fluid-card" style="border-left:3px solid '+_epCol+';margin-bottom:16px">'+
+        '<div class="fluid-card-header">'+
+          '<div>'+
+            '<div style="font-size:14px;font-weight:700;color:var(--dark)">⚡ Électricité totale (K1+K2)</div>'+
+            '<div style="font-size:10px;color:var(--text3);margin-top:2px">'+elecSynthPdf.noms.join(' + ')+'</div>'+
+          '</div>'+
+          '<div style="text-align:right">'+
+            '<div class="fluid-val">'+fmtCout(elecSynthPdf.cout,'XOF')+'</div>'+
+            (elecSynthPdf.budget?'<div style="font-size:10px;color:var(--text3);margin-top:2px">Budget : '+fmtCout(elecSynthPdf.budget,'XOF')+'</div>':'')+
+            (elecSynthPdf.vsPct!=null?'<span class="badge '+(elecSynthPdf.vsPct>0?'badge-ko':'badge-ok')+'" style="margin-top:6px;display:inline-block">'+(elecSynthPdf.vsPct>0?'Dépassement +':'OK ')+Math.abs(elecSynthPdf.vsPct)+'%</span>':'')+
+          '</div>'+
+        '</div>'+
+        '<div class="fluid-row">'+
+          (elecSynthPdf.conso?'<span>Conso totale : <strong>'+elecSynthPdf.conso.toLocaleString('fr-FR')+' kWh</strong></span>':'')+
+          (elecSynthPdf.budget?'<span>Budget mensuel : <strong>'+fmtCout(elecSynthPdf.budget,'XOF')+'</strong></span>':'')+
+          (elecSynthPdf.vs!=null?'<span style="color:'+_epCol+'">Écart : <strong>'+(elecSynthPdf.vs>0?'+':'')+fmtCout(elecSynthPdf.vs,'XOF')+'</strong></span>':'')+
+        '</div>'+
+        (elecSynthPdf.budget&&elecSynthPdf.cout?
+          '<div style="margin-top:10px"><div style="height:6px;background:#f0ebe4;border-radius:3px;overflow:hidden">'+
+          '<div style="height:6px;background:'+_epCol+';border-radius:3px;width:'+Math.min(100,Math.round(elecSynthPdf.cout/elecSynthPdf.budget*100))+'%"></div></div>'+
+          '<div style="font-size:9px;color:'+_epCol+';margin-top:3px;font-weight:600">'+Math.round(elecSynthPdf.cout/elecSynthPdf.budget*100)+'% du budget</div></div>'
+        :'')+
+      '</div>';
+    }
     energieData.forEach(function(d){
       var icon=_fluidIcon(d.f);
       var deviseSufix=d.f.devise||'FCFA';
@@ -14034,11 +14073,23 @@ async function _rtEnergie(sid){
     // chamReal déjà calculé plus haut
     var covReal=(function(){var s=0;var n=0;relevesAsc.forEach(function(r){if(r.nb_couverts!=null){s+=r.nb_couverts;n++;}});return n?Math.round(s/n):null;})();
     var covBudg=budgetMensuel.nb_couverts_budget;
+    // ── Synthèse K1+K2 Électricité ──────────────────────────────────────────────
+    var _elecFl=fluides.filter(function(f){return f.unite==='kWh'&&f.type_valeur!=='instantane';});
+    var elecSynth=null;
+    if(_elecFl.length>=2){
+      var _eCout=_elecFl.reduce(function(s,f){var c=consoMoisByFluide[f.id];var t=f.tarif?parseFloat(f.tarif):null;return s+(c!=null&&c>0&&t?Math.round(c*t):0);},0);
+      var _eBudget=_elecFl.reduce(function(s,f){var b=_budgetByFluide[f.id]&&_budgetByFluide[f.id].cout_budget_jour!=null?Math.round(parseFloat(_budgetByFluide[f.id].cout_budget_jour)*daysInMonth):0;return s+b;},0);
+      var _eConso=_elecFl.reduce(function(s,f){var c=consoMoisByFluide[f.id];return s+(c!=null?c:0);},0);
+      function _fmtE(v){if(!v)return'—';return v>=1000000?(Math.round(v/100000)/10).toLocaleString('fr-FR')+' M XOF':(Math.round(v/1000)).toLocaleString('fr-FR')+' k XOF';}
+      var _eEcartPct=_eBudget&&_eCout?Math.round((_eCout-_eBudget)/_eBudget*100):null;
+      elecSynth={cout:_eCout||null,budget:_eBudget||null,conso:Math.round(_eConso)||null,ecartPct:_eEcartPct,fmtCout:_fmtE(_eCout),fmtBudget:_fmtE(_eBudget)};
+    }
     var budgetKpiCards=[
       {lbl:'Ch. occ. / nuit',val:chamReal!=null?chamReal+' ch':'—',sub:chamBudg!=null?'Budget : '+chamBudg+' ch'+(toBudg?' ('+toBudg+'% TO)':''):null,ok:chamReal!=null&&chamBudg!=null?chamReal>=chamBudg:null,icon:'🏨'},
       {lbl:'Couverts/j',val:covReal!=null?covReal:'—',sub:covBudg!=null?'Budget : '+covBudg+'/j':null,ok:covReal!=null&&covBudg!=null?covReal>=covBudg:null,icon:'🍽'},
       (function(){var _tot=budgetFluidesRows.reduce(function(s,b){return s+(b.cout_budget_jour!=null?parseFloat(b.cout_budget_jour)*daysInMonth:0);},0);var _totJ=budgetFluidesRows.length?_tot/daysInMonth:0;return{lbl:'Budget énergie mois',val:_tot>0?Math.round(_tot).toLocaleString('fr-FR')+' XOF':'—',sub:_tot>0?Math.round(_totJ).toLocaleString('fr-FR')+' XOF/j':null,ok:null,icon:'💰'};})()
     ];
+    if(elecSynth&&elecSynth.cout)budgetKpiCards.push({lbl:'Électricité totale K1+K2',val:elecSynth.fmtCout,sub:elecSynth.budget?'Budget : '+elecSynth.fmtBudget+(elecSynth.ecartPct!=null?' · '+(elecSynth.ecartPct>0?'+':'')+elecSynth.ecartPct+'%':''):null,ok:elecSynth.budget&&elecSynth.cout?elecSynth.cout<=elecSynth.budget:null,icon:'⚡'});
     budgetKpiHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px">'+
       budgetKpiCards.map(function(c){
         var borderColor=c.ok===true?'var(--vert)':c.ok===false?'var(--rouge)':'var(--border)';
@@ -14074,6 +14125,22 @@ async function _rtEnergie(sid){
           (pctBar>0?'<div style="font-size:9px;color:'+(pctBar>105?'var(--rouge)':'var(--text3)')+';margin-top:2px">'+pctBar+'% du budget mois</div>':'')+
         '</div>';
       }).join('')+
+      // ── Barre synthèse K1+K2 ──────────────────────────────────────────────────
+      (elecSynth&&elecSynth.cout&&elecSynth.budget?
+        '<div style="margin-top:4px;padding-top:12px;border-top:1.5px dashed var(--border)">'+
+          '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">'+
+            '<span style="font-weight:700;color:var(--dark)">⚡ Électricité totale (K1+K2)</span>'+
+            '<span style="color:var(--text3)">'+elecSynth.fmtCout+' <span style="font-size:9px">/ '+elecSynth.fmtBudget+'</span></span>'+
+          '</div>'+
+          '<div style="height:7px;background:var(--border);border-radius:3px;overflow:hidden">'+
+            '<div style="height:7px;background:'+(elecSynth.cout>elecSynth.budget*1.05?'var(--rouge)':elecSynth.cout>elecSynth.budget?'#f59e0b':'var(--vert)')+';border-radius:3px;width:'+Math.min(100,Math.round(elecSynth.cout/elecSynth.budget*100))+'%;transition:width .3s"></div>'+
+          '</div>'+
+          '<div style="font-size:9px;color:'+(elecSynth.ecartPct!=null&&elecSynth.ecartPct>5?'var(--rouge)':'var(--text3)')+';margin-top:3px">'+
+            (elecSynth.ecartPct!=null?(elecSynth.ecartPct>0?'+':'')+elecSynth.ecartPct+'% du budget · ':'')+
+            (elecSynth.conso?elecSynth.conso.toLocaleString('fr-FR')+' kWh consommés':'')+
+          '</div>'+
+        '</div>'
+      :'')+
     '</div>':'')
     ;
   }else{
