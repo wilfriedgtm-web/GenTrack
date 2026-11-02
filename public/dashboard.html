@@ -13240,36 +13240,40 @@ async function _energieSaveToPctInline(releveId, rawVal){
 }
 
 // ── Édition inline Chambres occupées ──────────────────────────────────────────
-function _energieEditChambres(releveId, currentVal){
-  var cell=document.getElementById('ech-cell-'+releveId);
+function _energieEditChambres(releveId, currentVal, pfx){
+  pfx=pfx||'';
+  var cell=document.getElementById(pfx+'ech-cell-'+releveId);
   if(!cell)return;
   cell.setAttribute('data-orig',currentVal!=null?currentVal:'');
-  cell.innerHTML='<input id="ech-inp-'+releveId+'" type="number" min="0" step="1" '+
+  cell.innerHTML='<input id="'+pfx+'ech-inp-'+releveId+'" type="number" min="0" step="1" '+
     'value="'+(currentVal!=null?currentVal:'')+'" placeholder="ch" '+
     'style="border:1px solid var(--amber);border-radius:5px;padding:3px 6px;font-size:12px;width:58px;text-align:right;-moz-appearance:textfield" '+
-    'onblur="_energieSaveChambresInline(\''+releveId+'\',this.value)" '+
-    'onkeydown="if(event.key===\'Enter\'){this.blur();}else if(event.key===\'Escape\'){_energieCancelChambres(\''+releveId+'\');}" />';
-  var inp=document.getElementById('ech-inp-'+releveId);
+    'onblur="_energieSaveChambresInline(\''+releveId+'\',this.value,\''+pfx+'\')" '+
+    'onkeydown="if(event.key===\'Enter\'){this.blur();}else if(event.key===\'Escape\'){_energieCancelChambres(\''+releveId+'\',\''+pfx+'\');}" />';
+  var inp=document.getElementById(pfx+'ech-inp-'+releveId);
   if(inp){inp.focus();inp.select();}
 }
-function _energieCancelChambres(releveId){
-  var cell=document.getElementById('ech-cell-'+releveId);
+function _energieCancelChambres(releveId, pfx){
+  pfx=pfx||'';
+  var cell=document.getElementById(pfx+'ech-cell-'+releveId);
   if(!cell)return;
-  var inp=document.getElementById('ech-inp-'+releveId);
+  var inp=document.getElementById(pfx+'ech-inp-'+releveId);
   if(inp)inp.removeAttribute('onblur');
   var orig=cell.getAttribute('data-orig');
-  _energieRestoreChambresCell(releveId,orig!==''?parseInt(orig):null);
+  _energieRestoreChambresCell(releveId,orig!==''?parseInt(orig):null,undefined,pfx);
 }
-function _energieRestoreChambresCell(releveId,val,toP){
-  var cell=document.getElementById('ech-cell-'+releveId);
+function _energieRestoreChambresCell(releveId,val,toP,pfx){
+  pfx=pfx||'';
+  var cell=document.getElementById(pfx+'ech-cell-'+releveId);
   if(!cell)return;
   var toPStr=toP!=null?' <span style="font-size:9px;color:var(--text3)">('+Math.round(toP)+'%)</span>':'';
-  cell.innerHTML='<span id="ech-span-'+releveId+'" onclick="_energieEditChambres(\''+releveId+'\','+(val!=null?val:'null')+')" '+
+  cell.innerHTML='<span id="'+pfx+'ech-span-'+releveId+'" onclick="_energieEditChambres(\''+releveId+'\','+(val!=null?val:'null')+',\''+pfx+'\')" '+
     'style="cursor:pointer;color:'+(val!=null?'var(--dark)':'var(--text3)')+';font-size:11px" title="Cliquer pour saisir les chambres occupées">'+
     (val!=null?val+' ch'+toPStr:'— <span style="font-size:9px">(+)</span>')+
   '</span>';
 }
-async function _energieSaveChambresInline(releveId, rawVal){
+async function _energieSaveChambresInline(releveId, rawVal, pfx){
+  pfx=pfx||'';
   var nbCh=window._energieSiteNbChambres||null;
   var val=rawVal!=null&&rawVal!==''?parseInt(rawVal):null;
   var patch={nb_chambres_occupees:val};
@@ -13280,51 +13284,55 @@ async function _energieSaveChambresInline(releveId, rawVal){
     if(_session)setTimeout(function(){renderRespTech(_session,'energie');},200);
   }else{
     alert('Erreur lors de l\'enregistrement.');
-    var cell=document.getElementById('ech-cell-'+releveId);
+    var cell=document.getElementById(pfx+'ech-cell-'+releveId);
     var orig=cell?cell.getAttribute('data-orig'):'';
-    _energieRestoreChambresCell(releveId,orig!==''?parseInt(orig):null);
+    _energieRestoreChambresCell(releveId,orig!==''?parseInt(orig):null,undefined,pfx);
   }
 }
 
 // ── Édition inline Couverts ────────────────────────────────────────────────────
-function _energieEditCouverts(releveId, currentVal){
-  var cell=document.getElementById('ecov-cell-'+releveId);
+function _energieEditCouverts(releveId, currentVal, pfx){
+  pfx=pfx||'';
+  var cell=document.getElementById(pfx+'ecov-cell-'+releveId);
   if(!cell)return;
   cell.setAttribute('data-orig',currentVal!=null?currentVal:'');
-  cell.innerHTML='<input id="ecov-inp-'+releveId+'" type="number" min="0" step="1" '+
+  cell.innerHTML='<input id="'+pfx+'ecov-inp-'+releveId+'" type="number" min="0" step="1" '+
     'value="'+(currentVal!=null?currentVal:'')+'" placeholder="cvts" '+
     'style="border:1px solid var(--amber);border-radius:5px;padding:3px 6px;font-size:12px;width:64px;text-align:right;-moz-appearance:textfield" '+
-    'onblur="_energieSaveCouvertsInline(\''+releveId+'\',this.value)" '+
-    'onkeydown="if(event.key===\'Enter\'){this.blur();}else if(event.key===\'Escape\'){_energieCancelCouverts(\''+releveId+'\');}" />';
-  var inp=document.getElementById('ecov-inp-'+releveId);
+    'onblur="_energieSaveCouvertsInline(\''+releveId+'\',this.value,\''+pfx+'\')" '+
+    'onkeydown="if(event.key===\'Enter\'){this.blur();}else if(event.key===\'Escape\'){_energieCancelCouverts(\''+releveId+'\',\''+pfx+'\');}" />';
+  var inp=document.getElementById(pfx+'ecov-inp-'+releveId);
   if(inp){inp.focus();inp.select();}
 }
-function _energieCancelCouverts(releveId){
-  var cell=document.getElementById('ecov-cell-'+releveId);
+function _energieCancelCouverts(releveId, pfx){
+  pfx=pfx||'';
+  var cell=document.getElementById(pfx+'ecov-cell-'+releveId);
   if(!cell)return;
-  var inp=document.getElementById('ecov-inp-'+releveId);
+  var inp=document.getElementById(pfx+'ecov-inp-'+releveId);
   if(inp)inp.removeAttribute('onblur');
   var orig=cell.getAttribute('data-orig');
-  _energieRestoreCouvertsCell(releveId,orig!==''?parseInt(orig):null);
+  _energieRestoreCouvertsCell(releveId,orig!==''?parseInt(orig):null,pfx);
 }
-function _energieRestoreCouvertsCell(releveId,val){
-  var cell=document.getElementById('ecov-cell-'+releveId);
+function _energieRestoreCouvertsCell(releveId,val,pfx){
+  pfx=pfx||'';
+  var cell=document.getElementById(pfx+'ecov-cell-'+releveId);
   if(!cell)return;
-  cell.innerHTML='<span id="ecov-span-'+releveId+'" onclick="_energieEditCouverts(\''+releveId+'\','+(val!=null?val:'null')+')" '+
+  cell.innerHTML='<span id="'+pfx+'ecov-span-'+releveId+'" onclick="_energieEditCouverts(\''+releveId+'\','+(val!=null?val:'null')+',\''+pfx+'\')" '+
     'style="cursor:pointer;color:'+(val!=null?'var(--dark)':'var(--text3)')+';font-size:11px" title="Cliquer pour saisir les couverts">'+
     (val!=null?val.toLocaleString('fr-FR'):'— <span style="font-size:9px">(+)</span>')+
   '</span>';
 }
-async function _energieSaveCouvertsInline(releveId, rawVal){
+async function _energieSaveCouvertsInline(releveId, rawVal, pfx){
+  pfx=pfx||'';
   var val=rawVal!=null&&rawVal!==''?parseInt(rawVal):null;
   var ok=await supaPatch('releves_energie',releveId,{nb_couverts:val});
   if(ok){
     if(_session)setTimeout(function(){renderRespTech(_session,'energie');},200);
   }else{
     alert('Erreur lors de l\'enregistrement.');
-    var cell=document.getElementById('ecov-cell-'+releveId);
+    var cell=document.getElementById(pfx+'ecov-cell-'+releveId);
     var orig=cell?cell.getAttribute('data-orig'):'';
-    _energieRestoreCouvertsCell(releveId,orig!==''?parseInt(orig):null);
+    _energieRestoreCouvertsCell(releveId,orig!==''?parseInt(orig):null,pfx);
   }
 }
 
@@ -14172,14 +14180,14 @@ async function _rtEnergie(sid){
             (vNum!=null?((alerte||anomDeclare)?'⚠️ ':'')+vNum.toLocaleString('fr-FR'):'— <span style="font-size:9px">(+)</span>')+
           '</span>'+deltaStr+anomBadge+'</td>';
       }).join('')+
-      '<td id="ech-cell-'+r.id+'" style="padding:7px 9px;text-align:right">'+
-        '<span id="ech-span-'+r.id+'" onclick="_energieEditChambres(\''+r.id+'\','+(r.nb_chambres_occupees!=null?r.nb_chambres_occupees:'null')+')" '+
+      '<td id="ht-ech-cell-'+r.id+'" style="padding:7px 9px;text-align:right">'+
+        '<span id="ht-ech-span-'+r.id+'" onclick="_energieEditChambres(\''+r.id+'\','+(r.nb_chambres_occupees!=null?r.nb_chambres_occupees:'null')+',\'ht-\')" '+
           'style="cursor:pointer;color:'+(r.nb_chambres_occupees!=null?'var(--dark)':'var(--text3)')+';font-size:11px" title="Cliquer pour saisir les chambres occupées">'+
           (r.nb_chambres_occupees!=null?r.nb_chambres_occupees+' ch'+(r.to_percent!=null?' <span style="font-size:9px;color:var(--text3)">('+Math.round(r.to_percent)+'%)</span>':''):'— <span style="font-size:9px">(+)</span>')+
         '</span>'+
       '</td>'+
-      '<td id="ecov-cell-'+r.id+'" style="padding:7px 9px;text-align:right">'+
-        '<span id="ecov-span-'+r.id+'" onclick="_energieEditCouverts(\''+r.id+'\','+(r.nb_couverts!=null?r.nb_couverts:'null')+')" '+
+      '<td id="ht-ecov-cell-'+r.id+'" style="padding:7px 9px;text-align:right">'+
+        '<span id="ht-ecov-span-'+r.id+'" onclick="_energieEditCouverts(\''+r.id+'\','+(r.nb_couverts!=null?r.nb_couverts:'null')+',\'ht-\')" '+
           'style="cursor:pointer;color:'+(r.nb_couverts!=null?'var(--dark)':'var(--text3)')+';font-size:11px" title="Cliquer pour saisir les couverts">'+
           (r.nb_couverts!=null?r.nb_couverts.toLocaleString('fr-FR'):'— <span style="font-size:9px">(+)</span>')+
         '</span>'+
