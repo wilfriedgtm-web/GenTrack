@@ -8419,13 +8419,17 @@ async function _dtAccueil(session,sids,cid){
 
   // KPI globaux
   var totalAlertes=alertes.length+pannes.length;
-  var totalVal=0,totalTot=0;
-  rondes.forEach(function(r){
-    var eq=reByRonde[r.id]||[];
-    totalTot+=eq.length;
-    totalVal+=eq.filter(function(re){return re.statut==='valide';}).length;
+  // R1 — un site est conforme si ronde complète OU relevé validé (depuis 2026-11-03)
+  var R1_DATE='2026-11-03';
+  var confSites=0;
+  sids.forEach(function(sid){
+    var sRondes=rondesBySite[sid]||[];
+    var sEqs=[];sRondes.forEach(function(r){sEqs=sEqs.concat(reByRonde[r.id]||[]);});
+    var rondeOk=sEqs.length>0&&sEqs.filter(function(re){return re.statut==='valide';}).length===sEqs.length;
+    var releveOk=(today>=R1_DATE)&&(relevesJourDT||[]).some(function(rv){return rv.site_id===sid;});
+    if(rondeOk||releveOk)confSites++;
   });
-  var confPct=totalTot>0?Math.round(totalVal/totalTot*100):null;
+  var confPct=sids.length>0?Math.round(confSites/sids.length*100):null;
 
   // Rondes zones résidence par site (si au moins un site a le module)
   var rzBySite={};
@@ -10599,12 +10603,14 @@ async function _doAccueil(session,sids,cid){
   var since14=dateNJours(14);
   var threeDaysAgo=dateNJours(3);
 
-  var[sites,alertes,pannes,rondes7,pannes14]=await Promise.all([
+  var[sites,alertes,pannes,rondes7,pannes14,releves7]=await Promise.all([
     supaGet('sites','id=in.('+sidStr+')&select=id,nom'),
     supaGet('alertes','client_id=eq.'+cid+'&resolue=eq.false&select=id,type,severite,message,created_at&order=created_at.desc&limit=50'),
     supaGet('pannes','site_id=in.('+sidStr+')&resolue=eq.false&select=id,site_id,type,description,date_panne,equipements(nom)&order=date_panne.asc&limit=50'),
     supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+since7+'&select=id,site_id,date_ronde,frequence&order=date_ronde.desc&limit=200'),
-    supaGet('pannes','site_id=in.('+sidStr+')&date_panne=gte.'+since14+'&select=id,site_id,type,description,date_panne,resolue,equipements(nom)&order=date_panne.desc&limit=60')
+    supaGet('pannes','site_id=in.('+sidStr+')&date_panne=gte.'+since14+'&select=id,site_id,type,description,date_panne,resolue,equipements(nom)&order=date_panne.desc&limit=60'),
+    // R1 — relevés validés sur les 7 derniers jours
+    supaGet('releves_horaires','site_id=in.('+sidStr+')&statut=eq.validé&validated_at=gte.'+since7+'T00:00:00&select=id,site_id,validated_at&limit=500')
   ]);
 
   var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
@@ -10621,13 +10627,27 @@ async function _doAccueil(session,sids,cid){
     reByRonde7[re.ronde_id].push(re);
   });
 
-  var totalVal7=0,totalTot7=0;
-  rondes7.forEach(function(r){
-    var eq=reByRonde7[r.id]||[];
-    totalTot7+=eq.length;
-    totalVal7+=eq.filter(function(re){return re.statut==='valide';}).length;
+  // R1 — indexer les relevés validés par (site_id|date) pour les 7 derniers jours
+  var R1_DATE='2026-11-03';
+  var releve7BySiteDate={};
+  (releves7||[]).forEach(function(r){
+    var d=(r.validated_at||'').substring(0,10);
+    if(d>=R1_DATE){releve7BySiteDate[r.site_id+'|'+d]=true;}
   });
-  var confGlobal7=totalTot7>0?Math.round(totalVal7/totalTot7*100):null;
+  // R1 — conformité 7j par (site, jour) : ronde complète OU relevé validé
+  var confDays7=0,totalDays7=0;
+  for(var _i=0;_i<7;_i++){
+    var _d=dateNJours(_i);
+    sids.forEach(function(sid){
+      totalDays7++;
+      var dayRondes=rondes7.filter(function(r){return r.site_id===sid&&r.date_ronde===_d;});
+      var dayEqs=[];dayRondes.forEach(function(r){dayEqs=dayEqs.concat(reByRonde7[r.id]||[]);});
+      var rondeOk=dayEqs.length>0&&dayEqs.filter(function(re){return re.statut==='valide';}).length===dayEqs.length;
+      var releveOk=_d>=R1_DATE&&!!releve7BySiteDate[sid+'|'+_d];
+      if(rondeOk||releveOk)confDays7++;
+    });
+  }
+  var confGlobal7=totalDays7>0?Math.round(confDays7/totalDays7*100):null;
   var totalAlertes=alertes.length+pannes.length;
 
   // Banner
