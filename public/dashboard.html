@@ -7135,9 +7135,6 @@ var _relevePreviewData={}; // sid → [{eqNom, icon, questions:[{texte,type_repo
 async function _buildReleveConfigTab(sid){
   var equips=await supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,types_equipements(nom)&order=ordre_ronde.asc');
   if(!equips.length)return '<div class="placeholder-card" style="margin-top:16px"><div class="placeholder-icon">📋</div>Aucun équipement configuré</div>';
-  // R6 — fluides énergie actifs pour ce site
-  var fluides=await supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,inclure_releve_horaire&order=ordre.asc').catch(function(){return[];});
-  if(!Array.isArray(fluides))fluides=[];
   var eqIds=equips.map(function(e){return e.id;});
   var questions=await supaGet('questions','equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&select=id,texte,type_reponse,unite,frequences,equipement_id,options&order=ordre.asc');
   var eqMap={};equips.forEach(function(e){eqMap[e.id]=e;});
@@ -7214,7 +7211,9 @@ async function _buildReleveConfigTab(sid){
       '</div>';
   });
 
-  // R6 — Bloc fluides & énergie
+  // R6 — Bloc fluides énergie à inclure dans le relevé horaire
+  var fluides=await supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,inclure_releve_horaire&order=ordre.asc').catch(function(){return[];});
+  if(!Array.isArray(fluides))fluides=[];
   if(fluides.length){
     var fluidRows=fluides.map(function(f){
       var on=!!f.inclure_releve_horaire;
@@ -7234,8 +7233,8 @@ async function _buildReleveConfigTab(sid){
             '<span style="font-size:10px;color:var(--text3)">Non inclus</span>')+
       '</div>';
     }).join('');
-    html+='<div style="margin-top:24px;margin-bottom:12px">'+
-      '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">⚡ Fluides &amp; énergie à relever</div>'+
+    html+='<div style="margin-top:28px">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:6px">⚡ Fluides &amp; énergie à relever</div>'+
       '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Cochez les fluides que le technicien devra saisir lors du relevé horaire (valeur datée J-1).</div>'+
       '<div style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden">'+
         fluidRows+
@@ -7243,7 +7242,7 @@ async function _buildReleveConfigTab(sid){
     '</div>';
   }
 
-  html+='<div style="font-size:11px;color:var(--text3);margin-top:4px">💡 Activez un équipement pour choisir ses questions. Les modifications sont immédiates.</div>';
+  html+='<div style="font-size:11px;color:var(--text3);margin-top:12px">💡 Activez un équipement pour choisir ses questions. Les modifications sont immédiates.</div>';
   return html+'</div>';
 }
 
@@ -14721,6 +14720,7 @@ async function _buildEnergieConfigTab(sid){
           '</div>'+
         '</label>'+
       '</div>';
+
 
       h+='</div>'; // end card
     });
