@@ -6478,7 +6478,22 @@ async function _buildResPlanningHtml(sid){
   if(counts.never)h+='<button style="'+(_resPlanFilter==='never'?tabAct:tabBase)+'" onclick="_resPlanFilter=\'never\';navTo(\'residence-planning\')">⬜ Jamais ('+counts.never+')</button>';
   h+='</div>';
 
-  // ── Liste zones par bâtiment ────────────────────────────────────────────────
+  // ── Accordion bâtiments — dark design ──────────────────────────────────────
+  var C={
+    bg:'#0d1117',card:'#161b22',card2:'#21262d',border:'#30363d',
+    text:'#e6edf3',text2:'#8b949e',text3:'#6e7681',
+    blue:'#2f81f7',bluePale:'rgba(47,129,247,.15)',
+    green:'#3fb950',greenPale:'rgba(63,185,80,.15)',
+    amber:'#d29922',amberPale:'rgba(210,153,34,.15)',
+    red:'#f85149',redPale:'rgba(248,81,73,.15)',
+    gray:'#484f58',grayPale:'rgba(72,79,88,.15)'
+  };
+  window._resPlanZoneData={};
+  window._resPlanZoneMap=window._resPlanZoneMap||{};
+  zones.forEach(function(z){
+    var st=zStatus(z);
+    window._resPlanZoneData[z.id]={nom:z.nom,batiment:z.batiment,etage:z.etage,type_zone:z.type_zone,frequence_passage:z.frequence_passage,status:st,lr:lastRel[z.id]||null};
+  });
   var byBat={};var specials=[];
   zones.forEach(function(z){
     var st=zStatus(z);
@@ -6492,91 +6507,88 @@ async function _buildResPlanningHtml(sid){
     if(!byBat[bat][et])byBat[bat][et]=[];
     byBat[bat][et].push(z);
   });
-
-  function zIcon(z){
-    if(z.type_zone==='chambre')return '🛏️';
-    if(z.type_zone==='commun_etage')return '🛋️';
-    if(z.type_zone==='special')return '⭐';
-    return '📍';
-  }
-
-  function renderZoneCard(z){
-    var st=zStatus(z);
-    var leftBar={late:'var(--rouge)',warn:'var(--orange)',ok:'var(--vert)',never:'var(--text3)'}[st.cls];
-    var freq=z.frequence_passage||30;
-    var row='<div id="zcard-'+z.id+'" style="background:white;border:1.5px solid '+({late:'var(--rouge-border)',warn:'var(--orange-border)',ok:'var(--vert-border)',never:'var(--border)'}[st.cls])+';border-radius:10px;display:flex;align-items:center;gap:0;margin-bottom:5px;overflow:hidden;position:relative">';
-    // left color bar
-    row+='<div style="width:3px;align-self:stretch;background:'+leftBar+';flex-shrink:0"></div>';
-    // icon
-    row+='<div style="width:34px;height:34px;margin:8px 6px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:'+st.chipBg+'">'+zIcon(z)+'</div>';
-    // body
-    row+='<div style="flex:1;min-width:0;padding:8px 0">';
-    row+='<div style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(z.nom)+'</div>';
-    row+='<div style="font-size:11px;color:var(--text2);margin-top:1px">'+escape_html(z.batiment||'Résidence')+' · Ét. '+escape_html(String(z.etage||'—'))+(canCfgFreq?' · <span style="color:var(--text3)">'+freq+'j</span>':'')+'</div>';
-    row+='</div>';
-    // chip + last visit
-    row+='<div style="text-align:right;padding:8px 10px;flex-shrink:0">';
-    row+='<div style="display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700;background:'+st.chipBg+';color:'+st.chipColor+';border:1px solid '+st.chipBd+'">'+escape_html(st.chip)+'</div>';
-    row+='<div style="font-size:10px;color:var(--text3);margin-top:3px">'+escape_html(st.lastVisit)+'</div>';
-    row+='<div style="font-size:10px;color:var(--text3);margin-top:1px">'+escape_html(st.nextVisit||'')+'</div>';
-    row+='</div>';
-    // config btn (resp_tech / dir_tech seulement)
-    if(canCfgFreq){
-      row+='<button title="Changer la fréquence" onclick="_openFreqPanel(\''+z.id+'\','+freq+')" style="padding:6px 10px;background:none;border:none;border-left:1px solid var(--border);color:var(--text3);font-size:14px;cursor:pointer;align-self:stretch;flex-shrink:0">⚙️</button>';
-    }
-    row+='</div>';
-    // freq panel placeholder
-    row+='<div id="freqpanel-'+z.id+'" style="display:none"></div>';
-    return row;
-  }
-
-  // Blocs par bâtiment → étage
   var batKeys=Object.keys(byBat).sort();
   if(batKeys.length===0&&specials.length===0){
-    h+='<div style="text-align:center;padding:30px;color:var(--text3);background:white;border:1px solid var(--border);border-radius:10px;font-size:13px">Aucune zone pour ce filtre.</div>';
+    h+='<div style="text-align:center;padding:30px;color:'+C.text3+';background:'+C.card+';border:1px solid '+C.border+';border-radius:12px;font-size:13px">Aucune zone pour ce filtre.</div>';
   }
+  h+='<div style="background:'+C.bg+';border-radius:14px;padding:12px;margin-top:8px">';
   batKeys.forEach(function(bat){
-    var batZones=[];Object.values(byBat[bat]).forEach(function(arr){batZones=batZones.concat(arr);});
-    var batLate=batZones.filter(function(z){return zStatus(z).cls==='late';}).length;
-    var batOk=batZones.filter(function(z){return zStatus(z).cls==='ok';}).length;
-    var covPct=batZones.length?Math.round(batOk/batZones.length*100):0;
-
-    h+='<div style="margin-bottom:12px">';
-    h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 2px;margin-bottom:4px">';
-    h+='<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)">'+escape_html(bat)+'</div>';
-    h+='<div style="font-size:11px;font-weight:600;color:'+(batLate?'var(--rouge)':'var(--text2)')+'">'+batOk+'/'+batZones.length+' OK</div>';
+    var batKey=bat.replace(/[^a-zA-Z0-9]/g,'_');
+    var allBatZones=[];Object.values(byBat[bat]).forEach(function(arr){allBatZones=allBatZones.concat(arr);});
+    var batLate=allBatZones.filter(function(z){return zStatus(z).cls==='late';}).length;
+    var batWarn=allBatZones.filter(function(z){return zStatus(z).cls==='warn';}).length;
+    var batOk=allBatZones.filter(function(z){return zStatus(z).cls==='ok';}).length;
+    var batNever=allBatZones.filter(function(z){return zStatus(z).cls==='never';}).length;
+    h+='<div id="bat-card-'+batKey+'" style="background:'+C.card+';border:1px solid '+C.border+';border-radius:12px;margin-bottom:10px;overflow:hidden">';
+    h+='<div onclick="(function(){var b=document.getElementById(\'bat-body-'+batKey+'\');b.style.display=b.style.display===\'none\'?\'block\':\'none\';})()" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;user-select:none">';
+    h+='<div style="display:flex;align-items:center;gap:12px">';
+    h+='<div style="width:36px;height:36px;background:'+C.bluePale+';border:1px solid rgba(47,129,247,.3);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🏢</div>';
+    h+='<div>';
+    h+='<div style="font-size:15px;font-weight:700;color:'+C.text+'">'+escape_html(bat)+'</div>';
+    var batStats=[];
+    if(batLate)batStats.push('<span style="color:'+C.red+'">'+batLate+' en retard</span>');
+    if(batWarn)batStats.push('<span style="color:'+C.amber+'">'+batWarn+' bientôt</span>');
+    if(batOk)batStats.push('<span style="color:'+C.green+'">'+batOk+' ok</span>');
+    if(batNever)batStats.push('<span style="color:'+C.gray+'">'+batNever+' jamais</span>');
+    h+='<div style="font-size:12px;color:'+C.text2+';margin-top:2px">'+allBatZones.length+' zones — '+batStats.join(' · ')+'</div>';
+    h+='</div></div>';
+    h+='<div style="color:'+C.text3+';font-size:22px;font-weight:300">›</div>';
     h+='</div>';
+    h+='<div id="bat-body-'+batKey+'" style="padding:0 16px 16px">';
     Object.keys(byBat[bat]).sort().forEach(function(et){
       var etZones=byBat[bat][et];
       var gpKey=(bat+'_'+et).replace(/[^a-zA-Z0-9]/g,'_');
       var batEsc=bat.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
       var etEsc=String(et).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
       var sidEsc=sid.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-      // Stocker les zones par étage pour le bouton Planifier
-      if(!window._resPlanZoneMap)window._resPlanZoneMap={};
       window._resPlanZoneMap[gpKey]=etZones.map(function(z){return {id:z.id,nom:z.nom};});
-      h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 2px 3px 2px;margin-top:6px">';
-      h+='<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Étage '+escape_html(String(et))+'</div>';
-      h+='<div style="display:flex;gap:5px;align-items:center">';
+      var etLate=etZones.filter(function(z){return zStatus(z).cls==='late';}).length;
+      var etWarn=etZones.filter(function(z){return zStatus(z).cls==='warn';}).length;
+      var etOk=etZones.filter(function(z){return zStatus(z).cls==='ok';}).length;
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-top:1px solid '+C.border+'">';
+      h+='<div style="min-width:34px;text-align:center;font-size:12px;font-weight:700;color:'+C.text2+';flex-shrink:0;background:'+C.card2+';border-radius:6px;padding:4px 5px">'+escape_html(String(et))+'</div>';
+      h+='<div style="display:flex;flex-wrap:wrap;gap:3px;flex:1;align-items:center">';
+      etZones.forEach(function(z){
+        var st=zStatus(z);
+        var dc={ok:C.green,warn:C.amber,late:C.red,never:C.gray}[st.cls];
+        h+='<div onclick="_resPlanShowZone(\''+z.id+'\',\''+sidEsc+'\',\''+gpKey+'\') " title="'+escape_html(z.nom)+' — '+escape_html(st.chip)+'" style="width:20px;height:20px;border-radius:4px;background:'+dc+';cursor:pointer;flex-shrink:0"></div>';
+      });
+      h+='</div>';
+      h+='<div style="font-size:10px;white-space:nowrap;flex-shrink:0">';
+      if(etLate)h+='<span style="color:'+C.red+'">⚠'+etLate+' </span>';
+      if(etWarn)h+='<span style="color:'+C.amber+'">◑'+etWarn+' </span>';
+      h+='<span style="color:'+C.green+'">✓'+etOk+'</span>';
+      h+='</div>';
       if(canCfgFreq){
-        h+='<button onclick="_resPlanPlanifier(\''+gpKey+'\',\''+batEsc+'\',\''+etEsc+'\',\''+sidEsc+'\')" style="font-size:11px;font-weight:600;background:var(--bleu-pale);border:1px solid var(--bleu-pale);border-radius:20px;padding:2px 10px;cursor:pointer;color:var(--bleu)">📱 Planifier</button>';
-        h+='<button onclick="_openGroupFreqPanel(\''+batEsc+'\',\''+etEsc+'\',\''+sidEsc+'\',\''+gpKey+'\')" style="font-size:11px;background:none;border:1px solid var(--border);border-radius:20px;padding:2px 8px;cursor:pointer;color:var(--text3)">⚙️</button>';
+        h+='<button onclick="_resPlanPlanifier(\''+gpKey+'\',\''+batEsc+'\',\''+etEsc+'\',\''+sidEsc+'\') " style="background:'+C.blue+';border:none;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;color:white;cursor:pointer;flex-shrink:0;white-space:nowrap">📱 Planifier</button>';
+        h+='<button onclick="_openGroupFreqPanel(\''+batEsc+'\',\''+etEsc+'\',\''+sidEsc+'\',\''+gpKey+'\') " style="background:none;border:1px solid '+C.border+';border-radius:20px;padding:4px 8px;font-size:11px;cursor:pointer;color:'+C.text2+';flex-shrink:0">⚙️</button>';
       }
       h+='</div>';
-      h+='</div>';
       h+='<div id="groupfreqpanel-'+gpKey+'" style="display:none;margin-bottom:5px"></div>';
-      etZones.forEach(function(z){h+=renderZoneCard(z);});
+      h+='<div id="zonedetail-'+gpKey+'" data-open-zone="" style="display:none;background:'+C.card2+';border-radius:10px;margin-bottom:8px;padding:14px"></div>';
     });
     h+='</div>';
-  });
-
-  // Zones spéciales
-  if(specials.length){
-    h+='<div style="margin-bottom:12px">';
-    h+='<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);padding:6px 2px;margin-bottom:4px">Zones spéciales</div>';
-    specials.forEach(function(z){h+=renderZoneCard(z);});
     h+='</div>';
+  });
+  if(specials.length){
+    var sidEscSp=sid.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    h+='<div style="background:'+C.card+';border:1px solid '+C.border+';border-radius:12px;overflow:hidden;margin-top:4px">';
+    h+='<div style="font-size:13px;font-weight:700;color:'+C.text2+';padding:14px 16px;border-bottom:1px solid '+C.border+'">⭐ Zones spéciales</div>';
+    h+='<div style="padding:12px 16px">';
+    specials.forEach(function(z){
+      var st=zStatus(z);
+      var dc={ok:C.green,warn:C.amber,late:C.red,never:C.gray}[st.cls];
+      var bgc={ok:C.greenPale,warn:C.amberPale,late:C.redPale,never:C.grayPale}[st.cls];
+      h+='<div onclick="_resPlanShowZoneGlobal(\''+z.id+'\') " style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid '+C.border+';cursor:pointer">';
+      h+='<div style="width:20px;height:20px;border-radius:4px;background:'+dc+';flex-shrink:0"></div>';
+      h+='<div style="flex:1;font-size:13px;font-weight:600;color:'+C.text+'">'+escape_html(z.nom)+'</div>';
+      h+='<div style="font-size:11px;color:'+C.text2+'">'+escape_html(st.lastVisit)+'</div>';
+      h+='<span style="padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700;background:'+bgc+';color:'+dc+'">'+escape_html(st.chip)+'</span>';
+      h+='</div>';
+    });
+    h+='</div></div>';
   }
+  h+='</div>';
 
   // ── Historique des passages (30 derniers jours) ──────────────────────────────
   var recentRel=releves.filter(function(r){return r.date>=dateHisto;});
@@ -6697,6 +6709,136 @@ async function _setZoneFreq(zoneId,freq){
     _planFreqZoneId=null;
     navTo('residence-planning');
   }catch(e){alert('Erreur lors de la mise à jour.');}
+}
+
+// ── Zone detail panel
+function _resPlanShowZone(zoneId,sid,gpKey){
+  var D=document.getElementById('zonedetail-'+gpKey);
+  if(!D)return;
+  if(D.dataset.openZone===zoneId){
+    D.style.display='none';D.dataset.openZone='';
+    return;
+  }
+  D.dataset.openZone=zoneId;
+  var z=window._resPlanZoneData&&window._resPlanZoneData[zoneId];
+  if(!z){D.style.display='none';return;}
+  var st=z.status;
+  var C={bg:'#0d1117',card:'#161b22',card2:'#21262d',border:'#30363d',
+    text:'#e6edf3',text2:'#8b949e',blue:'#2f81f7',green:'#3fb950',
+    amber:'#d29922',red:'#f85149',gray:'#484f58'};
+  var stMap={ok:{bg:'rgba(63,185,80,.15)',c:'#3fb950',label:'OK'},
+    warn:{bg:'rgba(210,153,34,.15)',c:'#d29922',label:'Bientôt'},
+    late:{bg:'rgba(248,81,73,.15)',c:'#f85149',label:'En retard'},
+    never:{bg:'rgba(72,79,88,.15)',c:'#484f58',label:'Jamais visité'}};
+  var sc=stMap[st.cls]||stMap.never;
+  var lv=st.lastVisit||'Jamais';
+  var nv=st.nextVisit||'Non planifiée';
+  var canCfgFreq=window._session&&(window._session.role==='resp_tech'||window._session.role==='dir_tech');
+  var h='<div style="background:'+C.card2+';border:1px solid '+C.border+';border-radius:10px;padding:14px;margin:8px 0">';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
+  h+='<div style="font-weight:700;color:'+C.text+';font-size:14px">'+(z.nom||zoneId)+'</div>';
+  h+='<span style="background:'+sc.bg+';color:'+sc.c+';border:1px solid '+sc.c+';padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600">'+sc.label+'</span>';
+  h+='</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:12px">';
+  h+='<div style="color:'+C.text2+'">📅 Derniere visite<br><b style="color:'+C.text+'">'+lv+'</b></div>';
+  h+='<div style="color:'+C.text2+'">📅 Prochaine<br><b style="color:'+C.text+'">'+nv+'</b></div>';
+  h+='<div style="color:'+C.text2+'">📍 Type<br><b style="color:'+C.text+'">'+(z.type_zone||'—')+'</b></div>';
+  h+='<div style="color:'+C.text2+'">⏰ Fréquence<br><b style="color:'+C.text+'">'+(z.frequence_passage?z.frequence_passage+' j':'—')+'</b></div>';
+  h+='</div>';
+  if(canCfgFreq){
+    h+='<div style="display:flex;gap:8px">';
+    var sidEsc=encodeURIComponent(sid);
+    var batEsc=(z.batiment||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    var etEsc=(z.etage||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    h+='<button onclick="_resPlanPlanifier(\''+gpKey+'\',\''+batEsc+'\',\''+etEsc+'\',\''+sidEsc+'\')" style="flex:1;background:#2f81f7;color:#fff;border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:600;cursor:pointer">📱 Planifier</button>';
+    h+='<button onclick="_setZoneFreq(\''+zoneId+'\',\''+sidEsc+'\')" style="background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer">⚙️</button>';
+    h+='</div>';
+  }
+  h+='</div>';
+  D.innerHTML=h;
+  D.style.display='block';
+}
+
+// ── Planifier modal
+async function _resPlanPlanifier(gpKey,batNom,etNom,sid){
+  var C={bg:'#0d1117',card:'#161b22',card2:'#21262d',border:'#30363d',
+    text:'#e6edf3',text2:'#8b949e',blue:'#2f81f7'};
+  var sidDec=decodeURIComponent(sid);
+  var contacts=[];
+  try{
+    var r=await supaGet('contacts','site_id=eq.'+sidDec+'&actif=eq.true&select=id,nom,telephone,role&order=nom.asc');
+    contacts=(r||[]).filter(function(c){return c.telephone;});
+  }catch(e){console.error('contacts err',e);}
+  var zonesForFloor=[];
+  var prefix=(batNom+'_'+etNom).replace(/[^a-zA-Z0-9]/g,'_');
+  if(window._resPlanZoneData){
+    Object.entries(window._resPlanZoneData).forEach(function(kv){
+      var zd=kv[1];
+      if(zd.batiment===batNom&&zd.etage===etNom)zonesForFloor.push({id:kv[0],nom:zd.nom});
+    });
+  }
+  zonesForFloor.sort(function(a,b){return(a.nom||'').localeCompare(b.nom||'');});
+  var today=new Date().toISOString().slice(0,10);
+  var ov=document.createElement('div');
+  ov.id='rp-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(1,4,9,.85);z-index:9999;display:flex;align-items:center;justify-content:center';
+  var techOpts=contacts.length
+    ? contacts.map(function(c){return '<option value="'+c.id+'" data-phone="'+escape_html(c.telephone)+'">'+escape_html(c.nom)+'</option>';}).join('')
+    : '<option value="">Aucun contact disponible</option>';
+  var zoneOpts=zonesForFloor.map(function(z){return '<option value="'+z.id+'" selected>'+escape_html(z.nom)+'</option>';}).join('');
+  ov.innerHTML=(
+    '<div style="background:'+C.card+';border:1px solid '+C.border+';border-radius:14px;padding:24px;width:360px;max-width:92vw;max-height:85vh;overflow:auto">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">'+
+    '<div style="font-size:16px;font-weight:700;color:'+C.text+'">📋 Mission de passage</div>'+
+    '<button onclick="document.getElementById(\'rp-overlay\').remove()" style="background:none;border:none;color:'+C.text2+';font-size:20px;cursor:pointer">×</button>'+
+    '</div>'+
+    '<div style="font-size:12px;color:'+C.text2+';margin-bottom:16px">🏢 '+escape_html(batNom)+' · Niveau '+escape_html(etNom)+'</div>'+
+    '<label style="display:block;color:'+C.text2+';font-size:12px;margin-bottom:4px">👷 Technicien</label>'+
+    '<select id="rp-tech" style="width:100%;background:'+C.card2+';border:1px solid '+C.border+';color:'+C.text+';border-radius:8px;padding:8px;font-size:13px;margin-bottom:14px">'+techOpts+'</select>'+
+    '<label style="display:block;color:'+C.text2+';font-size:12px;margin-bottom:4px">📍 Périmètre (zones)</label>'+
+    '<select id="rp-zones" multiple style="width:100%;background:'+C.card2+';border:1px solid '+C.border+';color:'+C.text+';border-radius:8px;padding:6px;font-size:12px;margin-bottom:14px;height:'+Math.min(120,zonesForFloor.length*28+12)+'px">'+zoneOpts+'</select>'+
+    '<label style="display:block;color:'+C.text2+';font-size:12px;margin-bottom:4px">📅 Date de passage</label>'+
+    '<input id="rp-date" type="date" value="'+today+'" style="width:100%;background:'+C.card2+';border:1px solid '+C.border+';color:'+C.text+';border-radius:8px;padding:8px;font-size:13px;margin-bottom:20px;box-sizing:border-box">'+
+    '<button onclick="_resPlanEnvoyer(\''+gpKey+'\',\''+sid+'\',\''+batNom.replace(/\'/g,"\\\\'")+'\',\''+etNom.replace(/\'/g,"\\\\'")+'\')" style="width:100%;background:#2f81f7;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">📱 Envoyer la mission →</button>'+
+    '</div>'
+  );
+  document.body.appendChild(ov);
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+}
+
+// ── Envoyer mission via WhatsApp
+function _resPlanEnvoyer(gpKey,sid,batNom,etNom){
+  var techSel=document.getElementById('rp-tech');
+  var dateSel=document.getElementById('rp-date');
+  var zonesSel=document.getElementById('rp-zones');
+  if(!techSel||!dateSel||!zonesSel)return;
+  var techId=techSel.value;
+  var techNom=techSel.options[techSel.selectedIndex]?techSel.options[techSel.selectedIndex].text:'';
+  var phone=techSel.options[techSel.selectedIndex]?techSel.options[techSel.selectedIndex].dataset.phone:'';
+  var date=dateSel.value;
+  var selZones=Array.from(zonesSel.selectedOptions).map(function(o){return o.text;});
+  if(!phone){alert('Veuillez sélectionner un technicien avec un numéro de téléphone.');return;}
+  if(!date){alert('Veuillez sélectionner une date.');return;}
+  if(!selZones.length){alert('Veuillez sélectionner au moins une zone.');return;}
+  var dateFormatted=date.split('-').reverse().join('/');
+  var msg='📋 Mission de passage GenTrack\n';
+  msg+='📅 Date : '+dateFormatted+'\n';
+  msg+='🏢 Bâtiment : '+batNom+' — Niveau : '+etNom+'\n';
+  msg+='👷 Technicien : '+techNom+'\n\n';
+  msg+='📍 Zones à visiter :\n';
+  selZones.forEach(function(z,i){msg+=(i+1)+'. '+z+'\n';});
+  msg+='\nMerci de confirmer la prise en charge. ✅';
+  var cleanPhone=phone.replace(/[^0-9+]/g,'');
+  window.open('https://wa.me/'+cleanPhone+'?text='+encodeURIComponent(msg),'_blank');
+  var ov=document.getElementById('rp-overlay');
+  if(ov)ov.remove();
+}
+
+// ── Special zones
+function _resPlanShowZoneGlobal(zoneId){
+  var z=window._resPlanZoneData&&window._resPlanZoneData[zoneId];
+  if(!z)return;
+  alert((z.nom||zoneId)+' — '+z.type_zone+' — Statut: '+(z.status&&z.status.cls||'?'));
 }
 
 // ── Config fréquence par groupe (étage / bâtiment / tout le site) ────────────
