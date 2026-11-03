@@ -11607,9 +11607,9 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
     var totalCout=items.some(function(it){return it.cout!=null;})?items.reduce(function(a,it){return a+(it.cout||0);},0):null;
     var totalBudget=items.some(function(it){return it.budget!=null;})?items.reduce(function(a,it){return a+(it.budget||0);},0):null;
     var totalVs=totalCout!=null&&totalBudget!=null?totalCout-totalBudget:null;
-    // FCFA/ch : coût total de la période divisé par chambresOcc (pas par period) → taux par chambre sur la période
-    var fcfaPerCh=totalCout&&chambresOcc?Math.round(totalCout/chambresOcc):null;
-    var fcfaPerChBudget=totalBudget&&chambresOcc?Math.round(totalBudget/chambresOcc):null;
+    // FCFA/ch.nuitée : coût total / (chambres moy/jour × nb jours) — norme industrie hôtelière
+    var fcfaPerCh=totalCout&&chambresOcc&&period?Math.round(totalCout/(chambresOcc*period)):null;
+    var fcfaPerChBudget=totalBudget&&chambresOcc&&period?Math.round(totalBudget/(chambresOcc*period)):null;
     energieBySite[site.id]={items:items,totalCout:totalCout,totalBudget:totalBudget,totalVs:totalVs,toMoy:toMoyS?Math.round(toMoyS):null,chambresOcc:chambresOcc,fcfaPerCh:fcfaPerCh,fcfaPerChBudget:fcfaPerChBudget,nbCh:nbCh};
   });
 
@@ -11765,7 +11765,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
               (ef.totalVs!=null?
                 (function(){var vCol=ef.totalVs>0?'#C0392B':'#2D7A4F';var vPct=ef.totalBudget?Math.round(ef.totalVs/ef.totalBudget*100):null;return'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Écart vs budget</div><div style="font-size:16px;font-weight:700;color:'+vCol+'">'+(vPct!=null?(vPct>0?'+':'')+vPct+'%':'—')+'</div><div style="font-size:10px;color:'+vCol+'">'+(ef.totalVs>0?'+':'')+fmtCout(ef.totalVs,'XOF')+'</div></div>';})()
               :'')+
-              (ef.fcfaPerCh!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">FCFA / ch. occ.</div><div style="font-size:16px;font-weight:700">'+ef.fcfaPerCh.toLocaleString('fr-FR')+'<span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:2px">XOF/ch/'+period+'j</span></div>'+(ef.fcfaPerChBudget!=null?'<div style="font-size:10px;color:var(--text3)">Budget : '+ef.fcfaPerChBudget.toLocaleString('fr-FR')+' XOF/ch</div>':'')+(ef.toMoy!=null?'<div style="font-size:10px;color:var(--text3)">'+ef.chambresOcc+' ch.occ./j · TO '+ef.toMoy+'%</div>':'')+'</div>':'')+
+              (ef.fcfaPerCh!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">FCFA / ch. nuitée</div><div style="font-size:16px;font-weight:700">'+ef.fcfaPerCh.toLocaleString('fr-FR')+'<span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:2px">XOF/ch</span></div>'+(ef.fcfaPerChBudget!=null?'<div style="font-size:10px;color:var(--text3)">Budget : '+ef.fcfaPerChBudget.toLocaleString('fr-FR')+' XOF/ch</div>':'')+(ef.toMoy!=null?'<div style="font-size:10px;color:var(--text3)">'+ef.chambresOcc+' ch.occ./j · TO '+ef.toMoy+'%</div>':'')+'</div>':'')+
             '</div>'
           :'')+
         '</div>'+
@@ -12206,8 +12206,9 @@ function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,relev
   lignes.forEach(function(l){if(l.coutReel!=null){coutTotal+=l.coutReel;hasCout=true;}if(l.budget)budgetTotal+=l.budget;});
   var ecartTotal=hasCout&&budgetTotal?coutTotal-budgetTotal:null;
   var ecartTotalPct=ecartTotal!=null&&budgetTotal?Math.round(ecartTotal/budgetTotal*100):null;
-  var fcfaParCh=hasCout&&chambresOcc?Math.round(coutTotal/chambresOcc):null;
-  var fcfaParChBudget=budgetTotal&&chambresOcc?Math.round(budgetTotal/chambresOcc):null;
+  // FCFA/ch.nuitée : coût total / (chambres moy/jour × nb jours du mois) — norme industrie hôtelière
+  var fcfaParCh=hasCout&&chambresOcc&&daysInMonth?Math.round(coutTotal/(chambresOcc*daysInMonth)):null;
+  var fcfaParChBudget=budgetTotal&&chambresOcc&&daysInMonth?Math.round(budgetTotal/(chambresOcc*daysInMonth)):null;
   function fmtN(n){return n!=null?Math.round(n).toLocaleString('fr-FR'):'—';}
   function fmtPct(p){if(p==null)return'—';return(p>0?'+':'')+p+'%';}
   function pctCol(p){if(p==null)return'#888';if(p<=0)return'#2D7A4F';if(p<=10)return'#C49A1C';return'#C0392B';}
@@ -12248,7 +12249,7 @@ function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,relev
     h+='<div class="kpi"><div class="kpi-lbl">Coût total</div><div class="kpi-val">'+fmtN(coutTotal)+'</div><div class="kpi-sub">XOF HT</div></div>';
     h+='<div class="kpi"><div class="kpi-lbl">Budget</div><div class="kpi-val">'+fmtN(budgetTotal||null)+'</div><div class="kpi-sub">XOF HT</div></div>';
     h+='<div class="kpi"><div class="kpi-lbl">Écart</div><div class="kpi-val" style="color:'+pctCol(ecartTotalPct)+'">'+fmtPct(ecartTotalPct)+'</div><div class="kpi-sub">'+(ecartTotal!=null?(ecartTotal>0?'+':'')+fmtN(ecartTotal)+' XOF':'—')+'</div></div>';
-    h+='<div class="kpi"><div class="kpi-lbl">FCFA / ch. occ.</div><div class="kpi-val">'+fmtN(fcfaParCh)+'</div><div class="kpi-sub">'+(fcfaParChBudget?'Budget : '+fmtN(fcfaParChBudget):'Budget non défini')+'</div></div>';
+    h+='<div class="kpi"><div class="kpi-lbl">FCFA / ch. nuitée</div><div class="kpi-val">'+fmtN(fcfaParCh)+'</div><div class="kpi-sub">'+(fcfaParChBudget?'Budget : '+fmtN(fcfaParChBudget):'Budget non défini')+'</div></div>';
     h+='</div>';
   }
   h+='<h2>Détail par fluide</h2>';
@@ -12855,9 +12856,9 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     if(_hcR){
       var _eR=_bR?_cR-_bR:null;
       var _epR=_eR!=null&&_bR?Math.round(_eR/_bR*100):null;
-      // FCFA/ch/mois : unités homogènes — coût mensuel et budget mensuel, tous deux divisés par chambresOccP (pas par period)
-      var _fpChR=chambresOccP?Math.round(_cR/chambresOccP):null;
-      var _fbChR=chambresOccP&&_bR?Math.round(_bR/chambresOccP):null;
+      // FCFA/ch.nuitée : coût total / (chambres moy/jour × nb jours) — norme industrie hôtelière
+      var _fpChR=chambresOccP&&period?Math.round(_cR/(chambresOccP*period)):null;
+      var _fbChR=chambresOccP&&_bR&&period?Math.round(_bR/(chambresOccP*period)):null;
       var _ecartChR=_fpChR&&_fbChR?Math.round((_fpChR-_fbChR)/_fbChR*1000)/10:null;
       function _pColR(p){return p==null?'var(--text3)':p<=0?'var(--vert)':p<=10?'#C49A1C':'var(--rouge)';}
       function _fPctR(p){return p==null?'—':(p>0?'+':'')+p+'%';}
@@ -12874,8 +12875,8 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
         }
       }
       if(_fpChR){
-        h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">FCFA / ch. occ.</div>';
-        h+='<div style="font-size:17px;font-weight:700">'+_fpChR.toLocaleString('fr-FR')+'<span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:2px">XOF/ch/mois</span></div>';
+        h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">FCFA / ch. nuitée</div>';
+        h+='<div style="font-size:17px;font-weight:700">'+_fpChR.toLocaleString('fr-FR')+'<span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:2px">XOF/ch</span></div>';
         h+=(_fbChR?'<div style="font-size:10px;color:var(--text3);margin-top:2px">Budget : '+_fbChR.toLocaleString('fr-FR')+' XOF/ch</div>':'');
         h+=(_ecartChR!=null?'<div style="font-size:10px;font-weight:700;color:'+(_ecartChR>5?'#E8841A':_ecartChR<-5?'var(--vert)':'var(--text3)')+'">'+(_ecartChR>0?'↑ +':_ecartChR<0?'↓ ':'')+Math.abs(_ecartChR)+'% vs budget</div>':'');
         h+='<div style="font-size:10px;color:var(--text3);margin-top:1px">'+chambresOccP+' ch. occ./j · TO '+Math.round(_toMoyP)+'%</div></div>';
