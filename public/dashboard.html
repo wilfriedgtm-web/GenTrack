@@ -14690,6 +14690,23 @@ async function _buildEnergieConfigTab(sid){
         '</label>'+
       '</div>';
 
+      // ── R6 — Toggle inclure dans relevé horaire ──
+      var releve_on=!!f.inclure_releve_horaire;
+      h+='<div style="display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid var(--border)">'+
+        '<div>'+
+          '<div style="font-size:11px;font-weight:600;color:var(--text2)">📋 Inclure dans le relevé horaire</div>'+
+          '<div style="font-size:10px;color:var(--text3);margin-top:1px">Le technicien saisit ce fluide lors du relevé</div>'+
+        '</div>'+
+        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0">'+
+          '<span style="font-size:11px;color:var(--text2)">'+(releve_on?'Oui':'Non')+'</span>'+
+          '<div style="position:relative;display:inline-block;width:34px;height:19px">'+
+            '<input type="checkbox" '+(releve_on?'checked':'')+' onchange="_energieToggleReleve(\''+sid+'\',\''+fJs+'\',this.checked)" style="opacity:0;width:0;height:0;position:absolute"/>'+
+            '<span style="position:absolute;inset:0;background:'+(releve_on?'#2563eb':'#d1d5db')+';border-radius:19px;cursor:pointer;transition:background .15s"></span>'+
+            '<span style="position:absolute;left:'+(releve_on?'16px':'2px')+';top:2px;width:15px;height:15px;background:white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>'+
+          '</div>'+
+        '</label>'+
+      '</div>';
+
       h+='</div>'; // end card
     });
 
@@ -15298,6 +15315,12 @@ async function _energieCfgSaveFluid(){
 
 async function _energieToggleActif(sid,fid,actif){
   await supaPatch('energie_config',fid,{actif:actif,updated_at:new Date().toISOString()});
+  if(_session)renderRespTech(_session,'config');
+}
+
+// R6 — active/désactive l'inclusion d'un fluide dans le relevé horaire
+async function _energieToggleReleve(sid,fid,inclure){
+  await supaPatch('energie_config',fid,{inclure_releve_horaire:inclure,updated_at:new Date().toISOString()});
   if(_session)renderRespTech(_session,'config');
 }
 
