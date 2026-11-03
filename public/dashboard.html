@@ -12277,9 +12277,9 @@ function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,relev
   if(fcfaParCh&&chambresOcc){
     h+='<h2>Ratio FCFA / chambre</h2>';
     h+='<div style="background:white;border:1px solid #e5e0d8;border-radius:10px;padding:16px 20px;display:flex;gap:32px;flex-wrap:wrap;margin-bottom:24px">';
-    h+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Réel</div><div style="font-size:22px;font-weight:700">'+fmtN(fcfaParCh)+'</div><div style="font-size:10px;color:#aaa">XOF / ch. occupée / mois</div></div>';
+    h+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Réel</div><div style="font-size:22px;font-weight:700">'+fmtN(fcfaParCh)+'</div><div style="font-size:10px;color:#aaa">XOF / ch. nuitée</div></div>';
     if(fcfaParChBudget){
-      h+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Budget</div><div style="font-size:22px;font-weight:700;color:#aaa">'+fmtN(fcfaParChBudget)+'</div><div style="font-size:10px;color:#aaa">XOF / ch. occupée / mois</div></div>';
+      h+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Budget</div><div style="font-size:22px;font-weight:700;color:#aaa">'+fmtN(fcfaParChBudget)+'</div><div style="font-size:10px;color:#aaa">XOF / ch. nuitée</div></div>';
       var ecFcfa=fcfaParCh-fcfaParChBudget;
       var ecFcfaPct=Math.round(ecFcfa/fcfaParChBudget*100);
       h+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Écart</div>';
@@ -14163,13 +14163,13 @@ async function _rtEnergie(sid){
       '</div>';
     }
     if(hasCoutData&&chambresOcc){
-      // FCFA/ch/mois : coût réel mensuel par chambre occupée
-      var _fcfaCh=Math.round(coutTotalMois/chambresOcc);
-      // Budget/ch/mois : budget mensuel par chambre occupée (source unique : cout_budget_jour × daysInMonth / chambresOcc)
-      var _budgCh=hasBudgetData&&chambresOcc?Math.round(budgetTotalMois/chambresOcc):null;
+      // FCFA/ch.nuitée : coût total / (chambres moy/jour × nb jours) — norme industrie hôtelière
+      var _fcfaCh=Math.round(coutTotalMois/(chambresOcc*daysInMonth));
+      // Budget/ch.nuitée : budget mensuel par chambre-nuitée
+      var _budgCh=hasBudgetData&&chambresOcc?Math.round(budgetTotalMois/(chambresOcc*daysInMonth)):null;
       var _ecartBpc=_budgCh?Math.round((_fcfaCh-_budgCh)/_budgCh*1000)/10:null;
       kpiHtml+='<div style="background:white;border:1.5px solid #fef3c7;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px">'+
-        '<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px">💰 FCFA / chambre occupée</div>'+
+        '<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px">💰 FCFA / ch. nuitée</div>'+
         '<div style="font-size:28px;font-weight:800;color:var(--dark)">'+_fcfaCh.toLocaleString('fr-FR')+
           '<span style="font-size:13px;font-weight:500;color:var(--text3);margin-left:3px">XOF/ch</span>'+
         '</div>'+
