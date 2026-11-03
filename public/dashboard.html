@@ -6760,17 +6760,45 @@ function _resPlanShowZone(zoneId,sid,gpKey){
 }
 
 // ── Planifier modal
-async function _resPlanPlanifier(gpKey,batNom,etNom,sid){
-  var C={bg:'#0d1117',card:'#161b22',card2:'#21262d',border:'#30363d',
-    text:'#e6edf3',text2:'#8b949e',blue:'#2f81f7'};
+function _resPlanPlanifier(gpKey,batNom,etNom,sid){
   var sidDec=decodeURIComponent(sid);
-  var contacts=[];
-  try{
-    var r=await supaGet('contacts','site_id=eq.'+sidDec+'&actif=eq.true&role=in.(technicien,resp_tech)&select=id,nom,whatsapp,role&order=role.asc,nom.asc');
-    contacts=(r||[]).filter(function(c){return c.whatsapp&&c.whatsapp.trim();});
-  }catch(e){console.error('contacts err',e);}
+  window._resPlanCtx={gpKey:gpKey,batNom:batNom,etNom:etNom,sid:sid};
+  supaGet('contacts','site_id=eq.'+sidDec+'&actif=eq.true&role=in.(technicien,resp_tech)&select=id,nom,whatsapp,role&order=role.asc,nom.asc').then(function(contacts){
+    if(!contacts||!contacts.length){
+      _showCfgModal('<p style="font-size:13px;color:var(--text2);padding:8px">Aucun contact configuré pour ce site.</p><div style="margin-top:12px"><button onclick="_closeCfgModal()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">Fermer</button></div>');
+      return;
+    }
+    var ROLE_LABELS={technicien:'Technicien',resp_tech:'Resp. technique',dir_tech:'Dir. technique'};
+    var contactsHtml=contacts.map(function(c){
+      var ini=c.nom.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+      var roleLabel=ROLE_LABELS[c.role]||c.role||'';
+      var nomJs=c.nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var waJs=(c.whatsapp||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      var hasWa=!!(c.whatsapp&&c.whatsapp.trim());
+      return '<button onclick="_resPlanPickTech(\''+nomJs+'\',\''+waJs+'\')" style="width:100%;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;background:white;text-align:left">'+
+        '<div style="width:36px;height:36px;border-radius:50%;background:var(--bleu-pale);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--bleu);flex-shrink:0">'+escape_html(ini)+'</div>'+
+        '<div style="flex:1">'+
+          '<div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(c.nom)+'</div>'+
+          '<div style="font-size:11px;color:var(--text3)">'+escape_html(roleLabel)+'</div>'+
+        '</div>'+
+        (hasWa?'<span style="font-size:11px;font-weight:600;color:#25D366;background:#e8f5e9;border-radius:6px;padding:3px 8px">📱 WA</span>':'<span style="font-size:10px;color:var(--text3)">pas de WA</span>')+
+      '</button>';
+    }).join('');
+    _showCfgModal(
+      '<div style="font-size:15px;font-weight:700;color:var(--dark);margin-bottom:4px">📋 Mission de passage</div>'+
+      '<div style="font-size:12px;color:var(--text2);margin-bottom:14px">🏢 '+escape_html(batNom)+' · Niveau '+escape_html(etNom)+'</div>'+
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">Sélectionner un technicien</div>'+
+      contactsHtml+
+      '<button onclick="_closeCfgModal()" style="width:100%;margin-top:6px;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:white;cursor:pointer;color:var(--text2)">Annuler</button>'
+    );
+  });
+}
+
+function _resPlanPickTech(techNom,techWa){
+  var ctx=window._resPlanCtx||{};
+  var batNom=ctx.batNom||'';
+  var etNom=ctx.etNom||'';
   var zonesForFloor=[];
-  var prefix=(batNom+'_'+etNom).replace(/[^a-zA-Z0-9]/g,'_');
   if(window._resPlanZoneData){
     Object.entries(window._resPlanZoneData).forEach(function(kv){
       var zd=kv[1];
@@ -6779,59 +6807,52 @@ async function _resPlanPlanifier(gpKey,batNom,etNom,sid){
   }
   zonesForFloor.sort(function(a,b){return(a.nom||'').localeCompare(b.nom||'');});
   var today=new Date().toISOString().slice(0,10);
-  var ov=document.createElement('div');
-  ov.id='rp-overlay';
-  ov.style.cssText='position:fixed;inset:0;background:rgba(1,4,9,.85);z-index:9999;display:flex;align-items:center;justify-content:center';
-  var techOpts=contacts.length
-    ? contacts.map(function(c){return '<option value="'+c.id+'" data-phone="'+escape_html(c.whatsapp)+'">'+escape_html(c.nom)+'</option>';}).join('')
-    : '<option value="">Aucun contact disponible</option>';
   var zoneOpts=zonesForFloor.map(function(z){return '<option value="'+z.id+'" selected>'+escape_html(z.nom)+'</option>';}).join('');
-  ov.innerHTML=(
-    '<div style="background:'+C.card+';border:1px solid '+C.border+';border-radius:14px;padding:24px;width:360px;max-width:92vw;max-height:85vh;overflow:auto">'+
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">'+
-    '<div style="font-size:16px;font-weight:700;color:'+C.text+'">📋 Mission de passage</div>'+
-    '<button onclick="document.getElementById(\'rp-overlay\').remove()" style="background:none;border:none;color:'+C.text2+';font-size:20px;cursor:pointer">×</button>'+
-    '</div>'+
-    '<div style="font-size:12px;color:'+C.text2+';margin-bottom:16px">🏢 '+escape_html(batNom)+' · Niveau '+escape_html(etNom)+'</div>'+
-    '<label style="display:block;color:'+C.text2+';font-size:12px;margin-bottom:4px">👷 Technicien</label>'+
-    '<select id="rp-tech" style="width:100%;background:'+C.card2+';border:1px solid '+C.border+';color:'+C.text+';border-radius:8px;padding:8px;font-size:13px;margin-bottom:14px">'+techOpts+'</select>'+
-    '<label style="display:block;color:'+C.text2+';font-size:12px;margin-bottom:4px">📍 Périmètre (zones)</label>'+
-    '<select id="rp-zones" multiple style="width:100%;background:'+C.card2+';border:1px solid '+C.border+';color:'+C.text+';border-radius:8px;padding:6px;font-size:12px;margin-bottom:14px;height:'+Math.min(120,zonesForFloor.length*28+12)+'px">'+zoneOpts+'</select>'+
-    '<label style="display:block;color:'+C.text2+';font-size:12px;margin-bottom:4px">📅 Date de passage</label>'+
-    '<input id="rp-date" type="date" value="'+today+'" style="width:100%;background:'+C.card2+';border:1px solid '+C.border+';color:'+C.text+';border-radius:8px;padding:8px;font-size:13px;margin-bottom:20px;box-sizing:border-box">'+
-    '<button onclick="_resPlanEnvoyer(\''+gpKey+'\',\''+sid+'\',\''+batNom.replace(/\'/g,"\\\\'")+'\',\''+etNom.replace(/\'/g,"\\\\'")+'\')" style="width:100%;background:#2f81f7;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer">📱 Envoyer la mission →</button>'+
+  var hasWa=!!(techWa&&techWa.trim());
+  ctx.techNom=techNom;
+  ctx.techWa=techWa;
+  _showCfgModal(
+    '<div style="font-size:15px;font-weight:700;color:var(--dark);margin-bottom:4px">📋 Mission de passage</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">🏢 '+escape_html(batNom)+' · Niveau '+escape_html(etNom)+'</div>'+
+    '<div style="background:var(--bg);border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:13px;font-weight:600;color:var(--dark)">👷 '+escape_html(techNom)+'</div>'+
+    '<label style="display:block;color:var(--text3);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">📍 Zones</label>'+
+    '<select id="rp-zones" multiple style="width:100%;border:1px solid var(--border);border-radius:8px;padding:6px;font-size:12px;margin-bottom:14px;height:'+Math.min(120,zonesForFloor.length*28+12)+'px">'+zoneOpts+'</select>'+
+    '<label style="display:block;color:var(--text3);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">📅 Date de passage</label>'+
+    '<input id="rp-date" type="date" value="'+today+'" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px;margin-bottom:20px;box-sizing:border-box">'+
+    '<div style="display:flex;gap:8px">'+
+    '<button onclick="_resPlanBackToList()" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:white;cursor:pointer;color:var(--text2)">← Retour</button>'+
+    '<button onclick="_resPlanEnvoyer()" style="flex:2;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:'+(hasWa?'#25D366':'var(--dark)')+';color:white;cursor:pointer">'+(hasWa?'📱 Envoyer WA':'✅ Planifier')+'</button>'+
     '</div>'
   );
-  document.body.appendChild(ov);
-  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
 }
 
-// ── Envoyer mission via WhatsApp
-function _resPlanEnvoyer(gpKey,sid,batNom,etNom){
-  var techSel=document.getElementById('rp-tech');
+function _resPlanBackToList(){
+  var ctx=window._resPlanCtx||{};
+  _resPlanPlanifier(ctx.gpKey||'',ctx.batNom||'',ctx.etNom||'',ctx.sid||'');
+}
+
+function _resPlanEnvoyer(){
   var dateSel=document.getElementById('rp-date');
   var zonesSel=document.getElementById('rp-zones');
-  if(!techSel||!dateSel||!zonesSel)return;
-  var techId=techSel.value;
-  var techNom=techSel.options[techSel.selectedIndex]?techSel.options[techSel.selectedIndex].text:'';
-  var phone=techSel.options[techSel.selectedIndex]?techSel.options[techSel.selectedIndex].dataset.phone:'';
+  if(!dateSel||!zonesSel){_closeCfgModal();return;}
   var date=dateSel.value;
   var selZones=Array.from(zonesSel.selectedOptions).map(function(o){return o.text;});
-  if(!phone){alert('Veuillez sélectionner un technicien avec un numéro de téléphone.');return;}
-  if(!date){alert('Veuillez sélectionner une date.');return;}
-  if(!selZones.length){alert('Veuillez sélectionner au moins une zone.');return;}
+  if(!selZones.length){alert('Sélectionnez au moins une zone.');return;}
+  var ctx=window._resPlanCtx||{};
   var dateFormatted=date.split('-').reverse().join('/');
   var msg='📋 Mission de passage GenTrack\n';
   msg+='📅 Date : '+dateFormatted+'\n';
-  msg+='🏢 Bâtiment : '+batNom+' — Niveau : '+etNom+'\n';
-  msg+='👷 Technicien : '+techNom+'\n\n';
+  msg+='🏢 Bâtiment : '+(ctx.batNom||'')+' — Niveau : '+(ctx.etNom||'')+'\n';
+  msg+='👷 Technicien : '+(ctx.techNom||'')+'\n\n';
   msg+='📍 Zones à visiter :\n';
   selZones.forEach(function(z,i){msg+=(i+1)+'. '+z+'\n';});
   msg+='\nMerci de confirmer la prise en charge. ✅';
-  var cleanPhone=phone.replace(/[^0-9+]/g,'');
-  window.open('https://wa.me/'+cleanPhone+'?text='+encodeURIComponent(msg),'_blank');
-  var ov=document.getElementById('rp-overlay');
-  if(ov)ov.remove();
+  var wa=ctx.techWa||'';
+  if(wa.trim()){
+    var cleanPhone=wa.replace(/[^0-9+]/g,'');
+    window.open('https://wa.me/'+cleanPhone+'?text='+encodeURIComponent(msg),'_blank');
+  }
+  _closeCfgModal();
 }
 
 // ── Special zones

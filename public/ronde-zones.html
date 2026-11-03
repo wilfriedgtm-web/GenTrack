@@ -746,6 +746,14 @@ async function submitRonde(){
       }));
     }
 
+
+    /* 4. Notification resp_tech */
+    fetch(SUPA_URL+'/functions/v1/notif-ronde-zones',{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({site_id:_site.id,contact_id:_contact.id,contact_nom:_contact.nom,nb_zones:done.length,nb_total:_zones.length,nb_incidents:incidents.length})
+    }).catch(function(){});
+
     /* Confirmation */
     var nbResolu=_resolus.length;
     var nbInc=incidents.length;
