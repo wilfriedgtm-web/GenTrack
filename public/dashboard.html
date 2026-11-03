@@ -7135,6 +7135,9 @@ var _relevePreviewData={}; // sid → [{eqNom, icon, questions:[{texte,type_repo
 async function _buildReleveConfigTab(sid){
   var equips=await supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,types_equipements(nom)&order=ordre_ronde.asc');
   if(!equips.length)return '<div class="placeholder-card" style="margin-top:16px"><div class="placeholder-icon">📋</div>Aucun équipement configuré</div>';
+  // R6 — fluides énergie actifs pour ce site
+  var fluides=await supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,inclure_releve_horaire&order=ordre.asc').catch(function(){return[];});
+  if(!Array.isArray(fluides))fluides=[];
   var eqIds=equips.map(function(e){return e.id;});
   var questions=await supaGet('questions','equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&select=id,texte,type_reponse,unite,frequences,equipement_id,options&order=ordre.asc');
   var eqMap={};equips.forEach(function(e){eqMap[e.id]=e;});
@@ -7210,6 +7213,35 @@ async function _buildReleveConfigTab(sid){
         (eqActive?rowsHtml:'')+
       '</div>';
   });
+
+  // R6 — Bloc fluides & énergie
+  if(fluides.length){
+    var fluidRows=fluides.map(function(f){
+      var on=!!f.inclure_releve_horaire;
+      var fJs=f.id.replace(/'/g,"\\'");
+      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:'+(on?'#eff6ff':'white')+'">'+
+        '<label style="position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0">'+
+          '<input type="checkbox" '+(on?'checked':'')+' onchange="_energieToggleReleve(\''+sid+'\',\''+fJs+'\',this.checked)" '+
+            'style="opacity:0;width:0;height:0;position:absolute" />'+
+          '<span style="position:absolute;inset:0;background:'+(on?'#2563eb':'#ccc')+';border-radius:20px;transition:.2s;cursor:pointer"></span>'+
+          '<span style="position:absolute;left:'+(on?'18px':'2px')+';top:2px;width:16px;height:16px;background:white;border-radius:50%;transition:.2s"></span>'+
+        '</label>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:13px;font-weight:600;color:'+(on?'var(--dark)':'var(--text3)')+'">'+escape_html(f.nom)+'</div>'+
+          (f.unite?'<div style="font-size:10px;color:var(--text3)">'+escape_html(f.unite)+'</div>':'')+
+        '</div>'+
+        (on?'<span style="font-size:10px;font-weight:700;color:#2563eb;background:#dbeafe;border-radius:5px;padding:2px 7px">Inclus</span>':
+            '<span style="font-size:10px;color:var(--text3)">Non inclus</span>')+
+      '</div>';
+    }).join('');
+    html+='<div style="margin-top:24px;margin-bottom:12px">'+
+      '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">⚡ Fluides &amp; énergie à relever</div>'+
+      '<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Cochez les fluides que le technicien devra saisir lors du relevé horaire (valeur datée J-1).</div>'+
+      '<div style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden">'+
+        fluidRows+
+      '</div>'+
+    '</div>';
+  }
 
   html+='<div style="font-size:11px;color:var(--text3);margin-top:4px">💡 Activez un équipement pour choisir ses questions. Les modifications sont immédiates.</div>';
   return html+'</div>';
@@ -14686,23 +14718,6 @@ async function _buildEnergieConfigTab(sid){
             '<input type="checkbox" '+(f.actif?'checked':'')+' onchange="_energieToggleActif(\''+sid+'\',\''+fJs+'\',this.checked)" style="opacity:0;width:0;height:0;position:absolute"/>'+
             '<span style="position:absolute;inset:0;background:'+(f.actif?'var(--amber)':'#d1d5db')+';border-radius:19px;cursor:pointer"></span>'+
             '<span style="position:absolute;left:'+(f.actif?'16px':'2px')+';top:2px;width:15px;height:15px;background:white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>'+
-          '</div>'+
-        '</label>'+
-      '</div>';
-
-      // ── R6 — Toggle inclure dans relevé horaire ──
-      var releve_on=!!f.inclure_releve_horaire;
-      h+='<div style="display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid var(--border)">'+
-        '<div>'+
-          '<div style="font-size:11px;font-weight:600;color:var(--text2)">📋 Inclure dans le relevé horaire</div>'+
-          '<div style="font-size:10px;color:var(--text3);margin-top:1px">Le technicien saisit ce fluide lors du relevé</div>'+
-        '</div>'+
-        '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0">'+
-          '<span style="font-size:11px;color:var(--text2)">'+(releve_on?'Oui':'Non')+'</span>'+
-          '<div style="position:relative;display:inline-block;width:34px;height:19px">'+
-            '<input type="checkbox" '+(releve_on?'checked':'')+' onchange="_energieToggleReleve(\''+sid+'\',\''+fJs+'\',this.checked)" style="opacity:0;width:0;height:0;position:absolute"/>'+
-            '<span style="position:absolute;inset:0;background:'+(releve_on?'#2563eb':'#d1d5db')+';border-radius:19px;cursor:pointer;transition:background .15s"></span>'+
-            '<span style="position:absolute;left:'+(releve_on?'16px':'2px')+';top:2px;width:15px;height:15px;background:white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>'+
           '</div>'+
         '</label>'+
       '</div>';
