@@ -250,9 +250,10 @@ var _releve=null,_equips=[],_questions=[],_answers={},_obs={},_clock=null;
 var _autoSaveTimers={};
 var _lastReponses={};  // question_id → {valeur, created_at}
 var _lastByEquip={};   // equip_id → ISO string dernière saisie
-var _energieFluides=[];  // R6 — energie_config items avec inclure_releve_horaire=true
-var _energieValeurs={};  // R6 — energie_config_id → valeur saisie
+var _energieFluides=[];    // R6 — energie_config items avec inclure_releve_horaire=true
+var _energieValeurs={};    // R6 — energie_config_id → valeur saisie
 var _energieDejasSaisi=false; // R6 — true si releves_energie J-1 déjà enregistré aujourd'hui
+var _energieDernieres={};  // R6 — energie_config_id → {valeur, date_releve} dernière saisie connue
 
 var EQ_TYPE_ICONS={
   'Groupe électrogène':'⚡','Cuve fioul':'🛢️','Chambre froide':'❄️',
@@ -370,14 +371,37 @@ async function init(){
   ).catch(function(){return[];});
   if(!Array.isArray(_energieFluides))_energieFluides=[];
 
-  // R6 — Vérifier si les valeurs énergie ont déjà été saisies pour J-1 aujourd'hui
+  // R6 — Fetch données complémentaires énergie si des fluides sont configurés
   if(_energieFluides.length){
+    // Vérifier si les valeurs énergie ont déjà été saisies pour J-1 aujourd'hui
     var _ydCheck=new Date();_ydCheck.setDate(_ydCheck.getDate()-1);
     var _ydStr=_ydCheck.toLocaleDateString('fr-CA');
     var _existReleve=await supa('releves_energie',
-      'site_id=eq.'+_releve.site_id+'&date_releve=eq.'+_ydStr+'&select=id&limit=1'
+      'site_id=eq.'+_releve.site_id+'&date_releve=eq.'+_ydStr+'&select=id,valeurs&limit=1'
     ).catch(function(){return[];});
-    _energieDejasSaisi=Array.isArray(_existReleve)&&_existReleve.length>0;
+    if(Array.isArray(_existReleve)&&_existReleve.length>0){
+      _energieDejasSaisi=true;
+      // Peupler _energieDernieres avec les valeurs déjà saisies aujourd'hui
+      var vJ1=(_existReleve[0]&&_existReleve[0].valeurs)||{};
+      Object.keys(vJ1).forEach(function(fid){
+        _energieDernieres[fid]={valeur:vJ1[fid],date_releve:_ydStr};
+      });
+    }
+    // Si pas encore saisi pour J-1, chercher la dernière saisie connue (J-2, J-3…)
+    if(!_energieDejasSaisi){
+      var _lastReleves=await supa('releves_energie',
+        'site_id=eq.'+_releve.site_id+'&select=valeurs,date_releve&order=date_releve.desc&limit=5'
+      ).catch(function(){return[];});
+      if(Array.isArray(_lastReleves)){
+        _lastReleves.forEach(function(row){
+          var v=row.valeurs||{};
+          Object.keys(v).forEach(function(fid){
+            if(!_energieDernieres[fid]&&v[fid]!=null)
+              _energieDernieres[fid]={valeur:v[fid],date_releve:row.date_releve};
+          });
+        });
+      }
+    }
   }
 
   // Fetch dernières réponses par question (toutes passes confondues)
@@ -542,6 +566,21 @@ function _renderForm(site,contactNom){
 }
 
 // R6 — Section fluides & énergie (affichée uniquement si des fluides ont inclure_releve_horaire=true)
+function _energiePrevLine(fid){
+  var lr=_energieDernieres[fid];
+  if(!lr||lr.valeur==null)return '';
+  // Formater la date J-1 / J-2… de façon lisible
+  var parts=lr.date_releve?lr.date_releve.split('-'):null;
+  var when='';
+  if(parts&&parts.length===3){
+    var d=new Date(parseInt(parts[0]),parseInt(parts[1])-1,parseInt(parts[2]));
+    var today=new Date();today.setHours(0,0,0,0);
+    var diff=Math.round((today-d)/86400000);
+    when=diff===1?'hier':diff===0?'aujourd\'hui':d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+  }
+  return '<div class="rh-prev-val"><div class="rh-prev-dot"></div>Dernière valeur : <strong>'+h(String(lr.valeur))+'</strong>'+(when?' ('+when+')':'')+'</div>';
+}
+
 function _renderEnergieSection(){
   if(!_energieFluides.length)return '';
   // R6 — Déjà saisi aujourd'hui : afficher un message de confirmation, pas les champs
@@ -567,6 +606,7 @@ function _renderEnergieSection(){
     var typeLabel=f.type_valeur==='instantane'?'Valeur instantanée':'Index';
     rows+='<div class="rh-q-row" id="erow-'+f.id+'">'+
       '<div class="rh-q-label">'+h(f.nom)+'<span style="font-size:11px;color:var(--text3);margin-left:6px">('+typeLabel+')</span></div>'+
+      _energiePrevLine(f.id)+
       '<div class="rh-num-row">'+
         '<input class="rh-num-input" type="number" id="einp-'+f.id+'" placeholder="—" '+
           'step="any" oninput="_onEnergie(\''+f.id+'\')"/>'+
@@ -874,7 +914,8 @@ async function _submitReleve(){
     // R6 — Save valeurs énergie dans releves_energie (UPSERT sur site_id+date_releve via jsonb merge)
     var energieRemplis=Object.keys(_energieValeurs).filter(function(k){return _energieValeurs[k]!=null;});
     if(energieRemplis.length){
-      var dateReleve=new Date().toLocaleDateString('fr-CA'); // YYYY-MM-DD
+      var _yd=new Date();_yd.setDate(_yd.getDate()-1);
+      var dateReleve=_yd.toLocaleDateString('fr-CA'); // YYYY-MM-DD J-1 (énergie = bilan veille)
       // Construire le jsonb {config_id: valeur}
       var valeursObj={};
       energieRemplis.forEach(function(k){valeursObj[k]=_energieValeurs[k];});
