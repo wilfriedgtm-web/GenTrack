@@ -250,6 +250,8 @@ var _releve=null,_equips=[],_questions=[],_answers={},_obs={},_clock=null;
 var _autoSaveTimers={};
 var _lastReponses={};  // question_id → {valeur, created_at}
 var _lastByEquip={};   // equip_id → ISO string dernière saisie
+var _energieFluides=[];  // R6 — energie_config items avec inclure_releve_horaire=true
+var _energieValeurs={};  // R6 — energie_config_id → valeur saisie
 
 var EQ_TYPE_ICONS={
   'Groupe électrogène':'⚡','Cuve fioul':'🛢️','Chambre froide':'❄️',
@@ -360,6 +362,12 @@ async function init(){
   );
 
   if(!_questions.length){showState('📋','Aucune question','Configurez des questions journalières dans le dashboard.');return;}
+
+  // R6 — Fetch fluides à inclure dans le relevé horaire
+  _energieFluides=await supa('energie_config',
+    'site_id=eq.'+_releve.site_id+'&inclure_releve_horaire=eq.true&actif=eq.true&select=id,nom,unite,type_valeur&order=ordre.asc'
+  ).catch(function(){return[];});
+  if(!Array.isArray(_energieFluides))_energieFluides=[];
 
   // Fetch dernières réponses par question (toutes passes confondues)
   var qIds=_questions.map(function(q){return q.id;});
@@ -504,6 +512,7 @@ function _renderForm(site,contactNom){
         '<span class="rh-alerte-text" id="rh-alerte-text"></span>'+
       '</div>'+
       groups+
+      _renderEnergieSection()+
     '</div>'+
     '<div class="rh-footer">'+
       '<div class="rh-footer-counter">'+
@@ -519,6 +528,46 @@ function _renderForm(site,contactNom){
     var el=document.getElementById('rh-clock');
     if(el)el.textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   },30000);
+}
+
+// R6 — Section fluides & énergie (affichée uniquement si des fluides ont inclure_releve_horaire=true)
+function _renderEnergieSection(){
+  if(!_energieFluides.length)return '';
+  var rows='';
+  _energieFluides.forEach(function(f){
+    var unite=f.unite?(' '+f.unite):'';
+    var typeLabel=f.type_valeur==='instantane'?'Valeur instantanée':'Index';
+    rows+='<div class="rh-q-row" id="erow-'+f.id+'">'+
+      '<div class="rh-q-label">'+h(f.nom)+'<span style="font-size:11px;color:var(--text3);margin-left:6px">('+typeLabel+')</span></div>'+
+      '<div class="rh-num-row">'+
+        '<input class="rh-num-input" type="number" id="einp-'+f.id+'" placeholder="—" '+
+          'step="any" oninput="_onEnergie(\''+f.id+'\')"/>'+
+        '<div class="rh-num-meta">'+
+          '<div class="rh-num-unit">'+h(f.unite||'')+'</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  });
+  return '<div class="rh-eq-group" id="rh-energie-section">'+
+    '<div class="rh-eq-group-header">'+
+      '<div class="rh-eq-type-badge" style="background:#1a2035">⚡</div>'+
+      '<div class="rh-eq-type-info">'+
+        '<div class="rh-eq-type-name">Fluides &amp; énergie</div>'+
+        '<div class="rh-eq-count">'+_energieFluides.length+' fluide'+(   _energieFluides.length>1?'s':'')+' à relever</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="rh-eq-card">'+
+      '<div class="rh-eq-questions">'+rows+'</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function _onEnergie(fid){
+  var inp=document.getElementById('einp-'+fid);
+  if(!inp)return;
+  var v=inp.value.replace(',','.');
+  var num=parseFloat(v);
+  _energieValeurs[fid]=isNaN(num)?null:num;
 }
 
 function _renderQuestion(q,e){
@@ -793,6 +842,24 @@ async function _submitReleve(){
     await Promise.all(obsKeys.map(function(eqId){
       return supaPost('releve_observations',{releve_id:_releve.id,equipement_id:eqId,texte:_obs[eqId]});
     }));
+
+    // R6 — Save valeurs énergie dans releves_energie (UPSERT sur site_id+date_releve via jsonb merge)
+    var energieRemplis=Object.keys(_energieValeurs).filter(function(k){return _energieValeurs[k]!=null;});
+    if(energieRemplis.length){
+      var dateReleve=new Date().toLocaleDateString('fr-CA'); // YYYY-MM-DD
+      // Construire le jsonb {config_id: valeur}
+      var valeursObj={};
+      energieRemplis.forEach(function(k){valeursObj[k]=_energieValeurs[k];});
+      // UPSERT avec merge-duplicates : si la ligne (site_id, date_releve) existe déjà, les valeurs s'ajoutent
+      await supaUpsert('releves_energie',{
+        site_id:_releve.site_id,
+        date_releve:dateReleve,
+        valeurs:valeursObj
+      },'site_id,date_releve').catch(function(err){
+        console.warn('R6 energie upsert warning:',err);
+        // Non bloquant — le relevé est validé même si l'énergie échoue
+      });
+    }
 
     // Signalements : observations texte + OUI/NON avec alerte_severite
     obsKeys.forEach(function(eqId){
