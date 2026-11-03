@@ -252,6 +252,7 @@ var _lastReponses={};  // question_id → {valeur, created_at}
 var _lastByEquip={};   // equip_id → ISO string dernière saisie
 var _energieFluides=[];  // R6 — energie_config items avec inclure_releve_horaire=true
 var _energieValeurs={};  // R6 — energie_config_id → valeur saisie
+var _energieDejasSaisi=false; // R6 — true si releves_energie J-1 déjà enregistré aujourd'hui
 
 var EQ_TYPE_ICONS={
   'Groupe électrogène':'⚡','Cuve fioul':'🛢️','Chambre froide':'❄️',
@@ -368,6 +369,16 @@ async function init(){
     'site_id=eq.'+_releve.site_id+'&inclure_releve_horaire=eq.true&actif=eq.true&select=id,nom,unite,type_valeur&order=ordre.asc'
   ).catch(function(){return[];});
   if(!Array.isArray(_energieFluides))_energieFluides=[];
+
+  // R6 — Vérifier si les valeurs énergie ont déjà été saisies pour J-1 aujourd'hui
+  if(_energieFluides.length){
+    var _ydCheck=new Date();_ydCheck.setDate(_ydCheck.getDate()-1);
+    var _ydStr=_ydCheck.toLocaleDateString('fr-CA');
+    var _existReleve=await supa('releves_energie',
+      'site_id=eq.'+_releve.site_id+'&date_releve=eq.'+_ydStr+'&select=id&limit=1'
+    ).catch(function(){return[];});
+    _energieDejasSaisi=Array.isArray(_existReleve)&&_existReleve.length>0;
+  }
 
   // Fetch dernières réponses par question (toutes passes confondues)
   var qIds=_questions.map(function(q){return q.id;});
@@ -533,9 +544,26 @@ function _renderForm(site,contactNom){
 // R6 — Section fluides & énergie (affichée uniquement si des fluides ont inclure_releve_horaire=true)
 function _renderEnergieSection(){
   if(!_energieFluides.length)return '';
+  // R6 — Déjà saisi aujourd'hui : afficher un message de confirmation, pas les champs
+  if(_energieDejasSaisi){
+    return '<div class="rh-eq-group" id="rh-energie-section">'+
+      '<div class="rh-eq-group-header">'+
+        '<div class="rh-eq-type-badge" style="background:#1a2035">⚡</div>'+
+        '<div class="rh-eq-type-info">'+
+          '<div class="rh-eq-type-name">Fluides &amp; énergie</div>'+
+          '<div class="rh-eq-count" style="color:var(--vert)">✓ Déjà saisi pour la journée</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="rh-eq-card">'+
+        '<div style="padding:14px 16px;font-size:13px;color:var(--text3);display:flex;align-items:center;gap:10px">'+
+          '<span style="font-size:18px">✅</span>'+
+          '<span>Les relevés énergie ont déjà été enregistrés pour le bilan d\'hier. Aucune nouvelle saisie nécessaire.</span>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }
   var rows='';
   _energieFluides.forEach(function(f){
-    var unite=f.unite?(' '+f.unite):'';
     var typeLabel=f.type_valeur==='instantane'?'Valeur instantanée':'Index';
     rows+='<div class="rh-q-row" id="erow-'+f.id+'">'+
       '<div class="rh-q-label">'+h(f.nom)+'<span style="font-size:11px;color:var(--text3);margin-left:6px">('+typeLabel+')</span></div>'+
@@ -553,7 +581,7 @@ function _renderEnergieSection(){
       '<div class="rh-eq-type-badge" style="background:#1a2035">⚡</div>'+
       '<div class="rh-eq-type-info">'+
         '<div class="rh-eq-type-name">Fluides &amp; énergie</div>'+
-        '<div class="rh-eq-count">'+_energieFluides.length+' fluide'+(   _energieFluides.length>1?'s':'')+' à relever</div>'+
+        '<div class="rh-eq-count">'+_energieFluides.length+' fluide'+(_energieFluides.length>1?'s':'')+' à relever</div>'+
       '</div>'+
     '</div>'+
     '<div class="rh-eq-card">'+
@@ -846,8 +874,7 @@ async function _submitReleve(){
     // R6 — Save valeurs énergie dans releves_energie (UPSERT sur site_id+date_releve via jsonb merge)
     var energieRemplis=Object.keys(_energieValeurs).filter(function(k){return _energieValeurs[k]!=null;});
     if(energieRemplis.length){
-      var _yd=new Date();_yd.setDate(_yd.getDate()-1);
-      var dateReleve=_yd.toLocaleDateString('fr-CA'); // YYYY-MM-DD J-1 (énergie = bilan veille)
+      var dateReleve=new Date().toLocaleDateString('fr-CA'); // YYYY-MM-DD
       // Construire le jsonb {config_id: valeur}
       var valeursObj={};
       energieRemplis.forEach(function(k){valeursObj[k]=_energieValeurs[k];});
