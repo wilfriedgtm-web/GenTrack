@@ -6766,8 +6766,8 @@ async function _resPlanPlanifier(gpKey,batNom,etNom,sid){
   var sidDec=decodeURIComponent(sid);
   var contacts=[];
   try{
-    var r=await supaGet('contacts','site_id=eq.'+sidDec+'&actif=eq.true&select=id,nom,telephone,role&order=nom.asc');
-    contacts=(r||[]).filter(function(c){return c.telephone;});
+    var r=await supaGet('contacts','site_id=eq.'+sidDec+'&actif=eq.true&role=in.(technicien,resp_tech)&select=id,nom,whatsapp,role&order=role.asc,nom.asc');
+    contacts=(r||[]).filter(function(c){return c.whatsapp&&c.whatsapp.trim();});
   }catch(e){console.error('contacts err',e);}
   var zonesForFloor=[];
   var prefix=(batNom+'_'+etNom).replace(/[^a-zA-Z0-9]/g,'_');
@@ -6783,7 +6783,7 @@ async function _resPlanPlanifier(gpKey,batNom,etNom,sid){
   ov.id='rp-overlay';
   ov.style.cssText='position:fixed;inset:0;background:rgba(1,4,9,.85);z-index:9999;display:flex;align-items:center;justify-content:center';
   var techOpts=contacts.length
-    ? contacts.map(function(c){return '<option value="'+c.id+'" data-phone="'+escape_html(c.telephone)+'">'+escape_html(c.nom)+'</option>';}).join('')
+    ? contacts.map(function(c){return '<option value="'+c.id+'" data-phone="'+escape_html(c.whatsapp)+'">'+escape_html(c.nom)+'</option>';}).join('')
     : '<option value="">Aucun contact disponible</option>';
   var zoneOpts=zonesForFloor.map(function(z){return '<option value="'+z.id+'" selected>'+escape_html(z.nom)+'</option>';}).join('');
   ov.innerHTML=(
