@@ -846,7 +846,8 @@ async function _submitReleve(){
     // R6 — Save valeurs énergie dans releves_energie (UPSERT sur site_id+date_releve via jsonb merge)
     var energieRemplis=Object.keys(_energieValeurs).filter(function(k){return _energieValeurs[k]!=null;});
     if(energieRemplis.length){
-      var dateReleve=new Date().toLocaleDateString('fr-CA'); // YYYY-MM-DD
+      var _yd=new Date();_yd.setDate(_yd.getDate()-1);
+      var dateReleve=_yd.toLocaleDateString('fr-CA'); // YYYY-MM-DD J-1 (énergie = bilan veille)
       // Construire le jsonb {config_id: valeur}
       var valeursObj={};
       energieRemplis.forEach(function(k){valeursObj[k]=_energieValeurs[k];});
