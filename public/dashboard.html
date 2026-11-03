@@ -6552,11 +6552,17 @@ async function _buildResPlanningHtml(sid){
       var batEsc=bat.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
       var etEsc=String(et).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
       var sidEsc=sid.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      // Stocker les zones par étage pour le bouton Planifier
+      if(!window._resPlanZoneMap)window._resPlanZoneMap={};
+      window._resPlanZoneMap[gpKey]=etZones.map(function(z){return {id:z.id,nom:z.nom};});
       h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 2px 3px 2px;margin-top:6px">';
       h+='<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Étage '+escape_html(String(et))+'</div>';
+      h+='<div style="display:flex;gap:5px;align-items:center">';
       if(canCfgFreq){
-        h+='<button onclick="_openGroupFreqPanel(\''+batEsc+'\',\''+etEsc+'\',\''+sidEsc+'\',\''+gpKey+'\')" style="font-size:11px;background:none;border:1px solid var(--border);border-radius:20px;padding:2px 8px;cursor:pointer;color:var(--text3)">⚙️ Configurer l\'étage</button>';
+        h+='<button onclick="_resPlanPlanifier(\''+gpKey+'\',\''+batEsc+'\',\''+etEsc+'\',\''+sidEsc+'\')" style="font-size:11px;font-weight:600;background:var(--bleu-pale);border:1px solid var(--bleu-pale);border-radius:20px;padding:2px 10px;cursor:pointer;color:var(--bleu)">📱 Planifier</button>';
+        h+='<button onclick="_openGroupFreqPanel(\''+batEsc+'\',\''+etEsc+'\',\''+sidEsc+'\',\''+gpKey+'\')" style="font-size:11px;background:none;border:1px solid var(--border);border-radius:20px;padding:2px 8px;cursor:pointer;color:var(--text3)">⚙️</button>';
       }
+      h+='</div>';
       h+='</div>';
       h+='<div id="groupfreqpanel-'+gpKey+'" style="display:none;margin-bottom:5px"></div>';
       etZones.forEach(function(z){h+=renderZoneCard(z);});
