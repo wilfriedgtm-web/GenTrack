@@ -933,7 +933,8 @@ async function _rtAccueil(session,sid,cid){
   var eqRJ=rondeJ?rondesEq.filter(function(re){return re.ronde_id===rondeJ.id;}):[];
   var nbVal=eqRJ.filter(function(re){return re.statut==='valide';}).length;
   var nbTot=eqRJ.length;
-  var rondeOk=nbTot>0&&nbVal===nbTot;
+  var releveValide=relevesJour.some(function(r){return r.statut==='validé';});
+  var rondeOk=(nbTot>0&&nbVal===nbTot)||releveValide;
   var nbAlertes=alertes.length+pannes.length;
 
   // Banner
@@ -941,7 +942,7 @@ async function _rtAccueil(session,sid,cid){
   if(nbAlertes>0){
     banner='<div class="alert-banner" style="cursor:pointer" onclick="document.getElementById(\'accueil-alertes\')&&document.getElementById(\'accueil-alertes\').scrollIntoView({behavior:\'smooth\',block:\'start\'})"><div class="ab-icon">🚨</div><div class="ab-body"><div class="ab-title">'+nbAlertes+' alerte'+(nbAlertes>1?'s':'')+' active'+(nbAlertes>1?'s':'')+'</div><div class="ab-sub">Voir le détail ↓</div></div></div>';
   }else if(rondeOk){
-    banner='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Tout est OK</div><div class="ab-sub">Ronde journalière validée · '+equips.length+' équipement'+(equips.length>1?'s':'')+' en suivi</div></div></div>';
+    banner='<div class="alert-banner ok"><div class="ab-icon">✅</div><div class="ab-body"><div class="ab-title">Tout est OK</div><div class="ab-sub">'+(releveValide&&nbTot===0?'Relevé horaire effectué · ':'Ronde journalière validée · ')+equips.length+' équipement'+(equips.length>1?'s':'')+' en suivi</div></div></div>';
   }else if(nbTot>0){
     banner='<div class="alert-banner warn"><div class="ab-icon">⏳</div><div class="ab-body"><div class="ab-title">Ronde en cours</div><div class="ab-sub">'+nbVal+'/'+nbTot+' équipements validés</div></div></div>';
   }else{
@@ -949,10 +950,10 @@ async function _rtAccueil(session,sid,cid){
   }
 
   // KPIs
-  var rondeDisp=nbTot>0?(nbVal+'/'+nbTot):'—';
+  var rondeDisp=nbTot>0?(nbVal+'/'+nbTot):releveValide?'✅ Relevé':'—';
   var kpis='<div class="kpi-grid">'+
     '<div class="kpi"><div class="kpi-label">Équip. en suivi</div><div class="kpi-value">'+equips.length+'</div><div class="kpi-trend">Rondes + relevés</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Ronde du jour</div><div class="kpi-value" style="color:'+(rondeOk?'var(--vert)':nbTot===0?'var(--text2)':'var(--orange)')+'">'+rondeDisp+'</div><div class="kpi-trend">'+(rondeOk?'Validée':nbTot===0?'Non commencée':'En cours')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Ronde du jour</div><div class="kpi-value" style="color:'+(rondeOk?'var(--vert)':nbTot===0?'var(--text2)':'var(--orange)')+'">'+rondeDisp+'</div><div class="kpi-trend">'+(rondeOk?(releveValide&&nbTot===0?'Via relevé horaire':'Validée'):nbTot===0?'Non commencée':'En cours')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Alertes actives</div><div class="kpi-value" style="color:'+(nbAlertes>0?'var(--rouge)':'var(--vert)')+'">'+nbAlertes+'</div><div class="kpi-trend">'+(nbAlertes>0?'À traiter':'RAS')+'</div></div>'+
   '</div>';
 
@@ -8286,7 +8287,7 @@ async function _dtAccueil(session,sids,cid){
   var _now=new Date();
   var moisDebut=new Date(_now.getFullYear(),_now.getMonth(),1).toISOString().split('T')[0];
 
-  var[sites,equips,rondes,alertes,pannes,pannes7,energieFluidesDT,relevesEnergieDT,sigsAll,instantaneFluidesDT,latestRelsDT]=await Promise.all([
+  var[sites,equips,rondes,alertes,pannes,pannes7,energieFluidesDT,relevesEnergieDT,sigsAll,instantaneFluidesDT,latestRelsDT,relevesJourDT]=await Promise.all([
     supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres,modules'),
     supaGet('equipements','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id'),
     supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=eq.'+today+'&select=id,site_id,frequence,technicien_id'),
@@ -8297,7 +8298,8 @@ async function _dtAccueil(session,sids,cid){
     supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+moisDebut+'&select=site_id,date_releve,valeurs&order=date_releve.asc&limit=300'),
     supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+since30+'T00:00:00&select=id,groupe_id,equipement_id,equipement_zone_id,lieu,description,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=600'),
     supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=eq.instantane&select=id,site_id,nom,unite,capacite&order=ordre.asc'),
-    supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+dateNJours(35)+'&select=site_id,valeurs,date_releve&order=date_releve.desc&limit='+(sids.length*3))
+    supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+dateNJours(35)+'&select=site_id,valeurs,date_releve&order=date_releve.desc&limit='+(sids.length*3)),
+    supaGet('releves_horaires','site_id=in.('+sidStr+')&created_at=gte.'+today+'T00:00:00Z&statut=eq.valid%C3%A9&select=id,site_id&order=created_at.desc')
   ]);
 
   var rIds=rondes.map(function(r){return r.id;});
@@ -8466,9 +8468,11 @@ async function _dtAccueil(session,sids,cid){
     var val=eqRJ.filter(function(re){return re.statut==='valide';}).length;
     var tot=eqRJ.length;
     var pct=tot>0?Math.round(val/tot*100):null;
-    var ok=tot>0&&val===tot;
+    var siteReleveOk=(relevesJourDT||[]).some(function(r){return r.site_id===sid;});
+    var ok=(tot>0&&val===tot)||siteReleveOk;
     var rondeDisp,rondeCol;
-    if(!rondeJ){rondeDisp='Pas de ronde';rondeCol='var(--text3)';}
+    if(siteReleveOk&&(!rondeJ||tot===0)){rondeDisp='Relevé horaire';rondeCol='var(--vert)';}
+    else if(!rondeJ){rondeDisp='Pas de ronde';rondeCol='var(--text3)';}
     else if(tot===0){rondeDisp='Non commencée';rondeCol='var(--text3)';}
     else if(ok){rondeDisp='Complète';rondeCol='var(--vert)';}
     else{rondeDisp=val+'/'+tot+' · '+pct+'%';rondeCol='var(--amber)';}

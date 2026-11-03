@@ -809,6 +809,25 @@ async function _submitReleve(){
       nb_valeurs:filled,nb_alertes:nbAlertes
     });
 
+    // R3 — Notifier resp_tech/dir_tech si relevé complètement validé (fire & forget)
+    if(isComplete){
+      fetch('https://zbpoxjlkqxnqjzxohasq.supabase.co/functions/v1/notif-releve',{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M',
+          'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M'
+        },
+        body:JSON.stringify({
+          releve_id:_releve.id,
+          site_id:_releve.site_id,
+          contact_id:_releve.contact_id||null,
+          nb_alertes:nbAlertes,
+          nb_valeurs:filled
+        })
+      }).catch(function(){});// fire and forget — ne pas bloquer l'UI
+    }
+
     if(_clock)clearInterval(_clock);
     showConfirmation(false,nbAlertes,obsKeys.length,isComplete,filled,_questions.length);
 

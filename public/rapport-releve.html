@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>GenTrack · Rapport de relevé horaire</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --creme:#F5F0E8;--surface:#FDFAF5;--border:#DDD0BC;
+  --dark:#111110;--text:#1A1A18;--text2:#6B5E4A;--text3:#A8957E;
+  --amber:#C49A1C;--amber-pale:#FBF5E0;--amber-border:#E8D080;
+  --amber-dark:#9B7A14;
+  --vert:#2D6A4F;--vert-pale:#E8F5EE;--vert-border:#A8D8BC;
+  --rouge:#C0392B;--rouge-pale:#FDEEED;--rouge-border:#F0B8B0;
+  --orange:#E07B2A;--orange-pale:#FEF3E8;--orange-border:#F5C890;
+  --radius:14px;--radius-sm:9px;
+  --shadow:0 2px 10px rgba(17,17,16,.07);
+  --shadow-md:0 4px 20px rgba(17,17,16,.11);
+}
+body{background:var(--creme);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;color:var(--text);min-height:100vh}
+
+/* ── HEADER light mode (pas de dark !) ── */
+.rr-header{
+  background:var(--amber-pale);
+  border-bottom:2px solid var(--amber-border);
+  padding:calc(env(safe-area-inset-top,0px)+18px) 20px 22px;
+  box-shadow:0 2px 12px rgba(196,154,28,.12);
+}
+.rr-logo{font-size:10px;font-weight:800;letter-spacing:.2em;color:var(--amber);text-transform:uppercase;margin-bottom:14px}
+.rr-header-title{font-size:20px;font-weight:800;color:var(--dark);letter-spacing:-.02em;margin-bottom:3px}
+.rr-header-sub{font-size:13px;color:var(--text2)}
+.rr-header-meta{display:flex;align-items:center;justify-content:space-between;margin-top:12px;gap:8px;flex-wrap:wrap}
+.rr-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  background:rgba(196,154,28,.1);border:1px solid var(--amber-border);
+  border-radius:20px;padding:4px 11px;font-size:12px;color:var(--amber-dark);font-weight:600;
+}
+.rr-badge-vert{background:var(--vert-pale);border-color:var(--vert-border);color:var(--vert)}
+.rr-badge-rouge{background:var(--rouge-pale);border-color:var(--rouge-border);color:var(--rouge)}
+
+/* ── BODY ── */
+.rr-body{padding:18px 16px 40px;max-width:520px;margin:0 auto}
+
+/* ── KPIs ── */
+.rr-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.rr-kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 10px;text-align:center;box-shadow:var(--shadow)}
+.rr-kpi-val{font-size:26px;font-weight:800;color:var(--dark);letter-spacing:-.02em;line-height:1}
+.rr-kpi-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-top:5px}
+.rr-kpi.ok .rr-kpi-val{color:var(--vert)}
+.rr-kpi.warn .rr-kpi-val{color:var(--orange)}
+.rr-kpi.danger .rr-kpi-val{color:var(--rouge)}
+
+/* ── SECTION ── */
+.rr-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:0;margin-bottom:14px;box-shadow:var(--shadow);overflow:hidden}
+.rr-section-head{padding:13px 16px;background:rgba(17,17,16,.03);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.rr-section-icon{font-size:18px}
+.rr-section-title{font-size:14px;font-weight:700;color:var(--dark);flex:1}
+.rr-section-count{font-size:11px;font-weight:600;color:var(--text3);background:var(--creme);border:1px solid var(--border);border-radius:20px;padding:2px 9px}
+
+/* ── ALERTES SEUIL ── */
+.rr-alerte-banner{background:var(--rouge-pale);border:1.5px solid var(--rouge-border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:flex-start}
+.rr-alerte-banner-icon{font-size:20px;flex-shrink:0;margin-top:1px}
+.rr-alerte-banner-body{flex:1}
+.rr-alerte-banner-title{font-size:13px;font-weight:700;color:var(--rouge);margin-bottom:6px}
+.rr-alerte-item{font-size:12px;color:var(--rouge);padding:3px 0;display:flex;gap:6px;align-items:flex-start}
+.rr-alerte-item::before{content:'•';flex-shrink:0}
+
+/* ── EQUIPEMENT / TABLEAU ── */
+.rr-equip{border-bottom:1px solid var(--border)}
+.rr-equip:last-child{border-bottom:none}
+.rr-equip-head{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rr-equip-name{font-size:14px;font-weight:700;color:var(--dark)}
+.rr-equip-status{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.rr-equip-status.ok{background:var(--vert-pale);color:var(--vert);border:1px solid var(--vert-border)}
+.rr-equip-status.warn{background:var(--orange-pale);color:var(--orange);border:1px solid var(--orange-border)}
+.rr-equip-status.danger{background:var(--rouge-pale);color:var(--rouge);border:1px solid var(--rouge-border)}
+.rr-equip-status.missing{background:rgba(168,149,126,.1);color:var(--text3);border:1px solid var(--border)}
+
+.rr-equip-rows{padding:0 16px 14px}
+.rr-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(221,208,188,.5)}
+.rr-row:last-child{border-bottom:none}
+.rr-row-label{font-size:12px;color:var(--text2);flex:1;line-height:1.3}
+.rr-row-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px;margin-left:8px}
+.rr-row-val{font-size:13px;font-weight:700;color:var(--dark);white-space:nowrap}
+.rr-row-val.ok{color:var(--vert)}
+.rr-row-val.warn{color:var(--orange)}
+.rr-row-val.danger{color:var(--rouge)}
+.rr-row-val.missing{color:var(--text3);font-weight:500;font-style:italic}
+.rr-row-seuil{font-size:10px;color:var(--text3);white-space:nowrap}
+
+.rr-equip-obs{padding:8px 16px 12px;background:rgba(168,149,126,.06);border-top:1px solid var(--border)}
+.rr-equip-obs-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:3px}
+.rr-equip-obs-text{font-size:12px;color:var(--text2)}
+
+/* ── ÉTATS ── */
+.rr-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:12px;padding:32px 24px;text-align:center}
+.rr-state-emoji{font-size:48px;margin-bottom:4px}
+.rr-state-title{font-size:18px;font-weight:700;color:var(--dark)}
+.rr-state-sub{font-size:14px;color:var(--text3);max-width:300px}
+.rr-spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--amber);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── PRINT ── */
+.rr-print-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text2);margin-bottom:18px;width:100%}
+.rr-print-btn:hover{background:var(--creme)}
+@media print{.rr-print-btn{display:none}.rr-header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="rr-header"><div class="rr-logo">GenTrack ✦</div></div>
+  <div class="rr-body"><div class="rr-state"><div class="rr-spinner"></div><div class="rr-state-sub">Chargement du rapport…</div></div></div>
+</div>
+<script>
+var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+
+function h(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+async function supa(table,filter){
+  var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+(filter||''),{
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+  });
+  if(!r.ok)return[];
+  var d=await r.json();
+  return Array.isArray(d)?d:[];
+}
+
+function showError(msg){
+  document.getElementById('app').innerHTML=
+    '<div class="rr-header"><div class="rr-logo">GenTrack ✦</div></div>'+
+    '<div class="rr-body"><div class="rr-state"><div class="rr-state-emoji">⚠️</div>'+
+    '<div class="rr-state-title">Rapport introuvable</div>'+
+    '<div class="rr-state-sub">'+h(msg)+'</div></div></div>';
+}
+
+function fmtHeure(iso,tz){
+  if(!iso)return'—';
+  return new Date(iso).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:tz||'Africa/Dakar'});
+}
+function fmtDate(iso,tz){
+  if(!iso)return'—';
+  return new Date(iso).toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric',timeZone:tz||'Africa/Dakar'});
+}
+function calcDuree(debut,fin){
+  if(!debut||!fin)return null;
+  var ms=new Date(fin)-new Date(debut);
+  if(ms<=0)return null;
+  var m=Math.round(ms/60000);
+  if(m<60)return m+'min';
+  return Math.floor(m/60)+'h'+String(m%60).padStart(2,'0');
+}
+
+function seuilStatus(val,qMin,qMax){
+  if(val===null||val===undefined||val==='')return'missing';
+  var n=parseFloat(val);
+  if(isNaN(n))return'ok';
+  if(qMin!==null&&qMin!==undefined&&n<parseFloat(qMin))return'danger';
+  if(qMax!==null&&qMax!==undefined&&n>parseFloat(qMax))return'warn';
+  return'ok';
+}
+
+function seuilLabel(q){
+  if(q.seuil_min!=null&&q.seuil_max!=null)return'Seuil : '+q.seuil_min+' – '+q.seuil_max+(q.unite?' '+q.unite:'');
+  if(q.seuil_min!=null)return'Min : '+q.seuil_min+(q.unite?' '+q.unite:'');
+  if(q.seuil_max!=null)return'Max : '+q.seuil_max+(q.unite?' '+q.unite:'');
+  return'';
+}
+
+function statusIcon(st){
+  if(st==='ok')return'✅';
+  if(st==='warn')return'⚠️';
+  if(st==='danger')return'🔴';
+  return'—';
+}
+
+async function init(){
+  var params=new URLSearchParams(location.search);
+  var releveId=params.get('id')||params.get('releve_id');
+  if(!releveId){showError('Identifiant de relevé manquant.');return;}
+
+  var releves=await supa('releves_horaires','id=eq.'+releveId+'&select=*');
+  var releve=releves[0];
+  if(!releve){showError('Relevé introuvable ou accès refusé.');return;}
+
+  // Données parallèles
+  var siteP=supa('sites','id=eq.'+releve.site_id+'&select=nom');
+  var contactP=releve.contact_id?supa('contacts','id=eq.'+releve.contact_id+'&select=nom'):Promise.resolve([]);
+  var reponsesP=supa('reponses','releve_id=eq.'+releveId+'&select=question_id,valeur');
+  var obsP=supa('releve_observations','releve_id=eq.'+releveId+'&select=equipement_id,texte');
+
+  var[sites,contacts,reponses,observations]=await Promise.all([siteP,contactP,reponsesP,obsP]);
+  var siteNom=(sites[0]&&sites[0].nom)||'Hôtel';
+  var techNom=(contacts[0]&&contacts[0].nom)||'Technicien';
+
+  // Map réponses par question_id
+  var repMap={};
+  (reponses||[]).forEach(function(r){repMap[r.question_id]=r.valeur;});
+  var obsMap={};
+  (observations||[]).forEach(function(o){obsMap[o.equipement_id]=o.texte;});
+
+  // Charger équipements du site avec actif_releve
+  var equips=await supa('equipements',
+    'site_id=eq.'+releve.site_id+'&actif=eq.true&select=id,nom,type_id,types_equipements(nom,icone)&order=ordre_ronde.asc'
+  );
+
+  // Charger questions pour ces équipements
+  var eqIds=(equips||[]).map(function(e){return e.id;});
+  var questions=[];
+  if(eqIds.length){
+    questions=await supa('questions',
+      'equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&frequences=cs.{journalier}'+
+      '&select=id,texte,type_reponse,unite,seuil_min,seuil_max,alerte_severite,equipement_id,ordre'+
+      '&order=equipement_id.asc,ordre.asc'
+    );
+  }
+
+  // Grouper questions par équipement
+  var qByEq={};
+  (questions||[]).forEach(function(q){
+    if(!qByEq[q.equipement_id])qByEq[q.equipement_id]=[];
+    qByEq[q.equipement_id].push(q);
+  });
+
+  // Calculer alertes et statuts
+  var alertes=[];
+  equips.forEach(function(e){
+    var qs=qByEq[e.id]||[];
+    qs.forEach(function(q){
+      if(q.type_reponse!=='numerique')return;
+      var val=repMap[q.id];
+      var st=seuilStatus(val,q.seuil_min,q.seuil_max);
+      if(st==='warn'||st==='danger'){
+        var u=q.unite?' '+q.unite:'';
+        var seuil=st==='danger'?'min '+q.seuil_min+u:'max '+q.seuil_max+u;
+        alertes.push({equip:e.nom,label:q.texte,val:parseFloat(val),seuil:seuil,st:st});
+      }
+    });
+  });
+
+  // Calculer durée
+  var duree=calcDuree(releve.heure_debut||releve.created_at,releve.validated_at);
+  var hDebut=fmtHeure(releve.heure_debut||releve.created_at);
+  var hFin=fmtHeure(releve.validated_at);
+  var nbValeurs=releve.nb_valeurs||reponses.length||0;
+
+  // Déterminer statut global
+  var nbAlertes=alertes.length;
+  var badgeClass=nbAlertes>0?'rr-badge-rouge':'rr-badge-vert';
+  var badgeText=nbAlertes>0?('⚠️ '+nbAlertes+' alerte'+(nbAlertes>1?'s':'')):('✅ Tout OK');
+
+  // ── BUILD HTML ──
+  var out='';
+
+  // Header light
+  out+='<div class="rr-header">';
+  out+='<div class="rr-logo">GenTrack ✦</div>';
+  out+='<div class="rr-header-title">📊 Relevé horaire</div>';
+  out+='<div class="rr-header-sub">'+h(siteNom)+'</div>';
+  out+='<div class="rr-header-meta">';
+  out+='<div class="rr-badge">🕐 '+fmtDate(releve.validated_at)+'</div>';
+  out+='<div class="rr-badge">👤 '+h(techNom)+'</div>';
+  out+='<div class="rr-badge '+badgeClass+'">'+badgeText+'</div>';
+  out+='</div>';
+  out+='</div>';
+
+  out+='<div class="rr-body">';
+
+  // Bouton imprimer
+  out+='<button class="rr-print-btn" onclick="window.print()">🖨️ Imprimer / Exporter PDF</button>';
+
+  // KPIs
+  out+='<div class="rr-kpis">';
+  out+='<div class="rr-kpi '+(nbValeurs>0?'ok':'')+'"><div class="rr-kpi-val">'+nbValeurs+'</div><div class="rr-kpi-label">Valeurs</div></div>';
+  out+='<div class="rr-kpi '+(nbAlertes>0?(nbAlertes>2?'danger':'warn'):'ok')+'"><div class="rr-kpi-val">'+nbAlertes+'</div><div class="rr-kpi-label">Alertes</div></div>';
+  out+='<div class="rr-kpi"><div class="rr-kpi-val">'+(duree||'—')+'</div><div class="rr-kpi-label">Durée</div></div>';
+  out+='</div>';
+
+  // Timing
+  if(hDebut||hFin){
+    out+='<div class="rr-section"><div class="rr-section-head"><span class="rr-section-icon">🕐</span><span class="rr-section-title">Horaires du relevé</span></div>';
+    out+='<div style="padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    out+='<div style="text-align:center"><div style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Début</div><div style="font-size:20px;font-weight:800;color:var(--dark)">'+h(hDebut)+'</div></div>';
+    out+='<div style="text-align:center"><div style="font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Fin</div><div style="font-size:20px;font-weight:800;color:var(--vert)">'+h(hFin)+'</div></div>';
+    out+='</div></div>';
+  }
+
+  // Bannière alertes
+  if(alertes.length>0){
+    out+='<div class="rr-alerte-banner">';
+    out+='<div class="rr-alerte-banner-icon">🚨</div>';
+    out+='<div class="rr-alerte-banner-body">';
+    out+='<div class="rr-alerte-banner-title">'+alertes.length+' valeur'+(alertes.length>1?'s':'')+' hors seuil</div>';
+    alertes.forEach(function(a){
+      out+='<div class="rr-alerte-item"><span><strong>'+h(a.equip)+'</strong> — '+h(a.label)+' : '+a.val+' (seuil '+h(a.seuil)+')</span></div>';
+    });
+    out+='</div></div>';
+  }
+
+  // Sections par type d'équipement
+  var typeGroups={};
+  var typeOrder=[];
+  (equips||[]).forEach(function(e){
+    var tNom=(e.types_equipements&&e.types_equipements.nom)||'Équipements';
+    var tIcon=(e.types_equipements&&e.types_equipements.icone)||'🔧';
+    if(!typeGroups[tNom]){typeGroups[tNom]={icon:tIcon,equips:[]};typeOrder.push(tNom);}
+    typeGroups[tNom].equips.push(e);
+  });
+
+  typeOrder.forEach(function(tNom){
+    var grp=typeGroups[tNom];
+    var renseignes=grp.equips.filter(function(e){
+      var qs=qByEq[e.id]||[];
+      return qs.some(function(q){return repMap[q.id]!=null&&String(repMap[q.id]).trim()!=='';});
+    });
+    out+='<div class="rr-section">';
+    out+='<div class="rr-section-head"><span class="rr-section-icon">'+h(grp.icon)+'</span><span class="rr-section-title">'+h(tNom)+'</span>';
+    out+='<span class="rr-section-count">'+renseignes.length+'/'+grp.equips.length+'</span>';
+    out+='</div>';
+
+    grp.equips.forEach(function(e){
+      var qs=qByEq[e.id]||[];
+      // Calculer statut global de l'équipement
+      var hasAny=qs.some(function(q){return repMap[q.id]!=null&&String(repMap[q.id]).trim()!=='';});
+      var hasAlerte=qs.some(function(q){
+        var st=seuilStatus(repMap[q.id],q.seuil_min,q.seuil_max);
+        return st==='danger';
+      });
+      var hasWarn=qs.some(function(q){
+        var st=seuilStatus(repMap[q.id],q.seuil_min,q.seuil_max);
+        return st==='warn';
+      });
+      var eqSt=!hasAny?'missing':hasAlerte?'danger':hasWarn?'warn':'ok';
+      var eqLabel={'ok':'✅ OK','warn':'⚠️ Hors seuil','danger':'🔴 Hors seuil','missing':'— Non renseigné'}[eqSt];
+
+      out+='<div class="rr-equip">';
+      out+='<div class="rr-equip-head">';
+      out+='<div class="rr-equip-name">'+h(e.nom)+'</div>';
+      out+='<div class="rr-equip-status '+eqSt+'">'+eqLabel+'</div>';
+      out+='</div>';
+
+      if(qs.length>0){
+        out+='<div class="rr-equip-rows">';
+        qs.forEach(function(q){
+          var val=repMap[q.id];
+          var displayVal,valClass;
+          if(val===null||val===undefined||val===''){
+            displayVal='—';valClass='missing';
+          } else if(q.type_reponse==='numerique'){
+            var st=seuilStatus(val,q.seuil_min,q.seuil_max);
+            displayVal=val+(q.unite?' '+q.unite:'');
+            valClass=st==='missing'?'missing':st;
+          } else {
+            displayVal=val;valClass='';
+          }
+          var sl=q.type_reponse==='numerique'?seuilLabel(q):'';
+          out+='<div class="rr-row">';
+          out+='<div class="rr-row-label">'+h(q.texte)+'</div>';
+          out+='<div class="rr-row-right">';
+          out+='<div class="rr-row-val '+valClass+'">'+h(displayVal)+'</div>';
+          if(sl)out+='<div class="rr-row-seuil">'+h(sl)+'</div>';
+          out+='</div></div>';
+        });
+        out+='</div>';
+      }
+
+      // Observation éventuelle
+      if(obsMap[e.id]){
+        out+='<div class="rr-equip-obs">';
+        out+='<div class="rr-equip-obs-label">💬 Observation</div>';
+        out+='<div class="rr-equip-obs-text">'+h(obsMap[e.id])+'</div>';
+        out+='</div>';
+      }
+
+      out+='</div>'; // .rr-equip
+    });
+    out+='</div>'; // .rr-section
+  });
+
+  // Pied de page
+  out+='<div style="text-align:center;margin-top:24px;padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm)">';
+  out+='<div style="font-size:10px;font-weight:800;letter-spacing:.2em;color:var(--amber);text-transform:uppercase;margin-bottom:4px">GenTrack ✦</div>';
+  out+='<div style="font-size:12px;color:var(--text3)">Rapport généré le '+fmtDate(new Date().toISOString())+' à '+fmtHeure(new Date().toISOString())+'</div>';
+  out+='</div>';
+
+  out+='</div>'; // .rr-body
+
+  document.getElementById('app').innerHTML=out;
+}
+
+init().catch(function(e){showError('Erreur inattendue : '+String(e));});
+</script>
+</body>
+</html>

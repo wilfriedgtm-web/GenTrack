@@ -926,6 +926,13 @@ async function demarrerBilan(phone: string, contact: any, site: any): Promise<an
   });
   const rondesArr = Array.isArray(rondesRaw) ? rondesRaw : [];
 
+  // Relevés horaires validés aujourd'hui par ce tech
+  const relevesRaw = await db('releves_horaires', {
+    query: `&site_id=eq.${siteId}&contact_id=eq.${contact.id}&statut=eq.valid%C3%A9&created_at=gte.${today}T00:00:00`,
+    select: 'id,validated_at,nb_valeurs'
+  });
+  const relevesArr = Array.isArray(relevesRaw) ? relevesRaw : [];
+
   // Signalements résolus aujourd'hui sur le site (quel que soit le résolveur — rapport.html ou commande resolu)
   const sigsRaw = await db('signalements', {
     query: `&groupe_id=eq.${siteId}&statut=eq.resolu&resolved_at=gte.${today}T00:00:00`,
@@ -957,6 +964,14 @@ async function demarrerBilan(phone: string, contact: any, site: any): Promise<an
   } else {
     msg += `📋 *Rondes :* aucune aujourd'hui\n\n`;
   }
+  if (relevesArr.length > 0) {
+    msg += `📊 *Relevés horaires (${relevesArr.length}) :*\n`;
+    for (const rh of relevesArr) {
+      const h = rh.validated_at ? new Date(rh.validated_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Dakar' }) : '—';
+      msg += `✅ Validé à ${h}${rh.nb_valeurs ? ` · ${rh.nb_valeurs} valeurs` : ''}\n`;
+    }
+    msg += '\n';
+  }
   if (sigsArr.length > 0) {
     msg += `🔧 *Signalements résolus (${sigsArr.length}) :*\n`;
     for (const s of sigsArr) {
@@ -984,6 +999,10 @@ async function demarrerBilan(phone: string, contact: any, site: any): Promise<an
     tech_nom: contact.nom,
     tech_id: contact.id,
     rondes: rondesArr.map((r: any) => ({ frequence: r.frequence })),
+    releves_horaires: relevesArr.map((rh: any) => ({
+      validated_at: rh.validated_at,
+      nb_valeurs: rh.nb_valeurs,
+    })),
     sigs_resolus: sigsArr.map((s: any) => ({
       ref_code: s.ref_code || '—',
       desc: (s.description || '').substring(0, 60),
@@ -1022,9 +1041,18 @@ async function envoyerBilan(phone: string, contact: any, sd: any, blocages: stri
   const sigsEnCours: any[] = sd.sigs_en_cours || [];
   let recapMsg = `🌙 *Bilan fin de journée — GenTrack*\n*${siteNom}*\n\n`;
   recapMsg += `👷 *${contact.nom}* · ${today} ${heure}\n\n`;
+  const relevesHoraires: any[] = sd.releves_horaires || [];
   if (rondes.length > 0) {
     recapMsg += `📋 *Rondes :*\n`;
     for (const r of rondes) recapMsg += `✅ ${freqLabels[r.frequence] || r.frequence}\n`;
+    recapMsg += '\n';
+  }
+  if (relevesHoraires.length > 0) {
+    recapMsg += `📊 *Relevés horaires (${relevesHoraires.length}) :*\n`;
+    for (const rh of relevesHoraires) {
+      const h = rh.validated_at ? new Date(rh.validated_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Dakar' }) : '—';
+      recapMsg += `✅ Validé à ${h}${rh.nb_valeurs ? ` · ${rh.nb_valeurs} valeurs` : ''}\n`;
+    }
     recapMsg += '\n';
   }
   if (sigsResolus.length > 0) {
@@ -1498,11 +1526,22 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
   // ── Rapport choix (resp_tech) ──────────────────────────────
   if (state === 'rapport_choix') {
     const isMultiRapport = !!sd.multi_site;
-    const maxOptRapport = isMultiRapport ? 4 : 3;
+    // Vérifier si un relevé horaire a été validé aujourd'hui
+    const todayRapport = getToday();
+    const todayStartRapport = todayRapport + 'T00:00:00';
+    const relevesAujourdhuiRaw = await db('releves_horaires', {
+      query: `&site_id=eq.${sd.site_id}&statut=eq.valid%C3%A9&validated_at=gte.${todayStartRapport}&order=validated_at.desc&limit=1`,
+      select: 'id,validated_at,nb_valeurs,contact_id'
+    });
+    const dernierReleve = Array.isArray(relevesAujourdhuiRaw) && relevesAujourdhuiRaw.length ? relevesAujourdhuiRaw[0] : null;
+    // Nb options : 3 standard + 1 relevé horaire si dispo + 1 changer hôtel si multi
+    const hasReleve = !!dernierReleve;
+    const baseOpts = 3 + (hasReleve ? 1 : 0);
+    const maxOptRapport = isMultiRapport ? baseOpts + 1 : baseOpts;
     const n = parseInt(msg.trim());
-    if (isNaN(n) || n < 1 || n > maxOptRapport) return sendWA(phone, `Répondez avec *1*, *2* ou *3*${isMultiRapport ? ' ou *4*' : ''}.`);
-    if (n === 4) {
-      // Changer d'hôtel depuis le menu rapport
+    if (isNaN(n) || n < 1 || n > maxOptRapport) return sendWA(phone, `Répondez avec un numéro entre 1 et ${maxOptRapport}.`);
+    // Option "changer d'hôtel" = toujours la dernière option si multi
+    if (isMultiRapport && n === maxOptRapport) {
       const allSitesSwitch = await getSitesForContact(contact.id, contact.site_id || undefined, phoneSiteIds);
       const listeSwitch = allSitesSwitch.map((s: any, i: number) => `*${i + 1}* — ${s.nom}${s.id === sd.active_site_id ? ' ✓' : ''}`).join('\n');
       await setSession(phone, 'choix_site', { sites: allSitesSwitch.map((s: any) => ({ id: s.id, nom: s.nom })), pending_msg: 'rapport' });
@@ -1518,6 +1557,12 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     }
     if (n === 2) return demarrerSuivi(phone, contact, siteObj);
     if (n === 3) return afficherBilansResp(phone, contact, { id: sd.site_id, nom: sd.site_nom });
+    // n === 4 et hasReleve : envoyer lien du dernier relevé horaire
+    if (n === 4 && hasReleve) {
+      const h = dernierReleve.validated_at ? new Date(dernierReleve.validated_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Dakar' }) : '—';
+      const releveUrl = `https://gen-track.vercel.app/releve.html?token=${dernierReleve.id}`;
+      return sendWA(phone, `📊 *Dernier relevé horaire du jour*\n*${sd.site_nom}* · validé à ${h}${dernierReleve.nb_valeurs ? ` · ${dernierReleve.nb_valeurs} valeurs` : ''}\n\n🔗 ${releveUrl}`);
+    }
   }
 
   // ── Bilan recap — question blocages ───────────────────────
@@ -2074,7 +2119,11 @@ async function handleMessage(from: string, bodyText: string, mediaUrl: string = 
         const isResp = ['resp_tech', 'dir_tech'].includes(contact.role || '');
         if (isResp) {
           await setSession(phone, 'rapport_choix', { active_site_id: site.id, site_id: site.id, site_nom: site.nom, multi_site: true });
-          return sendWA(phone, `📊 *Rapport — ${site.nom}*\n\nQue souhaitez-vous consulter ?\n\n*1* — 📋 Dernière ronde journalière\n*2* — 🔴 Suivi des signalements\n*3* — 🌙 Bilans de fin de journée\n*4* — 🏨 Changer d'hôtel`);
+          const todayMenu1 = getToday();
+          const releveMenu1Raw = await db('releves_horaires', { query: `&site_id=eq.${site.id}&statut=eq.valid%C3%A9&validated_at=gte.${todayMenu1}T00:00:00&order=validated_at.desc&limit=1`, select: 'id' });
+          const hasReleveMenu1 = Array.isArray(releveMenu1Raw) && releveMenu1Raw.length > 0;
+          const releveLineMenu1 = hasReleveMenu1 ? `\n*${hasReleveMenu1 ? 4 : ''}* — 📊 Dernier relevé horaire du jour` : '';
+          return sendWA(phone, `📊 *Rapport — ${site.nom}*\n\nQue souhaitez-vous consulter ?\n\n*1* — 📋 Dernière ronde journalière\n*2* — 🔴 Suivi des signalements\n*3* — 🌙 Bilans de fin de journée${releveLineMenu1}\n*${hasReleveMenu1 ? 5 : 4}* — 🏨 Changer d'hôtel`);
         }
         const rondesResp = await db('rondes', { query: `&site_id=eq.${site.id}&order=date_ronde.desc,created_at.desc&limit=1` });
         if (!Array.isArray(rondesResp) || !rondesResp.length) return sendWA(phone, `Aucune ronde enregistrée pour *${site.nom}*.`);
@@ -2300,9 +2349,13 @@ async function handleMessage(from: string, bodyText: string, mediaUrl: string = 
       if (isResp) {
         const allSitesResp = await getSitesForContact(contact.id, contact.site_id || undefined, phoneSiteIds);
         const isMulti = allSitesResp.length > 1;
-        const extraOption = isMulti ? `\n*4* — 🏨 Changer d'hôtel` : '';
+        const todayMenu2 = getToday();
+        const releveMenu2Raw = await db('releves_horaires', { query: `&site_id=eq.${site.id}&statut=eq.valid%C3%A9&validated_at=gte.${todayMenu2}T00:00:00&order=validated_at.desc&limit=1`, select: 'id' });
+        const hasReleveMenu2 = Array.isArray(releveMenu2Raw) && releveMenu2Raw.length > 0;
+        const releveLineMenu2 = hasReleveMenu2 ? `\n*4* — 📊 Dernier relevé horaire du jour` : '';
+        const extraOption = isMulti ? `\n*${hasReleveMenu2 ? 5 : 4}* — 🏨 Changer d'hôtel` : '';
         await setSession(phone, 'rapport_choix', { active_site_id: site.id, site_id: site.id, site_nom: site.nom, multi_site: isMulti });
-        return sendWA(phone, `📊 *Rapport — ${site.nom}*\n\nQue souhaitez-vous consulter ?\n\n*1* — 📋 Dernière ronde journalière\n*2* — 🔴 Suivi des signalements\n*3* — 🌙 Bilans de fin de journée${extraOption}`);
+        return sendWA(phone, `📊 *Rapport — ${site.nom}*\n\nQue souhaitez-vous consulter ?\n\n*1* — 📋 Dernière ronde journalière\n*2* — 🔴 Suivi des signalements\n*3* — 🌙 Bilans de fin de journée${releveLineMenu2}${extraOption}`);
       }
       // Technicien → rapport direct
       const rondes = await db('rondes', { query: `&site_id=eq.${site.id}&order=date_ronde.desc,created_at.desc&limit=1` });
