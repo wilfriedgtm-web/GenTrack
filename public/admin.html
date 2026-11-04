@@ -223,7 +223,7 @@ async function loadAll() {
     api('contacts','','*'),
     api('types_equipements','&order=nom.asc','*'),
     api('rondes','&order=date_ronde.desc&limit=200','id,site_id,date_ronde,frequence,created_at'),
-    api('releves_horaires','&order=created_at.desc&limit=500','id,site_id,date,valide,created_at'),
+    api('releves_horaires','&order=created_at.desc&limit=500','id,site_id,statut,validated_at,created_at'),
   ]);
   S = { clients, sites, equipements, questions, rondes: rondes||[], rondes_equipements: [], alertes, signalements, tokens, contacts, types_equipements: types_eq, releves: releves||[] };
   document.getElementById('sync-status').textContent = `Màj ${new Date().toLocaleTimeString('fr-FR')}`;
@@ -277,13 +277,13 @@ function renderVue() {
     const mySites  = S.sites.filter(s=>s.client_id===client.id);
     const siteIds  = mySites.map(s=>s.id);
     const myRondes = S.rondes.filter(r=>siteIds.includes(r.site_id));
-    const myReleves= S.releves.filter(r=>siteIds.includes(r.site_id) && r.valide);
+    const myReleves= S.releves.filter(r=>siteIds.includes(r.site_id) && r.statut==='validé');
     const myAlertes= S.alertes.filter(a=>siteIds.includes(a.groupe_id) && !a.resolue);
     const myPannes = S.signalements.filter(s=>siteIds.includes(s.groupe_id) && s.type==='panne' && s.statut!=='resolu').length;
 
     // Dernière activité
     const lastRondeTs  = myRondes.length  ? new Date(myRondes[0].created_at).getTime()                                                   : 0;
-    const lastReleveTs = myReleves.length ? Math.max(...myReleves.map(r=>new Date(r.created_at).getTime()))                               : 0;
+    const lastReleveTs = myReleves.length ? Math.max(...myReleves.map(r=>new Date(r.validated_at||r.created_at).getTime()))               : 0;
     const lastActTs    = Math.max(lastRondeTs, lastReleveTs);
     const lastActDate  = lastActTs ? new Date(lastActTs).toISOString().slice(0,10) : null;
     const hoursNoAct   = lastActTs ? (now - lastActTs)/3600000 : 999;
@@ -292,7 +292,7 @@ function renderVue() {
     // Conformité 7j
     const activeDays = new Set([
       ...myRondes.filter(r=>r.date_ronde>=d7).map(r=>r.date_ronde),
-      ...myReleves.filter(r=>r.date&&r.date>=d7).map(r=>r.date),
+      ...myReleves.filter(r=>(r.validated_at||r.created_at)?.slice(0,10)>=d7).map(r=>(r.validated_at||r.created_at).slice(0,10)),
     ]);
     const conf7j = Math.round((activeDays.size/7)*100);
 
@@ -398,7 +398,7 @@ function renderVue() {
       const site=S.sites.find(s=>s.id===r.site_id), client=S.clients.find(c=>c.id===site?.client_id);
       return {ts:new Date(r.created_at).getTime(), html:`<div class="alert-item"><div class="alert-dot dot-green"></div><div class="alert-body"><div class="alert-title">🔄 ${site?esc(site.nom):'Site inconnu'}</div><div class="alert-meta">${client?esc(client.nom):''} · Ronde${r.frequence?' '+r.frequence:''} · ${relativeTime(r.created_at)}</div></div></div>`};
     }),
-    ...S.releves.filter(r=>r.valide).slice(0,8).map(r=>{
+    ...S.releves.filter(r=>r.statut==='validé').slice(0,8).map(r=>{
       const site=S.sites.find(s=>s.id===r.site_id), client=S.clients.find(c=>c.id===site?.client_id);
       return {ts:new Date(r.created_at).getTime(), html:`<div class="alert-item"><div class="alert-dot dot-green"></div><div class="alert-body"><div class="alert-title">📊 ${site?esc(site.nom):'Site inconnu'}</div><div class="alert-meta">${client?esc(client.nom):''} · Relevé horaire · ${relativeTime(r.created_at)}</div></div></div>`};
     }),
