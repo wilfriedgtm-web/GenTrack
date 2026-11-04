@@ -204,7 +204,7 @@ async function apiDelete(table, q) {
 }
 
 // ── STATE ──────────────────────────────────────────────────
-let S = { clients:[], sites:[], equipements:[], questions:[], rondes:[], rondes_equipements:[], alertes:[], signalements:[], tokens:[], contacts:[], types_equipements:[] };
+let S = { clients:[], sites:[], equipements:[], questions:[], rondes:[], rondes_equipements:[], alertes:[], signalements:[], tokens:[], contacts:[], types_equipements:[], releves:[] };
 let currentSection = 'vue';
 let openClientId = null;
 let openClientTab = 'infos';
@@ -212,7 +212,7 @@ let openClientTab = 'infos';
 // ── LOAD ───────────────────────────────────────────────────
 async function loadAll() {
   document.getElementById('sync-status').textContent = 'Chargement…';
-  const [clients, sites, equipements, questions, alertes, signalements, tokens, contacts, types_eq, rondes] = await Promise.all([
+  const [clients, sites, equipements, questions, alertes, signalements, tokens, contacts, types_eq, rondes, releves] = await Promise.all([
     api('clients','','*'),
     api('sites','','*'),
     api('equipements','','*'),
@@ -222,9 +222,10 @@ async function loadAll() {
     api('tokens','','*'),
     api('contacts','','*'),
     api('types_equipements','&order=nom.asc','*'),
-    api('rondes','&order=date_ronde.desc&limit=100','id,site_id,date_ronde,frequence,created_at'),
+    api('rondes','&order=date_ronde.desc&limit=200','id,site_id,date_ronde,frequence,created_at'),
+    api('releves_horaires','&order=created_at.desc&limit=500','id,site_id,date,valide,created_at'),
   ]);
-  S = { clients, sites, equipements, questions, rondes: rondes||[], rondes_equipements: [], alertes, signalements, tokens, contacts, types_equipements: types_eq };
+  S = { clients, sites, equipements, questions, rondes: rondes||[], rondes_equipements: [], alertes, signalements, tokens, contacts, types_equipements: types_eq, releves: releves||[] };
   document.getElementById('sync-status').textContent = `Màj ${new Date().toLocaleTimeString('fr-FR')}`;
   const openA = alertes.filter(a=>!a.resolue).length;
   const badge = document.getElementById('alert-badge');
@@ -255,51 +256,165 @@ function renderSection(sec) {
 function alertClientName(a){const site=S.sites.find(s=>s.id===a.groupe_id);const c=S.clients.find(x=>x.id===site?.client_id);return c?esc(c.nom):'—';}
 function alertSiteName(a){const site=S.sites.find(s=>s.id===a.groupe_id);return site?esc(site.nom):'—';}
 
+let vueExpanded = {};
+function toggleVueExpand(clientId) { vueExpanded[clientId]=!vueExpanded[clientId]; renderVue(); }
+
 function renderVue() {
-  const activeClients = S.clients.filter(c=>c.actif).length;
+  const now = Date.now();
+  const d7  = new Date(now - 7*86400000).toISOString().slice(0,10);
+  const mrr = S.clients.filter(c=>c.actif).reduce((s,c)=>s+(c.prix_mensuel||0),0);
   const openA = S.alertes.filter(a=>!a.resolue).length;
   const critA = S.alertes.filter(a=>!a.resolue && a.severite==='critique').length;
-  const mrr = S.clients.filter(c=>c.actif).reduce((s,c)=>s+(c.prix_mensuel||0),0);
-  const now = Date.now();
-  const today = new Date().toISOString().slice(0,10);
-  const rondesToday = S.rondes.filter(r=>(r.created_at?.slice(0,10)===today||r.date_ronde===today)).length;
 
-  // Per-site health
-  const siteCards = S.sites.map(site => {
-    const client = S.clients.find(c=>c.id===site.client_id);
-    const lastRonde = S.rondes.find(r=>r.site_id===site.id);
-    const siteAlertes = S.alertes.filter(a=>a.groupe_id===site.id && !a.resolue);
-    const sitePannes = S.signalements.filter(s=>s.groupe_id===site.id && s.type==='panne' && s.statut!=='resolu');
-    const rondeAge = lastRonde ? (now - new Date(lastRonde.created_at).getTime()) / 3600000 : Infinity;
-    const hasCrit = siteAlertes.some(a=>a.severite==='critique');
-    const status = hasCrit || rondeAge > 48 ? 'red' : (rondeAge > 24 || siteAlertes.length>0 || sitePannes.length>0) ? 'orange' : 'green';
-    const statusColors = {red:'#e53e3e', orange:'#dd6b20', green:'#38a169'};
-    const rondeText = lastRonde ? relativeTime(lastRonde.created_at) : 'Jamais';
-    return `<div class="card card-sm" style="border-left:4px solid ${statusColors[status]};cursor:pointer" onclick="openClient('${client?.id||''}')">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-        <div>
-          <div style="font-weight:600;font-size:13px">${esc(site.nom)}</div>
-          <div style="font-size:11px;color:var(--text-muted)">${client?esc(client.nom):'—'}</div>
+  // ── Score de santé composite par client ───────────────────────────
+  // Activité = ronde OU relevé horaire validé
+  // Conformité 7j = % jours distincts avec activité sur 7
+  // +40 activité <24h | +25 <48h | +10 <72h
+  // +30 × conformité7j/100
+  // +20 aucune alerte ouverte | +10 aucune critique >48h (mais alertes)
+  // +10 client actif
+  const clientStats = S.clients.map(client => {
+    const mySites  = S.sites.filter(s=>s.client_id===client.id);
+    const siteIds  = mySites.map(s=>s.id);
+    const myRondes = S.rondes.filter(r=>siteIds.includes(r.site_id));
+    const myReleves= S.releves.filter(r=>siteIds.includes(r.site_id) && r.valide);
+    const myAlertes= S.alertes.filter(a=>siteIds.includes(a.groupe_id) && !a.resolue);
+    const myPannes = S.signalements.filter(s=>siteIds.includes(s.groupe_id) && s.type==='panne' && s.statut!=='resolu').length;
+
+    // Dernière activité
+    const lastRondeTs  = myRondes.length  ? new Date(myRondes[0].created_at).getTime()                                                   : 0;
+    const lastReleveTs = myReleves.length ? Math.max(...myReleves.map(r=>new Date(r.created_at).getTime()))                               : 0;
+    const lastActTs    = Math.max(lastRondeTs, lastReleveTs);
+    const lastActDate  = lastActTs ? new Date(lastActTs).toISOString().slice(0,10) : null;
+    const hoursNoAct   = lastActTs ? (now - lastActTs)/3600000 : 999;
+    const daysNoAct    = hoursNoAct/24;
+
+    // Conformité 7j
+    const activeDays = new Set([
+      ...myRondes.filter(r=>r.date_ronde>=d7).map(r=>r.date_ronde),
+      ...myReleves.filter(r=>r.date&&r.date>=d7).map(r=>r.date),
+    ]);
+    const conf7j = Math.round((activeDays.size/7)*100);
+
+    // Alertes critiques >48h
+    const critiqueOuvertes = myAlertes.filter(a=>(now-new Date(a.created_at).getTime())/3600000>48 && a.severite==='critique').length;
+
+    // Score
+    let score = 0;
+    if      (hoursNoAct<24) score+=40;
+    else if (hoursNoAct<48) score+=25;
+    else if (hoursNoAct<72) score+=10;
+    score += Math.round(conf7j*0.30);
+    if      (myAlertes.length===0)      score+=20;
+    else if (critiqueOuvertes===0)      score+=10;
+    if (client.actif) score+=10;
+    score = Math.min(100, score);
+
+    const category = (score<50||critiqueOuvertes>0) ? 'urgent' : (score<75||daysNoAct>2) ? 'attention' : 'ok';
+
+    return {...client, mySites, myAlertes, myPannes, lastActDate, hoursNoAct, daysNoAct, conf7j, critiqueOuvertes, score, category};
+  });
+
+  clientStats.sort((a,b)=>{
+    const ord={urgent:0,attention:1,ok:2};
+    return ord[a.category]!==ord[b.category] ? ord[a.category]-ord[b.category] : a.score-b.score;
+  });
+
+  const nUrgent    = clientStats.filter(c=>c.category==='urgent').length;
+  const nAttention = clientStats.filter(c=>c.category==='attention').length;
+
+  // ── Helpers de rendu ──────────────────────────────────────────────
+  function col(score) {
+    if (score>=75) return {border:'#38a169',bg:'#f0fdf4',txt:'#38a169',bar:'#38a169'};
+    if (score>=50) return {border:'#dd6b20',bg:'#fffbeb',txt:'#dd6b20',bar:'#dd6b20'};
+    return                {border:'#e53e3e',bg:'#fff5f5',txt:'#e53e3e',bar:'#e53e3e'};
+  }
+  function relAct(dateStr) {
+    if (!dateStr) return 'Jamais';
+    const d=(now-new Date(dateStr+'T12:00:00').getTime())/86400000;
+    if(d<1) return "Auj."; if(d<2) return "Hier"; return `J-${Math.floor(d)}`;
+  }
+  function waLink(p){if(!p)return'';const n=p.replace(/[^0-9]/g,'');return n?`https://wa.me/${n}`:'';}
+
+  function clientCard(c) {
+    const k=col(c.score), isOpen=!!vueExpanded[c.id];
+    const wa=waLink(c.whatsapp_patron);
+    return `<div class="card card-sm" style="border-left:4px solid ${k.border};padding:0;overflow:hidden">
+      <div onclick="toggleVueExpand('${c.id}')" style="padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:14px">
+        <div style="flex-shrink:0;text-align:center;min-width:42px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;line-height:1;color:${k.txt}">${c.score}</div>
+          <div style="font-size:9px;color:var(--text-muted)">/100</div>
         </div>
-        <div style="width:10px;height:10px;border-radius:50%;background:${statusColors[status]};margin-top:3px;flex-shrink:0"></div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-weight:600;font-size:13.5px">${esc(c.nom)}</span>
+            ${!c.actif?'<span class="kpi-badge badge-gray" style="font-size:10px">Inactif</span>':''}
+            ${c.critiqueOuvertes>0?`<span class="kpi-badge badge-red" style="font-size:10px">🚨 ${c.critiqueOuvertes} critique${c.critiqueOuvertes>1?'s':''}</span>`:''}
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${esc(c.ville||'')}${c.plan?' · '+c.plan:''} · ${c.mySites.length} site${c.mySites.length!==1?'s':''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;text-align:center">
+          <div><div style="font-size:12px;font-weight:500">${relAct(c.lastActDate)}</div><div style="font-size:10px;color:var(--text-muted)">Activité</div></div>
+          <div><div style="font-size:12px;font-weight:500">${c.conf7j}%</div><div style="font-size:10px;color:var(--text-muted)">Conf. 7j</div></div>
+          <div><div style="font-size:12px;font-weight:500;color:${c.myAlertes.length>0?'var(--red)':'inherit'}">${c.myAlertes.length}</div><div style="font-size:10px;color:var(--text-muted)">Alertes</div></div>
+          <div style="font-size:11px;color:var(--text-muted)">${isOpen?'▲':'▼'}</div>
+        </div>
       </div>
-      <div style="font-size:11px;color:var(--text-muted);display:flex;flex-direction:column;gap:3px">
-        <div>🕐 Dernière ronde : <span style="color:${rondeAge>48?'var(--red)':rondeAge>24?'var(--orange)':'inherit'}">${rondeText}</span></div>
-        <div>🔔 Alertes : <span style="color:${siteAlertes.length>0?'var(--red)':'inherit'}">${siteAlertes.length}${hasCrit?' ⚠️ critique':''}</span></div>
-        <div>🔧 Pannes en cours : <span style="color:${sitePannes.length>0?'var(--orange)':'inherit'}">${sitePannes.length}</span></div>
+      <div style="height:3px;background:#eee"><div style="height:3px;background:${k.bar};width:${c.score}%"></div></div>
+      ${isOpen?`<div style="padding:14px 16px;background:${k.bg};border-top:1px solid var(--border)">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;font-size:12px">
+          <div><div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">Dernière activité</div><b>${relAct(c.lastActDate)}</b></div>
+          <div><div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">Conformité 7j</div><b>${c.conf7j}%</b></div>
+          <div><div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">Pannes ouvertes</div><b style="color:${c.myPannes>0?'var(--orange)':'inherit'}">${c.myPannes}</b></div>
+          <div><div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">Prix mensuel</div><b>${fmtCFA(c.prix_mensuel||0)}</b></div>
+        </div>
+        ${c.myAlertes.length?`<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:5px">Alertes ouvertes</div>${c.myAlertes.slice(0,3).map(a=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:3px;font-size:11px"><span class="kpi-badge ${a.severite==='critique'?'badge-red':'badge-orange'}" style="font-size:10px">${a.severite}</span><span style="color:var(--text-muted)">${new Date(a.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}</span>${a.message?`<span>${esc(String(a.message).slice(0,55))}</span>`:''}</div>`).join('')}${c.myAlertes.length>3?`<div style="font-size:11px;color:var(--text-muted)">+ ${c.myAlertes.length-3} autre${c.myAlertes.length-3>1?'s':''}</div>`:''}</div>`:''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="openClient('${c.id}');event.stopPropagation()">Voir le client</button>
+          ${wa?`<a href="${wa}" target="_blank" class="btn btn-outline btn-sm" style="color:#22543d;border-color:#9ae6b4" onclick="event.stopPropagation()">📱 WhatsApp patron</a>`:''}
+          ${c.myAlertes.length?`<button class="btn btn-outline btn-sm" onclick="showSection('alertes');event.stopPropagation()">Alertes →</button>`:''}
+        </div>
+      </div>`:''}
+    </div>`;
+  }
+
+  function group(title, dotClr, clients) {
+    if(!clients.length) return '';
+    return `<div style="margin-bottom:22px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="width:9px;height:9px;border-radius:50%;background:${dotClr}"></div>
+        <h3 style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px">${title}</h3>
+        <span class="kpi-badge badge-gray" style="font-size:10px">${clients.length}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:10px">
+        ${clients.map(c=>clientCard(c)).join('')}
       </div>
     </div>`;
-  }).join('');
+  }
+
+  // ── Activité récente (rondes + relevés mélangés) ───────────────────
+  const recentActivity = [
+    ...S.rondes.slice(0,8).map(r=>{
+      const site=S.sites.find(s=>s.id===r.site_id), client=S.clients.find(c=>c.id===site?.client_id);
+      return {ts:new Date(r.created_at).getTime(), html:`<div class="alert-item"><div class="alert-dot dot-green"></div><div class="alert-body"><div class="alert-title">🔄 ${site?esc(site.nom):'Site inconnu'}</div><div class="alert-meta">${client?esc(client.nom):''} · Ronde${r.frequence?' '+r.frequence:''} · ${relativeTime(r.created_at)}</div></div></div>`};
+    }),
+    ...S.releves.filter(r=>r.valide).slice(0,8).map(r=>{
+      const site=S.sites.find(s=>s.id===r.site_id), client=S.clients.find(c=>c.id===site?.client_id);
+      return {ts:new Date(r.created_at).getTime(), html:`<div class="alert-item"><div class="alert-dot dot-green"></div><div class="alert-body"><div class="alert-title">📊 ${site?esc(site.nom):'Site inconnu'}</div><div class="alert-meta">${client?esc(client.nom):''} · Relevé horaire · ${relativeTime(r.created_at)}</div></div></div>`};
+    }),
+  ].sort((a,b)=>b.ts-a.ts).slice(0,8);
 
   document.getElementById('content').innerHTML = `
-    <div class="grid-4" style="margin-bottom:20px">
-      <div class="card card-sm"><div class="kpi-label">Clients actifs</div><div class="kpi-value">${activeClients}</div><div class="kpi-sub">${S.clients.length} total</div></div>
-      <div class="card card-sm"><div class="kpi-label">Alertes ouvertes</div><div class="kpi-value" style="color:${openA>0?'var(--red)':'inherit'}">${openA}</div>${critA>0?`<span class="kpi-badge badge-red">${critA} critiques</span>`:`<span class="kpi-badge badge-green">OK</span>`}</div>
-      <div class="card card-sm"><div class="kpi-label">Rondes aujourd'hui</div><div class="kpi-value">${rondesToday}</div><div class="kpi-sub">${S.sites.length} sites actifs</div></div>
+    <div class="grid-4" style="margin-bottom:24px">
+      <div class="card card-sm"><div class="kpi-label">Clients actifs</div><div class="kpi-value">${S.clients.filter(c=>c.actif).length}</div><div class="kpi-sub">${S.clients.length} total</div></div>
+      <div class="card card-sm"><div class="kpi-label">Alertes ouvertes</div><div class="kpi-value" style="color:${openA>0?'var(--red)':'inherit'}">${openA}</div>${critA>0?`<span class="kpi-badge badge-red">${critA} critique${critA>1?'s':''}</span>`:`<span class="kpi-badge badge-green">OK</span>`}</div>
+      <div class="card card-sm"><div class="kpi-label">Urgences</div><div class="kpi-value" style="color:${nUrgent>0?'var(--red)':'inherit'}">${nUrgent}</div><div class="kpi-sub">${nAttention} à surveiller</div></div>
       <div class="card card-sm"><div class="kpi-label">MRR</div><div class="kpi-value">${fmtCFA(mrr)}</div><div class="kpi-sub">ARR: ${fmtCFA(mrr*12)}</div></div>
     </div>
-    ${S.sites.length ? `<div style="margin-bottom:8px"><h3 style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text-muted);margin-bottom:12px">SANTÉ PAR SITE</h3><div class="grid-3">${siteCards}</div></div>` : ''}
-    <div class="grid-2">
+    ${group('Urgences','#e53e3e',clientStats.filter(c=>c.category==='urgent'))}
+    ${group('À surveiller','#dd6b20',clientStats.filter(c=>c.category==='attention'))}
+    ${group('OK','#38a169',clientStats.filter(c=>c.category==='ok'))}
+    <div class="grid-2" style="margin-top:4px">
       <div class="card">
         <div class="card-header"><h3>Alertes ouvertes</h3><a href="#" onclick="showSection('alertes')" style="font-size:12px;color:var(--gold)">Tout voir →</a></div>
         ${S.alertes.filter(a=>!a.resolue).slice(0,8).map(a=>`
@@ -310,15 +425,8 @@ function renderVue() {
           </div>`).join('')||'<p style="color:var(--text-muted);font-size:13px">Aucune alerte ouverte ✓</p>'}
       </div>
       <div class="card">
-        <div class="card-header"><h3>Rondes récentes</h3></div>
-        ${S.rondes.slice(0,8).map(r=>{
-          const site=S.sites.find(s=>s.id===r.site_id);
-          const client=S.clients.find(c=>c.id===site?.client_id);
-          return `<div class="alert-item">
-            <div class="alert-dot dot-green"></div>
-            <div class="alert-body"><div class="alert-title">${site?esc(site.nom):'Site inconnu'}</div><div class="alert-meta">${client?esc(client.nom):''} · ${r.frequence||''} · ${relativeTime(r.created_at)}</div></div>
-          </div>`;
-        }).join('')||'<p style="color:var(--text-muted);font-size:13px">Aucune ronde enregistrée.</p>'}
+        <div class="card-header"><h3>Activité récente</h3></div>
+        ${recentActivity.map(x=>x.html).join('')||'<p style="color:var(--text-muted);font-size:13px">Aucune activité récente.</p>'}
       </div>
     </div>`;
 }
