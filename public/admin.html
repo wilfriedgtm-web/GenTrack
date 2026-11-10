@@ -257,163 +257,135 @@ function alertClientName(a){const site=S.sites.find(s=>s.id===a.groupe_id);const
 function alertSiteName(a){const site=S.sites.find(s=>s.id===a.groupe_id);return site?esc(site.nom):'—';}
 
 let vueExpanded = {};
-function toggleVueExpand(clientId) { vueExpanded[clientId]=!vueExpanded[clientId]; renderVue(); }
+function toggleVueExpand(siteId) { vueExpanded[siteId]=!vueExpanded[siteId]; renderVue(); }
 
 function renderVue() {
   const now = Date.now();
-  const d7  = new Date(now - 7*86400000).toISOString().slice(0,10);
+  const todayStr = new Date().toISOString().slice(0,10);
+  const d7 = new Date(now - 7*86400000).toISOString().slice(0,10);
   const mrr = S.clients.filter(c=>c.actif).reduce((s,c)=>s+(c.prix_mensuel||0),0);
   const openA = S.alertes.filter(a=>!a.resolue).length;
   const critA = S.alertes.filter(a=>!a.resolue && a.severite==='critique').length;
 
-  // ── Score de santé composite par client ───────────────────────────
-  // Activité = ronde OU relevé horaire validé
-  // Conformité 7j = % jours distincts avec activité sur 7
-  // +40 activité <24h | +25 <48h | +10 <72h
-  // +30 × conformité7j/100
-  // +20 aucune alerte ouverte | +10 aucune critique >48h (mais alertes)
-  // +10 client actif
-  const clientStats = S.clients.map(client => {
-    const mySites  = S.sites.filter(s=>s.client_id===client.id);
-    const siteIds  = mySites.map(s=>s.id);
-    const myRondes = S.rondes.filter(r=>siteIds.includes(r.site_id));
-    const myReleves= S.releves.filter(r=>siteIds.includes(r.site_id) && r.statut==='validé');
-    const myAlertes= S.alertes.filter(a=>siteIds.includes(a.groupe_id) && !a.resolue);
-    const myPannes = S.signalements.filter(s=>siteIds.includes(s.groupe_id) && s.type==='panne' && s.statut!=='resolu').length;
-
-    // Dernière activité
-    const lastRondeTs  = myRondes.length  ? new Date(myRondes[0].created_at).getTime()                                                   : 0;
-    const lastReleveTs = myReleves.length ? Math.max(...myReleves.map(r=>new Date(r.validated_at||r.created_at).getTime()))               : 0;
-    const lastActTs    = Math.max(lastRondeTs, lastReleveTs);
-    const lastActDate  = lastActTs ? new Date(lastActTs).toISOString().slice(0,10) : null;
-    const hoursNoAct   = lastActTs ? (now - lastActTs)/3600000 : 999;
-    const daysNoAct    = hoursNoAct/24;
-
-    // Conformité 7j
-    const activeDays = new Set([
-      ...myRondes.filter(r=>r.date_ronde>=d7).map(r=>r.date_ronde),
-      ...myReleves.filter(r=>(r.validated_at||r.created_at)?.slice(0,10)>=d7).map(r=>(r.validated_at||r.created_at).slice(0,10)),
-    ]);
+  // ── Stats par site (hôtel) ────────────────────────────────────────
+  const allSiteStats = S.sites.map(site => {
+    const client = S.clients.find(c=>c.id===site.client_id)||{};
+    const todayReleves = S.releves.filter(r=>r.site_id===site.id && r.created_at?.slice(0,10)===todayStr);
+    const validatedToday = todayReleves.filter(r=>r.statut==='validé').length;
+    const openToday = todayReleves.filter(r=>r.statut==='ouvert').length;
+    const siteAlertes = S.alertes.filter(a=>a.groupe_id===site.id && !a.resolue);
+    const critiques = siteAlertes.filter(a=>a.severite==='critique').length;
+    const siteEquips = S.equipements.filter(e=>e.site_id===site.id && e.actif!==false);
+    const activeDays = new Set(S.releves.filter(r=>r.site_id===site.id && r.statut==='validé' && (r.validated_at||r.created_at)?.slice(0,10)>=d7).map(r=>(r.validated_at||r.created_at).slice(0,10)));
     const conf7j = Math.round((activeDays.size/7)*100);
-
-    // Alertes critiques >48h
-    const critiqueOuvertes = myAlertes.filter(a=>(now-new Date(a.created_at).getTime())/3600000>48 && a.severite==='critique').length;
-
-    // Score
-    let score = 0;
-    if      (hoursNoAct<24) score+=40;
-    else if (hoursNoAct<48) score+=25;
-    else if (hoursNoAct<72) score+=10;
-    score += Math.round(conf7j*0.30);
-    if      (myAlertes.length===0)      score+=20;
-    else if (critiqueOuvertes===0)      score+=10;
-    if (client.actif) score+=10;
-    score = Math.min(100, score);
-
-    const category = (score<50||critiqueOuvertes>0) ? 'urgent' : (score<75||daysNoAct>2) ? 'attention' : 'ok';
-
-    return {...client, mySites, myAlertes, myPannes, lastActDate, hoursNoAct, daysNoAct, conf7j, critiqueOuvertes, score, category};
+    const status = (siteAlertes.length>0||critiques>0) ? 'alert' : (todayReleves.length>0) ? 'ok' : 'muted';
+    return { ...site, client, todayReleves, validatedToday, openToday, siteAlertes, critiques, siteEquips, conf7j, status };
   });
 
-  clientStats.sort((a,b)=>{
-    const ord={urgent:0,attention:1,ok:2};
-    return ord[a.category]!==ord[b.category] ? ord[a.category]-ord[b.category] : a.score-b.score;
-  });
+  // Grouper par client, alertes en tête
+  const grouped = S.clients.map(c=>({
+    client: c,
+    sites: allSiteStats.filter(s=>s.client_id===c.id).sort((a,b)=>{
+      const o={alert:0,muted:1,ok:2}; return o[a.status]-o[b.status];
+    })
+  })).filter(g=>g.sites.length>0);
 
-  const nUrgent    = clientStats.filter(c=>c.category==='urgent').length;
-  const nAttention = clientStats.filter(c=>c.category==='attention').length;
+  const totalHotels = allSiteStats.length;
+  const alertHotels = allSiteStats.filter(s=>s.status==='alert').length;
 
-  // ── Helpers de rendu ──────────────────────────────────────────────
-  function col(score) {
-    if (score>=75) return {border:'#38a169',bg:'#f0fdf4',txt:'#38a169',bar:'#38a169'};
-    if (score>=50) return {border:'#dd6b20',bg:'#fffbeb',txt:'#dd6b20',bar:'#dd6b20'};
-    return                {border:'#e53e3e',bg:'#fff5f5',txt:'#e53e3e',bar:'#e53e3e'};
-  }
-  function relAct(dateStr) {
-    if (!dateStr) return 'Jamais';
-    const d=(now-new Date(dateStr+'T12:00:00').getTime())/86400000;
-    if(d<1) return "Auj."; if(d<2) return "Hier"; return `J-${Math.floor(d)}`;
-  }
-  function waLink(p){if(!p)return'';const n=p.replace(/[^0-9]/g,'');return n?`https://wa.me/${n}`:'';}
+  // ── Rendu carte hôtel ─────────────────────────────────────────────
+  function dotColor(status) { return status==='alert'?'#E24B4A':status==='ok'?'#1D9E75':'#B4B2A9'; }
+  function borderColor(status) { return status==='alert'?'#E24B4A':status==='ok'?'#1D9E75':'transparent'; }
 
-  function clientCard(c) {
-    const k=col(c.score), isOpen=!!vueExpanded[c.id];
-    const wa=waLink(c.whatsapp_patron);
-    return `<div class="card card-sm" style="border-left:4px solid ${k.border};padding:0;overflow:hidden">
-      <div onclick="toggleVueExpand('${c.id}')" style="padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:14px">
-        <div style="flex-shrink:0;text-align:center;min-width:42px">
-          <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;line-height:1;color:${k.txt}">${c.score}</div>
-          <div style="font-size:9px;color:var(--text-muted)">/100</div>
-        </div>
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-weight:600;font-size:13.5px">${esc(c.nom)}</span>
-            ${!c.actif?'<span class="kpi-badge badge-gray" style="font-size:10px">Inactif</span>':''}
-            ${c.critiqueOuvertes>0?`<span class="kpi-badge badge-red" style="font-size:10px">🚨 ${c.critiqueOuvertes} critique${c.critiqueOuvertes>1?'s':''}</span>`:''}
+  function hotelCard(site) {
+    const isOpen = !!vueExpanded[site.id];
+    const dc = dotColor(site.status), bc = borderColor(site.status);
+    const alertBg = site.status==='alert'?'#fff5f5':'#f9f9f9';
+    // Pills équipements
+    const pills = site.siteEquips.slice(0,6).map(eq=>{
+      const hasAlert = S.alertes.some(a=>a.equipement_id===eq.id&&!a.resolue);
+      return `<span style="font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid ${hasAlert?'#fca5a5':'var(--border)'};background:${hasAlert?'#fff0f0':'var(--bg)'};color:${hasAlert?'#991b1b':'var(--text-muted)'}">${esc(eq.nom.length>14?eq.nom.slice(0,13)+'…':eq.nom)}</span>`;
+    }).join('');
+    // Détail étendu
+    const detail = isOpen ? `<div style="padding:12px 16px;background:${alertBg};border-top:1px solid var(--border)">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Équipements</div>
+      ${site.siteEquips.length===0?'<p style="font-size:12px;color:var(--text-muted)">Aucun équipement actif.</p>':site.siteEquips.map(eq=>{
+        const eqAlert = S.alertes.filter(a=>a.equipement_id===eq.id&&!a.resolue);
+        const eqRel = S.releves.filter(r=>r.site_id===site.id).slice(0,1)[0];
+        const statusTxt = eqAlert.length>0?`<span class="kpi-badge badge-red" style="font-size:10px">${eqAlert.length} alerte${eqAlert.length>1?'s':''}</span>`:'<span class="kpi-badge badge-green" style="font-size:10px">OK</span>';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px">
+          <span style="color:var(--text)">${esc(eq.nom)}</span>
+          <span style="display:flex;align-items:center;gap:8px">${statusTxt}<span style="color:var(--text-muted);font-size:11px">${eq.marque?esc(eq.marque):''}</span></span>
+        </div>`;
+      }).join('')}
+      ${site.siteAlertes.length?`<div style="margin-top:10px"><div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:5px">Alertes ouvertes</div>${site.siteAlertes.slice(0,4).map(a=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:3px;font-size:11px"><span class="kpi-badge ${a.severite==='critique'?'badge-red':'badge-orange'}">${a.severite||'—'}</span><span>${esc(String(a.message||a.type_alerte||'').slice(0,60))}</span></div>`).join('')}</div>`:''}
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="openClient('${site.client_id}','sites');event.stopPropagation()">Gérer le site →</button>
+        ${site.siteAlertes.length?`<button class="btn btn-outline btn-sm" onclick="showSection('alertes');event.stopPropagation()">Alertes →</button>`:''}
+      </div>
+    </div>` : '';
+    return `<div class="card card-sm" style="border-left:3px solid ${bc};padding:0;overflow:hidden;cursor:pointer" onclick="toggleVueExpand('${site.id}')">
+      <div style="padding:14px 16px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
+          <div>
+            <div style="font-size:14px;font-weight:600">${esc(site.nom)}</div>
+            <div style="font-size:11px;color:var(--text-muted)">${esc(site.ville||'')}${site.ville&&site.client.nom?' · ':''}${esc(site.client.nom||'')}</div>
           </div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${esc(c.ville||'')}${c.plan?' · '+c.plan:''} · ${c.mySites.length} site${c.mySites.length!==1?'s':''}</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            ${site.critiques>0?`<span class="kpi-badge badge-red" style="font-size:10px">🚨 Critique</span>`:''}
+            <div style="width:8px;height:8px;border-radius:50%;background:${dc};flex-shrink:0"></div>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:14px;flex-shrink:0;text-align:center">
-          <div><div style="font-size:12px;font-weight:500">${relAct(c.lastActDate)}</div><div style="font-size:10px;color:var(--text-muted)">Activité</div></div>
-          <div><div style="font-size:12px;font-weight:500">${c.conf7j}%</div><div style="font-size:10px;color:var(--text-muted)">Conf. 7j</div></div>
-          <div><div style="font-size:12px;font-weight:500;color:${c.myAlertes.length>0?'var(--red)':'inherit'}">${c.myAlertes.length}</div><div style="font-size:10px;color:var(--text-muted)">Alertes</div></div>
-          <div style="font-size:11px;color:var(--text-muted)">${isOpen?'▲':'▼'}</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+          <div style="background:var(--bg);border-radius:7px;padding:8px 10px">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Relevés auj.</div>
+            <div style="font-size:16px;font-weight:700;color:${site.validatedToday>0?'#0F6E56':site.openToday>0?'#dd6b20':'var(--text-muted)'}">${site.validatedToday+site.openToday}</div>
+          </div>
+          <div style="background:var(--bg);border-radius:7px;padding:8px 10px">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Alertes</div>
+            <div style="font-size:16px;font-weight:700;color:${site.siteAlertes.length>0?'#E24B4A':'#0F6E56'}">${site.siteAlertes.length}</div>
+          </div>
+          <div style="background:var(--bg);border-radius:7px;padding:8px 10px">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">Conf. 7j</div>
+            <div style="font-size:16px;font-weight:700;color:${site.conf7j>=80?'#0F6E56':site.conf7j>=50?'#dd6b20':'#E24B4A'}">${site.conf7j}%</div>
+          </div>
         </div>
+        ${pills?`<div style="display:flex;gap:5px;flex-wrap:wrap">${pills}</div>`:''}
       </div>
-      <div style="height:3px;background:#eee"><div style="height:3px;background:${k.bar};width:${c.score}%"></div></div>
-      ${isOpen?`<div style="padding:14px 16px;background:${k.bg};border-top:1px solid var(--border)">
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;font-size:12px">
-          <div><div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">Dernière activité</div><b>${relAct(c.lastActDate)}</b></div>
-          <div><div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">Conformité 7j</div><b>${c.conf7j}%</b></div>
-          <div><div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">Pannes ouvertes</div><b style="color:${c.myPannes>0?'var(--orange)':'inherit'}">${c.myPannes}</b></div>
-          <div><div style="color:var(--text-muted);font-size:11px;margin-bottom:2px">Prix mensuel</div><b>${fmtCFA(c.prix_mensuel||0)}</b></div>
-        </div>
-        ${c.myAlertes.length?`<div style="margin-bottom:10px"><div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:5px">Alertes ouvertes</div>${c.myAlertes.slice(0,3).map(a=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:3px;font-size:11px"><span class="kpi-badge ${a.severite==='critique'?'badge-red':'badge-orange'}" style="font-size:10px">${a.severite}</span><span style="color:var(--text-muted)">${new Date(a.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}</span>${a.message?`<span>${esc(String(a.message).slice(0,55))}</span>`:''}</div>`).join('')}${c.myAlertes.length>3?`<div style="font-size:11px;color:var(--text-muted)">+ ${c.myAlertes.length-3} autre${c.myAlertes.length-3>1?'s':''}</div>`:''}</div>`:''}
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-sm" onclick="openClient('${c.id}');event.stopPropagation()">Voir le client</button>
-          ${wa?`<a href="${wa}" target="_blank" class="btn btn-outline btn-sm" style="color:#22543d;border-color:#9ae6b4" onclick="event.stopPropagation()">📱 WhatsApp patron</a>`:''}
-          ${c.myAlertes.length?`<button class="btn btn-outline btn-sm" onclick="showSection('alertes');event.stopPropagation()">Alertes →</button>`:''}
-        </div>
-      </div>`:''}
+      ${detail}
     </div>`;
   }
 
-  function group(title, dotClr, clients) {
-    if(!clients.length) return '';
-    return `<div style="margin-bottom:22px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <div style="width:9px;height:9px;border-radius:50%;background:${dotClr}"></div>
-        <h3 style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px">${title}</h3>
-        <span class="kpi-badge badge-gray" style="font-size:10px">${clients.length}</span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:10px">
-        ${clients.map(c=>clientCard(c)).join('')}
-      </div>
-    </div>`;
-  }
-
-  // ── Activité récente (rondes + relevés mélangés) ───────────────────
+  // ── Activité récente ──────────────────────────────────────────────
   const recentActivity = [
-    ...S.rondes.slice(0,8).map(r=>{
-      const site=S.sites.find(s=>s.id===r.site_id), client=S.clients.find(c=>c.id===site?.client_id);
-      return {ts:new Date(r.created_at).getTime(), html:`<div class="alert-item"><div class="alert-dot dot-green"></div><div class="alert-body"><div class="alert-title">🔄 ${site?esc(site.nom):'Site inconnu'}</div><div class="alert-meta">${client?esc(client.nom):''} · Ronde${r.frequence?' '+r.frequence:''} · ${relativeTime(r.created_at)}</div></div></div>`};
+    ...S.rondes.slice(0,6).map(r=>{
+      const site=S.sites.find(s=>s.id===r.site_id),client=S.clients.find(c=>c.id===site?.client_id);
+      return {ts:new Date(r.created_at).getTime(),html:`<div class="alert-item"><div class="alert-dot dot-green"></div><div class="alert-body"><div class="alert-title">🔄 ${site?esc(site.nom):'—'}</div><div class="alert-meta">${client?esc(client.nom):''} · Ronde · ${relativeTime(r.created_at)}</div></div></div>`};
     }),
-    ...S.releves.filter(r=>r.statut==='validé').slice(0,8).map(r=>{
-      const site=S.sites.find(s=>s.id===r.site_id), client=S.clients.find(c=>c.id===site?.client_id);
-      return {ts:new Date(r.created_at).getTime(), html:`<div class="alert-item"><div class="alert-dot dot-green"></div><div class="alert-body"><div class="alert-title">📊 ${site?esc(site.nom):'Site inconnu'}</div><div class="alert-meta">${client?esc(client.nom):''} · Relevé horaire · ${relativeTime(r.created_at)}</div></div></div>`};
+    ...S.releves.filter(r=>r.statut==='validé').slice(0,6).map(r=>{
+      const site=S.sites.find(s=>s.id===r.site_id),client=S.clients.find(c=>c.id===site?.client_id);
+      return {ts:new Date(r.created_at).getTime(),html:`<div class="alert-item"><div class="alert-dot dot-green"></div><div class="alert-body"><div class="alert-title">📊 ${site?esc(site.nom):'—'}</div><div class="alert-meta">${client?esc(client.nom):''} · Relevé · ${relativeTime(r.created_at)}</div></div></div>`};
     }),
   ].sort((a,b)=>b.ts-a.ts).slice(0,8);
 
   document.getElementById('content').innerHTML = `
     <div class="grid-4" style="margin-bottom:24px">
-      <div class="card card-sm"><div class="kpi-label">Clients actifs</div><div class="kpi-value">${S.clients.filter(c=>c.actif).length}</div><div class="kpi-sub">${S.clients.length} total</div></div>
+      <div class="card card-sm"><div class="kpi-label">Hôtels suivis</div><div class="kpi-value">${totalHotels}</div><div class="kpi-sub">${S.clients.filter(c=>c.actif).length} clients actifs</div></div>
       <div class="card card-sm"><div class="kpi-label">Alertes ouvertes</div><div class="kpi-value" style="color:${openA>0?'var(--red)':'inherit'}">${openA}</div>${critA>0?`<span class="kpi-badge badge-red">${critA} critique${critA>1?'s':''}</span>`:`<span class="kpi-badge badge-green">OK</span>`}</div>
-      <div class="card card-sm"><div class="kpi-label">Urgences</div><div class="kpi-value" style="color:${nUrgent>0?'var(--red)':'inherit'}">${nUrgent}</div><div class="kpi-sub">${nAttention} à surveiller</div></div>
+      <div class="card card-sm"><div class="kpi-label">Hôtels en alerte</div><div class="kpi-value" style="color:${alertHotels>0?'var(--red)':'inherit'}">${alertHotels}</div><div class="kpi-sub">${totalHotels-alertHotels} sans alerte</div></div>
       <div class="card card-sm"><div class="kpi-label">MRR</div><div class="kpi-value">${fmtCFA(mrr)}</div><div class="kpi-sub">ARR: ${fmtCFA(mrr*12)}</div></div>
     </div>
-    ${group('Urgences','#e53e3e',clientStats.filter(c=>c.category==='urgent'))}
-    ${group('À surveiller','#dd6b20',clientStats.filter(c=>c.category==='attention'))}
-    ${group('OK','#38a169',clientStats.filter(c=>c.category==='ok'))}
+    ${grouped.map(({client,sites})=>`
+      <div style="margin-bottom:24px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">${esc(client.groupe_hotelier||client.nom)}</span>
+          <span class="kpi-badge badge-gray" style="font-size:10px">${sites.length} hôtel${sites.length>1?'s':''}</span>
+          ${sites.some(s=>s.status==='alert')?`<span class="kpi-badge badge-red" style="font-size:10px">${sites.filter(s=>s.status==='alert').length} alerte${sites.filter(s=>s.status==='alert').length>1?'s':''}</span>`:''}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px">
+          ${sites.map(s=>hotelCard(s)).join('')}
+        </div>
+      </div>`).join('')}
     <div class="grid-2" style="margin-top:4px">
       <div class="card">
         <div class="card-header"><h3>Alertes ouvertes</h3><a href="#" onclick="showSection('alertes')" style="font-size:12px;color:var(--gold)">Tout voir →</a></div>
