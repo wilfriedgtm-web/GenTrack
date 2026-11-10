@@ -327,13 +327,14 @@ function renderVue() {
     return `<div class="card card-sm" style="border-left:3px solid ${bc};padding:0;overflow:hidden;cursor:pointer" onclick="toggleVueExpand('${site.id}')">
       <div style="padding:14px 16px">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">
-          <div>
+          <div style="flex:1;min-width:0">
             <div style="font-size:14px;font-weight:600">${esc(site.nom)}</div>
             <div style="font-size:11px;color:var(--text-muted)">${esc(site.ville||'')}${site.ville&&site.client.nom?' · ':''}${esc(site.client.nom||'')}</div>
           </div>
-          <div style="display:flex;align-items:center;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
             ${site.critiques>0?`<span class="kpi-badge badge-red" style="font-size:10px">🚨 Critique</span>`:''}
-            <div style="width:8px;height:8px;border-radius:50%;background:${dc};flex-shrink:0"></div>
+            <button class="btn btn-outline btn-xs" onclick="openClient('${site.client_id}','sites');event.stopPropagation()" style="font-size:11px">Gérer →</button>
+            <div style="width:8px;height:8px;border-radius:50%;background:${dc}"></div>
           </div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
