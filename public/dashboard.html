@@ -11144,11 +11144,34 @@ var _recoCache={};
 // Affiche une grille de sous-métriques pour les équipements multi-paramètres (TGBT, GE, CF…)
 function _buildSubMetrics(qVals){
   if(!qVals)return '';
-  var entries=Object.values(qVals);
+  // Filtrer : inclure les valeurs numériques valides ET les valeurs texte
+  var entries=Object.values(qVals).filter(function(m){return !isNaN(m.v)||(m.vTexte&&m.vTexte.trim());});
   if(entries.length<2)return '';
   // Trier par texte de question pour un affichage stable
   entries.sort(function(a,b){return (a.texte||'').localeCompare(b.texte||'');});
   var cells=entries.map(function(m){
+    // --- Valeur TEXTE (ex: GE niveau gasoil, état groupe) ---
+    if(isNaN(m.v)&&m.vTexte){
+      var vk=(m.vTexte||'').toLowerCase().trim();
+      var tk=(m.texte||'').toLowerCase();
+      var col='var(--text2)';var note='';var extra='';
+      if(tk.indexOf('gasoil')>=0){
+        var nm={vide:{p:0,c:'var(--rouge)',n:'Réserve critique'},bas:{p:25,c:'var(--rouge)',n:'Niveau bas'},moyen:{p:50,c:'var(--orange)',n:'~50% estimé'},bon:{p:75,c:'var(--vert)',n:'Niveau correct'},plein:{p:100,c:'var(--vert)',n:'Plein'}};
+        var nv=nm[vk];
+        if(nv){col=nv.c;note=nv.n;extra='<div style="height:4px;background:var(--border);border-radius:2px;margin-top:3px;overflow:hidden"><div style="height:100%;width:'+nv.p+'%;background:'+nv.c+'"></div></div>';}
+      } else if(tk.indexOf('état groupe')>=0||tk.indexOf('etat groupe')>=0){
+        var em={auto:{c:'var(--vert)',n:'Prêt au démarrage'},manuel:{c:'var(--orange)',n:'Mode manuel'},marche:{c:'var(--vert)',n:'En fonctionnement'},'arrêt':{c:'var(--rouge)',n:'Arrêté'},arret:{c:'var(--rouge)',n:'Arrêté'},off:{c:'var(--rouge)',n:'Arrêté'}};
+        var ev=em[vk]||em[vk.normalize('NFD').replace(/[̀-ͯ]/g,'')];
+        if(ev){col=ev.c;note=ev.n;}
+      }
+      return '<div style="display:flex;flex-direction:column;gap:1px;min-width:0">'+
+        '<span style="font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escape_html(m.texte)+'</span>'+
+        '<span style="font-size:12px;font-weight:600;color:'+col+'">'+escape_html(m.vTexte)+'</span>'+
+        (note?'<span style="font-size:10px;color:var(--text3)">'+escape_html(note)+'</span>':'')+
+        extra+
+      '</div>';
+    }
+    // --- Valeur NUMÉRIQUE ---
     var sMin=m.seuil_min!=null?parseFloat(m.seuil_min):null;
     var sMax=m.seuil_max!=null?parseFloat(m.seuil_max):null;
     // Les questions "consigne" sont des setpoints de réglage, pas des mesures dynamiques :
@@ -11236,10 +11259,10 @@ async function _fetchRecoEquipements(sid){
   var lastSaisieByEq={};
   // lastValsByEqQ : dernière valeur connue par (eqId, questionId) pour l'affichage sous-métriques
   var lastValsByEqQ={};
-  function _trackQVal(eqId,qId,v,t,q){
+  function _trackQVal(eqId,qId,v,t,q,rawText){
     if(!lastValsByEqQ[eqId])lastValsByEqQ[eqId]={};
     var cur=lastValsByEqQ[eqId][qId];
-    if(!cur||t>cur.t)lastValsByEqQ[eqId][qId]={v:v,t:t,texte:q.texte||'',unite:q.unite||'',seuil_min:q.seuil_min,seuil_max:q.seuil_max};
+    if(!cur||t>cur.t)lastValsByEqQ[eqId][qId]={v:v,vTexte:rawText||null,t:t,texte:q.texte||'',unite:q.unite||'',seuil_min:q.seuil_min,seuil_max:q.seuil_max};
   }
   reponses.forEach(function(r){
     var eqId=reToEq[r.ronde_equipement_id];
@@ -11254,6 +11277,10 @@ async function _fetchRecoEquipements(sid){
         }
         _trackQVal(eqId,r.question_id,_numV,r.created_at,q);
       }
+    }
+    // Valeurs texte/choix pour sous-métriques (ex: GE — niveau gasoil, état groupe)
+    if(q&&q.type_reponse!=='numerique'&&r.valeur&&r.valeur.trim()){
+      _trackQVal(eqId,r.question_id,NaN,r.created_at,q,r.valeur.trim());
     }
     // Pour les recos : numérique + seuils définis
     if(!q||q.type_reponse!=='numerique'||(q.seuil_min===null&&q.seuil_max===null))return;
@@ -11277,6 +11304,12 @@ async function _fetchRecoEquipements(sid){
           }
           _trackQVal(eqId,r.question_id,_numVR,r.created_at,q);
         }
+      }
+      // Valeurs texte/choix pour sous-métriques (relevés horaires)
+      if(q.type_reponse!=='numerique'&&r.valeur&&r.valeur.trim()){
+        _trackQVal(eqId,r.question_id,NaN,r.created_at,q,r.valeur.trim());
+      }
+      if(q.type_reponse==='numerique'){
         if(q.seuil_min!==null||q.seuil_max!==null){
           if(!repByEqQ[eqId])repByEqQ[eqId]={};
           if(!repByEqQ[eqId][r.question_id])repByEqQ[eqId][r.question_id]=[];
@@ -11306,7 +11339,11 @@ async function _fetchRecoEquipements(sid){
         // Préventive approche seuil min (ex: cuve carburant proche de 1500L)
         // Multiplicateur 1.1 (10%) pour éviter les faux positifs sur ratios de qualité (cos phi, rendement…)
         if(sMin!==null&&sMin>0&&last>sMin&&last<sMin*1.1){
-          recos.push({type:'preventive',message:'Niveau à '+last+u+' — approche du seuil minimum ('+sMin+u+'). Planifier le ravitaillement.',severite:2});
+          // Message adapté selon l'unité : °C = température, sinon = niveau (cuve, réservoir)
+          var _approxMsg=u==='°C'
+            ?'Température à '+last+u+' — approche du seuil minimum ('+sMin+u+'). Surveiller la chauffe.'
+            :'Niveau à '+last+u+' — approche du seuil minimum ('+sMin+u+'). Planifier le ravitaillement.';
+          recos.push({type:'preventive',message:_approxMsg,severite:2});
         }
         // Préventive approche seuil max (ex: CF proche de 5°C)
         if(sMax!==null&&sMax>0&&last<sMax&&last>sMax*0.8){
