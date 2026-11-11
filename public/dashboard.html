@@ -1044,6 +1044,13 @@ async function _rtAccueil(session,sid,cid){
       }
       var today=new Date().toISOString().split('T')[0];
       var lsOld=ls?new Date(ls.t).toISOString().split('T')[0]<today:false;
+      // Sous-métriques : si l'équipement a 2+ valeurs de questions connues, on remplace "dernière valeur" par la grille
+      var qVals=eqReco.qVals||null;
+      var subMetricsHtml=_buildSubMetrics(qVals);
+      var hasSubMetrics=subMetricsHtml!=='';
+      // Horodatage discret sous la grille (récupère le timestamp le plus récent des qVals)
+      var latestT=null;
+      if(hasSubMetrics&&qVals){Object.values(qVals).forEach(function(m){if(!latestT||m.t>latestT)latestT=m.t;});}
       statut+='<div class="eq-card" style="flex-direction:column;align-items:stretch;gap:6px">'+
         '<div style="display:flex;align-items:center;gap:10px">'+
           '<span style="font-size:18px">'+tIcon+'</span>'+
@@ -1056,10 +1063,13 @@ async function _rtAccueil(session,sid,cid){
             '<span style="font-size:10px;font-weight:600;color:'+sc+';text-transform:uppercase;letter-spacing:0.3px">'+s+'</span>'+
           '</div>'+
         '</div>'+
-        (ls?'<div style="font-size:11px;color:'+(lsOld?'var(--orange)':'var(--text3)')+';padding-left:28px">'+
-          (lsOld?'⚠ ':'')+
-          'Dernière valeur : '+(ls.v!=null&&!isNaN(ls.v)?ls.v:'—')+(ls.unite?' '+ls.unite:'')+' · '+_timeAgo(ls.t)+
-        '</div>':'')+
+        (hasSubMetrics
+          ? subMetricsHtml+'<div style="font-size:10px;color:var(--text3);padding-left:28px">'+(latestT?_timeAgo(latestT):'')+'</div>'
+          : (ls?'<div style="font-size:11px;color:'+(lsOld?'var(--orange)':'var(--text3)')+';padding-left:28px">'+
+              (lsOld?'⚠ ':'')+
+              'Dernière valeur : '+(ls.v!=null&&!isNaN(ls.v)?ls.v:'—')+(ls.unite?' '+ls.unite:'')+' · '+_timeAgo(ls.t)+
+            '</div>':'')
+        )+
         (topReco?_buildRecoTag(topReco,e.id,e.nom,sid):'')+
       '</div>';
     });
@@ -11131,6 +11141,32 @@ function _timeAgo(isoStr){
 // Store reco data for action buttons (keyed by eqId+index to avoid JSON in onclick)
 var _recoCache={};
 
+// Affiche une grille de sous-métriques pour les équipements multi-paramètres (TGBT, GE, CF…)
+function _buildSubMetrics(qVals){
+  if(!qVals)return '';
+  var entries=Object.values(qVals);
+  if(entries.length<2)return '';
+  // Trier par texte de question pour un affichage stable
+  entries.sort(function(a,b){return (a.texte||'').localeCompare(b.texte||'');});
+  var cells=entries.map(function(m){
+    var sMin=m.seuil_min!=null?parseFloat(m.seuil_min):null;
+    var sMax=m.seuil_max!=null?parseFloat(m.seuil_max):null;
+    var col='var(--text2)';
+    var dot='';
+    if(sMin!==null&&m.v<sMin){col='var(--rouge)';dot='🔴 ';}
+    else if(sMax!==null&&m.v>sMax){col='var(--rouge)';dot='🔴 ';}
+    else if(sMin!==null&&m.v<sMin*1.1){col='var(--orange)';dot='🟡 ';}
+    else if(sMax!==null&&m.v>sMax*0.9){col='var(--orange)';dot='🟡 ';}
+    else if(sMin!==null||sMax!==null){col='var(--vert)';}
+    var val=Number.isInteger(m.v)?m.v:parseFloat(m.v.toFixed(2));
+    return '<div style="display:flex;flex-direction:column;gap:1px;min-width:0">'+
+      '<span style="font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escape_html(m.texte)+'</span>'+
+      '<span style="font-size:12px;font-weight:600;color:'+col+'">'+dot+val+(m.unite?' '+m.unite:'')+'</span>'+
+    '</div>';
+  });
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px 10px;padding:6px 0 2px 28px">'+cells.join('')+'</div>';
+}
+
 function _buildRecoTag(reco,eqId,eqNom,sid){
   var cfgs={
     immediate:{bg:'var(--rouge-pale)',border:'var(--rouge-border)',color:'var(--rouge)',icon:'🔴',btnLabel:'Créer un signalement',btnFn:'_recoSignaler'},
@@ -11195,6 +11231,13 @@ async function _fetchRecoEquipements(sid){
   // Group reponses numériques (avec seuils) par équipement → question
   var repByEqQ={};
   var lastSaisieByEq={};
+  // lastValsByEqQ : dernière valeur connue par (eqId, questionId) pour l'affichage sous-métriques
+  var lastValsByEqQ={};
+  function _trackQVal(eqId,qId,v,t,q){
+    if(!lastValsByEqQ[eqId])lastValsByEqQ[eqId]={};
+    var cur=lastValsByEqQ[eqId][qId];
+    if(!cur||t>cur.t)lastValsByEqQ[eqId][qId]={v:v,t:t,texte:q.texte||'',unite:q.unite||'',seuil_min:q.seuil_min,seuil_max:q.seuil_max};
+  }
   reponses.forEach(function(r){
     var eqId=reToEq[r.ronde_equipement_id];
     if(!eqId)return;
@@ -11206,6 +11249,7 @@ async function _fetchRecoEquipements(sid){
         if(!lastSaisieByEq[eqId]||r.created_at>lastSaisieByEq[eqId].t){
           lastSaisieByEq[eqId]={v:_numV,t:r.created_at,unite:q.unite||''};
         }
+        _trackQVal(eqId,r.question_id,_numV,r.created_at,q);
       }
     }
     // Pour les recos : numérique + seuils définis
@@ -11228,6 +11272,7 @@ async function _fetchRecoEquipements(sid){
           if(!lastSaisieByEq[eqId]||r.created_at>lastSaisieByEq[eqId].t){
             lastSaisieByEq[eqId]={v:_numVR,t:r.created_at,unite:q.unite||''};
           }
+          _trackQVal(eqId,r.question_id,_numVR,r.created_at,q);
         }
         if(q.seuil_min!==null||q.seuil_max!==null){
           if(!repByEqQ[eqId])repByEqQ[eqId]={};
@@ -11256,7 +11301,8 @@ async function _fetchRecoEquipements(sid){
         recos.push({type:'immediate',message:last+u+' — seuil '+dir+' : '+seuil+u+'. Vérifier l\'équipement.',severite:1});
       }else{
         // Préventive approche seuil min (ex: cuve carburant proche de 1500L)
-        if(sMin!==null&&sMin>0&&last>sMin&&last<sMin*1.3){
+        // Multiplicateur 1.1 (10%) pour éviter les faux positifs sur ratios de qualité (cos phi, rendement…)
+        if(sMin!==null&&sMin>0&&last>sMin&&last<sMin*1.1){
           recos.push({type:'preventive',message:'Niveau à '+last+u+' — approche du seuil minimum ('+sMin+u+'). Planifier le ravitaillement.',severite:2});
         }
         // Préventive approche seuil max (ex: CF proche de 5°C)
@@ -11282,11 +11328,15 @@ async function _fetchRecoEquipements(sid){
     var nb=pannesByEq[eqId]||0;
     if(nb>3)recos.push({type:'operationnelle',message:nb+' interventions en 90 jours. Remplacement à envisager.',severite:3});
     recos.sort(function(a,b){return a.severite-b.severite;});
-    result[eqId]={recos:recos,lastSaisie:lastSaisieByEq[eqId]||null};
+    result[eqId]={recos:recos,lastSaisie:lastSaisieByEq[eqId]||null,qVals:lastValsByEqQ[eqId]||null};
   });
   // Équipements avec saisie numérique mais sans seuils ni pannes (ex: GE compteur horaire)
   Object.keys(lastSaisieByEq).forEach(function(eqId){
-    if(!result[eqId])result[eqId]={recos:[],lastSaisie:lastSaisieByEq[eqId]};
+    if(!result[eqId])result[eqId]={recos:[],lastSaisie:lastSaisieByEq[eqId],qVals:lastValsByEqQ[eqId]||null};
+  });
+  // Équipements avec qVals mais sans saisie dans lastSaisieByEq ni repByEqQ (ex: relevés texte+numérique mixtes)
+  Object.keys(lastValsByEqQ).forEach(function(eqId){
+    if(!result[eqId])result[eqId]={recos:[],lastSaisie:null,qVals:lastValsByEqQ[eqId]};
   });
   return result;
 }
