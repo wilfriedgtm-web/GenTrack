@@ -11151,12 +11151,15 @@ function _buildSubMetrics(qVals){
   var cells=entries.map(function(m){
     var sMin=m.seuil_min!=null?parseFloat(m.seuil_min):null;
     var sMax=m.seuil_max!=null?parseFloat(m.seuil_max):null;
+    // Les questions "consigne" sont des setpoints de réglage, pas des mesures dynamiques :
+    // leur seuil_min délimite la plage acceptable du réglage, pas un seuil d'alerte.
+    var isConsigne=(m.texte||'').toLowerCase().indexOf('consigne')>=0;
     var col='var(--text2)';
     var dot='';
     if(sMin!==null&&m.v<sMin){col='var(--rouge)';dot='🔴 ';}
     else if(sMax!==null&&m.v>sMax){col='var(--rouge)';dot='🔴 ';}
-    else if(sMin!==null&&m.v<sMin*1.1){col='var(--orange)';dot='🟡 ';}
-    else if(sMax!==null&&m.v>sMax*0.9){col='var(--orange)';dot='🟡 ';}
+    else if(!isConsigne&&sMin!==null&&m.v<sMin*1.1){col='var(--orange)';dot='🟡 ';}
+    else if(!isConsigne&&sMax!==null&&m.v>sMax*0.9){col='var(--orange)';dot='🟡 ';}
     else if(sMin!==null||sMax!==null){col='var(--vert)';}
     var val=Number.isInteger(m.v)?m.v:parseFloat(m.v.toFixed(2));
     return '<div style="display:flex;flex-direction:column;gap:1px;min-width:0">'+
