@@ -1889,9 +1889,10 @@ async function _rtHistorique(sid){
   var moisFinStr=moisFin.toISOString().substring(0,10);
   var isCurrentMonth=_histMonthOffset===0;
 
-  var[rondes,pannes]=await Promise.all([
+  var[rondes,pannes,mntRows]=await Promise.all([
     supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+moisDebutStr+'&date_ronde=lte.'+moisFinStr+'&select=id,date_ronde,frequence&order=date_ronde.desc&limit=90'),
-    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&created_at=gte.'+moisDebut.toISOString()+'&created_at=lte.'+moisFin.toISOString()+'&select=id,description,statut,created_at,equipement_id,equipements(nom)&order=created_at.desc&limit=60')
+    supaGet('signalements','groupe_id=eq.'+sid+'&type=eq.panne&created_at=gte.'+moisDebut.toISOString()+'&created_at=lte.'+moisFin.toISOString()+'&select=id,description,statut,created_at,equipement_id,equipements(nom)&order=created_at.desc&limit=60'),
+    supaGet('maintenances','groupe_id=eq.'+sid+'&date_realisee=gte.'+moisDebutStr+'&date_realisee=lte.'+moisFinStr+'&select=id,titre,statut,date_realisee,technicien,equipement_id,equipements(nom)&order=date_realisee.desc&limit=60').catch(function(){return[];})
   ]);
   var rondesFilt=rondes;
   var pannesFilt=pannes;
@@ -1905,7 +1906,7 @@ async function _rtHistorique(sid){
       ? '<div style="width:32px;height:32px"></div>'
       : '<button onclick="_histNavMonth(1)" style="width:32px;height:32px;border:1.5px solid var(--border);border-radius:8px;background:white;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:var(--dark)">›</button>')+
   '</div>';
-  if(rondesFilt.length===0&&pannesFilt.length===0){
+  if(rondesFilt.length===0&&pannesFilt.length===0&&mntRows.length===0){
     return h+'<div class="placeholder-card"><div class="placeholder-icon">📊</div>Aucune donnée pour '+monthLabel+'</div>';
   }
   // Rondes
@@ -1943,6 +1944,25 @@ async function _rtHistorique(sid){
           '<div style="font-size:10px;color:var(--text3);margin-top:8px;text-align:right">Voir le détail →</div>'+
         '</div>';
       });
+    });
+    h+='</div>';
+  }
+  // Maintenances réalisées
+  if(mntRows.length>0){
+    h+='<div class="section-title">Maintenances <span style="font-size:12px;font-weight:400;color:var(--text3)">— '+monthLabel+'</span></div>';
+    h+='<div style="display:flex;flex-direction:column;gap:6px">';
+    mntRows.forEach(function(m){
+      var eqNom=m.equipements&&m.equipements.nom?m.equipements.nom:'Équipement';
+      var dateDisp=m.date_realisee?new Date(m.date_realisee+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'';
+      var statOk=m.statut==='realise';
+      h+='<div class="eq-card" style="padding:12px 14px">'+
+        '<span style="font-size:16px">'+(statOk?'✅':'🔄')+'</span>'+
+        '<div style="flex:1">'+
+          '<div class="eq-card-nom">'+escape_html(m.titre||'Maintenance')+'</div>'+
+          '<div class="eq-card-type">'+escape_html(eqNom)+(m.technicien?' · '+escape_html(m.technicien):'')+(dateDisp?' · '+dateDisp:'')+'</div>'+
+        '</div>'+
+        '<span style="font-size:10px;font-weight:600;color:'+(statOk?'var(--vert)':'var(--amber)')+'">'+( statOk?'Réalisé':'Partiel')+'</span>'+
+      '</div>';
     });
     h+='</div>';
   }
@@ -4919,10 +4939,10 @@ async function _mntSelectEq(eqId,eqNom,sid){
       var pStart=new Date(pDate);pStart.setDate(pStart.getDate()-freqDays);
       var inPeriodOrOverdue=(today0>=pStart);
       var mp=missionPlanStatuts[p.id];
-      if(mp&&(mp.statut==='valide'||mp.statut==='bloque')){
+      if(mp&&(mp.statut==='realise'||mp.statut==='bloque')){
         var mpD=mp.missions&&mp.missions.created_at?new Date(mp.missions.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'numeric'}):null;
         rapportToken=(mp.missions&&mp.missions.token)||'';
-        if(mp.statut==='valide'){
+        if(mp.statut==='realise'){
           badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#f0fdf4;color:#16a34a;font-weight:700;border:1px solid #bbf7d0;white-space:nowrap">✓ Fait'+(mpD?' le '+mpD:'')+'</span>';
         } else {
           badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#fef2f2;color:#ef4444;font-weight:700;border:1px solid #fecaca;white-space:nowrap">🔒 Bloqué</span>';
@@ -5357,7 +5377,9 @@ function _mntFilterTpls(cat){
 
 async function _mntApplyTemplate(tplId){
   var d=window._mntTplData||{};
-  var t=(d.all||[]).find(function(x){return x.id===tplId;})||{};
+  // Fetch frais pour garantir la checklist la plus récente
+  var rows=await supaGet('templates_maintenance','id=eq.'+tplId+'&select=id,titre,frequence,categorie,checklist').catch(function(){return[];});
+  var t=rows[0]||(d.all||[]).find(function(x){return x.id===tplId;})||{};
   _closeCfgModal&&_closeCfgModal();
   await _mntNouvelleTachePourEq(d.eqId,d.eqNom,d.sid,null,t);
 }
