@@ -328,7 +328,8 @@ async function _submitMission(){
       if(Object.keys(planPatch).length)await sbPatch('plans_maintenance',plan.id,planPatch);
     }
     // Créer un enregistrement dans maintenances pour l'historique
-    if(st.statut==='realise'||st.statut==='partiel'){
+    if(st.statut==='realise'||st.statut==='partiel'||st.statut==='bloque'){
+      var mntStatut=st.statut==='realise'?'realise':st.statut==='bloque'?'bloque':'partiel';
       var mntRecord={
         groupe_id:_mission.site_id||null,
         equipement_id:_mission.equipement_id||null,
@@ -336,9 +337,9 @@ async function _submitMission(){
         type:'preventif',
         titre:plan.titre||('Maintenance '+(plan.frequence||'')),
         date_realisee:new Date().toISOString().split('T')[0],
-        statut:st.statut==='realise'?'realise':'partiel',
+        statut:mntStatut,
         technicien:_mission.technicien_nom||null,
-        rapport_texte:st.commentaire||null,
+        rapport_texte:(st.statut==='bloque'&&st.motifBlocage?'🔒 Bloqué — '+st.motifBlocage:(st.commentaire||null)),
         photo_url:photoUrl||null
       };
       await sbPost('maintenances',mntRecord);

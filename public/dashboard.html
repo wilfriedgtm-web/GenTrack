@@ -1954,14 +1954,17 @@ async function _rtHistorique(sid){
     mntRows.forEach(function(m){
       var eqNom=m.equipements&&m.equipements.nom?m.equipements.nom:'Équipement';
       var dateDisp=m.date_realisee?new Date(m.date_realisee+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'';
-      var statOk=m.statut==='realise';
+      var statOk=m.statut==='realise',statBloq=m.statut==='bloque';
+      var statIco=statOk?'✅':statBloq?'🔒':'🔄';
+      var statLbl=statOk?'Réalisé':statBloq?'Bloqué':'Partiel';
+      var statCol=statOk?'var(--vert)':statBloq?'var(--rouge)':'var(--amber)';
       h+='<div class="eq-card" style="padding:12px 14px">'+
-        '<span style="font-size:16px">'+(statOk?'✅':'🔄')+'</span>'+
+        '<span style="font-size:16px">'+statIco+'</span>'+
         '<div style="flex:1">'+
           '<div class="eq-card-nom">'+escape_html(m.titre||'Maintenance')+'</div>'+
           '<div class="eq-card-type">'+escape_html(eqNom)+(m.technicien?' · '+escape_html(m.technicien):'')+(dateDisp?' · '+dateDisp:'')+'</div>'+
         '</div>'+
-        '<span style="font-size:10px;font-weight:600;color:'+(statOk?'var(--vert)':'var(--amber)')+'">'+( statOk?'Réalisé':'Partiel')+'</span>'+
+        '<span style="font-size:10px;font-weight:600;color:'+statCol+'">'+statLbl+'</span>'+
       '</div>';
     });
     h+='</div>';
@@ -4778,9 +4781,9 @@ async function _mntSelectEq(eqId,eqNom,sid){
       sub:s.assigne_a?'→ '+escape_html(s.assigne_a):''});
   });
   mnts.forEach(function(m){
-    var col={planifie:'#f59e0b',realise:'#22c55e',annule:'#94a3b8'}[m.statut]||'#94a3b8';
-    var colBg={planifie:'#fffbeb',realise:'#f0fdf4',annule:'#f8fafc'}[m.statut]||'#f8fafc';
-    var badge={planifie:'Planifié',realise:'Réalisé',annule:'Annulé'}[m.statut]||m.statut;
+    var col={planifie:'#f59e0b',realise:'#22c55e',bloque:'#ef4444',partiel:'#f59e0b',annule:'#94a3b8'}[m.statut]||'#94a3b8';
+    var colBg={planifie:'#fffbeb',realise:'#f0fdf4',bloque:'#fef2f2',partiel:'#fffbeb',annule:'#f8fafc'}[m.statut]||'#f8fafc';
+    var badge={planifie:'Planifié',realise:'Réalisé',bloque:'🔒 Bloqué',partiel:'Partiel',annule:'Annulé'}[m.statut]||m.statut;
     var who=m.prestataire||m.technicien||'';
     var mPhotos=[];try{if(m.photo_url)mPhotos=JSON.parse(m.photo_url);}catch(e){if(m.photo_url)mPhotos=[m.photo_url];}
     events.push({date:m.date_realisee||m.created_at,col:col,colBg:colBg,badge:badge,
@@ -4915,22 +4918,23 @@ async function _mntSelectEq(eqId,eqNom,sid){
     var typeP=(p.type_plan||'calendrier');
     var badgeHtml='';
     var rapportToken='';
-    if(typeP==='calendrier'&&p.prochaine_date){
+    // Badge bloqué : priorité absolue, peu importe prochaine_date
+    var mp=missionPlanStatuts[p.id];
+    if(mp&&(mp.statut==='realise'||mp.statut==='bloque')){
+      var mpD=mp.missions&&mp.missions.created_at?new Date(mp.missions.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'numeric'}):null;
+      rapportToken=(mp.missions&&mp.missions.token)||'';
+      if(mp.statut==='realise'){
+        badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#f0fdf4;color:#16a34a;font-weight:700;border:1px solid #bbf7d0;white-space:nowrap">✓ Fait'+(mpD?' le '+mpD:'')+'</span>';
+      } else {
+        badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#fef2f2;color:#ef4444;font-weight:700;border:1px solid #fecaca;white-space:nowrap">🔒 Bloqué'+(mpD?' le '+mpD:'')+'</span>';
+      }
+    } else if(typeP==='calendrier'&&p.prochaine_date){
       var freqDays=_mntFreqToDays(p.frequence||'');
       var pDate=new Date(p.prochaine_date+'T00:00:00');
       var today0=new Date();today0.setHours(0,0,0,0);
       var pStart=new Date(pDate);pStart.setDate(pStart.getDate()-freqDays);
       var inPeriodOrOverdue=(today0>=pStart);
-      var mp=missionPlanStatuts[p.id];
-      if(mp&&(mp.statut==='realise'||mp.statut==='bloque')){
-        var mpD=mp.missions&&mp.missions.created_at?new Date(mp.missions.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'numeric'}):null;
-        rapportToken=(mp.missions&&mp.missions.token)||'';
-        if(mp.statut==='realise'){
-          badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#f0fdf4;color:#16a34a;font-weight:700;border:1px solid #bbf7d0;white-space:nowrap">✓ Fait'+(mpD?' le '+mpD:'')+'</span>';
-        } else {
-          badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#fef2f2;color:#ef4444;font-weight:700;border:1px solid #fecaca;white-space:nowrap">🔒 Bloqué</span>';
-        }
-      } else if(inPeriodOrOverdue){
+      if(inPeriodOrOverdue){
         badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#fffbeb;color:#d97706;font-weight:700;border:1px solid #fde68a;white-space:nowrap">⏰ À faire</span>';
       }
     } else if(typeP==='horaire'&&valHeure){
