@@ -4483,7 +4483,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
     supaGet('signalements','equipement_id=eq.'+eqId+'&type=eq.panne&statut=not.in.(traite,resolu,annule)&order=created_at.desc&select=id,description,statut,created_at').catch(function(){return[];}),
     supaGet('signalements','equipement_id=eq.'+eqId+'&order=created_at.desc&limit=15&select=id,type,description,statut,created_at,assigne_a').catch(function(){return[];}),
     supaGet('maintenances','equipement_id=eq.'+eqId+'&order=date_realisee.desc&limit=15&select=id,titre,type,statut,created_at,date_realisee,prestataire,prestataire_id,technicien,cout,rapport_texte,plan_maintenance_id').catch(function(){return[];}),
-    supaGet('plans_maintenance','equipement_id=eq.'+eqId+'&actif=eq.true&order=prochaine_date.asc&select=id,titre,frequence,prochaine_date,intervenant,checklist,prestataires(nom)').catch(function(){return[];}),
+    supaGet('plans_maintenance','equipement_id=eq.'+eqId+'&actif=eq.true&order=prochaine_date.asc&select=id,titre,frequence,prochaine_date,intervenant,checklist,type_plan,prestataires(nom)').catch(function(){return[];}),
     supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom,telephone,email').catch(function(){return[];}),
     supaGet('reponses',
       'select=valeur,created_at,questions!inner(texte,unite,equipement_id,type_reponse)'+
@@ -4505,6 +4505,24 @@ async function _mntSelectEq(eqId,eqNom,sid){
   var allValeurs=res[6]||[];
   var pannes90=res[7]||[];
   var techContacts=res[8]||[];
+
+  // Fetch statut missions pour les plans (badge validation période courante)
+  var missionPlanStatuts={};
+  var calPlanIds=plans.map(function(p){return p.id;});
+  if(calPlanIds.length){
+    var mpRows=await supaGet('mission_plans',
+      'plan_maintenance_id=in.('+calPlanIds.join(',')+')'+'&select=plan_maintenance_id,statut,missions(id,created_at,statut,token)'
+    ).catch(function(){return[];});
+    // Garder uniquement le plus récent par plan
+    mpRows.forEach(function(mp){
+      if(!mp.missions)return;
+      var existing=missionPlanStatuts[mp.plan_maintenance_id];
+      var mpDate=mp.missions.created_at||'';
+      if(!existing||(existing.missions&&mpDate>existing.missions.created_at)){
+        missionPlanStatuts[mp.plan_maintenance_id]=mp;
+      }
+    });
+  }
 
   // Dernière valeur par unité pour les cards métriques
   var valParUnite={};
@@ -4889,6 +4907,39 @@ async function _mntSelectEq(eqId,eqNom,sid){
     var freqLbl=_mntFreqLabel(p.frequence||'');
     var who=(p.prestataires&&p.prestataires.nom)||p.intervenant||'';
     var urgLabel=diff===null?'—':diff<0?'En retard '+Math.abs(diff)+'j':diff===0?'Aujourd\'hui':diff+'j';
+
+    // Badge statut validation période courante
+    var typeP=(p.type_plan||'calendrier');
+    var badgeHtml='';
+    var rapportToken='';
+    if(typeP==='calendrier'&&p.prochaine_date){
+      var freqDays=_mntFreqToDays(p.frequence||'');
+      var pDate=new Date(p.prochaine_date+'T00:00:00');
+      var today0=new Date();today0.setHours(0,0,0,0);
+      var pStart=new Date(pDate);pStart.setDate(pStart.getDate()-freqDays);
+      var inPeriodOrOverdue=(today0>=pStart);
+      var mp=missionPlanStatuts[p.id];
+      if(mp&&(mp.statut==='valide'||mp.statut==='bloque')){
+        var mpD=mp.missions&&mp.missions.created_at?new Date(mp.missions.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'numeric'}):null;
+        rapportToken=(mp.missions&&mp.missions.token)||'';
+        if(mp.statut==='valide'){
+          badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#f0fdf4;color:#16a34a;font-weight:700;border:1px solid #bbf7d0;white-space:nowrap">✓ Fait'+(mpD?' le '+mpD:'')+'</span>';
+        } else {
+          badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#fef2f2;color:#ef4444;font-weight:700;border:1px solid #fecaca;white-space:nowrap">🔒 Bloqué</span>';
+        }
+      } else if(inPeriodOrOverdue){
+        badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#fffbeb;color:#d97706;font-weight:700;border:1px solid #fde68a;white-space:nowrap">⏰ À faire</span>';
+      }
+    } else if(typeP==='horaire'&&valHeure){
+      var hCur=Math.round(parseFloat(valHeure.valeur)||0);
+      var hAgo=timeAgo(valHeure.created_at);
+      badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#f0f9ff;color:#0369a1;font-weight:700;border:1px solid #bae6fd;white-space:nowrap">⏱ '+hCur+'h · '+hAgo+'</span>';
+    } else if(typeP==='niveau'&&valLevel){
+      var lCur=Math.round(parseFloat(valLevel.valeur)||0);
+      var lAgo=timeAgo(valLevel.created_at);
+      badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#faf5ff;color:#7e22ce;font-weight:700;border:1px solid #e9d5ff;white-space:nowrap">⛽ '+lCur+escape_html(valLevel.unite||'')+'· '+lAgo+'</span>';
+    }
+
     return '<div style="padding:9px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:flex-start;gap:10px">'+
       '<input type="checkbox" class="mnt-mission-plan" value="'+p.id+'" '+
         'style="width:15px;height:15px;cursor:pointer;margin-top:2px;flex-shrink:0" '+
@@ -4898,8 +4949,12 @@ async function _mntSelectEq(eqId,eqNom,sid){
           '<span style="font-size:12px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+escape_html(p.titre||freqLbl||'Plan')+'</span>'+
           '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:'+urgBg+';color:'+dateCol+';font-weight:700;white-space:nowrap;flex-shrink:0">'+urgLabel+'</span>'+
         '</div>'+
-        '<div style="font-size:10px;color:#64748b">'+escape_html(freqLbl||p.frequence||'')+(who?' · '+escape_html(who):'')+'</div>'+
-        '<div style="display:flex;align-items:center;gap:5px;margin-top:5px">'+
+        '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px">'+
+          '<span style="font-size:10px;color:#64748b">'+escape_html(freqLbl||p.frequence||'')+(who?' · '+escape_html(who):'')+'</span>'+
+          (badgeHtml?badgeHtml:'')+
+          (rapportToken?'<a href="mission.html?token='+escape_html(rapportToken)+'" target="_blank" style="font-size:9px;color:#3b82f6;text-decoration:none;font-weight:600;white-space:nowrap">Voir rapport →</a>':'')+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:5px;margin-top:4px">'+
           '<input type="date" value="'+(d||'')+'" '+
             'onchange="_mntSetPlanDate(\''+p.id+'\',\''+sid+'\',this.value)" '+
             'style="flex:1;border:1px solid '+dateCol+';border-radius:6px;padding:3px 7px;font-size:11px;color:'+dateCol+';background:white;cursor:pointer;outline:none"/>'+
@@ -5104,6 +5159,17 @@ function _mntFreqLabel(freq){
   var key=Object.keys(labels).find(function(k){return unit.startsWith(k);})||unit;
   return'Tous les '+n+' '+labels[key];
 }
+function _mntFreqToDays(freq){
+  if(!freq)return 30;
+  var m=(freq||'').match(/^(\d+)\s*(jour|semaine|mois|an|heure|km|cycle)/i);
+  if(!m)return 30;
+  var n=parseInt(m[1]),u=m[2].toLowerCase();
+  if(u.startsWith('jour'))return n;
+  if(u.startsWith('semaine'))return n*7;
+  if(u.startsWith('mois'))return n*30;
+  if(u.startsWith('an'))return n*365;
+  return 9999; // compteur horaire/km — pas de fenêtre calendaire
+}
 function _mntToggleFreqType(type){
   var btnT=document.getElementById('ntache-type-temps');
   var btnC=document.getElementById('ntache-type-compteur');
@@ -5129,13 +5195,14 @@ async function _mntNouvelleTachePourEq(eqId,eqNom,sid,editPlanId,tpl){
   var prests=await supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom').catch(function(){return[];});
   var ep={};
   if(editPlanId){
-    var rows=await supaGet('plans_maintenance','id=eq.'+editPlanId+'&select=id,titre,frequence,prochaine_date,intervenant,prestataire_id,checklist').catch(function(){return[];});
+    var rows=await supaGet('plans_maintenance','id=eq.'+editPlanId+'&select=id,titre,frequence,prochaine_date,intervenant,prestataire_id,checklist,type_plan').catch(function(){return[];});
     ep=rows[0]||{};
   }
   if(tpl&&tpl.titre)ep.titre=tpl.titre;
   if(tpl&&tpl.frequence)ep.frequence=tpl.frequence;
   if(tpl&&tpl.checklist)ep.checklist=tpl.checklist;
   var epChecklist=Array.isArray(ep.checklist)?ep.checklist:[];
+  var typePlan=ep.type_plan||'calendrier';
   var eFreq=ep.frequence||'';
   var fm=eFreq.match(/^(\d+)\s*(jour|semaine|mois|an|heure|km|cycle)/i);
   var fVal=fm?fm[1]:'1';
@@ -5152,6 +5219,12 @@ async function _mntNouvelleTachePourEq(eqId,eqNom,sid,editPlanId,tpl){
     '<div style="display:flex;flex-direction:column;gap:12px">'+
       '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">TITRE *</label>'+
         '<input id="ntache-titre" value="'+escape_html(ep.titre||'')+'" placeholder="ex: Nettoyage condenseur" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">TYPE DE PLAN</label>'+
+        '<select id="ntache-type-plan" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:white">'+
+          '<option value="calendrier"'+(typePlan==='calendrier'?' selected':'')+'>📅 Calendrier (date fixe)</option>'+
+          '<option value="horaire"'+(typePlan==='horaire'?' selected':'')+'>⏱ Compteur horaire (groupe)</option>'+
+          '<option value="niveau"'+(typePlan==='niveau'?' selected':'')+'>⛽ Niveau / cuve</option>'+
+        '</select></div>'+
       '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:6px">TYPE DE FRÉQUENCE</label>'+
         '<div style="display:flex;border:1.5px solid #e2e8f0;border-radius:8px;overflow:hidden">'+
           '<button id="ntache-type-temps" onclick="_mntToggleFreqType(\'temps\')" style="flex:1;padding:8px;font-size:12px;font-weight:600;border:none;cursor:pointer">🕐 Temps</button>'+
@@ -5433,6 +5506,7 @@ async function _mntSaveTacheEq(eqId,sid,editPlanId){
   var prestId=(document.getElementById('ntache-prest')||{}).value||null;
   var intervenant=(document.getElementById('ntache-intervenant')||{}).value||null;
   var freq=fVal+' '+fUnit;
+  var typePlanVal=(document.getElementById('ntache-type-plan')||{}).value||'calendrier';
   // Lire la checklist
   var checklistItems=[];
   document.querySelectorAll('#ntache-checklist .ntache-cl-item').forEach(function(inp){
@@ -5440,7 +5514,7 @@ async function _mntSaveTacheEq(eqId,sid,editPlanId){
     if(t)checklistItems.push({text:t});
   });
   var payload={site_id:sid,equipement_id:eqId,titre:titre||_mntFreqLabel(freq)||freq,frequence:freq,
-    prochaine_date:date||null,actif:true,intervenant:'',checklist:checklistItems};
+    prochaine_date:date||null,actif:true,intervenant:'',checklist:checklistItems,type_plan:typePlanVal};
   if(prestId){payload.prestataire_id=prestId;payload.intervenant='';}
   else if(intervenant&&intervenant.trim())payload.intervenant=intervenant.trim();
   var ok;
