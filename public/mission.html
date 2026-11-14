@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Mission de maintenance · GenTrack</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;min-height:100vh;}
+    .header{background:#0f172a;color:white;padding:16px 18px;position:sticky;top:0;z-index:10;}
+    .header-brand{font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;}
+    .header-title{font-size:17px;font-weight:700;}
+    .header-sub{font-size:11px;color:#94a3b8;margin-top:2px;}
+    .content{padding:16px;max-width:600px;margin:0 auto;}
+    .card{background:white;border-radius:14px;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.07);}
+    .card-head{padding:12px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;}
+    .card-head-label{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.7px;flex:1;}
+    .task-row{padding:14px;border-bottom:1px solid #f1f5f9;}
+    .task-row:last-child{border-bottom:none;}
+    .task-name{font-size:14px;font-weight:700;color:#1e293b;margin-bottom:3px;}
+    .task-freq{font-size:11px;color:#64748b;margin-bottom:12px;}
+    .btn-group{display:flex;gap:8px;margin-bottom:10px;}
+    .btn-status{flex:1;padding:9px;border-radius:9px;border:2px solid #e2e8f0;background:white;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+    .btn-status.ok{border-color:#22c55e;background:#f0fdf4;color:#16a34a;}
+    .btn-status.ko{border-color:#ef4444;background:#fef2f2;color:#ef4444;}
+    .field-label{font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+    .field-input{width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:9px 11px;font-size:12px;outline:none;font-family:inherit;resize:vertical;}
+    .field-input:focus{border-color:#3b82f6;}
+    .counter-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+    .counter-input{flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:9px 11px;font-size:14px;font-weight:600;outline:none;text-align:center;}
+    .counter-input:focus{border-color:#3b82f6;}
+    .photo-label{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:8px;font-size:11px;font-weight:600;color:#64748b;cursor:pointer;transition:all .15s;width:100%;justify-content:center;}
+    .photo-label:hover{border-color:#3b82f6;color:#3b82f6;background:#eff6ff;}
+    .photo-preview{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+    .photo-preview img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;}
+    .submit-btn{width:100%;padding:16px;background:#0f172a;color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+    .submit-btn:disabled{opacity:.5;cursor:not-allowed;}
+    .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
+    .badge-ok{background:#f0fdf4;color:#16a34a;}
+    .badge-ko{background:#fef2f2;color:#ef4444;}
+    .badge-todo{background:#fffbeb;color:#d97706;}
+    .loading{text-align:center;padding:60px 20px;color:#94a3b8;}
+    .loading-spinner{font-size:32px;margin-bottom:12px;animation:spin 1s linear infinite;display:block;}
+    @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    .error-box{background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:20px;text-align:center;color:#ef4444;font-weight:600;}
+    .success-screen{text-align:center;padding:60px 20px;}
+    .success-icon{font-size:56px;margin-bottom:16px;}
+    .success-title{font-size:20px;font-weight:800;color:#1e293b;margin-bottom:8px;}
+    .success-sub{font-size:13px;color:#64748b;}
+  </style>
+</head>
+<body>
+<div class="header">
+  <div class="header-brand">GenTrack · GMAO</div>
+  <div class="header-title" id="hdr-title">Mission de maintenance</div>
+  <div class="header-sub" id="hdr-sub">Chargement...</div>
+</div>
+<div class="content" id="app">
+  <div class="loading"><span class="loading-spinner">⟳</span>Chargement de la mission...</div>
+</div>
+
+<script>
+var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+
+var _mission=null;
+var _missionPlans=[];
+var _taskStates={}; // planId → {statut, commentaire, heures, photoFiles}
+
+async function sbGet(table,qs){
+  var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+qs,{
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Accept':'application/json'}
+  });
+  if(!r.ok)return[];
+  return await r.json();
+}
+async function sbPatch(table,id,data){
+  var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?id=eq.'+id,{
+    method:'PATCH',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify(data)
+  });
+  return r.ok;
+}
+async function sbUploadPhoto(missionId,file){
+  var ext=file.name.split('.').pop();
+  var path='missions/'+missionId+'/'+Date.now()+'.'+ext;
+  var r=await fetch(SUPA_URL+'/storage/v1/object/maintenance-photos/'+path,{
+    method:'POST',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':file.type},
+    body:file
+  });
+  if(!r.ok)return null;
+  return SUPA_URL+'/storage/v1/object/public/maintenance-photos/'+path;
+}
+
+function freqLabel(freq){
+  if(!freq)return '';
+  var m=freq.match(/^(\d+(?:\.\d+)?)\s*(\w+)/);
+  if(!m)return freq;
+  var n=m[1],u=m[2].toLowerCase();
+  if(u.startsWith('heure'))return 'Tous les '+n+'h compteur';
+  if(u.startsWith('sem'))return 'Toutes les '+n+' semaine'+(n>1?'s':'');
+  if(u.startsWith('mois'))return 'Tous les '+n+' mois';
+  if(u.startsWith('jour'))return 'Tous les '+n+' jour'+(n>1?'s':'');
+  if(u.startsWith('an'))return 'Tous les '+n+' an'+(n>1?'s':'');
+  return freq;
+}
+
+function nextDateFromFreq(freq){
+  if(!freq)return null;
+  var today=new Date();today.setHours(0,0,0,0);
+  var m=freq.match(/^(\d+(?:\.\d+)?)\s*(\w+)/);
+  if(!m)return null;
+  var n=parseFloat(m[1]),u=m[2].toLowerCase();
+  var d=new Date(today);
+  if(u.startsWith('heure'))return null; // compteur-based, skip
+  if(u.startsWith('jour'))d.setDate(d.getDate()+n);
+  else if(u.startsWith('sem'))d.setDate(d.getDate()+n*7);
+  else if(u.startsWith('mois'))d.setMonth(d.getMonth()+n);
+  else if(u.startsWith('an'))d.setFullYear(d.getFullYear()+n);
+  else return null;
+  return d.toISOString().slice(0,10);
+}
+
+function esc(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function init(){
+  var params=new URLSearchParams(window.location.search);
+  var token=params.get('token');
+  if(!token){renderError('Lien invalide — token manquant.');return;}
+
+  // Fetch mission par token
+  var missions=await sbGet('missions','token=eq.'+token+'&select=*,equipements(nom,types_equipements(nom)),sites(nom)');
+  if(!missions||!missions.length){renderError('Mission introuvable ou expirée.');return;}
+  _mission=missions[0];
+
+  if(_mission.statut==='realisee'){renderSuccess();return;}
+
+  // Fetch mission_plans + plans_maintenance
+  var mps=await sbGet('mission_plans','mission_id=eq.'+_mission.id+'&select=*,plans_maintenance(id,titre,frequence)');
+  _missionPlans=mps||[];
+
+  // Init states
+  _missionPlans.forEach(function(mp){
+    _taskStates[mp.id]={statut:'a_faire',commentaire:'',heures:null,photoFiles:[],photoUrls:[]};
+  });
+
+  var eqNom=(_mission.equipements&&_mission.equipements.nom)||'Équipement';
+  var siteNom=(_mission.sites&&_mission.sites.nom)||'';
+  document.getElementById('hdr-title').textContent=eqNom;
+  document.getElementById('hdr-sub').textContent=(siteNom?siteNom+' · ':'')+_missionPlans.length+' tâche'+(_missionPlans.length>1?'s':'');
+
+  renderApp();
+}
+
+function renderApp(){
+  var app=document.getElementById('app');
+  if(!_missionPlans.length){
+    app.innerHTML='<div class="card"><div style="padding:24px;text-align:center;color:#94a3b8">Aucune tâche dans cette mission.</div></div>';
+    return;
+  }
+  var html='';
+  _missionPlans.forEach(function(mp,i){
+    var plan=mp.plans_maintenance||{};
+    var st=_taskStates[mp.id];
+    var isOk=st.statut==='realise',isKo=st.statut==='echec';
+    var hasCounter=plan.frequence&&plan.frequence.toLowerCase().includes('heure');
+    html+='<div class="card" id="task-card-'+mp.id+'">';
+    html+='<div class="card-head">';
+    html+='<div class="card-head-label">Tâche '+(i+1)+' / '+_missionPlans.length+'</div>';
+    if(isOk)html+='<span class="badge badge-ok">✅ Réalisé</span>';
+    else if(isKo)html+='<span class="badge badge-ko">❌ Non réalisé</span>';
+    else html+='<span class="badge badge-todo">À faire</span>';
+    html+='</div>';
+    html+='<div class="task-row">';
+    html+='<div class="task-name">'+esc(plan.titre||plan.frequence||'Tâche')+'</div>';
+    if(plan.frequence)html+='<div class="task-freq">'+esc(freqLabel(plan.frequence))+'</div>';
+    // Boutons statut
+    html+='<div class="btn-group">';
+    html+='<button class="btn-status'+(isOk?' ok':'')+'" onclick="_setStatut(\''+mp.id+'\',\'realise\')">✅ Réalisé</button>';
+    html+='<button class="btn-status'+(isKo?' ko':'')+'" onclick="_setStatut(\''+mp.id+'\',\'echec\')">❌ Non réalisé</button>';
+    html+='</div>';
+    // Compteur heures
+    if(hasCounter){
+      html+='<div class="field-label">Heures compteur actuel</div>';
+      html+='<div class="counter-row"><input class="counter-input" type="number" placeholder="ex: 1250" value="'+(st.heures!==null?st.heures:'')+'" onchange="_setHeures(\''+mp.id+'\',this.value)"></div>';
+    }
+    // Commentaire
+    html+='<div class="field-label" style="margin-top:8px">Commentaire</div>';
+    html+='<textarea class="field-input" rows="2" placeholder="Notes sur cette tâche..." onchange="_setComment(\''+mp.id+'\',this.value)">'+esc(st.commentaire)+'</textarea>';
+    // Photo
+    html+='<div style="margin-top:10px">';
+    html+='<div class="field-label">Photo</div>';
+    html+='<label class="photo-label" for="photo-'+mp.id+'"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Ajouter une photo</label>';
+    html+='<input type="file" id="photo-'+mp.id+'" accept="image/*" capture="environment" style="display:none" onchange="_addPhoto(\''+mp.id+'\',this)">';
+    html+='<div class="photo-preview" id="photos-'+mp.id+'">';
+    st.photoUrls.forEach(function(u){html+='<img src="'+esc(u)+'">';});
+    html+='</div>';
+    html+='</div>';
+    html+='</div></div>';
+  });
+  // Submit button
+  html+='<button class="submit-btn" id="submit-btn" onclick="_submitMission()">'+
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Soumettre la mission</button>';
+  html+='<div style="height:32px"></div>';
+  app.innerHTML=html;
+}
+
+function _setStatut(mpId,statut){
+  _taskStates[mpId].statut=statut;
+  // Update badge
+  var card=document.getElementById('task-card-'+mpId);
+  if(!card)return;
+  var badge=card.querySelector('.badge');
+  if(badge){
+    badge.className='badge '+(statut==='realise'?'badge-ok':statut==='echec'?'badge-ko':'badge-todo');
+    badge.textContent=statut==='realise'?'✅ Réalisé':statut==='echec'?'❌ Non réalisé':'À faire';
+  }
+  var btns=card.querySelectorAll('.btn-status');
+  btns.forEach(function(b){
+    b.className='btn-status';
+    if(b.textContent.includes('Réalisé')&&statut==='realise')b.className='btn-status ok';
+    if(b.textContent.includes('Non réalisé')&&statut==='echec')b.className='btn-status ko';
+  });
+}
+function _setComment(mpId,val){_taskStates[mpId].commentaire=val;}
+function _setHeures(mpId,val){_taskStates[mpId].heures=val?parseFloat(val):null;}
+function _addPhoto(mpId,input){
+  var file=input.files[0];
+  if(!file)return;
+  _taskStates[mpId].photoFiles.push(file);
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var preview=document.getElementById('photos-'+mpId);
+    if(preview){var img=document.createElement('img');img.src=e.target.result;preview.appendChild(img);}
+    // Store as local preview (actual upload happens on submit)
+    _taskStates[mpId].photoUrls.push(e.target.result);
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+
+async function _submitMission(){
+  var allSet=_missionPlans.every(function(mp){return _taskStates[mp.id].statut!=='a_faire';});
+  if(!allSet){
+    if(!confirm('Certaines tâches ne sont pas encore marquées. Soumettre quand même ?'))return;
+  }
+  var btn=document.getElementById('submit-btn');
+  if(btn){btn.disabled=true;btn.textContent='Envoi en cours...';}
+
+  for(var i=0;i<_missionPlans.length;i++){
+    var mp=_missionPlans[i];
+    var st=_taskStates[mp.id];
+    var plan=mp.plans_maintenance||{};
+    // Upload photos
+    var photoUrl=null;
+    if(st.photoFiles&&st.photoFiles.length){
+      var url=await sbUploadPhoto(_mission.id,st.photoFiles[0]);
+      if(url)photoUrl=url;
+    }
+    // Update mission_plan
+    var mpPatch={statut:st.statut,commentaire:st.commentaire||null};
+    if(photoUrl)mpPatch.photo_url=photoUrl;
+    if(st.heures!==null)mpPatch.heures_compteur=st.heures;
+    await sbPatch('mission_plans',mp.id,mpPatch);
+    // Si réalisé : mettre à jour plans_maintenance prochaine_date
+    if(st.statut==='realise'&&plan.frequence){
+      var nextDate=nextDateFromFreq(plan.frequence);
+      var planPatch={};
+      if(nextDate)planPatch.prochaine_date=nextDate;
+      if(st.heures!==null&&plan.frequence.toLowerCase().includes('heure'))planPatch.prochaine_date=null;
+      if(Object.keys(planPatch).length)await sbPatch('plans_maintenance',plan.id,planPatch);
+    }
+  }
+  // Marquer mission comme réalisée
+  var allRealise=_missionPlans.every(function(mp){return _taskStates[mp.id].statut==='realise';});
+  var missionStatut=allRealise?'realisee':
+    _missionPlans.some(function(mp){return _taskStates[mp.id].statut==='realise';})
+      ?'realisee':'echec';
+  await sbPatch('missions',_mission.id,{statut:missionStatut,completed_at:new Date().toISOString()});
+
+  renderSuccess();
+}
+
+function renderSuccess(){
+  document.getElementById('hdr-sub').textContent='Mission soumise';
+  document.getElementById('app').innerHTML=
+    '<div class="success-screen">'+
+      '<div class="success-icon">✅</div>'+
+      '<div class="success-title">Mission soumise !</div>'+
+      '<div class="success-sub">Vos données ont bien été enregistrées.<br>Le responsable a été notifié.</div>'+
+    '</div>';
+}
+function renderError(msg){
+  document.getElementById('app').innerHTML='<div class="error-box">'+esc(msg)+'</div>';
+}
+
+init();
+</script>
+</body>
+</html>
