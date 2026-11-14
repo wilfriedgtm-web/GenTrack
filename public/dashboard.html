@@ -440,7 +440,7 @@ async function supaPost(table,data){
     });
     var payload=await r.json();
     if(!r.ok){
-      console.error('[supaPost] '+table+' HTTP '+r.status, payload);
+      console.error('[supaPost] '+table+' HTTP '+r.status, JSON.stringify(payload));
       return null;
     }
     return Array.isArray(payload)?payload[0]:payload;
@@ -4683,14 +4683,18 @@ async function _mntSaveTacheEq(eqId,sid,editPlanId){
     prochaine_date:date||null,actif:true,intervenant:''};
   if(prestId){payload.prestataire_id=prestId;payload.intervenant='';}
   else if(intervenant&&intervenant.trim())payload.intervenant=intervenant.trim();
-  var ok=editPlanId?
-    await supaPatch('plans_maintenance',editPlanId,payload).catch(function(){return null;}):
-    await supaPost('plans_maintenance',payload).catch(function(){return null;});
-  if(ok!==null){
+  var ok;
+  if(editPlanId){
+    ok=await supaPatch('plans_maintenance',editPlanId,payload).catch(function(){return false;});
+  }else{
+    ok=await supaPost('plans_maintenance',payload).catch(function(){return null;});
+  }
+  var success=editPlanId?(ok===true):( ok!==null&&ok!==undefined&&ok!==false);
+  if(success){
     _closeCfgModal();
     if(_mntSelectedTaskId)_mntSelectEq(_mntSelectedTaskId,'',sid);
     _rtMaintenances(sid);
-  }else alert('Erreur lors de la sauvegarde.');
+  }else alert('Erreur lors de la sauvegarde. Vérifiez la console.');
 }
 
 // ── Clôture plan préventif (Écran 6) ──────────────────────────────────────────
