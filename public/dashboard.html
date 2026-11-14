@@ -4944,20 +4944,29 @@ async function _mntSelectEq(eqId,eqNom,sid){
 
   // ── Onglet "Prestataire" ──────────────────────────────────────────────────
   var eqPrests=prests.filter(function(p){return true;}); // tous les prests du site
-  var prestTabHtml=eqPrests.length?
-    secHead('Prestataires du site')+
-    eqPrests.map(function(p){
+  var prestTabHtml=
+    secHead('Prestataires du site',
+      '<button onclick="_mntAddPrestataire(\''+sid+'\',\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\')" '+
+        'style="font-size:10px;color:#3b82f6;background:none;border:none;cursor:pointer;padding:0;font-weight:600">+ Ajouter</button>')+
+    (eqPrests.length?eqPrests.map(function(p){
       return '<div style="padding:11px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px">'+
         '<div style="width:36px;height:36px;border-radius:9px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
           '<i class="ti ti-building" style="font-size:17px;color:#64748b"></i>'+
         '</div>'+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-size:12px;font-weight:700;color:#1e293b">'+escape_html(p.nom)+'</div>'+
+          (p.specialite?'<div style="font-size:10px;color:#3b82f6;font-weight:600">'+escape_html(p.specialite)+'</div>':'')+
           (p.email?'<div style="font-size:10px;color:#64748b">'+escape_html(p.email)+'</div>':'')+
           (p.telephone?'<div style="font-size:10px;color:#64748b">'+escape_html(p.telephone)+'</div>':'')+
         '</div>'+
+        '<div style="display:flex;gap:5px;flex-shrink:0">'+
+          '<button onclick="_mntEditPrestataire(\''+p.id+'\',\''+sid+'\',\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\')" '+
+            'style="padding:5px 8px;border:1px solid #e2e8f0;border-radius:7px;font-size:11px;background:white;cursor:pointer;color:#64748b" title="Modifier">✏️</button>'+
+          '<button onclick="_mntDesactiverPrestataire(\''+p.id+'\',\''+sid+'\',\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\')" '+
+            'style="padding:5px 8px;border:1px solid #fecaca;border-radius:7px;font-size:11px;background:#fef2f2;cursor:pointer;color:#ef4444" title="Désactiver">🗑️</button>'+
+        '</div>'+
       '</div>';
-    }).join('')+
+    }).join(''):'<div style="padding:14px;text-align:center;color:#94a3b8;font-size:11px">Aucun prestataire sur ce site.</div>')+
     secHead('Fiche équipement PDF')+
     '<div style="padding:12px 14px;display:flex;flex-direction:column;gap:9px">'+
       '<div style="font-size:11px;color:#64748b;line-height:1.5">Génère un PDF avec les 5 dernières maintenances, les plans actifs et les signalements récents — à envoyer par email au prestataire.</div>'+
@@ -5032,9 +5041,10 @@ async function _mntCreerMission(eqId,sid){
   // Créer les lignes mission_plans
   var bulk=planIds.map(function(pid){return{mission_id:mission.id,plan_maintenance_id:pid,statut:'a_faire'};});
   await supaPostBulk('mission_plans',bulk).catch(function(){});
-  // Construire le lien (avec resp_tel embarqué pour le retour WhatsApp)
+  // Construire le lien — resp_tel déjà sauvegardé en DB, ne pas l'inclure dans l'URL
+  // (le & dans les liens WhatsApp tronque l'autolink sur mobile)
   var baseUrl=window.location.origin+'/mission.html';
-  var missionUrl=baseUrl+'?token='+mission.token+(respTel?'&resp_tel='+encodeURIComponent(respTel):'');
+  var missionUrl=baseUrl+'?token='+mission.token;
   var nbTaches=planIds.length;
   var eqNom=document.querySelector('#mnt-detail-panel [style*="font-size:15px"]');
   var eqNomTxt=eqNom?eqNom.textContent:'Équipement';
@@ -5212,7 +5222,7 @@ function _mntAddChecklistItem(val){
 // ── Templates de maintenance ────────────────────────────────────────────────
 async function _mntOpenTemplatePicker(eqId,eqNom,sid){
   _closeCfgModal&&_closeCfgModal();
-  var tmpls=await supaGet('templates_maintenance','actif=eq.true&order=categorie.asc,titre.asc&select=id,titre,frequence,categorie').catch(function(){return[];});
+  var tmpls=await supaGet('templates_maintenance','actif=eq.true&order=categorie.asc,titre.asc&select=id,titre,frequence,categorie,checklist').catch(function(){return[];});
   var cats=[...new Set(tmpls.map(function(t){return t.categorie||'Général';}))].sort();
   window._mntTplData={all:tmpls,eqId:eqId,eqNom:eqNom,sid:sid,activeCat:null};
   var catBtns=cats.map(function(c){
@@ -5262,12 +5272,17 @@ function _mntFilterTpls(cat){
     return;
   }
   grid.innerHTML=filtered.map(function(t){
-    return '<div onclick="_mntApplyTemplate(\''+t.id+'\')" style="padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;cursor:pointer;background:white" onmouseover="this.style.borderColor=\'#3b82f6\';this.style.background=\'#f0f9ff\'" onmouseout="this.style.borderColor=\'#e2e8f0\';this.style.background=\'white\'">'+
-      '<div style="font-size:12px;font-weight:700;color:#1e293b">'+escape_html(t.titre)+'</div>'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-top:3px">'+
-        '<span style="font-size:10px;background:#f1f5f9;color:#475569;padding:2px 7px;border-radius:12px;font-weight:600">'+escape_html(t.frequence)+'</span>'+
-        (t.categorie?'<span style="font-size:10px;color:#94a3b8">'+escape_html(t.categorie)+'</span>':'')+
+    var cl=Array.isArray(t.checklist)?t.checklist:[];
+    return '<div style="padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;background:white;display:flex;align-items:flex-start;gap:8px">'+
+      '<div onclick="_mntApplyTemplate(\''+t.id+'\')" style="flex:1;cursor:pointer" onmouseover="this.parentElement.style.borderColor=\'#3b82f6\';this.parentElement.style.background=\'#f0f9ff\'" onmouseout="this.parentElement.style.borderColor=\'#e2e8f0\';this.parentElement.style.background=\'white\'">'+
+        '<div style="font-size:12px;font-weight:700;color:#1e293b">'+escape_html(t.titre)+'</div>'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-top:3px">'+
+          '<span style="font-size:10px;background:#f1f5f9;color:#475569;padding:2px 7px;border-radius:12px;font-weight:600">'+escape_html(t.frequence)+'</span>'+
+          (t.categorie?'<span style="font-size:10px;color:#94a3b8">'+escape_html(t.categorie)+'</span>':'')+
+          (cl.length?'<span style="font-size:10px;color:#3b82f6;font-weight:600">📋 '+cl.length+' point'+(cl.length>1?'s':'')+'</span>':'')+
+        '</div>'+
       '</div>'+
+      '<button onclick="event.stopPropagation();_mntEditTemplate(\''+t.id+'\',\''+d.sid+'\')" style="padding:5px 8px;border:1px solid #e2e8f0;border-radius:7px;font-size:11px;background:white;cursor:pointer;color:#64748b;flex-shrink:0" title="Modifier">✏️</button>'+
     '</div>';
   }).join('');
 }
@@ -5301,12 +5316,42 @@ function _mntCreateTemplate(sid){
             '<option value="heure">Heures compteur</option><option value="km">Kilomètres</option>'+
           '</select></div>'+
       '</div>'+
+      '<div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'+
+          '<label style="font-size:11px;font-weight:700;color:#64748b">POINTS À VÉRIFIER (optionnel)</label>'+
+          '<button type="button" onclick="_mntAddTplChecklistItem()" style="font-size:11px;color:#3b82f6;background:none;border:none;cursor:pointer;font-weight:600;padding:0">+ Ajouter</button>'+
+        '</div>'+
+        '<div id="tplc-checklist" style="display:flex;flex-direction:column;gap:4px"></div>'+
+      '</div>'+
     '</div>'+
     '<div style="display:flex;gap:10px;margin-top:18px">'+
       '<button onclick="_mntOpenTemplatePicker(\''+d.eqId+'\',\''+escape_html(d.eqNom||'')+'\',\''+sid+'\')" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer;color:#64748b">← Retour</button>'+
       '<button onclick="_mntSaveTemplate(\''+sid+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:#1e293b;color:white;cursor:pointer">Créer</button>'+
     '</div>'
   );
+  setTimeout(function(){_mntAddTplChecklistItem('');},0);
+}
+
+function _mntAddTplChecklistItem(val){
+  var container=document.getElementById('tplc-checklist');
+  if(!container)return;
+  var row=document.createElement('div');
+  row.style.cssText='display:flex;align-items:center;gap:6px';
+  row.innerHTML=
+    '<input type="text" class="tplc-cl-item" value="'+escape_html(val||'')+'" placeholder="ex: Vérifier niveau d\'huile" '+
+      'style="flex:1;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px;box-sizing:border-box"/>'+
+    '<button type="button" onclick="this.parentElement.remove()" style="color:#94a3b8;background:none;border:none;cursor:pointer;padding:2px;font-size:14px;line-height:1" title="Supprimer">×</button>';
+  container.appendChild(row);
+  if(val===''||val===undefined)row.querySelector('input').focus();
+}
+
+function _mntReadTplChecklist(containerId){
+  var items=[];
+  document.querySelectorAll('#'+containerId+' .tplc-cl-item').forEach(function(inp){
+    var t=(inp.value||'').trim();
+    if(t)items.push({text:t});
+  });
+  return items;
 }
 
 async function _mntSaveTemplate(sid){
@@ -5315,11 +5360,73 @@ async function _mntSaveTemplate(sid){
   var val=(document.getElementById('tplc-val')||{}).value||'1';
   var unit=(document.getElementById('tplc-unit')||{}).value||'mois';
   if(!titre.trim()){alert('Le titre est requis.');return;}
-  var ok=await supaPost('templates_maintenance',{titre:titre.trim(),frequence:val+' '+unit,categorie:cat,actif:true}).catch(function(){return null;});
+  var checklist=_mntReadTplChecklist('tplc-checklist');
+  var ok=await supaPost('templates_maintenance',{titre:titre.trim(),frequence:val+' '+unit,categorie:cat,actif:true,checklist:checklist}).catch(function(){return null;});
   if(ok){
     var d=window._mntTplData||{};
     _mntOpenTemplatePicker(d.eqId,d.eqNom||'',sid);
   }else{alert('Erreur lors de la création du template.');}
+}
+
+async function _mntEditTemplate(tplId,sid){
+  var rows=await supaGet('templates_maintenance','id=eq.'+tplId+'&select=id,titre,frequence,categorie,checklist').catch(function(){return[];});
+  var t=rows[0]||{};
+  var d=window._mntTplData||{};
+  var cats=['Groupe électrogène','Climatisation','Chambre froide','Pompe','Transformateur','Compresseur','Éclairage','Général','Autre'];
+  var fm=(t.frequence||'').match(/^(\d+)\s*(jour|semaine|mois|an|heure|km)/i);
+  var fVal=fm?fm[1]:'1',fUnit=fm?fm[2].toLowerCase():'mois';
+  var cl=Array.isArray(t.checklist)?t.checklist:[];
+  _showCfgModal(
+    '<div style="font-size:15px;font-weight:700;margin-bottom:16px">✏️ Modifier le template</div>'+
+    '<div style="display:flex;flex-direction:column;gap:12px">'+
+      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">TITRE *</label>'+
+        '<input id="tplc-titre" value="'+escape_html(t.titre||'')+'" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">CATÉGORIE</label>'+
+        '<select id="tplc-cat" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:white">'+
+          cats.map(function(c){return'<option value="'+escape_html(c)+'"'+(t.categorie===c?' selected':'')+'>'+escape_html(c)+'</option>';}).join('')+
+        '</select></div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+        '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">VALEUR</label>'+
+          '<input id="tplc-val" type="number" min="1" value="'+fVal+'" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">UNITÉ</label>'+
+          '<select id="tplc-unit" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:white">'+
+            ['jour','semaine','mois','an','heure','km'].map(function(u){
+              return'<option value="'+u+'"'+(u===fUnit?' selected':'')+'>'+(u==='jour'?'Jours':u==='semaine'?'Semaines':u==='mois'?'Mois':u==='an'?'Ans':u==='heure'?'Heures compteur':'Kilomètres')+'</option>';
+            }).join('')+
+          '</select></div>'+
+      '</div>'+
+      '<div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'+
+          '<label style="font-size:11px;font-weight:700;color:#64748b">POINTS À VÉRIFIER</label>'+
+          '<button type="button" onclick="_mntAddTplChecklistItem()" style="font-size:11px;color:#3b82f6;background:none;border:none;cursor:pointer;font-weight:600;padding:0">+ Ajouter</button>'+
+        '</div>'+
+        '<div id="tplc-checklist" style="display:flex;flex-direction:column;gap:4px"></div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:10px;margin-top:18px">'+
+      '<button onclick="_mntOpenTemplatePicker(\''+d.eqId+'\',\''+escape_html(d.eqNom||'')+'\',\''+sid+'\')" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer;color:#64748b">← Retour</button>'+
+      '<button onclick="_mntSaveTemplateEdit(\''+tplId+'\',\''+sid+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:#1e293b;color:white;cursor:pointer">Enregistrer</button>'+
+    '</div>'
+  );
+  setTimeout(function(){
+    if(cl.length)cl.forEach(function(item){_mntAddTplChecklistItem(item.text||'');});
+    else _mntAddTplChecklistItem('');
+  },0);
+}
+
+async function _mntSaveTemplateEdit(tplId,sid){
+  var titre=(document.getElementById('tplc-titre')||{}).value||'';
+  var cat=(document.getElementById('tplc-cat')||{}).value||'Général';
+  var val=(document.getElementById('tplc-val')||{}).value||'1';
+  var unit=(document.getElementById('tplc-unit')||{}).value||'mois';
+  if(!titre.trim()){alert('Le titre est requis.');return;}
+  var checklist=_mntReadTplChecklist('tplc-checklist');
+  var ok=await supaPatch('templates_maintenance',tplId,{titre:titre.trim(),frequence:val+' '+unit,categorie:cat,checklist:checklist}).catch(function(){return false;});
+  if(ok){
+    // Reload picker avec données fraîches
+    var d=window._mntTplData||{};
+    _mntOpenTemplatePicker(d.eqId,d.eqNom||'',sid);
+  }else{alert('Erreur lors de la mise à jour du template.');}
 }
 
 // ── Fin templates ────────────────────────────────────────────────────────────
@@ -5727,51 +5834,71 @@ async function _mntSaveFiche(eqId,sid){
 }
 
 // ── Prestataire management ──────────────────────────────────────────────────
-function _mntAddPrestataire(sid){
+function _mntPrestForm(sid,eqId,eqNom,ep){
+  // ep = objet existant pour édition, null pour création
+  var editId=ep?ep.id:null;
   _showCfgModal(
-    '<div style="font-size:15px;font-weight:700;margin-bottom:16px">🏢 Nouveau prestataire</div>'+
+    '<div style="font-size:15px;font-weight:700;margin-bottom:16px">🏢 '+(editId?'Modifier':'Nouveau')+' prestataire</div>'+
     '<div style="display:flex;flex-direction:column;gap:12px">'+
       '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">NOM *</label>'+
-        '<input id="prest-nom" placeholder="ex: Froid Services SN" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+        '<input id="prest-nom" value="'+escape_html((ep&&ep.nom)||'')+'" placeholder="ex: Froid Services SN" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
       '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">SPÉCIALITÉ</label>'+
-        '<input id="prest-spec" placeholder="ex: Froid, Électricité, Générateur…" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+        '<input id="prest-spec" value="'+escape_html((ep&&ep.specialite)||'')+'" placeholder="ex: Froid, Électricité, Générateur…" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
       '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">TÉLÉPHONE (WhatsApp)</label>'+
-        '<input id="prest-tel" type="tel" placeholder="+221 77 000 00 00" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+        '<input id="prest-tel" type="tel" value="'+escape_html((ep&&ep.telephone)||'')+'" placeholder="+221 77 000 00 00" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
       '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">EMAIL</label>'+
-        '<input id="prest-email" type="email" placeholder="contact@exemple.com" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+        '<input id="prest-email" type="email" value="'+escape_html((ep&&ep.email)||'')+'" placeholder="contact@exemple.com" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
     '</div>'+
     '<div style="display:flex;gap:10px;margin-top:18px">'+
       '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
-      '<button onclick="_mntSavePrestataire(\''+sid+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--dark);color:white;cursor:pointer">Enregistrer</button>'+
+      '<button onclick="_mntSavePrestataire(\''+sid+'\',\''+eqId+'\',\''+escape_html(eqNom||'')+'\','+(editId?'\''+editId+'\'':'null')+')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--dark);color:white;cursor:pointer">'+(editId?'Mettre à jour':'Enregistrer')+'</button>'+
     '</div>'
   );
 }
 
-async function _mntSavePrestataire(sid){
+function _mntAddPrestataire(sid,eqId,eqNom){
+  _mntPrestForm(sid,eqId,eqNom,null);
+}
+
+async function _mntEditPrestataire(id,sid,eqId,eqNom){
+  var rows=await supaGet('prestataires','id=eq.'+id+'&select=id,nom,specialite,telephone,email').catch(function(){return[];});
+  _mntPrestForm(sid,eqId,eqNom,rows[0]||{id:id});
+}
+
+async function _mntSavePrestataire(sid,eqId,eqNom,editId){
   var nom=(document.getElementById('prest-nom')||{}).value||'';
   if(!nom.trim()){alert('Le nom est obligatoire.');return;}
   var spec=(document.getElementById('prest-spec')||{}).value||'';
   var tel=(document.getElementById('prest-tel')||{}).value||'';
   var email=(document.getElementById('prest-email')||{}).value||'';
-  try{
-    await supaPost('prestataires',{site_id:sid,nom:nom.trim(),specialite:spec.trim()||null,telephone:tel.trim()||null,email:email.trim()||null,actif:true});
+  var payload={nom:nom.trim(),specialite:spec.trim()||null,telephone:tel.trim()||null,email:email.trim()||null};
+  var ok;
+  if(editId){
+    ok=await supaPatch('prestataires',editId,payload).catch(function(){return false;});
+  }else{
+    payload.site_id=sid;payload.actif=true;
+    ok=await supaPost('prestataires',payload).catch(function(){return null;});
+    ok=ok!==null;
+  }
+  if(ok){
     _closeCfgModal();
-    // Refresh maintenance tab
-    if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
+    if(eqId){_mntSelectEq(eqId,eqNom||'',sid);}
+    else if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
     else renderRespTech(_session,'maintenances');
-  }catch(e){
-    alert('Erreur : '+e.message);
+  }else{
+    alert('Erreur lors de la sauvegarde. Vérifiez la console.');
   }
 }
 
-async function _mntDesactiverPrestataire(id){
+async function _mntDesactiverPrestataire(id,sid,eqId,eqNom){
   if(!confirm('Désactiver ce prestataire ?'))return;
-  try{
-    await supaPatch('prestataires',id,{actif:false});
-    if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
+  var ok=await supaPatch('prestataires',id,{actif:false}).catch(function(){return false;});
+  if(ok){
+    if(eqId){_mntSelectEq(eqId,eqNom||'',sid);}
+    else if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
     else renderRespTech(_session,'maintenances');
-  }catch(e){
-    alert('Erreur : '+e.message);
+  }else{
+    alert('Erreur lors de la désactivation.');
   }
 }
 
