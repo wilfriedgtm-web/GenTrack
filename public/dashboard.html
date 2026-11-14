@@ -4563,8 +4563,8 @@ async function _mntSaveTacheEq(eqId,sid,editPlanId){
   var intervenant=(document.getElementById('ntache-intervenant')||{}).value||null;
   var freq=fVal+' '+fUnit;
   var payload={site_id:sid,equipement_id:eqId,titre:titre||_mntFreqLabel(freq)||freq,frequence:freq,
-    prochaine_date:date||null,actif:true};
-  if(prestId)payload.prestataire_id=prestId;
+    prochaine_date:date||null,actif:true,intervenant:''};
+  if(prestId){payload.prestataire_id=prestId;payload.intervenant='';}
   else if(intervenant&&intervenant.trim())payload.intervenant=intervenant.trim();
   var ok=editPlanId?
     await supaPatch('plans_maintenance',editPlanId,payload).catch(function(){return null;}):
