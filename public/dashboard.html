@@ -4984,6 +4984,9 @@ async function _mntSelectEq(eqId,eqNom,sid){
           '<button onclick="_mntNouvelleTachePourEq(\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\',\''+sid+'\',\''+p.id+'\')" '+
             'style="padding:3px 7px;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;color:#64748b;background:white;cursor:pointer" title="Modifier">'+
             '<i class="ti ti-pencil" style="font-size:12px"></i></button>'+
+          '<button onclick="_mntSupprimerPlan(\''+p.id+'\',\''+escape_html(p.titre||freqLbl||'Plan')+'\',\''+eqId+'\',\''+sid+'\')" '+
+            'style="padding:3px 7px;border:1px solid #fecaca;border-radius:6px;font-size:11px;color:#ef4444;background:#fef2f2;cursor:pointer" title="Supprimer">'+
+            '<i class="ti ti-trash" style="font-size:12px"></i></button>'+
         '</div>'+
       '</div>'+
     '</div>';
@@ -5551,6 +5554,18 @@ async function _mntSaveTacheEq(eqId,sid,editPlanId){
     if(_mntSelectedTaskId)_mntSelectEq(_mntSelectedTaskId,'',sid);
     _rtMaintenances(sid);
   }else alert('Erreur lors de la sauvegarde. Vérifiez la console.');
+}
+
+// ── Supprimer (archiver) un plan préventif ────────────────────────────────────
+async function _mntSupprimerPlan(planId,planTitre,eqId,sid){
+  if(!confirm('Supprimer le plan "'+planTitre+'" ?\nIl sera archivé et n\'apparaîtra plus dans la liste.'))return;
+  var ok=await supaPatch('plans_maintenance',planId,{actif:false}).catch(function(){return false;});
+  if(ok===true){
+    if(_mntSelectedTaskId)_mntSelectEq(_mntSelectedTaskId,'',sid);
+    _rtMaintenances(sid);
+  }else{
+    alert('Erreur lors de la suppression.');
+  }
 }
 
 // ── Clôture plan préventif (Écran 6) ──────────────────────────────────────────
