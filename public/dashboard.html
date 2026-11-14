@@ -3160,6 +3160,8 @@ var _mntFilter='tous';
 var _rtMntPeriod=30;
 var _mntSelectedTaskId=null;
 var _mntEqFilter='all';
+var _mntEqHistOffset=0;   // 0=mois en cours, -1=mois précédent, etc.
+var _mntEqEvents=[];      // cache des events de l'équipement sélectionné
 var _mntEqSearch='';
 var _mntCurrentData=null;
 var _mntRenderEqRowFn=null;
@@ -4501,8 +4503,8 @@ async function _mntSelectEq(eqId,eqNom,sid){
   var res=await Promise.all([
     supaGet('equipements','id=eq.'+eqId+'&select=id,nom,marque,modele,numero_serie,date_mise_en_service,garantie_fin,contrat_type,contrat_actif,notes_tech,types_equipements(nom)').catch(function(){return[];}),
     supaGet('signalements','equipement_id=eq.'+eqId+'&type=eq.panne&statut=not.in.(traite,resolu,annule)&order=created_at.desc&select=id,description,statut,created_at').catch(function(){return[];}),
-    supaGet('signalements','equipement_id=eq.'+eqId+'&order=created_at.desc&limit=15&select=id,type,description,statut,created_at,assigne_a').catch(function(){return[];}),
-    supaGet('maintenances','equipement_id=eq.'+eqId+'&order=date_realisee.desc&limit=15&select=id,titre,type,statut,created_at,date_realisee,prestataire,prestataire_id,technicien,cout,rapport_texte,plan_maintenance_id').catch(function(){return[];}),
+    supaGet('signalements','equipement_id=eq.'+eqId+'&order=created_at.desc&limit=90&select=id,type,description,statut,created_at,assigne_a').catch(function(){return[];}),
+    supaGet('maintenances','equipement_id=eq.'+eqId+'&order=date_realisee.desc&limit=90&select=id,titre,type,statut,created_at,date_realisee,prestataire,prestataire_id,technicien,cout,rapport_texte,plan_maintenance_id').catch(function(){return[];}),
     supaGet('plans_maintenance','equipement_id=eq.'+eqId+'&actif=eq.true&order=prochaine_date.asc&select=id,titre,frequence,prochaine_date,intervenant,checklist,type_plan,prestataires(nom)').catch(function(){return[];}),
     supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom,telephone,email').catch(function(){return[];}),
     supaGet('reponses',
@@ -4787,29 +4789,10 @@ async function _mntSelectEq(eqId,eqNom,sid){
       photos:mPhotos,mntId:m.id,statut:m.statut});
   });
   events.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
-  var tlHtml=events.length?events.map(function(ev,i){
-    var d=new Date(ev.date);
-    var dStr=d.toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'2-digit'});
-    return '<div style="display:flex;gap:10px;padding:8px 14px;border-bottom:1px solid #f8fafc">'+
-      '<div style="display:flex;flex-direction:column;align-items:center;width:12px;flex-shrink:0">'+
-        '<div style="width:10px;height:10px;border-radius:50%;background:'+ev.colBg+';border:2px solid '+ev.col+';margin-top:3px;flex-shrink:0"></div>'+
-        (i<events.length-1?'<div style="width:1px;flex:1;background:#e2e8f0;min-height:10px;margin-top:2px"></div>':'')+
-      '</div>'+
-      '<div style="flex:1;min-width:0;padding-bottom:4px">'+
-        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">'+
-          '<div style="font-size:11px;font-weight:600;color:#1e293b;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+ev.title+'</div>'+
-          '<span style="font-size:9px;padding:1px 6px;border-radius:10px;background:'+ev.colBg+';color:'+ev.col+';border:1px solid '+ev.col+';font-weight:700;flex-shrink:0;white-space:nowrap">'+ev.badge+'</span>'+
-        '</div>'+
-        (ev.sub?'<div style="font-size:10px;color:#64748b;margin-top:1px">'+ev.sub+'</div>':'')+
-        (ev.photos&&ev.photos.length?'<div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap">'+ev.photos.map(function(u){return'<img src="'+u+'" onclick="_mntLightbox(\''+u+'\')" style="width:48px;height:48px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid #e2e8f0" onerror="this.style.display=\'none\'">';}).join('')+'</div>':'')+
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:3px">'+
-          '<div style="font-size:10px;color:#94a3b8">'+dStr+'</div>'+
-          (ev.mntId&&ev.statut==='realise'?'<button onclick="event.stopPropagation();_mntGeneratePDF(\''+ev.mntId+'\')" style="font-size:9px;padding:2px 7px;border:1px solid #e2e8f0;border-radius:5px;background:white;color:#64748b;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:3px"><i class="ti ti-file-type-pdf" style="font-size:11px;color:#ef4444"></i>PDF</button>':'')+
-        '</div>'+
-      '</div>'+
-    '</div>';
-  }).join(''):
-  '<div style="padding:14px;text-align:center;color:#94a3b8;font-size:11px">Aucun historique</div>';
+  // Stocker en cache + reset au mois courant quand on change d'équipement
+  _mntEqEvents=events;
+  _mntEqHistOffset=0;
+  var tlHtml=_mntBuildEqHistHtml();
 
   // ── Plans ─────────────────────────────────────────────────────────────────
   var plansHtml=plans.length?plans.map(function(p){
@@ -5059,7 +5042,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
     '<div id="mnt-tab-fiche">'+ficheHtml+'</div>'+
     '<div id="mnt-tab-plan" style="display:none">'+planTabHtml+'</div>'+
     '<div id="mnt-tab-prest" style="display:none">'+prestTabHtml+'</div>'+
-    '<div id="mnt-tab-hist" style="display:none">'+secHead('Historique — signalements & maintenances')+tlHtml+'</div>';
+    '<div id="mnt-tab-hist" style="display:none">'+secHead('Historique — signalements & maintenances')+'<div id="mnt-hist-content">'+tlHtml+'</div></div>';
 }
 
 async function _mntSetPlanDate(planId,sid,newDate){
@@ -5554,6 +5537,67 @@ async function _mntSaveTacheEq(eqId,sid,editPlanId){
     if(_mntSelectedTaskId)_mntSelectEq(_mntSelectedTaskId,'',sid);
     _rtMaintenances(sid);
   }else alert('Erreur lors de la sauvegarde. Vérifiez la console.');
+}
+
+// ── Navigation mois par mois dans l'historique équipement ────────────────────
+function _mntBuildEqHistHtml(){
+  var now=new Date();
+  var targetYear=now.getFullYear();
+  var targetMonth=now.getMonth(); // 0-11
+  if(_mntEqHistOffset!==0){
+    var d=new Date(now.getFullYear(),now.getMonth()+_mntEqHistOffset,1);
+    targetYear=d.getFullYear();
+    targetMonth=d.getMonth();
+  }
+  var monthStart=new Date(targetYear,targetMonth,1);
+  var monthEnd=new Date(targetYear,targetMonth+1,0,23,59,59);
+  var monthLabel=monthStart.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  monthLabel=monthLabel.charAt(0).toUpperCase()+monthLabel.slice(1);
+  var isCurrentMonth=(_mntEqHistOffset===0);
+  // Trouver le premier mois qui a des events pour désactiver ‹ si nécessaire
+  var hasOlder=_mntEqEvents.some(function(ev){return new Date(ev.date)<monthStart;});
+  var filtered=_mntEqEvents.filter(function(ev){
+    var d=new Date(ev.date);
+    return d>=monthStart&&d<=monthEnd;
+  });
+  // Barre de navigation
+  var navHtml='<div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid #f1f5f9;background:#f8fafc">'+
+    '<button onclick="_mntNavEqHist(-1)" style="width:28px;height:28px;border:1px solid #e2e8f0;border-radius:6px;background:white;cursor:'+(hasOlder?'pointer':'default')+';color:'+(hasOlder?'#1e293b':'#cbd5e1')+';font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0" '+(hasOlder?'':'disabled')+'>‹</button>'+
+    '<div style="flex:1;text-align:center;font-size:11px;font-weight:700;color:#334155">'+monthLabel+'</div>'+
+    (isCurrentMonth?'<div style="width:28px"></div>':
+      '<button onclick="_mntNavEqHist(1)" style="width:28px;height:28px;border:1px solid #e2e8f0;border-radius:6px;background:white;cursor:pointer;color:#1e293b;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">›</button>')+
+  '</div>';
+  // Timeline
+  var tlHtml=filtered.length?filtered.map(function(ev,i){
+    var d=new Date(ev.date);
+    var dStr=d.toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'2-digit'});
+    return '<div style="display:flex;gap:10px;padding:8px 14px;border-bottom:1px solid #f8fafc">'+
+      '<div style="display:flex;flex-direction:column;align-items:center;width:12px;flex-shrink:0">'+
+        '<div style="width:10px;height:10px;border-radius:50%;background:'+ev.colBg+';border:2px solid '+ev.col+';margin-top:3px;flex-shrink:0"></div>'+
+        (i<filtered.length-1?'<div style="width:1px;flex:1;background:#e2e8f0;min-height:10px;margin-top:2px"></div>':'')+
+      '</div>'+
+      '<div style="flex:1;min-width:0;padding-bottom:4px">'+
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">'+
+          '<div style="font-size:11px;font-weight:600;color:#1e293b;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+ev.title+'</div>'+
+          '<span style="font-size:9px;padding:1px 6px;border-radius:10px;background:'+ev.colBg+';color:'+ev.col+';border:1px solid '+ev.col+';font-weight:700;flex-shrink:0;white-space:nowrap">'+ev.badge+'</span>'+
+        '</div>'+
+        (ev.sub?'<div style="font-size:10px;color:#64748b;margin-top:1px">'+ev.sub+'</div>':'')+
+        (ev.photos&&ev.photos.length?'<div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap">'+ev.photos.map(function(u){return'<img src="'+u+'" onclick="_mntLightbox(\''+u+'\')" style="width:48px;height:48px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid #e2e8f0" onerror="this.style.display=\'none\'">';}).join('')+'</div>':'')+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:3px">'+
+          '<div style="font-size:10px;color:#94a3b8">'+dStr+'</div>'+
+          (ev.mntId&&ev.statut==='realise'?'<button onclick="event.stopPropagation();_mntGeneratePDF(\''+ev.mntId+'\')" style="font-size:9px;padding:2px 7px;border:1px solid #e2e8f0;border-radius:5px;background:white;color:#64748b;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:3px"><i class="ti ti-file-type-pdf" style="font-size:11px;color:#ef4444"></i>PDF</button>':'')+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join(''):
+  '<div style="padding:14px;text-align:center;color:#94a3b8;font-size:11px">Aucun événement ce mois-ci</div>';
+  return navHtml+tlHtml;
+}
+
+function _mntNavEqHist(delta){
+  _mntEqHistOffset+=delta;
+  var el=document.getElementById('mnt-hist-content');
+  if(el)el.innerHTML=_mntBuildEqHistHtml();
 }
 
 // ── Supprimer (archiver) un plan préventif ────────────────────────────────────
