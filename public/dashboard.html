@@ -2513,14 +2513,10 @@ function _sgBuildCard(r,zones,colKey){
       '<button onclick="event.stopPropagation();_sgAffecter(\''+r.id+'\')" style="padding:5px 8px;font-size:11px;border:1.5px solid var(--border);border-radius:6px;background:white;color:var(--text2);cursor:pointer;font-family:inherit">↩</button>'+
     '</div>';
   }
-  var ficheBtn=r.equipement_id?
-    '<button onclick="event.stopPropagation();_openFicheEquipement(\''+r.equipement_id+'\',\''+escape_html(eqNom||'')+'\',window._sgSid)" '+
-      'title="Fiche équipement" style="padding:3px 8px;border:1px solid var(--border);border-radius:5px;background:var(--bg);font-size:10px;font-weight:700;color:var(--text2);cursor:pointer;white-space:nowrap;flex-shrink:0">📋 Fiche</button>':'';
   return '<div id="sg-card-'+r.id+'" onclick="_sgSelectCard(\''+r.id+'\')" style="border:1.5px solid '+(isSel?'var(--amber)':'var(--border)')+';border-left:4px solid '+accent+';border-radius:8px;padding:10px 11px;cursor:pointer;background:'+(isSel?'var(--amber-pale)':'white')+';transition:border-color .12s">'+
     '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">'+
       '<span style="font-size:11px">'+icon+'</span>'+
       '<span style="font-size:11px;font-weight:700;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(typeLabel)+(eqNom?' · '+escape_html(eqNom):'')+'</span>'+
-      ficheBtn+
     '</div>'+
     '<div style="font-size:12px;color:var(--dark);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+escape_html(r.description)+'</div>'+
     photoThumb+
@@ -4022,6 +4018,27 @@ async function _rtMonEquipe(sid,session){
 }
 
 
+function _mntTypeIcon(typNom){
+  var t=(typNom||'').toLowerCase();
+  if(t.indexOf('clim')>=0||t.indexOf('froid')>=0||t.indexOf('cf')>=0||t.indexOf('cta')>=0)
+    return{icon:'ti-snowflake',bg:'#eff6ff',col:'#2563eb'};
+  if(t.indexOf('elec')>=0||t.indexOf('tgbt')>=0||t.indexOf('compt')>=0||t.indexOf('tableau')>=0)
+    return{icon:'ti-plug',bg:'#fefce8',col:'#ca8a04'};
+  if(t.indexOf('groupe')>=0||t.indexOf('génér')>=0||t.indexOf('generateur')>=0)
+    return{icon:'ti-engine-off',bg:'#fff7ed',col:'#d97706'};
+  if(t.indexOf('plomb')>=0||t.indexOf('eau')>=0||t.indexOf('pompe')>=0||t.indexOf('ecs')>=0||t.indexOf('bouc')>=0)
+    return{icon:'ti-droplet',bg:'#ecfdf5',col:'#059669'};
+  if(t.indexOf('chaud')>=0||t.indexOf('incend')>=0||t.indexOf('feu')>=0)
+    return{icon:'ti-flame',bg:'#fef2f2',col:'#dc2626'};
+  if(t.indexOf('vent')>=0||t.indexOf('vmc')>=0||t.indexOf('aéraul')>=0)
+    return{icon:'ti-wind',bg:'#f0fdf4',col:'#16a34a'};
+  if(t.indexOf('cuve')>=0||t.indexOf('gasoil')>=0||t.indexOf('carb')>=0||t.indexOf('fuel')>=0)
+    return{icon:'ti-gas-station',bg:'#faf5ff',col:'#7c3aed'};
+  if(t.indexOf('ascens')>=0||t.indexOf('élév')>=0||t.indexOf('elevateu')>=0)
+    return{icon:'ti-arrow-up',bg:'#f8fafc',col:'#475569'};
+  return{icon:'ti-tool',bg:'#f8fafc',col:'#64748b'};
+}
+
 function _mntKpiTab(label,val,sub,col){
   return '<div style="flex:1;padding:12px 14px 14px;border-bottom:3px solid transparent;cursor:default">'+
     '<div style="font-size:11px;color:#94a3b8;margin-bottom:4px">'+label+'</div>'+
@@ -4076,20 +4093,24 @@ async function _rtMaintenances(sid){
     var isSel=_mntSelectedTaskId===e.id;
     var eqPannes=pannesIdx[e.id]||[];
     var eqPlans=plansIdx[e.id]||[];
-    var dot=eqPannes.length?'#ef4444':eqPlans.length?'#22c55e':'#f59e0b';
-    var badge=eqPannes.length?
-      '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#fef2f2;color:#ef4444;font-weight:700">🔴 '+eqPannes.length+' panne'+(eqPannes.length>1?'s':'')+'</span>':
+    var borderCol=eqPannes.length?'#ef4444':eqPlans.length?'#22c55e':'#f59e0b';
+    var typNom=e.types_equipements?e.types_equipements.nom||'':'';
+    var ti=_mntTypeIcon(typNom);
+    var statusTxt=eqPannes.length?
+      '<span style="font-size:10px;color:#ef4444;font-weight:600">'+eqPannes.length+' panne'+(eqPannes.length>1?'s':'')+'</span>':
       eqPlans.length?
-      '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#f0fdf4;color:#16a34a;font-weight:700">✅ '+eqPlans.length+' plan'+(eqPlans.length>1?'s':'')+'</span>':
-      '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#fffbeb;color:#d97706;font-weight:700">⚠ Sans plan</span>';
+      '<span style="font-size:10px;color:#16a34a;font-weight:600">'+eqPlans.length+' plan'+(eqPlans.length>1?'s':'')+'</span>':
+      '<span style="font-size:10px;color:#d97706;font-weight:600">sans plan</span>';
     return '<div onclick="_mntSelectEq(\''+e.id+'\',\''+escape_html(e.nom)+'\',\''+sid+'\')" '+
-      'style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-left:3px solid '+dot+';'+
-      'background:'+(isSel?'#f8fafc':'white')+';cursor:pointer;border-bottom:1px solid #f1f5f9;transition:background .1s">'+
-      '<div style="flex:1;min-width:0">'+
-        '<div style="font-size:13px;font-weight:700;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(e.nom)+'</div>'+
-        (e.marque||e.modele?'<div style="font-size:10px;color:#94a3b8;margin-top:1px">'+escape_html([e.marque,e.modele].filter(Boolean).join(' '))+'</div>':'')+
+      'style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-left:3px solid '+borderCol+';'+
+      'background:'+(isSel?'#f0f9ff':'white')+';cursor:pointer;border-bottom:1px solid #f1f5f9;transition:background .1s">'+
+      '<div style="width:32px;height:32px;border-radius:8px;background:'+ti.bg+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
+        '<i class="ti '+ti.icon+'" style="font-size:16px;color:'+ti.col+'" aria-hidden="true"></i>'+
       '</div>'+
-      badge+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:12px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(e.nom)+'</div>'+
+        statusTxt+
+      '</div>'+
     '</div>';
   }
 
@@ -4147,97 +4168,200 @@ async function _mntSelectEq(eqId,eqNom,sid){
   _mntSelectedTaskId=eqId;
   var panel=document.getElementById('mnt-detail-panel');
   if(!panel)return;
-  panel.innerHTML='<div style="text-align:center;padding:32px;color:#94a3b8"><div style="font-size:24px">⟳</div></div>';
+  panel.style.cssText='background:white;border:1.5px solid #e2e8f0;border-radius:14px;overflow:hidden;padding:0;text-align:left;min-height:280px;';
+  panel.innerHTML='<div style="padding:32px;text-align:center;color:#94a3b8"><i class="ti ti-loader" style="font-size:24px"></i></div>';
 
   var res=await Promise.all([
-    supaGet('equipements','id=eq.'+eqId+'&select=id,nom,marque,modele,numero_serie,date_mise_en_service,garantie_fin,contrat_type,contrat_actif,types_equipements(nom)').catch(function(){return[];}),
+    supaGet('equipements','id=eq.'+eqId+'&select=id,nom,marque,modele,numero_serie,date_mise_en_service,garantie_fin,contrat_type,contrat_actif,notes_tech,types_equipements(nom)').catch(function(){return[];}),
     supaGet('signalements','equipement_id=eq.'+eqId+'&type=eq.panne&statut=not.in.(traite,resolu,annule)&order=created_at.desc&select=id,description,statut,created_at').catch(function(){return[];}),
+    supaGet('signalements','equipement_id=eq.'+eqId+'&order=created_at.desc&limit=15&select=id,type,description,statut,created_at,assigne_a').catch(function(){return[];}),
+    supaGet('maintenances','equipement_id=eq.'+eqId+'&order=date_realisation.desc&limit=15&select=id,titre,type,statut,created_at,date_realisation,prestataire,intervenant,cout,rapport_texte').catch(function(){return[];}),
     supaGet('plans_maintenance','equipement_id=eq.'+eqId+'&actif=eq.true&order=prochaine_date.asc&select=id,titre,frequence,prochaine_date,intervenant,prestataires(nom)').catch(function(){return[];}),
-    supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom,telephone,email,specialite').catch(function(){return[];})
+    supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom,telephone,email').catch(function(){return[];})
   ]);
   var eq=res[0][0]||{nom:eqNom};
-  var pannes=res[1]||[];
-  var plans=res[2]||[];
-  var prests=res[3]||[];
+  var pannesOuv=res[1]||[];
+  var allSigs=res[2]||[];
+  var mnts=res[3]||[];
+  var plans=res[4]||[];
+  var prests=res[5]||[];
 
   var typNom=eq.types_equipements?eq.types_equipements.nom||'':'';
-  var modStr=escape_html([eq.marque,eq.modele].filter(Boolean).join(' '));
+  var ti=_mntTypeIcon(typNom);
+  var modStr=[eq.marque,eq.modele].filter(Boolean).map(escape_html).join(' ');
 
-  // Pannes HTML
-  var pannesHtml=pannes.length?
-    pannes.map(function(s){
-      var ago=Math.round((Date.now()-new Date(s.created_at))/(1000*60*60*24));
-      return '<div style="padding:10px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:flex-start;gap:10px">'+
-        '<div style="flex:1;min-width:0">'+
-          '<div style="font-size:11px;color:#1e293b;line-height:1.4">'+escape_html((s.description||'Panne').slice(0,80))+'</div>'+
-          '<div style="font-size:10px;color:#94a3b8;margin-top:3px">Il y a '+ago+' j · '+escape_html(s.statut)+'</div>'+
-        '</div>'+
-        '<div style="display:flex;gap:5px;flex-shrink:0">'+
-          prests.length?
-            '<button onclick="_mntDispatchSig(\''+s.id+'\',\''+sid+'\',\'prestataire\',\''+prests[0].id+'\',\''+escape_html(prests[0].nom)+'\',\''+escape_html(prests[0].email||'')+'\',\''+escape_html(prests[0].telephone||'')+'\')" '+
-              'style="padding:4px 10px;border:1.5px solid #3b82f6;border-radius:6px;background:white;font-size:11px;font-weight:700;color:#3b82f6;cursor:pointer">Envoyer</button>'
-            :'<button onclick="_mntDispatchSig(\''+s.id+'\',\''+sid+'\',\'interne\',\'\',\'\',\'\',\'\')" '+
-              'style="padding:4px 10px;border:1.5px solid #f59e0b;border-radius:6px;background:white;font-size:11px;font-weight:700;color:#d97706;cursor:pointer">Traiter</button>'+
-        '</div>'+
-      '</div>';
-    }).join(''):
-    '<div style="padding:14px;text-align:center;color:#94a3b8;font-size:11px">Aucune panne active ✅</div>';
+  // ── Section header ────────────────────────────────────────────────────────
+  function secHead(label,btnHtml){
+    return '<div style="padding:7px 14px;background:#fafbfc;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center">'+
+      '<span style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.8px">'+label+'</span>'+
+      (btnHtml||'')+
+    '</div>';
+  }
 
-  // Plans HTML
-  var plansHtml=plans.length?
-    plans.map(function(p){
-      var d=p.prochaine_date;
-      var diff=d?Math.round((new Date(d+'T00:00:00')-new Date().setHours(0,0,0,0))/(1000*60*60*24)):null;
-      var col=diff===null||diff<0?'#ef4444':diff<=7?'#f59e0b':'#16a34a';
-      var dStr=d?new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'Non planifié';
-      return '<div style="padding:10px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px">'+
-        '<div style="flex:1">'+
-          '<div style="font-size:12px;font-weight:700;color:#1e293b">'+escape_html(p.titre||p.frequence||'Plan')+'</div>'+
-          '<div style="font-size:10px;color:#64748b">'+escape_html(p.frequence||'')+(p.prestataires?' · '+escape_html(p.prestataires.nom):p.intervenant?' · '+escape_html(p.intervenant):'')+'</div>'+
+  // ── Infos ─────────────────────────────────────────────────────────────────
+  var garantieStr='';
+  if(eq.garantie_fin){
+    var gd=new Date(eq.garantie_fin+'T00:00:00');
+    var gDiff=Math.round((gd-new Date())/(1000*60*60*24));
+    garantieStr=gd.toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'})+
+      (gDiff<0?' (expirée)':gDiff<60?' (bientôt)':'');
+  }
+  var dmsStr=eq.date_mise_en_service?
+    new Date(eq.date_mise_en_service+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}):'—';
+  function infoCell(lbl,val){
+    return '<div style="padding:9px 0"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;margin-bottom:2px">'+lbl+'</div>'+
+      '<div style="font-size:12px;font-weight:600;color:#1e293b">'+val+'</div></div>';
+  }
+  var infosHtml=
+    secHead('Informations',
+      '<button onclick="_mntCompleteFiche(\''+eqId+'\',\''+sid+'\')" '+
+        'style="font-size:10px;color:#3b82f6;background:none;border:none;cursor:pointer;padding:0;font-weight:600">Modifier</button>')+
+    '<div style="padding:4px 14px 8px;display:grid;grid-template-columns:1fr 1fr;gap:0 16px">'+
+      infoCell('Mise en service',dmsStr)+
+      infoCell('Marque / modèle',modStr||'—')+
+      infoCell('N° de série',escape_html(eq.numero_serie||'—'))+
+      infoCell('Contrat',(eq.contrat_actif?'Actif · ':'Inactif'+(eq.contrat_type?' · ':''))+escape_html(eq.contrat_type||''))+
+      (garantieStr?infoCell('Fin de garantie',garantieStr):'')+
+    '</div>';
+
+  // ── Pannes ouvertes ───────────────────────────────────────────────────────
+  var pannesHtml='';
+  if(pannesOuv.length){
+    pannesHtml=secHead('<i class="ti ti-alert-circle" style="color:#ef4444;font-size:12px;vertical-align:-1px;margin-right:4px"></i>Pannes ouvertes ('+pannesOuv.length+')')+
+      pannesOuv.map(function(s){
+        var ago=Math.round((Date.now()-new Date(s.created_at))/(1000*60*60*24));
+        var dispBtn=prests.length?
+          '<button onclick="_mntDispatchSig(\''+s.id+'\',\''+sid+'\',\'prestataire\',\''+prests[0].id+'\',\''+escape_html(prests[0].nom)+'\',\''+escape_html(prests[0].email||'')+'\',\'\')" '+
+            'style="padding:3px 9px;border:1px solid #3b82f6;border-radius:5px;font-size:10px;font-weight:600;color:#3b82f6;background:white;cursor:pointer">Envoyer</button>':
+          '<button onclick="_mntDispatchSig(\''+s.id+'\',\''+sid+'\',\'interne\',\'\',\'\',\'\',\'\')" '+
+            'style="padding:3px 9px;border:1px solid #d97706;border-radius:5px;font-size:10px;font-weight:600;color:#d97706;background:white;cursor:pointer">Traiter</button>';
+        return '<div style="padding:9px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px">'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:11px;color:#1e293b;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html((s.description||'Panne').slice(0,70))+'</div>'+
+            '<div style="font-size:10px;color:#94a3b8;margin-top:2px">Il y a '+ago+' j</div>'+
+          '</div>'+dispBtn+'</div>';
+      }).join('');
+  }
+
+  // ── Timeline ──────────────────────────────────────────────────────────────
+  var events=[];
+  allSigs.forEach(function(s){
+    var col={ouvert:'#ef4444',en_cours:'#f59e0b',traite:'#22c55e',resolu:'#22c55e',annule:'#94a3b8'}[s.statut]||'#94a3b8';
+    var colBg={ouvert:'#fef2f2',en_cours:'#fffbeb',traite:'#f0fdf4',resolu:'#f0fdf4',annule:'#f8fafc'}[s.statut]||'#f8fafc';
+    var badge={ouvert:'Ouvert',en_cours:'En cours',traite:'Traité',resolu:'Résolu',annule:'Annulé'}[s.statut]||s.statut;
+    events.push({date:s.created_at,col:col,colBg:colBg,badge:badge,
+      title:escape_html((s.description||'Signalement').slice(0,70)),
+      sub:s.assigne_a?'→ '+escape_html(s.assigne_a):''});
+  });
+  mnts.forEach(function(m){
+    var col={planifie:'#f59e0b',realise:'#22c55e',annule:'#94a3b8'}[m.statut]||'#94a3b8';
+    var colBg={planifie:'#fffbeb',realise:'#f0fdf4',annule:'#f8fafc'}[m.statut]||'#f8fafc';
+    var badge={planifie:'Planifié',realise:'Réalisé',annule:'Annulé'}[m.statut]||m.statut;
+    var who=m.prestataire||m.intervenant||'';
+    events.push({date:m.date_realisation||m.created_at,col:col,colBg:colBg,badge:badge,
+      title:escape_html(m.titre||m.type||'Intervention'),
+      sub:who?'→ '+escape_html(who)+(m.cout?' · '+parseFloat(m.cout).toLocaleString('fr-FR')+' FCFA':''):''});
+  });
+  events.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+  var tlHtml=events.length?events.map(function(ev,i){
+    var d=new Date(ev.date);
+    var dStr=d.toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'2-digit'});
+    return '<div style="display:flex;gap:10px;padding:8px 14px;border-bottom:1px solid #f8fafc">'+
+      '<div style="display:flex;flex-direction:column;align-items:center;width:12px;flex-shrink:0">'+
+        '<div style="width:10px;height:10px;border-radius:50%;background:'+ev.colBg+';border:2px solid '+ev.col+';margin-top:3px;flex-shrink:0"></div>'+
+        (i<events.length-1?'<div style="width:1px;flex:1;background:#e2e8f0;min-height:10px;margin-top:2px"></div>':'')+
+      '</div>'+
+      '<div style="flex:1;min-width:0;padding-bottom:4px">'+
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">'+
+          '<div style="font-size:11px;font-weight:600;color:#1e293b;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+ev.title+'</div>'+
+          '<span style="font-size:9px;padding:1px 6px;border-radius:10px;background:'+ev.colBg+';color:'+ev.col+';border:1px solid '+ev.col+';font-weight:700;flex-shrink:0;white-space:nowrap">'+ev.badge+'</span>'+
         '</div>'+
-        '<span style="font-size:10px;font-weight:700;color:'+col+'">'+dStr+'</span>'+
-        '<div style="display:flex;gap:3px">'+
-          (d?'<button onclick="event.stopPropagation();_mntShiftDate(\''+p.id+'\',\''+sid+'\',-7)" style="width:20px;height:20px;border:1px solid #e2e8f0;border-radius:4px;background:white;cursor:pointer;font-size:10px">◁</button>':'')+
-          (d?'<button onclick="event.stopPropagation();_mntShiftDate(\''+p.id+'\',\''+sid+'\',7)" style="width:20px;height:20px;border:1px solid #e2e8f0;border-radius:4px;background:white;cursor:pointer;font-size:10px">▷</button>':'')+
+        (ev.sub?'<div style="font-size:10px;color:#64748b;margin-top:1px">'+ev.sub+'</div>':'')+
+        '<div style="font-size:10px;color:#94a3b8">'+dStr+'</div>'+
+      '</div>'+
+    '</div>';
+  }).join(''):
+  '<div style="padding:14px;text-align:center;color:#94a3b8;font-size:11px">Aucun historique</div>';
+
+  // ── Plans ─────────────────────────────────────────────────────────────────
+  var plansHtml=plans.length?plans.map(function(p){
+    var d=p.prochaine_date;
+    var diff=d?Math.round((new Date(d+'T00:00:00')-new Date().setHours(0,0,0,0))/(1000*60*60*24)):null;
+    var dateCol=diff===null||diff<0?'#ef4444':diff<=14?'#f59e0b':'#16a34a';
+    return '<div style="padding:9px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px">'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:12px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(p.titre||p.frequence||'Plan')+'</div>'+
+        '<div style="font-size:10px;color:#64748b;margin-top:1px">'+escape_html(p.frequence||'')+(p.prestataires?' · '+escape_html(p.prestataires.nom):p.intervenant?' · '+escape_html(p.intervenant):'')+'</div>'+
+      '</div>'+
+      '<input type="date" value="'+(d||'')+'" '+
+        'onchange="_mntSetPlanDate(\''+p.id+'\',\''+sid+'\',this.value)" '+
+        'style="border:1px solid '+dateCol+';border-radius:6px;padding:3px 7px;font-size:11px;color:'+dateCol+';background:white;cursor:pointer;outline:none"/>'+
+      '<button onclick="_mntDispatchSig(\''+p.id+'\',\''+sid+'\',\'interne\',\'\',\'\',\'\',\'\')" '+
+        'style="padding:3px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:11px;color:#64748b;background:white;cursor:pointer" title="Envoyer">'+
+        '<i class="ti ti-send" style="font-size:12px" aria-hidden="true"></i></button>'+
+    '</div>';
+  }).join(''):
+  '<div style="padding:12px;text-align:center;color:#94a3b8;font-size:11px">Aucun plan créé</div>';
+
+  // ── Viz 6 mois ────────────────────────────────────────────────────────────
+  var now2=new Date();now2.setHours(0,0,0,0);
+  var months=[];
+  for(var mi=0;mi<6;mi++){
+    var dm=new Date(now2.getFullYear(),now2.getMonth()+mi,1);
+    months.push({lbl:dm.toLocaleDateString('fr-FR',{month:'short'}),y:dm.getFullYear(),m:dm.getMonth(),n:0});
+  }
+  plans.forEach(function(p){
+    if(!p.prochaine_date)return;
+    var pd=new Date(p.prochaine_date+'T00:00:00');
+    months.forEach(function(mo){if(pd.getFullYear()===mo.y&&pd.getMonth()===mo.m)mo.n++;});
+  });
+  var maxN=Math.max(1,Math.max.apply(null,months.map(function(mo){return mo.n;})));
+  var vizHtml=months.map(function(mo){
+    var pct=mo.n?Math.max(15,Math.round((mo.n/maxN)*80)):0;
+    var bc=mo.n>=2?'#f59e0b':mo.n===1?'#3b82f6':'transparent';
+    var tc=mo.n>=2?'#d97706':mo.n===1?'#2563eb':'#94a3b8';
+    return '<div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">'+
+      '<div style="font-size:10px;color:#94a3b8;width:22px;text-align:right;flex-shrink:0">'+mo.lbl+'</div>'+
+      '<div style="flex:1;height:14px;background:#f1f5f9;border-radius:3px;overflow:hidden">'+
+        (mo.n?'<div style="width:'+pct+'%;height:100%;background:'+bc+';border-radius:3px;display:flex;align-items:center;padding-left:5px"><span style="font-size:9px;font-weight:700;color:white">'+mo.n+'</span></div>':'')+'</div>'+
+      '<div style="font-size:10px;color:'+tc+';width:36px;text-align:right;flex-shrink:0">'+(mo.n?mo.n+' int.':'—')+'</div>'+
+    '</div>';
+  }).join('');
+
+  // ── Header ────────────────────────────────────────────────────────────────
+  var headerHtml=
+    '<div style="padding:14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:flex-start;gap:12px">'+
+      '<div style="width:38px;height:38px;border-radius:10px;background:'+ti.bg+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
+        '<i class="ti '+ti.icon+'" style="font-size:20px;color:'+ti.col+'" aria-hidden="true"></i>'+
+      '</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:15px;font-weight:700;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(eq.nom||eqNom)+'</div>'+
+        '<div style="font-size:11px;color:#94a3b8;margin-top:1px">'+escape_html(typNom||'Équipement')+(modStr?' · '+modStr:'')+'</div>'+
+        '<div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap">'+
+          (eq.contrat_actif?'<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#f0fdf4;color:#16a34a;font-weight:600">Contrat actif</span>':'')+
+          (pannesOuv.length?'<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#fef2f2;color:#ef4444;font-weight:600">'+pannesOuv.length+' panne'+(pannesOuv.length>1?'s':'')+'</span>':'')+
+          (!modStr?'<button onclick="_mntCompleteFiche(\''+eqId+'\',\''+sid+'\')" style="font-size:10px;padding:1px 7px;border-radius:10px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;cursor:pointer;font-weight:600">Compléter la fiche</button>':'')+
         '</div>'+
-      '</div>';
-    }).join(''):
-    '<div style="padding:14px;text-align:center;color:#94a3b8;font-size:11px">Aucun plan créé</div>';
+      '</div>'+
+    '</div>';
 
   panel.innerHTML=
-    // Header équipement
-    '<div style="background:linear-gradient(135deg,#1e293b,#334155);border-radius:14px 14px 0 0;padding:16px;color:white">'+
-      '<div style="font-size:10px;color:#94a3b8;margin-bottom:2px;text-transform:uppercase;letter-spacing:1px">'+(typNom||'Équipement')+'</div>'+
-      '<div style="font-size:17px;font-weight:800">'+escape_html(eq.nom||eqNom)+'</div>'+
-      (modStr?'<div style="font-size:11px;color:#cbd5e1;margin-top:2px">'+modStr+'</div>':'')+
-      (eq.numero_serie?'<div style="font-size:10px;color:#94a3b8;margin-top:1px">S/N : '+escape_html(eq.numero_serie)+'</div>':'')+
-      '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'+
-        (eq.contrat_actif?'<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(34,197,94,.2);color:#4ade80;font-weight:700">Contrat actif · '+(eq.contrat_type||'')+'</span>':'')+
-        (pannes.length?'<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(239,68,68,.2);color:#fca5a5;font-weight:700">'+pannes.length+' panne'+(pannes.length>1?'s':'')+' ouverte'+(pannes.length>1?'s':'')+'</span>':'')+
-      '</div>'+
-    '</div>'+
-    // Pannes
-    '<div style="border-bottom:1px solid #f1f5f9">'+
-      '<div style="padding:8px 14px;background:#fafbfc;display:flex;justify-content:space-between;align-items:center">'+
-        '<span style="font-size:10px;font-weight:800;color:#ef4444;text-transform:uppercase;letter-spacing:1px">🔴 Pannes ouvertes</span>'+
-      '</div>'+
-      pannesHtml+
-    '</div>'+
-    // Plans
-    '<div>'+
-      '<div style="padding:8px 14px;background:#fafbfc;display:flex;justify-content:space-between;align-items:center">'+
-        '<span style="font-size:10px;font-weight:800;color:#16a34a;text-transform:uppercase;letter-spacing:1px">📅 Plans de maintenance</span>'+
-        '<button onclick="_mntNouvelleTachePourEq(\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\',\''+sid+'\')" '+
-          'style="font-size:10px;font-weight:700;color:#3b82f6;background:none;border:none;cursor:pointer;padding:0">＋ Ajouter</button>'+
-      '</div>'+
-      plansHtml+
-    '</div>';
-  panel.style.borderRadius='14px';
-  panel.style.overflow='hidden';
-  panel.style.padding='0';
-  panel.style.alignItems='stretch';
-  panel.style.justifyContent='flex-start';
-  panel.style.textAlign='left';
+    headerHtml+
+    infosHtml+
+    pannesHtml+
+    secHead('Timeline — historique')+tlHtml+
+    secHead('Plans de maintenance',
+      '<button onclick="_mntNouvelleTachePourEq(\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\',\''+sid+'\')" '+
+        'style="font-size:10px;color:#3b82f6;background:none;border:none;cursor:pointer;padding:0;font-weight:600">+ Ajouter</button>')+
+    plansHtml+
+    secHead('Charge — 6 mois à venir')+
+    '<div style="padding:10px 14px 12px">'+vizHtml+'</div>';
+}
+
+async function _mntSetPlanDate(planId,sid,newDate){
+  if(!newDate)return;
+  await supaPatch('plans_maintenance',planId,{prochaine_date:newDate}).catch(function(){});
+  _mntSelectEq(_mntSelectedTaskId,'',sid);
 }
 
 async function _mntDispatchSig(sigId,sid,mode,prestId,prestNom,prestEmail,prestTel){
@@ -4283,191 +4407,6 @@ async function _mntSaveTacheEq(eqId,sid){
   var freq=(document.getElementById('ntache-freq')||{}).value||'mensuel';
   var date=(document.getElementById('ntache-date')||{}).value||null;
   var ok=await supaPost('plans_maintenance',{site_id:sid,equipement_id:eqId,titre:titre||freq,frequence:freq,prochaine_date:date,actif:true}).catch(function(){return null;});
-  if(ok!==null){_closeCfgModal();_rtMaintenances(sid);}
-  else alert('Erreur lors de la création.');
-}
-
-async function _mntSelectTask(taskId,kind,eqId,eqNom,sid){
-  _mntSelectedTaskId=taskId;
-  var panel=document.getElementById('mnt-detail-panel');
-  if(!panel)return;
-  panel.innerHTML='<div style="text-align:center;padding:32px;color:#94a3b8"><div style="font-size:24px;margin-bottom:8px;animation:spin 1s linear infinite">⟳</div></div>';
-
-  // Fetch prestataires du site for assignment choice
-  var prests=await supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom,email,telephone,specialite').catch(function(){return[];});
-
-  // Fetch equipment info if available
-  var eq={};
-  if(eqId){
-    var eqRows=await supaGet('equipements','id=eq.'+eqId+'&select=id,nom,marque,modele,numero_serie,date_mise_en_service,garantie_fin,contrat_type,contrat_actif,types_equipements(nom)').catch(function(){return[];});
-    eq=eqRows[0]||{};
-  }
-
-  // Count pannes for this equipment (last 90 days)
-  var panneCount=0;
-  if(eqId){
-    var d90=new Date();d90.setDate(d90.getDate()-90);
-    var pannes=await supaGet('signalements','equipement_id=eq.'+eqId+'&type=eq.panne&created_at=gte.'+d90.toISOString()+'&select=id').catch(function(){return[];});
-    panneCount=pannes.length;
-  }
-
-  var typNom=eq.types_equipements?eq.types_equipements.nom||'':'';
-  var eqDisplay=escape_html(eqNom||eq.nom||'');
-  var modeleStr=[eq.marque,eq.modele].filter(Boolean).map(escape_html).join(' ');
-  var contratBadge=eq.contrat_actif?
-    '<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#f0fdf4;color:#16a34a;font-weight:700">Contrat actif · '+(eq.contrat_type||'')+'</span>':'';
-
-  var prestChoices=prests.map(function(p){
-    return '<button onclick="_mntDispatch(\''+taskId+'\',\''+kind+'\',\''+sid+'\',\'prestataire\',\''+p.id+'\',\''+escape_html(p.nom)+'\',\''+escape_html(p.email||'')+'\',\''+escape_html(p.telephone||'')+'\')" '+
-      'style="display:flex;flex-direction:column;align-items:flex-start;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;background:white;cursor:pointer;width:100%;text-align:left;transition:border-color .15s" '+
-      'onmouseover="this.style.borderColor=\'#3b82f6\'" onmouseout="this.style.borderColor=\'#e2e8f0\'">'+
-      '<span style="font-size:12px;font-weight:700;color:#1e293b">🏢 '+escape_html(p.nom)+'</span>'+
-      (p.specialite?'<span style="font-size:10px;color:#64748b;margin-top:1px">'+escape_html(p.specialite)+'</span>':'')+
-    '</button>';
-  }).join('');
-
-  panel.innerHTML=
-    '<div style="padding:16px;display:flex;flex-direction:column;gap:14px">'+
-      // Header équipement
-      '<div style="background:linear-gradient(135deg,#1e293b,#334155);border-radius:12px;padding:14px;color:white">'+
-        '<div style="font-size:11px;color:#94a3b8;margin-bottom:2px">'+(typNom||'Équipement')+'</div>'+
-        '<div style="font-size:15px;font-weight:800">'+eqDisplay+'</div>'+
-        (modeleStr?'<div style="font-size:11px;color:#cbd5e1;margin-top:2px">'+modeleStr+'</div>':'')+
-        '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'+
-          contratBadge+
-          (panneCount>0?'<span style="font-size:10px;padding:2px 7px;border-radius:10px;background:#fef2f2;color:#ef4444;font-weight:700">'+panneCount+' panne'+(panneCount>1?'s':'')+' en 90j</span>':'')+
-          (!eq.marque?'<button onclick="_mntCompleteFiche(\''+eqId+'\',\''+sid+'\')" style="font-size:10px;padding:2px 7px;border-radius:10px;background:rgba(251,191,36,.2);color:#fbbf24;border:1px solid rgba(251,191,36,.4);cursor:pointer;font-weight:700">⚠ Compléter la fiche</button>':'')+
-        '</div>'+
-      '</div>'+
-      // Choix affectation
-      '<div>'+
-        '<div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Choix d\'affectation</div>'+
-        '<button onclick="_mntDispatch(\''+taskId+'\',\''+kind+'\',\''+sid+'\',\'interne\',\'\',\'\',\'\',\'\')" '+
-          'style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid #e2e8f0;border-radius:10px;background:white;cursor:pointer;width:100%;text-align:left;margin-bottom:8px;transition:border-color .15s" '+
-          'onmouseover="this.style.borderColor=\'#f59e0b\'" onmouseout="this.style.borderColor=\'#e2e8f0\'">'+
-          '<span style="font-size:22px">👷</span>'+
-          '<div><div style="font-size:13px;font-weight:700;color:#1e293b">Interne</div>'+
-          '<div style="font-size:11px;color:#64748b">Lien WhatsApp → technicien</div></div>'+
-        '</button>'+
-        (prests.length?
-          '<div style="font-size:11px;font-weight:600;color:#94a3b8;margin-bottom:6px">Prestataires disponibles</div>'+prestChoices:
-          '<div style="font-size:11px;color:#94a3b8;padding:10px;text-align:center;border:1.5px dashed #e2e8f0;border-radius:8px">'+
-            '<div>Aucun prestataire enregistré</div>'+
-            '<button onclick="_mntAddPrestataire(\''+sid+'\')" style="font-size:10px;color:#3b82f6;background:none;border:none;cursor:pointer;margin-top:4px">+ Ajouter un prestataire</button>'+
-          '</div>'
-        )+
-      '</div>'+
-    '</div>';
-}
-
-async function _mntDispatch(taskId,kind,sid,mode,prestId,prestNom,prestEmail,prestTel){
-  var patch={};
-  if(mode==='interne'){
-    patch={statut:'en_cours',intervenant:'interne'};
-  }else{
-    patch={statut:'en_cours',prestataire_id:prestId||null,prestataire:prestNom||null};
-  }
-  if(kind==='plan'){
-    // For plans_maintenance: create a maintenances instance (future)
-    alert('Affectation enregistrée. Lien envoyé à '+(mode==='interne'?'technicien interne':prestNom)+'.');
-    setTimeout(function(){_rtMaintenances(sid);},500);
-    return;
-  }
-  // corrective = signalement — patch statut + affectation
-  var sigPatch={statut:'en_cours'};
-  if(mode==='prestataire'&&prestNom)sigPatch.assigne_a=prestNom;
-  var ok=await supaPatch('signalements',taskId,sigPatch).catch(function(){return null;});
-  if(ok!==null){
-    var msg=mode==='interne'?'Envoyé au technicien interne (WhatsApp).':'Envoyé à '+prestNom+' (Email + WhatsApp).';
-    // Show brief confirmation in panel
-    var panel=document.getElementById('mnt-detail-panel');
-    if(panel){
-      panel.innerHTML='<div style="text-align:center;padding:32px;color:#16a34a">'+
-        '<div style="font-size:36px;margin-bottom:10px">✅</div>'+
-        '<div style="font-size:14px;font-weight:700">'+msg+'</div>'+
-        '<div style="font-size:11px;color:#94a3b8;margin-top:6px">Statut : En cours</div>'+
-      '</div>';
-    }
-    setTimeout(function(){_rtMaintenances(sid);},1500);
-  }else{
-    alert('Erreur lors de l\'enregistrement.');
-  }
-}
-
-async function _mntShiftDate(planId,sid,delta){
-  var rows=await supaGet('plans_maintenance','id=eq.'+planId+'&select=prochaine_date').catch(function(){return[];});
-  if(!rows.length)return;
-  var d=new Date((rows[0].prochaine_date||new Date().toISOString().slice(0,10))+'T00:00:00');
-  d.setDate(d.getDate()+delta);
-  var newDate=d.toISOString().slice(0,10);
-  await supaPatch('plans_maintenance',planId,{prochaine_date:newDate}).catch(function(){});
-  _rtMaintenances(sid);
-}
-
-async function _mntNouvelleTache(sid){
-  // Show template picker modal
-  var tmpls=await supaGet('maintenance_templates','order=nom.asc&select=id,nom,description,frequence,type_equipement_id').catch(function(){return[];});
-  var tmplHtml=tmpls.length?
-    tmpls.map(function(t){
-      return '<button onclick="_mntApplyTemplate(\''+t.id+'\',\''+escape_html(t.nom)+'\',\''+sid+'\')" '+
-        'style="display:flex;align-items:flex-start;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:8px;background:white;cursor:pointer;width:100%;text-align:left;margin-bottom:6px">'+
-        '<div>'+
-          '<div style="font-size:12px;font-weight:700;color:#1e293b">'+escape_html(t.nom)+'</div>'+
-          (t.description?'<div style="font-size:11px;color:#64748b;margin-top:1px">'+escape_html(t.description)+'</div>':'')+
-          (t.frequence?'<div style="font-size:10px;color:#94a3b8;margin-top:2px">'+escape_html(t.frequence)+'</div>':'')+
-        '</div>'+
-      '</button>';
-    }).join(''):
-    '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px">Aucun template disponible.<br>La tâche sera créée manuellement.</div>';
-
-  _showCfgModal(
-    '<div style="font-size:15px;font-weight:700;margin-bottom:4px">＋ Nouvelle tâche de maintenance</div>'+
-    '<div style="font-size:11px;color:#64748b;margin-bottom:16px">Choisissez un template ou créez manuellement</div>'+
-    '<div style="max-height:300px;overflow-y:auto">'+tmplHtml+'</div>'+
-    '<div style="margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9">'+
-      '<button onclick="_mntCreateManual(\''+sid+'\')" '+
-        'style="width:100%;padding:10px;border:1.5px dashed #cbd5e1;border-radius:8px;background:transparent;font-size:12px;font-weight:700;color:#64748b;cursor:pointer">'+
-        '✏️ Créer manuellement (sans template)'+
-      '</button>'+
-    '</div>'
-  );
-}
-
-async function _mntCreateManual(sid){
-  _closeCfgModal();
-  _showCfgModal(
-    '<div style="font-size:15px;font-weight:700;margin-bottom:16px">✏️ Nouvelle tâche manuelle</div>'+
-    '<div style="display:flex;flex-direction:column;gap:12px">'+
-      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">TITRE *</label>'+
-        '<input id="ntache-titre" placeholder="ex: Nettoyage condenseur" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
-      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">FRÉQUENCE</label>'+
-        '<select id="ntache-freq" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:white">'+
-          '<option value="mensuel">Mensuel</option><option value="trimestriel">Trimestriel</option>'+
-          '<option value="semestriel">Semestriel</option><option value="annuel">Annuel</option>'+
-          '<option value="ponctuel">Ponctuel</option>'+
-        '</select></div>'+
-      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">PROCHAINE DATE</label>'+
-        '<input id="ntache-date" type="date" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
-      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">INTERVENANT</label>'+
-        '<select id="ntache-intervenant" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:white">'+
-          '<option value="interne">Interne</option><option value="prestataire">Prestataire</option>'+
-        '</select></div>'+
-    '</div>'+
-    '<div style="display:flex;gap:10px;margin-top:18px">'+
-      '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
-      '<button onclick="_mntSaveTache(\''+sid+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:#1e293b;color:white;cursor:pointer">Créer</button>'+
-    '</div>'
-  );
-}
-
-async function _mntSaveTache(sid){
-  var titre=(document.getElementById('ntache-titre')||{}).value||'';
-  var freq=(document.getElementById('ntache-freq')||{}).value||'mensuel';
-  var date=(document.getElementById('ntache-date')||{}).value||null;
-  var intervenant=(document.getElementById('ntache-intervenant')||{}).value||'interne';
-  if(!titre){alert('Le titre est obligatoire.');return;}
-  var payload={site_id:sid,titre:titre,frequence:freq,prochaine_date:date||null,intervenant:intervenant,actif:true};
-  var ok=await supaPost('plans_maintenance',payload).catch(function(){return null;});
   if(ok!==null){_closeCfgModal();_rtMaintenances(sid);}
   else alert('Erreur lors de la création.');
 }
@@ -4582,177 +4521,6 @@ async function _mntDesactiverPrestataire(id){
   }catch(e){
     alert('Erreur : '+e.message);
   }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// FICHE ÉQUIPEMENT — Overlay slide-up avec timeline unifiée
-// ══════════════════════════════════════════════════════════════════════════════
-async function _openFicheEquipement(eqId,eqNom,sid){
-  var old=document.getElementById('fiche-eq-overlay');if(old)old.remove();
-  // Inject CSS once
-  if(!document.getElementById('fiche-eq-css')){
-    var s=document.createElement('style');s.id='fiche-eq-css';
-    s.textContent=[
-      '@keyframes feSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}',
-      '@keyframes feFadeIn{from{opacity:0}to{opacity:1}}',
-      '.fe-overlay{position:fixed;inset:0;z-index:9000;background:rgba(10,10,20,.52);backdrop-filter:blur(2px);animation:feFadeIn .18s ease;display:flex;flex-direction:column;justify-content:flex-end}',
-      '.fe-panel{background:#fff;border-radius:20px 20px 0 0;max-height:92vh;display:flex;flex-direction:column;animation:feSlideUp .28s cubic-bezier(.22,.61,.36,1)}',
-      '.fe-header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%);border-radius:20px 20px 0 0;padding:20px 20px 16px;color:#fff;flex-shrink:0}',
-      '.fe-drag{width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,.3);margin:0 auto 16px}',
-      '.fe-kpi{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:10px 14px;text-align:center;flex:1}',
-      '.fe-kpi-val{font-size:22px;font-weight:800;line-height:1}',
-      '.fe-kpi-lbl{font-size:10px;opacity:.7;margin-top:3px;line-height:1.3}',
-      '.fe-body{flex:1;overflow-y:auto;padding:0 0 32px}',
-      '.fe-tl-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;position:relative;z-index:1}',
-      '.fe-tl-line{position:absolute;left:13px;top:28px;bottom:-4px;width:2px;background:var(--border)}',
-      '.fe-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;line-height:1.6}'
-    ].join('');
-    document.head.appendChild(s);
-  }
-  // Create overlay with loader
-  var ov=document.createElement('div');ov.className='fe-overlay';ov.id='fiche-eq-overlay';
-  ov.onclick=function(e){if(e.target===ov)_closeFicheEquipement();};
-  ov.innerHTML='<div class="fe-panel"><div class="fe-header"><div class="fe-drag"></div>'+
-    '<div style="font-size:15px;font-weight:700;opacity:.7">Chargement…</div></div>'+
-    '<div class="fe-body" style="display:flex;align-items:center;justify-content:center;min-height:200px">'+
-    '<div style="text-align:center;color:var(--text3)"><div style="font-size:32px;animation:spin 1s linear infinite">⚙️</div><div style="margin-top:12px;font-size:12px">Chargement de la fiche…</div></div></div></div>';
-  document.body.appendChild(ov);
-
-  // Parallel fetch
-  var sgsQ='equipement_id=eq.'+eqId+'&order=created_at.desc&limit=40&select=id,type,description,statut,created_at,assigne_a,pris_en_charge_par,resolu_at,source';
-  var mntsQ='equipement_id=eq.'+eqId+'&order=created_at.desc&limit=40&select=id,type,titre,statut,created_at,date_realisation,prestataire,intervenant,cout,rapport_texte,signalement_id';
-  var eqQ='id=eq.'+eqId+'&select=id,nom,actif,types_equipements(nom)&limit=1';
-  var res=await Promise.all([
-    supaGet('signalements',sgsQ).catch(function(){return[];}),
-    supaGet('maintenances',mntsQ).catch(function(){return[];}),
-    supaGet('equipements',eqQ).catch(function(){return[];})
-  ]);
-  var sigs=res[0]||[];var mnts=res[1]||[];var eqData=(res[2]||[])[0]||null;
-  var typeNom=eqData&&eqData.types_equipements?eqData.types_equipements.nom:'Équipement';
-  var nom=eqNom||(eqData&&eqData.nom)||'Équipement';
-
-  // KPIs
-  var nbPannes=sigs.filter(function(s){return s.type==='panne';}).length;
-  var nbInterv=mnts.length;
-  var lastMnt=mnts[0];
-  var lastMntDate=lastMnt&&(lastMnt.date_realisation||lastMnt.created_at)?
-    new Date((lastMnt.date_realisation||lastMnt.created_at)).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'2-digit'}):'—';
-  var nextPlan=mnts.find(function(m){return m.statut==='planifie';});
-  var nextDate=nextPlan&&nextPlan.created_at?
-    new Date(nextPlan.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
-
-  // Type icon
-  var eqIcon='🔧';
-  if(typeNom){var t=typeNom.toLowerCase();if(t.indexOf('froid')>=0||t.indexOf('cf')>=0)eqIcon='❄️';else if(t.indexOf('groupe')>=0||t.indexOf('ge')>=0)eqIcon='⚡';else if(t.indexOf('cuve')>=0||t.indexOf('gasoil')>=0)eqIcon='⛽';else if(t.indexOf('eau')>=0||t.indexOf('pompe')>=0)eqIcon='💧';else if(t.indexOf('elec')>=0||t.indexOf('tgbt')>=0)eqIcon='🔌';}
-
-  // Build timeline events (merge sigs + mnts)
-  var events=[];
-  sigs.forEach(function(s){
-    var typeLabel={panne:'Panne',anomalie:'Anomalie',niveau_bas:'Niveau bas',qr:'QR code',other:'Signalement'}[s.type]||s.type||'Signalement';
-    var col={ouvert:'#ef4444',en_cours:'#f59e0b',resolu:'#22c55e'}[s.statut]||'#94a3b8';
-    var colBg={ouvert:'#fef2f2',en_cours:'#fffbeb',resolu:'#f0fdf4'}[s.statut]||'#f8fafc';
-    var who=s.assigne_a||s.pris_en_charge_par||'';
-    events.push({date:s.created_at,kind:'sig',icon:'🔔',col:col,colBg:colBg,
-      title:typeLabel+' · '+escape_html(s.description||'').substring(0,60),
-      sub:who?'👷 '+escape_html(who):'',
-      badge:{ouvert:'Ouvert',en_cours:'En cours',resolu:'Résolu'}[s.statut]||s.statut,
-      badgeCol:col,id:s.id});
-  });
-  mnts.forEach(function(m){
-    var col={planifie:'#f59e0b',realise:'#22c55e',annule:'#94a3b8'}[m.statut]||'#94a3b8';
-    var colBg={planifie:'#fffbeb',realise:'#f0fdf4',annule:'#f8fafc'}[m.statut]||'#f8fafc';
-    var who=m.prestataire||m.intervenant||'';
-    var rapportBtn=m.statut==='realise'?
-      '<button onclick="event.stopPropagation();_ficheJoindreRapport(\''+m.id+'\')" style="margin-top:8px;padding:5px 12px;border:1.5px solid #3b82f6;border-radius:6px;font-size:11px;font-weight:700;color:#3b82f6;background:#eff6ff;cursor:pointer">'+
-        (m.rapport_texte?'📄 Voir rapport':'📎 Joindre rapport')+
-      '</button>':'';
-    var rapportPreview=m.rapport_texte?
-      '<div style="margin-top:7px;padding:8px 10px;background:#f8fafc;border-left:3px solid #3b82f6;border-radius:4px;font-size:11px;color:#334155;line-height:1.5">'+
-        escape_html(m.rapport_texte.substring(0,120))+(m.rapport_texte.length>120?'…':'')+
-      '</div>':'';
-    events.push({date:m.date_realisation||m.created_at,kind:'mnt',icon:m.type==='panne'?'🔴':'🔧',col:col,colBg:colBg,
-      title:escape_html(m.titre||m.type||'Intervention'),
-      sub:who?'👷 '+escape_html(who)+(m.cout?' · 💰 '+parseFloat(m.cout).toLocaleString('fr-FR')+' FCFA':''):
-              (m.cout?'💰 '+parseFloat(m.cout).toLocaleString('fr-FR')+' FCFA':''),
-      badge:{planifie:'Planifié',realise:'Réalisé',annule:'Annulé'}[m.statut]||m.statut,
-      badgeCol:col,extra:rapportPreview+rapportBtn,id:m.id});
-  });
-  events.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
-
-  // Timeline HTML
-  var tlHtml='';
-  var lastMonthKey='';
-  events.forEach(function(ev,i){
-    var d=new Date(ev.date);
-    var mk=d.getFullYear()+'-'+(d.getMonth()+1);
-    if(mk!==lastMonthKey){
-      lastMonthKey=mk;
-      tlHtml+='<div style="padding:14px 20px 6px;font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px">'+
-        d.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})+'</div>';
-    }
-    var dateStr=d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
-    tlHtml+=
-      '<div style="display:flex;gap:12px;padding:4px 20px;position:relative">'+
-        '<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:28px">'+
-          '<div class="fe-tl-dot" style="background:'+ev.colBg+';border:2px solid '+ev.col+'">'+ev.icon+'</div>'+
-          (i<events.length-1?'<div style="width:2px;flex:1;min-height:12px;background:#e2e8f0;margin-top:3px"></div>':'')+
-        '</div>'+
-        '<div style="flex:1;padding-bottom:14px">'+
-          '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">'+
-            '<div style="font-size:12px;font-weight:700;color:#1e293b;line-height:1.4">'+ev.title+'</div>'+
-            '<span class="fe-badge" style="background:'+ev.colBg+';color:'+ev.col+';border:1px solid '+ev.col+';flex-shrink:0">'+ev.badge+'</span>'+
-          '</div>'+
-          (ev.sub?'<div style="font-size:11px;color:#64748b;margin-bottom:3px">'+ev.sub+'</div>':'')+
-          '<div style="font-size:10px;color:#94a3b8">'+dateStr+'</div>'+
-          (ev.extra||'')+
-        '</div>'+
-      '</div>';
-  });
-  if(!events.length){
-    tlHtml='<div style="text-align:center;padding:48px 24px;color:#94a3b8">'+
-      '<div style="font-size:40px;margin-bottom:12px;opacity:.4">📋</div>'+
-      '<div style="font-size:14px">Aucun historique pour cet équipement.</div></div>';
-  }
-
-  // Assemble panel
-  var actifBadge=eqData&&!eqData.actif?
-    '<span class="fe-badge" style="background:rgba(239,68,68,.2);color:#fca5a5;border:1px solid rgba(239,68,68,.3)">Inactif</span>':'';
-  ov.innerHTML=
-    '<div class="fe-panel" onclick="event.stopPropagation()">'+
-      // Header gradient
-      '<div class="fe-header">'+
-        '<div class="fe-drag"></div>'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
-          '<div style="display:flex;align-items:center;gap:12px">'+
-            '<div style="width:46px;height:46px;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px">'+eqIcon+'</div>'+
-            '<div>'+
-              '<div style="font-size:17px;font-weight:800;line-height:1.2">'+escape_html(nom)+'</div>'+
-              '<div style="font-size:11px;opacity:.65;margin-top:2px">'+escape_html(typeNom)+(actifBadge?' · '+actifBadge:'')+'</div>'+
-            '</div>'+
-          '</div>'+
-          '<button onclick="_closeFicheEquipement()" style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;line-height:1">✕</button>'+
-        '</div>'+
-        // KPIs row
-        '<div style="display:flex;gap:8px">'+
-          '<div class="fe-kpi"><div class="fe-kpi-val">'+nbPannes+'</div><div class="fe-kpi-lbl">Pannes<br>signalées</div></div>'+
-          '<div class="fe-kpi"><div class="fe-kpi-val">'+nbInterv+'</div><div class="fe-kpi-lbl">Interventions<br>totales</div></div>'+
-          '<div class="fe-kpi"><div class="fe-kpi-val" style="font-size:13px">'+lastMntDate+'</div><div class="fe-kpi-lbl">Dernière<br>intervention</div></div>'+
-          '<div class="fe-kpi"><div class="fe-kpi-val" style="font-size:13px">'+nextDate+'</div><div class="fe-kpi-lbl">Prochaine<br>planifiée</div></div>'+
-        '</div>'+
-      '</div>'+
-      // Timeline section header
-      '<div style="padding:16px 20px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f1f5f9;flex-shrink:0">'+
-        '<div style="font-size:13px;font-weight:700;color:#1e293b">📋 Historique complet</div>'+
-        '<div style="font-size:11px;color:#94a3b8">'+events.length+' événement'+(events.length>1?'s':'')+'</div>'+
-      '</div>'+
-      // Body timeline
-      '<div class="fe-body">'+tlHtml+'</div>'+
-    '</div>';
-}
-
-function _closeFicheEquipement(){
-  var ov=document.getElementById('fiche-eq-overlay');
-  if(ov){ov.style.opacity='0';ov.style.transition='opacity .15s';setTimeout(function(){ov.remove();},150);}
 }
 
 function _ficheJoindreRapport(mntId){
