@@ -4492,7 +4492,7 @@ function _mntTogglePrestMode(){
   if(prest&&wrap)wrap.style.display=prest.value?'none':'';
 }
 
-async function _mntNouvelleTachePourEq(eqId,eqNom,sid,editPlanId){
+async function _mntNouvelleTachePourEq(eqId,eqNom,sid,editPlanId,tpl){
   _closeCfgModal&&_closeCfgModal();
   var prests=await supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom').catch(function(){return[];});
   var ep={};
@@ -4500,6 +4500,8 @@ async function _mntNouvelleTachePourEq(eqId,eqNom,sid,editPlanId){
     var rows=await supaGet('plans_maintenance','id=eq.'+editPlanId+'&select=id,titre,frequence,prochaine_date,intervenant,prestataire_id').catch(function(){return[];});
     ep=rows[0]||{};
   }
+  if(tpl&&tpl.titre)ep.titre=tpl.titre;
+  if(tpl&&tpl.frequence)ep.frequence=tpl.frequence;
   var eFreq=ep.frequence||'';
   var fm=eFreq.match(/^(\d+)\s*(jour|semaine|mois|an|heure|km|cycle)/i);
   var fVal=fm?fm[1]:'1';
@@ -4511,7 +4513,8 @@ async function _mntNouvelleTachePourEq(eqId,eqNom,sid,editPlanId){
   }).join('');
   _showCfgModal(
     '<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+(editPlanId?'✏️ Modifier le plan':'📅 Nouveau plan')+'</div>'+
-    '<div style="font-size:11px;color:#64748b;margin-bottom:16px">'+escape_html(eqNom)+'</div>'+
+    '<div style="font-size:11px;color:#64748b;margin-bottom:'+(editPlanId?'16':'10')+'px">'+escape_html(eqNom)+'</div>'+
+    (!editPlanId?'<button onclick="_mntOpenTemplatePicker(\''+eqId+'\',\''+escape_html(eqNom)+'\',\''+sid+'\')" style="display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:9px;border:1.5px dashed #cbd5e1;border-radius:8px;font-size:12px;font-weight:600;color:#475569;background:#f8fafc;cursor:pointer;margin-bottom:14px;box-sizing:border-box"><i class=\"ti ti-layout-list\" style=\"font-size:14px\"></i> Depuis un template</button>':'')+
     '<div style="display:flex;flex-direction:column;gap:12px">'+
       '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">TITRE *</label>'+
         '<input id="ntache-titre" value="'+escape_html(ep.titre||'')+'" placeholder="ex: Nettoyage condenseur" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
@@ -4554,6 +4557,120 @@ async function _mntNouvelleTachePourEq(eqId,eqNom,sid,editPlanId){
   },0);
 }
 
+// ── Templates de maintenance ────────────────────────────────────────────────
+async function _mntOpenTemplatePicker(eqId,eqNom,sid){
+  _closeCfgModal&&_closeCfgModal();
+  var tmpls=await supaGet('templates_maintenance','actif=eq.true&order=categorie.asc,titre.asc&select=id,titre,frequence,categorie').catch(function(){return[];});
+  var cats=[...new Set(tmpls.map(function(t){return t.categorie||'Général';}))].sort();
+  window._mntTplData={all:tmpls,eqId:eqId,eqNom:eqNom,sid:sid,activeCat:null};
+  var catBtns=cats.map(function(c){
+    return '<button onclick="_mntFilterTpls(\''+escape_html(c)+'\')" id="tpl-cat-'+c.replace(/[^a-z0-9]/gi,'_')+'" style="padding:4px 10px;border:1.5px solid #e2e8f0;border-radius:16px;font-size:11px;font-weight:600;background:white;color:#475569;cursor:pointer">'+escape_html(c)+'</button>';
+  }).join('');
+  _showCfgModal(
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
+      '<div style="font-size:15px;font-weight:700">📋 Templates</div>'+
+      '<button onclick="_mntCreateTemplate(\''+sid+'\')" style="font-size:11px;font-weight:700;color:#3b82f6;background:none;border:none;cursor:pointer;padding:0">+ Nouveau</button>'+
+    '</div>'+
+    '<input id="tpl-search" oninput="_mntFilterTpls()" placeholder="Rechercher un template…" style="width:100%;padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;box-sizing:border-box;margin-bottom:10px"/>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">'+
+      '<button onclick="_mntFilterTpls(\'\')" id="tpl-cat-all" style="padding:4px 10px;border:1.5px solid #1e293b;border-radius:16px;font-size:11px;font-weight:700;background:#1e293b;color:white;cursor:pointer">Tous</button>'+
+      catBtns+
+    '</div>'+
+    '<div id="tpl-grid" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto"></div>'+
+    '<button onclick="_mntNouvelleTachePourEq(\''+eqId+'\',\''+escape_html(eqNom)+'\',\''+sid+'\')" style="width:100%;margin-top:12px;padding:9px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;font-weight:600;background:white;cursor:pointer;color:#64748b">← Sans template</button>'
+  );
+  setTimeout(function(){_mntFilterTpls('');},0);
+}
+
+function _mntFilterTpls(cat){
+  var d=window._mntTplData||{};
+  if(cat!==undefined)d.activeCat=cat||null;
+  var activeCat=d.activeCat;
+  var search=(document.getElementById('tpl-search')||{}).value||'';
+  // Update cat button styles
+  ['all'].concat((d.all||[]).map(function(t){return t.categorie||'Général';})).forEach(function(c){
+    var id=c==='all'?'tpl-cat-all':'tpl-cat-'+c.replace(/[^a-z0-9]/gi,'_');
+    var el=document.getElementById(id);
+    if(!el)return;
+    var active=(c==='all'&&!activeCat)||(activeCat&&c===activeCat);
+    el.style.background=active?'#1e293b':'white';
+    el.style.color=active?'white':'#475569';
+    el.style.borderColor=active?'#1e293b':'#e2e8f0';
+  });
+  var filtered=(d.all||[]).filter(function(t){
+    var matchCat=!activeCat||(t.categorie||'Général')===activeCat;
+    var matchSearch=!search||t.titre.toLowerCase().indexOf(search.toLowerCase())>=0;
+    return matchCat&&matchSearch;
+  });
+  window._mntTplData=d;
+  var grid=document.getElementById('tpl-grid');
+  if(!grid)return;
+  if(!filtered.length){
+    grid.innerHTML='<div style="text-align:center;padding:28px;color:#94a3b8;font-size:12px">Aucun template · <button onclick="_mntCreateTemplate(\''+d.sid+'\')" style="color:#3b82f6;background:none;border:none;cursor:pointer;font-size:12px;font-weight:600">Créer le premier</button></div>';
+    return;
+  }
+  grid.innerHTML=filtered.map(function(t){
+    return '<div onclick="_mntApplyTemplate(\''+t.id+'\')" style="padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;cursor:pointer;background:white" onmouseover="this.style.borderColor=\'#3b82f6\';this.style.background=\'#f0f9ff\'" onmouseout="this.style.borderColor=\'#e2e8f0\';this.style.background=\'white\'">'+
+      '<div style="font-size:12px;font-weight:700;color:#1e293b">'+escape_html(t.titre)+'</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-top:3px">'+
+        '<span style="font-size:10px;background:#f1f5f9;color:#475569;padding:2px 7px;border-radius:12px;font-weight:600">'+escape_html(t.frequence)+'</span>'+
+        (t.categorie?'<span style="font-size:10px;color:#94a3b8">'+escape_html(t.categorie)+'</span>':'')+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+async function _mntApplyTemplate(tplId){
+  var d=window._mntTplData||{};
+  var t=(d.all||[]).find(function(x){return x.id===tplId;})||{};
+  _closeCfgModal&&_closeCfgModal();
+  await _mntNouvelleTachePourEq(d.eqId,d.eqNom,d.sid,null,t);
+}
+
+function _mntCreateTemplate(sid){
+  var d=window._mntTplData||{};
+  var cats=['Groupe électrogène','Climatisation','Chambre froide','Pompe','Transformateur','Compresseur','Éclairage','Général','Autre'];
+  _showCfgModal(
+    '<div style="font-size:15px;font-weight:700;margin-bottom:16px">✨ Nouveau template</div>'+
+    '<div style="display:flex;flex-direction:column;gap:12px">'+
+      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">TITRE *</label>'+
+        '<input id="tplc-titre" placeholder="ex: Vidange huile moteur" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">CATÉGORIE</label>'+
+        '<select id="tplc-cat" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:white">'+
+          cats.map(function(c){return'<option value="'+escape_html(c)+'">'+escape_html(c)+'</option>';}).join('')+
+        '</select></div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+        '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">VALEUR</label>'+
+          '<input id="tplc-val" type="number" min="1" value="1" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">UNITÉ</label>'+
+          '<select id="tplc-unit" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:white">'+
+            '<option value="jour">Jours</option><option value="semaine">Semaines</option>'+
+            '<option value="mois" selected>Mois</option><option value="an">Ans</option>'+
+            '<option value="heure">Heures compteur</option><option value="km">Kilomètres</option>'+
+          '</select></div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:10px;margin-top:18px">'+
+      '<button onclick="_mntOpenTemplatePicker(\''+d.eqId+'\',\''+escape_html(d.eqNom||'')+'\',\''+sid+'\')" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer;color:#64748b">← Retour</button>'+
+      '<button onclick="_mntSaveTemplate(\''+sid+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:#1e293b;color:white;cursor:pointer">Créer</button>'+
+    '</div>'
+  );
+}
+
+async function _mntSaveTemplate(sid){
+  var titre=(document.getElementById('tplc-titre')||{}).value||'';
+  var cat=(document.getElementById('tplc-cat')||{}).value||'Général';
+  var val=(document.getElementById('tplc-val')||{}).value||'1';
+  var unit=(document.getElementById('tplc-unit')||{}).value||'mois';
+  if(!titre.trim()){alert('Le titre est requis.');return;}
+  var ok=await supaPost('templates_maintenance',{titre:titre.trim(),frequence:val+' '+unit,categorie:cat,actif:true}).catch(function(){return null;});
+  if(ok){
+    var d=window._mntTplData||{};
+    _mntOpenTemplatePicker(d.eqId,d.eqNom||'',sid);
+  }else{alert('Erreur lors de la création du template.');}
+}
+
+// ── Fin templates ────────────────────────────────────────────────────────────
 async function _mntSaveTacheEq(eqId,sid,editPlanId){
   var titre=(document.getElementById('ntache-titre')||{}).value||'';
   var fVal=(document.getElementById('ntache-freq-val')||{}).value||'1';
