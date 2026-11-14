@@ -149,9 +149,7 @@ async function init(){
   _mission=missions[0];
   if(!_respTel&&_mission.resp_tel)_respTel=_mission.resp_tel;
 
-  if(_mission.statut==='realisee'){renderSuccess();return;}
-
-  // Fetch mission_plans + plans_maintenance (avec checklist)
+  // Fetch mission_plans dans tous les cas (mode actif ET mode lecture rapport)
   var mps=await sbGet('mission_plans','mission_id=eq.'+_mission.id+'&select=*,plans_maintenance(id,titre,frequence,checklist)');
   _missionPlans=mps||[];
 
@@ -171,6 +169,7 @@ async function init(){
   document.getElementById('hdr-title').textContent=eqNom;
   document.getElementById('hdr-sub').textContent=(siteNom?siteNom+' · ':'')+_missionPlans.length+' tâche'+(_missionPlans.length>1?'s':'');
 
+  if(_mission.statut==='realisee'){renderRapport();return;}
   renderApp();
 }
 
@@ -372,6 +371,86 @@ async function _submitMission(){
 }
 
 var _waRapportMsg='';
+
+function renderRapport(){
+  var eqNom=(_mission.equipements&&_mission.equipements.nom)||'Équipement';
+  var siteNom=(_mission.sites&&_mission.sites.nom)||'';
+  var dateComp=_mission.completed_at?new Date(_mission.completed_at).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}):'';
+  var app=document.getElementById('app');
+  document.getElementById('hdr-sub').textContent='Rapport · '+(dateComp||'Mission réalisée');
+  var html='<div class="card" style="margin-bottom:12px;padding:14px 16px">';
+  html+='<div style="display:flex;align-items:center;gap:10px">';
+  html+='<span style="font-size:28px">✅</span>';
+  html+='<div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1e293b">Mission réalisée</div>';
+  if(_mission.technicien_nom)html+='<div style="font-size:11px;color:#64748b;margin-top:1px">Tech : '+esc(_mission.technicien_nom)+(dateComp?' · '+dateComp:'')+'</div>';
+  html+='</div></div></div>';
+
+  _missionPlans.forEach(function(mp,i){
+    var plan=mp.plans_maintenance||{};
+    var statut=mp.statut||'a_faire';
+    var isOk=statut==='realise',isKo=statut==='bloque';
+    var clDef=Array.isArray(plan.checklist)?plan.checklist:[];
+    var clComp=Array.isArray(mp.checklist_completee)?mp.checklist_completee:[];
+    var nbComp=clComp.filter(function(c){return c&&c.done;}).length;
+    var nbTotal=clDef.length;
+
+    html+='<div class="card" id="task-card-'+mp.id+'">';
+    html+='<div class="card-head">';
+    html+='<div class="card-head-label">Tâche '+(i+1)+' / '+_missionPlans.length+'</div>';
+    if(isOk)html+='<span class="badge badge-ok">✅ Réalisé</span>';
+    else if(isKo)html+='<span class="badge badge-ko">🔴 Bloqué</span>';
+    else html+='<span class="badge badge-todo">Non traité</span>';
+    html+='</div>';
+    html+='<div class="task-row">';
+    html+='<div class="task-name">'+esc(plan.titre||plan.frequence||'Tâche')+'</div>';
+    if(plan.frequence)html+='<div class="task-freq">'+esc(freqLabel(plan.frequence))+'</div>';
+
+    // Checklist complétée
+    if(clComp.length){
+      html+='<div style="margin-bottom:10px">';
+      html+='<div class="field-label" style="margin-bottom:5px">Points vérifiés ('+nbComp+'/'+nbTotal+')</div>';
+      clComp.forEach(function(c){
+        var txt=c.text||'';
+        var done=!!c.done;
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9">';
+        html+='<span style="font-size:14px">'+(done?'✅':'⬜')+'</span>';
+        html+='<span style="font-size:12px;color:'+(done?'#94a3b8':'#374151')+';'+(done?'text-decoration:line-through':'')+'">'+esc(txt)+'</span>';
+        html+='</div>';
+      });
+      html+='</div>';
+    } else if(clDef.length){
+      // Checklist définie sur le plan mais pas de résultats sauvegardés
+      html+='<div style="margin-bottom:10px">';
+      html+='<div class="field-label" style="margin-bottom:5px">Points à vérifier</div>';
+      clDef.forEach(function(item){
+        html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9">';
+        html+='<span style="font-size:14px">⬜</span>';
+        html+='<span style="font-size:12px;color:#374151">'+esc(item.text||item)+'</span>';
+        html+='</div>';
+      });
+      html+='</div>';
+    }
+
+    if(mp.motif_blocage&&isKo){
+      html+='<div style="background:#fef2f2;border-radius:8px;padding:9px 12px;margin-bottom:8px;font-size:12px;color:#dc2626"><strong>Motif :</strong> '+esc(mp.motif_blocage)+'</div>';
+    }
+    if(mp.commentaire){
+      html+='<div style="background:#f8fafc;border-radius:8px;padding:9px 12px;margin-bottom:8px;font-size:12px;color:#374151">'+esc(mp.commentaire)+'</div>';
+    }
+    if(mp.photo_url){
+      html+='<div style="margin-top:6px"><img src="'+esc(mp.photo_url)+'" style="width:100%;max-width:280px;border-radius:10px;border:1px solid #e2e8f0"/></div>';
+    }
+    html+='</div></div>';
+  });
+
+  // Bouton WA
+  var telClean=_respTel?_respTel.replace(/^\+/,'').replace(/\s+/g,''):'';
+  var waUrl='https://wa.me/'+(telClean?telClean:'')+'?text='+encodeURIComponent(_waRapportMsg||'Mission terminée.');
+  html+='<a href="'+waUrl+'" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;margin-bottom:16px;padding:14px;background:#22c55e;color:white;border-radius:12px;font-size:14px;font-weight:700;text-decoration:none">'+
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.374 0 0 5.373 0 12c0 2.136.564 4.133 1.546 5.861L0 24l6.336-1.521A11.914 11.914 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.797 9.797 0 01-5.023-1.381l-.36-.214-3.729.896.927-3.635-.236-.374A9.771 9.771 0 012.182 12C2.182 6.577 6.577 2.182 12 2.182S21.818 6.577 21.818 12 17.423 21.818 12 21.818z"/></svg>'+
+    ' Envoyer au responsable</a>';
+  app.innerHTML=html;
+}
 
 function renderSuccess(){
   document.getElementById('hdr-sub').textContent='Mission soumise';
