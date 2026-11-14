@@ -74,6 +74,15 @@ async function sbGet(table,qs){
   if(!r.ok)return[];
   return await r.json();
 }
+async function sbPost(table,data){
+  var r=await fetch(SUPA_URL+'/rest/v1/'+table,{
+    method:'POST',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+    body:JSON.stringify(data)
+  });
+  if(!r.ok){var e=await r.text();console.error('POST error',e);}
+  return r.ok;
+}
 async function sbPatch(table,id,data){
   var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?id=eq.'+id,{
     method:'PATCH',
@@ -273,6 +282,22 @@ async function _submitMission(){
       if(nextDate)planPatch.prochaine_date=nextDate;
       if(st.heures!==null&&plan.frequence.toLowerCase().includes('heure'))planPatch.prochaine_date=null;
       if(Object.keys(planPatch).length)await sbPatch('plans_maintenance',plan.id,planPatch);
+    }
+    // Créer un enregistrement dans maintenances pour l'historique
+    if(st.statut==='realise'||st.statut==='partiel'){
+      var mntRecord={
+        groupe_id:_mission.site_id||null,
+        equipement_id:_mission.equipement_id||null,
+        plan_maintenance_id:plan.id||null,
+        type:'preventif',
+        titre:plan.titre||('Maintenance '+(plan.frequence||'')),
+        date_realisee:new Date().toISOString().split('T')[0],
+        statut:st.statut==='realise'?'realise':'partiel',
+        technicien:_mission.technicien_nom||null,
+        rapport_texte:st.commentaire||null,
+        photo_url:photoUrl||null
+      };
+      await sbPost('maintenances',mntRecord);
     }
   }
   // Marquer mission comme réalisée

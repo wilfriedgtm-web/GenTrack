@@ -4484,7 +4484,15 @@ async function _mntSelectEq(eqId,eqNom,sid){
     supaGet('maintenances','equipement_id=eq.'+eqId+'&order=date_realisee.desc&limit=15&select=id,titre,type,statut,created_at,date_realisee,prestataire,prestataire_id,technicien,cout,rapport_texte,plan_maintenance_id').catch(function(){return[];}),
     supaGet('plans_maintenance','equipement_id=eq.'+eqId+'&actif=eq.true&order=prochaine_date.asc&select=id,titre,frequence,prochaine_date,intervenant,prestataires(nom)').catch(function(){return[];}),
     supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom,telephone,email').catch(function(){return[];}),
-    supaGet('vue_derniere_valeur_equipement','equipement_id=eq.'+eqId+'&select=valeur,unite,question_texte,relevee_at').catch(function(){return[];})
+    supaGet('reponses',
+      'select=valeur,created_at,questions!inner(texte,unite,equipement_id,type_reponse)'+
+      '&questions.equipement_id=eq.'+eqId+
+      '&questions.type_reponse=eq.numerique'+
+      '&questions.unite=not.is.null'+
+      '&order=created_at.desc&limit=100'
+    ).catch(function(){return[];}),
+    (function(){var d90=new Date();d90.setDate(d90.getDate()-90);
+      return supaGet('signalements','equipement_id=eq.'+eqId+'&type=eq.panne&created_at=gte.'+d90.toISOString()+'&select=id').catch(function(){return[];});})()
   ]);
   var eq=res[0][0]||{nom:eqNom};
   var pannesOuv=res[1]||[];
@@ -4492,11 +4500,176 @@ async function _mntSelectEq(eqId,eqNom,sid){
   var mnts=res[3]||[];
   var plans=res[4]||[];
   var prests=res[5]||[];
-  var mesurePrincipale=res[6]&&res[6][0]?res[6][0]:null;
+  var allValeurs=res[6]||[];
+  var pannes90=res[7]||[];
+
+  // Dernière valeur par unité pour les cards métriques
+  var valParUnite={};
+  allValeurs.forEach(function(r){
+    var u=r.questions&&r.questions.unite;if(!u)return;
+    if(!valParUnite[u]||new Date(r.created_at)>new Date(valParUnite[u].created_at))
+      valParUnite[u]={valeur:r.valeur,unite:u,texte:r.questions?r.questions.texte:'',created_at:r.created_at};
+  });
+  var valHeure=valParUnite['h']||null;
+  var valTemp=valParUnite['°C']||null;
+  var valLevel=valParUnite['L']||valParUnite['%']||valParUnite['m³']||null;
+  var mesurePrincipale=valHeure||valTemp||valLevel||(Object.keys(valParUnite).length?valParUnite[Object.keys(valParUnite)[0]]:null);
+
+  // Index dernière maintenance par plan
+  var lastMntByPlanId={};
+  mnts.forEach(function(m){if(m.plan_maintenance_id)lastMntByPlanId[m.plan_maintenance_id]=m;});
 
   var typNom=eq.types_equipements?eq.types_equipements.nom||'':'';
   var ti=_mntTypeIcon(typNom);
   var modStr=[eq.marque,eq.modele].filter(Boolean).map(escape_html).join(' ');
+
+  // ── Fiche tab — cards métriques + calendrier d'entretien ─────────────────
+  function fmtVal(v,u){
+    var n=parseFloat(v);
+    var s=n%1===0?n.toString():n.toFixed(1);
+    return s+'<span style="font-size:10px;font-weight:500;color:#64748b;margin-left:2px">'+escape_html(u)+'</span>';
+  }
+  function metricCard(title,val,sub,accentCol){
+    return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:11px 13px;min-width:0">'+
+      '<div style="font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">'+title+'</div>'+
+      '<div style="font-size:20px;font-weight:800;color:'+(accentCol||'#1e293b')+';line-height:1">'+val+'</div>'+
+      (sub?'<div style="font-size:10px;color:#94a3b8;margin-top:3px">'+sub+'</div>':'')+
+    '</div>';
+  }
+  function timeAgo(dateStr){
+    if(!dateStr)return '';
+    var d=new Date(dateStr),now=new Date();
+    var diff=Math.round((now-d)/(1000*60*60*24));
+    if(diff===0)return 'Aujourd\'hui';
+    if(diff===1)return 'Hier';
+    if(diff<30)return 'Il y a '+diff+' j';
+    if(diff<365)return 'Il y a '+Math.round(diff/30)+' mois';
+    return 'Il y a '+Math.round(diff/365)+' an'+(Math.round(diff/365)>1?'s':'');
+  }
+
+  // Cards métriques
+  var card1,card2,card3,card4;
+  if(valHeure){
+    var hVal=Math.round(parseFloat(valHeure.valeur));
+    card1=metricCard('Heures moteur',hVal+'<span style="font-size:12px;font-weight:600;color:#64748b;margin-left:2px">h</span>',timeAgo(valHeure.created_at),'#1e293b');
+  } else {
+    card1=metricCard('Heures moteur','—','Pas de compteur','#94a3b8');
+  }
+  if(valTemp){
+    var tVal=parseFloat(valTemp.valeur);
+    var tCol=tVal<-10?'#3b82f6':tVal<0?'#06b6d4':tVal>35?'#ef4444':'#1e293b';
+    card2=metricCard('Température',fmtVal(valTemp.valeur,'°C'),timeAgo(valTemp.created_at),tCol);
+  } else if(valLevel){
+    card2=metricCard((valLevel.unite==='L'?'Niveau cuve':valLevel.unite==='%'?'Niveau':'Volume'),fmtVal(valLevel.valeur,valLevel.unite),timeAgo(valLevel.created_at),'#1e293b');
+  } else {
+    var otherKeys=Object.keys(valParUnite).filter(function(u){return u!=='h'&&u!=='°C'&&u!=='L'&&u!=='%'&&u!=='m³';});
+    if(otherKeys.length){
+      var ov=valParUnite[otherKeys[0]];
+      card2=metricCard('Mesure',fmtVal(ov.valeur,ov.unite),timeAgo(ov.created_at),'#1e293b');
+    } else {
+      card2=metricCard('Mesure','—','Aucune relève','#94a3b8');
+    }
+  }
+  var nbP90=pannes90.length;
+  card3=metricCard('Pannes (3 mois)',nbP90+'<span style="font-size:12px;font-weight:600;color:'+(nbP90>0?'#ef4444':'#64748b')+';margin-left:2px">sign.</span>',
+    pannesOuv.length?pannesOuv.length+' ouverte'+(pannesOuv.length>1?'s':''):'Aucune ouverte',nbP90>0?'#ef4444':'#1e293b');
+  var specVal=modStr||typNom||'—';
+  card4=metricCard('Équipement',
+    '<span style="font-size:13px;font-weight:700;color:#1e293b;line-height:1.3;word-break:break-word">'+escape_html(specVal)+'</span>',
+    eq.numero_serie?'N° '+escape_html(eq.numero_serie):'',null);
+  var cardsHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 14px 6px">'+card1+card2+card3+card4+'</div>';
+
+  // Calendrier d'entretien — timeline
+  var calItems=[];
+  // Plans en retard et à venir
+  plans.forEach(function(p){
+    var isHeure=p.frequence&&/heure/i.test(p.frequence);
+    var diff=null,estHeures=null;
+    if(p.prochaine_date){
+      diff=Math.round((new Date(p.prochaine_date+'T00:00:00')-new Date().setHours(0,0,0,0))/(1000*60*60*24));
+    } else if(isHeure&&valHeure){
+      var intervalH=parseFloat((p.frequence||'').match(/(\d+(?:\.\d+)?)/)||[0,'0'])[1]||0;
+      var curH=parseFloat(valHeure.valeur)||0;
+      if(intervalH>0){
+        var nextH=Math.ceil((curH+0.001)/intervalH)*intervalH;
+        estHeures=Math.round(nextH-curH);
+      }
+    }
+    var lastMnt=lastMntByPlanId[p.id];
+    calItems.push({p:p,diff:diff,isHeure:isHeure,estHeures:estHeures,lastMnt:lastMnt,order:diff!==null?diff:(estHeures!==null?estHeures+1000:9999)});
+  });
+  calItems.sort(function(a,b){return a.order-b.order;});
+
+  var calHtml=calItems.length?calItems.map(function(item,i){
+    var p=item.p,diff=item.diff;
+    var col=diff!==null&&diff<0?'#ef4444':diff!==null&&diff<=14?'#f59e0b':item.lastMnt&&item.lastMnt.statut==='realise'&&(diff===null||diff>0)?'#22c55e':'#94a3b8';
+    var dotInner=diff!==null&&diff<0?'<i class="ti ti-alert-triangle" style="font-size:9px;color:white"></i>':
+      diff===null&&item.estHeures!==null?'':'';
+    var statusTxt=diff!==null&&diff<0?
+      '<span style="font-size:10px;font-weight:700;color:#ef4444">En retard +'+Math.abs(diff)+'j</span>':
+      diff===null&&item.estHeures!==null?
+        '<span style="font-size:10px;color:#64748b">Dans ~'+item.estHeures+'h de marche</span>':
+      diff===null?
+        '<span style="font-size:10px;color:#94a3b8">Date à définir</span>':
+      diff===0?'<span style="font-size:10px;font-weight:700;color:#f59e0b">Aujourd\'hui</span>':
+      diff<=14?'<span style="font-size:10px;font-weight:700;color:#f59e0b">Dans '+diff+' j</span>':
+        '<span style="font-size:10px;color:#64748b">Dans '+diff+' j</span>';
+    var subLine='';
+    if(item.lastMnt){
+      var lm=item.lastMnt;
+      var who=lm.technicien||lm.prestataire||'';
+      var lmDate=lm.date_realisee||lm.created_at;
+      var lmDateStr=new Date(lmDate).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'2-digit'});
+      if(item.isHeure&&valHeure){
+        subLine='<div style="font-size:10px;color:#94a3b8">Fait à '+Math.round(parseFloat(valHeure.valeur)-((diff||0)*0))+'h · '+(who?escape_html(who)+' · ':'')+lmDateStr+'</div>';
+      } else {
+        subLine='<div style="font-size:10px;color:#94a3b8">'+(who?escape_html(who)+' · ':'')+lmDateStr+'</div>';
+      }
+    }
+    var freqLbl=_mntFreqLabel(p.frequence||'')||escape_html(p.frequence||'');
+    return '<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 14px;'+(i<calItems.length-1?'border-bottom:1px solid #f1f5f9':'')+'">'+
+      '<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;margin-top:2px">'+
+        '<div style="width:14px;height:14px;border-radius:50%;background:'+col+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+dotInner+'</div>'+
+        (i<calItems.length-1?'<div style="width:1px;height:100%;min-height:16px;background:#e2e8f0;margin-top:3px"></div>':'')+
+      '</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px">'+
+          '<div style="font-size:12px;font-weight:600;color:'+(diff!==null&&diff<0?'#ef4444':diff!==null&&diff<=14?'#b45309':'#1e293b')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
+            escape_html(p.titre||freqLbl||'Maintenance')+' — '+freqLbl+
+          '</div>'+
+          statusTxt+
+        '</div>'+
+        (p.intervenant||p.prestataires?'<div style="font-size:10px;color:#64748b;margin-bottom:1px">'+escape_html((p.prestataires&&p.prestataires.nom)||p.intervenant||'')+'</div>':'')+
+        subLine+
+      '</div>'+
+    '</div>';
+  }).join(''):
+  '<div style="padding:20px;text-align:center;color:#94a3b8;font-size:11px">Aucun plan de maintenance créé</div>';
+
+  var ficheHtml=
+    cardsHtml+
+    '<div style="border-top:1px solid #f1f5f9;padding:7px 14px 4px;background:#fafbfc;display:flex;align-items:center;justify-content:space-between">'+
+      '<span style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.8px"><i class="ti ti-calendar-event" style="font-size:11px;vertical-align:-1px;margin-right:4px"></i>Calendrier d\'entretien</span>'+
+      '<button onclick="_mntNouvelleTachePourEq(\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\',\''+sid+'\')" style="font-size:10px;color:#3b82f6;background:none;border:none;cursor:pointer;padding:0;font-weight:600">+ Ajouter</button>'+
+    '</div>'+
+    calHtml+
+    (pannesOuv.length?
+      '<div style="border-top:1px solid #f1f5f9;padding:7px 14px 4px;background:#fafbfc">'+
+        '<span style="font-size:10px;font-weight:700;color:#ef4444;text-transform:uppercase;letter-spacing:.8px"><i class="ti ti-alert-circle" style="font-size:11px;vertical-align:-1px;margin-right:4px"></i>Pannes ouvertes ('+pannesOuv.length+')</span>'+
+      '</div>'+
+      pannesOuv.map(function(s){
+        var ago=Math.round((Date.now()-new Date(s.created_at))/(1000*60*60*24));
+        var dispBtn=prests.length?
+          '<button onclick="_mntDispatchSig(\''+s.id+'\',\''+sid+'\',\'prestataire\',\''+prests[0].id+'\',\''+escape_html(prests[0].nom)+'\',\''+escape_html(prests[0].email||'')+'\',\'\')" '+
+            'style="padding:3px 9px;border:1px solid #3b82f6;border-radius:5px;font-size:10px;font-weight:600;color:#3b82f6;background:white;cursor:pointer">Envoyer</button>':
+          '<button onclick="_mntDispatchSig(\''+s.id+'\',\''+sid+'\',\'interne\',\'\',\'\',\'\',\'\')" '+
+            'style="padding:3px 9px;border:1px solid #d97706;border-radius:5px;font-size:10px;font-weight:600;color:#d97706;background:white;cursor:pointer">Traiter</button>';
+        return '<div style="padding:9px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px">'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="font-size:11px;color:#1e293b;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html((s.description||'Panne').slice(0,70))+'</div>'+
+            '<div style="font-size:10px;color:#94a3b8;margin-top:2px">Il y a '+ago+' j</div>'+
+          '</div>'+dispBtn+'</div>';
+      }).join(''):'');
 
   // ── Section header ────────────────────────────────────────────────────────
   function secHead(label,btnHtml){
@@ -4654,25 +4827,40 @@ async function _mntSelectEq(eqId,eqNom,sid){
     '</div>';
   }).join('');
 
-  // ── Header ────────────────────────────────────────────────────────────────
+  // ── Header sombre (style fiche technique) ───────────────────────────────
+  var urgPlansDiff=null;
+  plans.forEach(function(p){
+    if(!p.prochaine_date)return;
+    var d=Math.round((new Date(p.prochaine_date+'T00:00:00')-new Date().setHours(0,0,0,0))/(1000*60*60*24));
+    if(urgPlansDiff===null||d<urgPlansDiff)urgPlansDiff=d;
+  });
+  var hdrStatus=pannesOuv.length?
+    '<span style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#fca5a5"><i class="ti ti-alert-circle" style="font-size:13px"></i>'+pannesOuv.length+' panne'+(pannesOuv.length>1?'s':'')+'</span>':
+    urgPlansDiff!==null&&urgPlansDiff<0?
+      '<span style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#fbbf24"><i class="ti ti-clock-exclamation" style="font-size:13px"></i>En retard</span>':
+      '<span style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#86efac"><i class="ti ti-circle-check" style="font-size:13px"></i>OK</span>';
+  var dmsStr=eq.date_mise_en_service?
+    new Date(eq.date_mise_en_service+'T00:00:00').toLocaleDateString('fr-FR',{month:'short',year:'numeric'}):'';
   var headerHtml=
-    '<div style="padding:14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:flex-start;gap:12px">'+
-      '<button onclick="_mntCloseDetail()" title="Retour au calendrier" style="position:absolute;top:8px;right:10px;background:none;border:none;cursor:pointer;color:#94a3b8;font-size:16px;padding:4px;border-radius:6px" aria-label="Fermer"><i class="ti ti-x"></i></button>'+
-      '<div style="width:38px;height:38px;border-radius:10px;background:'+ti.bg+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
-        '<i class="ti '+ti.icon+'" style="font-size:20px;color:'+ti.col+'" aria-hidden="true"></i>'+
+    '<div style="position:relative;background:linear-gradient(160deg,#1a2234 0%,#0f172a 100%);padding:20px 16px 18px;overflow:hidden">'+
+      '<button onclick="_mntCloseDetail()" title="Retour au calendrier" style="position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;cursor:pointer;color:#94a3b8;font-size:14px;padding:5px 7px;border-radius:7px;line-height:1" aria-label="Fermer"><i class="ti ti-x"></i></button>'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
+        (modStr?'<span style="font-size:10px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:.8px;background:rgba(251,191,36,.12);padding:3px 9px;border-radius:5px;border:1px solid rgba(251,191,36,.2)">'+escape_html(eq.marque||typNom||'')+'</span>':'<span></span>')+
+        hdrStatus+
       '</div>'+
-      '<div style="flex:1;min-width:0">'+
-        '<div style="font-size:15px;font-weight:700;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(eq.nom||eqNom)+'</div>'+
-        '<div style="font-size:11px;color:#94a3b8;margin-top:1px">'+escape_html(typNom||'Équipement')+(modStr?' · '+modStr:'')+'</div>'+
-        '<div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;align-items:center">'+
-          (mesurePrincipale?
-            '<span style="font-size:12px;padding:2px 9px;border-radius:10px;background:#f8fafc;color:#1e293b;font-weight:700;border:1px solid #e2e8f0">'+
-              (parseFloat(mesurePrincipale.valeur)%1===0?parseInt(mesurePrincipale.valeur):parseFloat(mesurePrincipale.valeur).toFixed(1))+
-              ' '+escape_html(mesurePrincipale.unite)+
-            '</span>':'')+
-          (eq.contrat_actif?'<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#f0fdf4;color:#16a34a;font-weight:600">Contrat actif</span>':'')+
-          (pannesOuv.length?'<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:#fef2f2;color:#ef4444;font-weight:600">'+pannesOuv.length+' panne'+(pannesOuv.length>1?'s':'')+'</span>':'')+
-          (!modStr?'<button onclick="_mntCompleteFiche(\''+eqId+'\',\''+sid+'\')" style="font-size:10px;padding:1px 7px;border-radius:10px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;cursor:pointer;font-weight:600">Compléter la fiche</button>':'')+
+      '<div style="display:flex;align-items:center;gap:14px">'+
+        '<div style="width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
+          '<i class="ti '+ti.icon+'" style="font-size:28px;color:'+ti.col+'" aria-hidden="true"></i>'+
+        '</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:17px;font-weight:800;color:white;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(eq.nom||eqNom)+'</div>'+
+          '<div style="font-size:11px;color:#94a3b8;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
+            escape_html([eq.marque,eq.modele].filter(Boolean).join(' ')+(eq.numero_serie?' · N° '+eq.numero_serie:''))+'</div>'+
+          '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'+
+            (dmsStr?'<span style="font-size:10px;padding:2px 8px;border-radius:5px;background:rgba(255,255,255,.1);color:#cbd5e1;font-weight:500">Mise en service: '+dmsStr+'</span>':'')+
+            (eq.contrat_actif?'<span style="font-size:10px;padding:2px 8px;border-radius:5px;background:rgba(34,197,94,.12);color:#86efac;font-weight:600">Contrat actif</span>':'')+
+            (typNom?'<span style="font-size:10px;padding:2px 8px;border-radius:5px;background:rgba(255,255,255,.08);color:#94a3b8">'+escape_html(typNom)+'</span>':'')+
+          '</div>'+
         '</div>'+
       '</div>'+
     '</div>';
@@ -4745,7 +4933,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
   panel.innerHTML=
     headerHtml+
     tabBar+
-    '<div id="mnt-tab-fiche">'+infosHtml+pannesHtml+'</div>'+
+    '<div id="mnt-tab-fiche">'+ficheHtml+'</div>'+
     '<div id="mnt-tab-plan" style="display:none">'+
       secHead('Plans de maintenance',
         '<button onclick="_mntNouvelleTachePourEq(\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\',\''+sid+'\')" '+
