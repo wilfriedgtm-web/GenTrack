@@ -467,6 +467,51 @@ async function supaDelete(table,filter){
     });
   }catch(e){}
 }
+async function supaUploadPhoto(file,path){
+  try{
+    var r=await fetch(SUPA_URL+'/storage/v1/object/gentrack-photos/'+path,{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':file.type||'image/jpeg','x-upsert':'true'},
+      body:file
+    });
+    if(!r.ok){var t=await r.text().catch(function(){return'';});console.error('[supaUploadPhoto]',r.status,t);return null;}
+    return SUPA_URL+'/storage/v1/object/public/gentrack-photos/'+path;
+  }catch(e){console.error('[supaUploadPhoto]',e);return null;}
+}
+
+// ── Photos state & helpers ─────────────────────────────────────────────────────
+var _mntPendingPhotos=[];
+function _mntAddPhotos(input){
+  Array.from(input.files).forEach(function(f){
+    if(_mntPendingPhotos.length>=5)return;
+    if(!f.type.startsWith('image/'))return;
+    _mntPendingPhotos.push(f);
+  });
+  input.value='';
+  _mntRenderPhotoPreviews();
+}
+function _mntRemovePhoto(idx){
+  _mntPendingPhotos.splice(idx,1);
+  _mntRenderPhotoPreviews();
+}
+function _mntRenderPhotoPreviews(){
+  var wrap=document.getElementById('clot-photos-preview');
+  if(!wrap)return;
+  wrap.innerHTML=_mntPendingPhotos.map(function(f,i){
+    var url=URL.createObjectURL(f);
+    return'<div style="position:relative;width:70px;height:70px;border-radius:8px;overflow:hidden;flex-shrink:0">'+
+      '<img src="'+url+'" style="width:100%;height:100%;object-fit:cover">'+
+      '<button onclick="_mntRemovePhoto('+i+')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.65);border:none;color:white;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1">✕</button>'+
+    '</div>';
+  }).join('');
+}
+function _mntLightbox(url){
+  var ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:pointer';
+  ov.onclick=function(){ov.remove();};
+  ov.innerHTML='<img src="'+url+'" style="max-width:92vw;max-height:92vh;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.6)">';
+  document.body.appendChild(ov);
+}
 var _configCurrentSid=null;
 var _waCache={};
 
@@ -4259,9 +4304,11 @@ async function _mntSelectEq(eqId,eqNom,sid){
     var colBg={planifie:'#fffbeb',realise:'#f0fdf4',annule:'#f8fafc'}[m.statut]||'#f8fafc';
     var badge={planifie:'Planifié',realise:'Réalisé',annule:'Annulé'}[m.statut]||m.statut;
     var who=m.prestataire||m.technicien||'';
+    var mPhotos=[];try{if(m.photo_url)mPhotos=JSON.parse(m.photo_url);}catch(e){if(m.photo_url)mPhotos=[m.photo_url];}
     events.push({date:m.date_realisee||m.created_at,col:col,colBg:colBg,badge:badge,
       title:escape_html(m.titre||m.type||'Intervention'),
-      sub:who?'→ '+escape_html(who)+(m.cout?' · '+parseFloat(m.cout).toLocaleString('fr-FR')+' FCFA':''):''});
+      sub:who?'→ '+escape_html(who)+(m.cout?' · '+parseFloat(m.cout).toLocaleString('fr-FR')+' FCFA':''):'',
+      photos:mPhotos});
   });
   events.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
   var tlHtml=events.length?events.map(function(ev,i){
@@ -4278,6 +4325,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
           '<span style="font-size:9px;padding:1px 6px;border-radius:10px;background:'+ev.colBg+';color:'+ev.col+';border:1px solid '+ev.col+';font-weight:700;flex-shrink:0;white-space:nowrap">'+ev.badge+'</span>'+
         '</div>'+
         (ev.sub?'<div style="font-size:10px;color:#64748b;margin-top:1px">'+ev.sub+'</div>':'')+
+        (ev.photos&&ev.photos.length?'<div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap">'+ev.photos.map(function(u){return'<img src="'+u+'" onclick="_mntLightbox(\''+u+'\')" style="width:48px;height:48px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid #e2e8f0" onerror="this.style.display=\'none\'">';}).join('')+'</div>':'')+
         '<div style="font-size:10px;color:#94a3b8">'+dStr+'</div>'+
       '</div>'+
     '</div>';
@@ -4557,11 +4605,22 @@ function _mntCloturerPlan(planId,planTitre,freq,eqId,sid){
         '</div>'
       )+
     '</div>'+
+      '<div>'+
+        '<label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:6px">PHOTOS <span style="font-weight:400;color:#94a3b8">(optionnel, max 5)</span></label>'+
+        '<div id="clot-photos-preview" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"></div>'+
+        '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px dashed #cbd5e1;border-radius:8px;cursor:pointer;background:#f8fafc">'+
+          '<i class="ti ti-camera" style="font-size:18px;color:#64748b"></i>'+
+          '<span style="font-size:12px;color:#64748b">Prendre ou choisir une photo</span>'+
+          '<input type="file" accept="image/*" multiple capture="environment" onchange="_mntAddPhotos(this)" style="display:none">'+
+        '</label>'+
+      '</div>'+
+    '</div>'+
     '<div style="display:flex;gap:10px;margin-top:18px">'+
       '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
       '<button onclick="_mntSaveCloture(\''+sid+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:#059669;color:white;cursor:pointer">Enregistrer</button>'+
     '</div>'
   );
+  _mntPendingPhotos=[];
 }
 
 async function _mntSaveCloture(sid){
@@ -4575,9 +4634,23 @@ async function _mntSaveCloture(sid){
   var rapport=(document.getElementById('clot-rapport')||{}).value||null;
   var nextDate=(document.getElementById('clot-next-date')||{}).value||null;
   if(!dateReal){alert('La date de réalisation est obligatoire.');return;}
+  // Upload photos
+  var photoUrls=[];
+  if(_mntPendingPhotos.length){
+    var ts=Date.now();
+    for(var pi=0;pi<_mntPendingPhotos.length;pi++){
+      var pf=_mntPendingPhotos[pi];
+      var ext=(pf.name||'').split('.').pop()||'jpg';
+      var ppath='maintenances/'+eqId+'/'+ts+'_'+pi+'.'+ext;
+      var purl=await supaUploadPhoto(pf,ppath);
+      if(purl)photoUrls.push(purl);
+    }
+    _mntPendingPhotos=[];
+  }
   var mntPayload={groupe_id:sid,equipement_id:eqId,plan_maintenance_id:planId||null,
     titre:titre,type:'preventive',statut:'realise',date_realisee:dateReal,
-    cout:cout,technicien:intervenant,heures_au_compteur:heures,rapport_texte:rapport};
+    cout:cout,technicien:intervenant,heures_au_compteur:heures,rapport_texte:rapport,
+    photo_url:photoUrls.length?JSON.stringify(photoUrls):null};
   var ok=await supaPost('maintenances',mntPayload).catch(function(){return null;});
   if(!ok){alert('Erreur lors de la création de la maintenance.');return;}
   if(planId&&nextDate)await supaPatch('plans_maintenance',planId,{prochaine_date:nextDate}).catch(function(){});
