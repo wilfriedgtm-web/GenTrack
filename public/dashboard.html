@@ -4308,7 +4308,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
     events.push({date:m.date_realisee||m.created_at,col:col,colBg:colBg,badge:badge,
       title:escape_html(m.titre||m.type||'Intervention'),
       sub:who?'→ '+escape_html(who)+(m.cout?' · '+parseFloat(m.cout).toLocaleString('fr-FR')+' FCFA':''):'',
-      photos:mPhotos});
+      photos:mPhotos,mntId:m.id,statut:m.statut});
   });
   events.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
   var tlHtml=events.length?events.map(function(ev,i){
@@ -4326,7 +4326,10 @@ async function _mntSelectEq(eqId,eqNom,sid){
         '</div>'+
         (ev.sub?'<div style="font-size:10px;color:#64748b;margin-top:1px">'+ev.sub+'</div>':'')+
         (ev.photos&&ev.photos.length?'<div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap">'+ev.photos.map(function(u){return'<img src="'+u+'" onclick="_mntLightbox(\''+u+'\')" style="width:48px;height:48px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid #e2e8f0" onerror="this.style.display=\'none\'">';}).join('')+'</div>':'')+
-        '<div style="font-size:10px;color:#94a3b8">'+dStr+'</div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:3px">'+
+          '<div style="font-size:10px;color:#94a3b8">'+dStr+'</div>'+
+          (ev.mntId&&ev.statut==='realise'?'<button onclick="event.stopPropagation();_mntGeneratePDF(\''+ev.mntId+'\')" style="font-size:9px;padding:2px 7px;border:1px solid #e2e8f0;border-radius:5px;background:white;color:#64748b;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:3px"><i class="ti ti-file-type-pdf" style="font-size:11px;color:#ef4444"></i>PDF</button>':'')+
+        '</div>'+
       '</div>'+
     '</div>';
   }).join(''):
@@ -4556,8 +4559,10 @@ async function _mntSaveTacheEq(eqId,sid,editPlanId){
   var prestId=(document.getElementById('ntache-prest')||{}).value||null;
   var intervenant=(document.getElementById('ntache-intervenant')||{}).value||null;
   var freq=fVal+' '+fUnit;
-  var payload={site_id:sid,equipement_id:eqId,titre:titre||_mntFreqLabel(freq)||freq,frequence:freq,prochaine_date:date,
-    prestataire_id:prestId||null,intervenant:prestId?null:(intervenant||null),actif:true};
+  var payload={site_id:sid,equipement_id:eqId,titre:titre||_mntFreqLabel(freq)||freq,frequence:freq,
+    prochaine_date:date||null,actif:true};
+  if(prestId)payload.prestataire_id=prestId;
+  else if(intervenant&&intervenant.trim())payload.intervenant=intervenant.trim();
   var ok=editPlanId?
     await supaPatch('plans_maintenance',editPlanId,payload).catch(function(){return null;}):
     await supaPost('plans_maintenance',payload).catch(function(){return null;});
@@ -4657,6 +4662,123 @@ async function _mntSaveCloture(sid){
   _closeCfgModal();
   if(_mntSelectedTaskId)_mntSelectEq(_mntSelectedTaskId,'',sid);
   _rtMaintenances(sid);
+}
+
+// ── Écran 4 — PDF rapport d'intervention ──────────────────────────────────────
+function _loadJsPDF(){
+  return new Promise(function(resolve){
+    if(window.jspdf){resolve();return;}
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload=function(){resolve();};
+    s.onerror=function(){resolve();};
+    document.head.appendChild(s);
+  });
+}
+async function _imgToBase64(url){
+  try{
+    var r=await fetch(url);
+    if(!r.ok)return null;
+    var blob=await r.blob();
+    return new Promise(function(resolve){
+      var fr=new FileReader();
+      fr.onloadend=function(){resolve(fr.result);};
+      fr.onerror=function(){resolve(null);};
+      fr.readAsDataURL(blob);
+    });
+  }catch(e){return null;}
+}
+async function _mntGeneratePDF(mntId){
+  await _loadJsPDF();
+  if(!window.jspdf){alert('Impossible de charger le générateur PDF.');return;}
+  // Fetch data
+  var mnts=await supaGet('maintenances','id=eq.'+mntId+'&select=*,equipements(nom,marque,modele,numero_serie,types_equipements(nom))').catch(function(){return[];});
+  var m=mnts[0];if(!m){alert('Intervention introuvable.');return;}
+  var siteArr=await supaGet('sites','id=eq.'+m.groupe_id+'&select=nom').catch(function(){return[];});
+  var siteNom=(siteArr[0]&&siteArr[0].nom)||'';
+  var eq=m.equipements||{};
+  var eqNom=eq.nom||'';
+  var typNom=(eq.types_equipements&&eq.types_equipements.nom)||'';
+  var modele=[eq.marque,eq.modele].filter(Boolean).join(' ');
+  // Load photos
+  var photos=[];try{if(m.photo_url)photos=JSON.parse(m.photo_url);}catch(e){if(m.photo_url)photos=[m.photo_url];}
+  var photoData=[];
+  for(var pi=0;pi<photos.length&&pi<6;pi++){
+    var b64=await _imgToBase64(photos[pi]);
+    if(b64)photoData.push(b64);
+  }
+  // Build PDF
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({unit:'mm',format:'a4'});
+  var W=210,ml=15,cw=180;
+  // Header band
+  doc.setFillColor(30,41,59);doc.rect(0,0,W,38,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFont('helvetica','bold');doc.setFontSize(18);doc.text('GenTrack',ml,16);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text('GMAO · Maintenance',ml,22);
+  doc.setFont('helvetica','bold');doc.setFontSize(13);doc.text('RAPPORT D\'INTERVENTION',ml,32);
+  if(siteNom){doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text(siteNom,W-ml,32,{align:'right'});}
+  // Equipment card
+  var y=46;
+  doc.setFillColor(241,245,249);doc.rect(ml,y-5,cw,22,'F');
+  doc.setTextColor(30,41,59);doc.setFont('helvetica','bold');doc.setFontSize(13);
+  doc.text(eqNom||'Équipement',ml+4,y+4);
+  doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(100,116,139);
+  var eqSub=[typNom,modele,eq.numero_serie?'S/N '+eq.numero_serie:''].filter(Boolean).join('  ·  ');
+  doc.text(eqSub,ml+4,y+10);
+  // Intervention details grid
+  y+=28;
+  doc.setDrawColor(226,232,240);doc.line(ml,y,ml+cw,y);
+  y+=6;
+  doc.setTextColor(100,116,139);doc.setFontSize(8);doc.setFont('helvetica','bold');
+  doc.text('DATE DE RÉALISATION',ml,y);doc.text('INTERVENANT / PRESTATAIRE',ml+95,y);
+  y+=5;
+  doc.setTextColor(30,41,59);doc.setFontSize(11);doc.setFont('helvetica','bold');
+  var dateStr=m.date_realisee?new Date(m.date_realisee+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}):'—';
+  doc.text(dateStr,ml,y);
+  doc.setFontSize(11);doc.text(m.technicien||m.prestataire||'—',ml+95,y);
+  y+=8;
+  doc.setTextColor(100,116,139);doc.setFontSize(8);doc.setFont('helvetica','bold');
+  doc.text('COÛT',ml,y);doc.text('TYPE',ml+95,y);
+  y+=5;
+  doc.setTextColor(30,41,59);doc.setFontSize(11);doc.setFont('helvetica','bold');
+  doc.text(m.cout?parseFloat(m.cout).toLocaleString('fr-FR')+' FCFA':'—',ml,y);
+  doc.text(m.type==='preventive'?'Préventive':m.type==='corrective'?'Corrective':m.type||'—',ml+95,y);
+  y+=10;
+  doc.setDrawColor(226,232,240);doc.line(ml,y,ml+cw,y);
+  // Compte rendu
+  if(m.rapport_texte&&m.rapport_texte.trim()){
+    y+=8;
+    doc.setTextColor(100,116,139);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('COMPTE RENDU',ml,y);
+    y+=5;
+    doc.setTextColor(30,41,59);doc.setFont('helvetica','normal');doc.setFontSize(10);
+    var lines=doc.splitTextToSize(m.rapport_texte,cw);
+    doc.text(lines,ml,y);
+    y+=lines.length*5+4;
+    doc.setDrawColor(226,232,240);doc.line(ml,y,ml+cw,y);
+  }
+  // Photos
+  if(photoData.length){
+    y+=8;
+    doc.setTextColor(100,116,139);doc.setFontSize(8);doc.setFont('helvetica','bold');
+    doc.text('PHOTOS ('+photoData.length+')',ml,y);y+=4;
+    var imgW=85,imgH=55,gap=10;
+    for(var ii=0;ii<photoData.length;ii++){
+      var col=ii%2,row=Math.floor(ii/2);
+      var ix=ml+col*(imgW+gap);
+      var iy=y+row*(imgH+gap);
+      if(iy+imgH>285){doc.addPage();y=15;iy=y+row*(imgH+gap);}
+      try{doc.addImage(photoData[ii],'JPEG',ix,iy,imgW,imgH);}catch(e){}
+    }
+    y+=Math.ceil(photoData.length/2)*(imgH+gap);
+  }
+  // Footer
+  doc.setFontSize(8);doc.setTextColor(148,163,184);doc.setFont('helvetica','normal');
+  var today=new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+  doc.text('Généré le '+today+' · GenTrack GMAO',W/2,290,{align:'center'});
+  // Save
+  var fname='rapport_'+( eqNom||'intervention').replace(/[^a-z0-9]/gi,'_').toLowerCase()+'_'+( m.date_realisee||'').replace(/-/g,'')+'.pdf';
+  doc.save(fname);
 }
 
 async function _mntCompleteFiche(eqId,sid){
