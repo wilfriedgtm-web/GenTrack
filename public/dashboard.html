@@ -4176,7 +4176,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
     supaGet('equipements','id=eq.'+eqId+'&select=id,nom,marque,modele,numero_serie,date_mise_en_service,garantie_fin,contrat_type,contrat_actif,notes_tech,types_equipements(nom)').catch(function(){return[];}),
     supaGet('signalements','equipement_id=eq.'+eqId+'&type=eq.panne&statut=not.in.(traite,resolu,annule)&order=created_at.desc&select=id,description,statut,created_at').catch(function(){return[];}),
     supaGet('signalements','equipement_id=eq.'+eqId+'&order=created_at.desc&limit=15&select=id,type,description,statut,created_at,assigne_a').catch(function(){return[];}),
-    supaGet('maintenances','equipement_id=eq.'+eqId+'&order=date_realisation.desc&limit=15&select=id,titre,type,statut,created_at,date_realisation,prestataire,intervenant,cout,rapport_texte').catch(function(){return[];}),
+    supaGet('maintenances','equipement_id=eq.'+eqId+'&order=date_realisee.desc&limit=15&select=id,titre,type,statut,created_at,date_realisee,prestataire,prestataire_id,technicien,cout,rapport_texte,plan_maintenance_id').catch(function(){return[];}),
     supaGet('plans_maintenance','equipement_id=eq.'+eqId+'&actif=eq.true&order=prochaine_date.asc&select=id,titre,frequence,prochaine_date,intervenant,prestataires(nom)').catch(function(){return[];}),
     supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom,telephone,email').catch(function(){return[];})
   ]);
@@ -4258,8 +4258,8 @@ async function _mntSelectEq(eqId,eqNom,sid){
     var col={planifie:'#f59e0b',realise:'#22c55e',annule:'#94a3b8'}[m.statut]||'#94a3b8';
     var colBg={planifie:'#fffbeb',realise:'#f0fdf4',annule:'#f8fafc'}[m.statut]||'#f8fafc';
     var badge={planifie:'Planifié',realise:'Réalisé',annule:'Annulé'}[m.statut]||m.statut;
-    var who=m.prestataire||m.intervenant||'';
-    events.push({date:m.date_realisation||m.created_at,col:col,colBg:colBg,badge:badge,
+    var who=m.prestataire||m.technicien||'';
+    events.push({date:m.date_realisee||m.created_at,col:col,colBg:colBg,badge:badge,
       title:escape_html(m.titre||m.type||'Intervention'),
       sub:who?'→ '+escape_html(who)+(m.cout?' · '+parseFloat(m.cout).toLocaleString('fr-FR')+' FCFA':''):''});
   });
@@ -4288,18 +4288,30 @@ async function _mntSelectEq(eqId,eqNom,sid){
   var plansHtml=plans.length?plans.map(function(p){
     var d=p.prochaine_date;
     var diff=d?Math.round((new Date(d+'T00:00:00')-new Date().setHours(0,0,0,0))/(1000*60*60*24)):null;
-    var dateCol=diff===null||diff<0?'#ef4444':diff<=14?'#f59e0b':'#16a34a';
-    return '<div style="padding:9px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px">'+
-      '<div style="flex:1;min-width:0">'+
-        '<div style="font-size:12px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(p.titre||p.frequence||'Plan')+'</div>'+
-        '<div style="font-size:10px;color:#64748b;margin-top:1px">'+escape_html(p.frequence||'')+(p.prestataires?' · '+escape_html(p.prestataires.nom):p.intervenant?' · '+escape_html(p.intervenant):'')+'</div>'+
+    var dateCol=diff===null?'#94a3b8':diff<0?'#ef4444':diff<=14?'#f59e0b':'#16a34a';
+    var urgBg=diff===null?'#f8fafc':diff<0?'#fef2f2':diff<=14?'#fffbeb':'#f0fdf4';
+    var freqLbl=_mntFreqLabel(p.frequence||'');
+    var who=p.prestataires?p.prestataires.nom:p.intervenant||'';
+    return '<div style="padding:9px 14px;border-bottom:1px solid #f1f5f9">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:12px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(p.titre||freqLbl||'Plan')+'</div>'+
+          '<div style="font-size:10px;color:#64748b;margin-top:1px">'+escape_html(freqLbl||p.frequence||'')+(who?' · '+escape_html(who):'')+'</div>'+
+        '</div>'+
+        '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:'+urgBg+';color:'+dateCol+';font-weight:700;white-space:nowrap">'+
+          (diff===null?'—':diff<0?'En retard '+Math.abs(diff)+'j':diff===0?'Aujourd\'hui':diff+'j')+'</span>'+
       '</div>'+
-      '<input type="date" value="'+(d||'')+'" '+
-        'onchange="_mntSetPlanDate(\''+p.id+'\',\''+sid+'\',this.value)" '+
-        'style="border:1px solid '+dateCol+';border-radius:6px;padding:3px 7px;font-size:11px;color:'+dateCol+';background:white;cursor:pointer;outline:none"/>'+
-      '<button onclick="_mntDispatchSig(\''+p.id+'\',\''+sid+'\',\'interne\',\'\',\'\',\'\',\'\')" '+
-        'style="padding:3px 8px;border:1px solid #e2e8f0;border-radius:5px;font-size:11px;color:#64748b;background:white;cursor:pointer" title="Envoyer">'+
-        '<i class="ti ti-send" style="font-size:12px" aria-hidden="true"></i></button>'+
+      '<div style="display:flex;align-items:center;gap:6px">'+
+        '<input type="date" value="'+(d||'')+'" '+
+          'onchange="_mntSetPlanDate(\''+p.id+'\',\''+sid+'\',this.value)" '+
+          'style="flex:1;border:1px solid '+dateCol+';border-radius:6px;padding:4px 8px;font-size:11px;color:'+dateCol+';background:white;cursor:pointer;outline:none"/>'+
+        '<button onclick="_mntCloturerPlan(\''+p.id+'\',\''+escape_html(p.titre||freqLbl||'Plan')+'\',\''+escape_html(p.frequence||'')+'\',\''+eqId+'\',\''+sid+'\')" '+
+          'style="padding:4px 8px;border:1px solid #bbf7d0;border-radius:6px;font-size:11px;color:#059669;background:#f0fdf4;cursor:pointer;white-space:nowrap;font-weight:600" title="Clôturer">'+
+          '<i class="ti ti-check" style="font-size:12px"></i></button>'+
+        '<button onclick="_mntNouvelleTachePourEq(\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\',\''+sid+'\',\''+p.id+'\')" '+
+          'style="padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;color:#64748b;background:white;cursor:pointer" title="Modifier">'+
+          '<i class="ti ti-pencil" style="font-size:12px"></i></button>'+
+      '</div>'+
     '</div>';
   }).join(''):
   '<div style="padding:12px;text-align:center;color:#94a3b8;font-size:11px">Aucun plan créé</div>';
@@ -4381,35 +4393,197 @@ async function _mntDispatchSig(sigId,sid,mode,prestId,prestNom,prestEmail,prestT
   }
 }
 
-function _mntNouvelleTachePourEq(eqId,eqNom,sid){
+// ── Fréquence helpers ──────────────────────────────────────────────────────────
+function _calcNextDate(freq,fromDate){
+  if(!freq)return null;
+  var d=fromDate?new Date(fromDate+'T00:00:00'):new Date();
+  var m=freq.match(/^(\d+)\s*(jour|semaine|mois|an|heure|km|cycle)/i);
+  if(!m)return null;
+  var n=parseInt(m[1]);
+  var unit=m[2].toLowerCase();
+  if(unit.startsWith('jour')){d.setDate(d.getDate()+n);}
+  else if(unit.startsWith('semaine')){d.setDate(d.getDate()+n*7);}
+  else if(unit.startsWith('mois')){d.setMonth(d.getMonth()+n);}
+  else if(unit.startsWith('an')){d.setFullYear(d.getFullYear()+n);}
+  else return null; // compteur — pas de calcul auto
+  return d.toISOString().slice(0,10);
+}
+function _mntFreqLabel(freq){
+  if(!freq)return'';
+  var m=freq.match(/^(\d+)\s*(jour|semaine|mois|an|heure|km|cycle)/i);
+  if(!m)return freq;
+  var n=parseInt(m[1]);
+  var unit=m[2].toLowerCase();
+  var labels={jour:n>1?'jours':'jour',semaine:n>1?'semaines':'semaine',mois:'mois',an:n>1?'ans':'an',heure:n>1?'heures':'heure',km:'km',cycle:n>1?'cycles':'cycle'};
+  var key=Object.keys(labels).find(function(k){return unit.startsWith(k);})||unit;
+  return'Tous les '+n+' '+labels[key];
+}
+function _mntToggleFreqType(type){
+  var btnT=document.getElementById('ntache-type-temps');
+  var btnC=document.getElementById('ntache-type-compteur');
+  var sel=document.getElementById('ntache-freq-unit');
+  if(!btnT||!sel)return;
+  var isT=type==='temps';
+  btnT.style.background=isT?'#1e293b':'white';btnT.style.color=isT?'white':'#64748b';
+  btnC.style.background=isT?'white':'#1e293b';btnC.style.color=isT?'#64748b':'white';
+  ['jour','semaine','mois','an'].forEach(function(u){var o=document.getElementById('ntache-unit-'+u);if(o)o.style.display=isT?'':'none';});
+  ['heure','km'].forEach(function(u){var o=document.getElementById('ntache-unit-'+u);if(o)o.style.display=isT?'none':'';});
+  var cur=sel.value;
+  if(isT&&(cur==='heure'||cur==='km'))sel.value='mois';
+  if(!isT&&(cur==='jour'||cur==='semaine'||cur==='mois'||cur==='an'))sel.value='heure';
+}
+function _mntTogglePrestMode(){
+  var prest=document.getElementById('ntache-prest');
+  var wrap=document.getElementById('ntache-interne-wrap');
+  if(prest&&wrap)wrap.style.display=prest.value?'none':'';
+}
+
+async function _mntNouvelleTachePourEq(eqId,eqNom,sid,editPlanId){
   _closeCfgModal&&_closeCfgModal();
+  var prests=await supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom').catch(function(){return[];});
+  var ep={};
+  if(editPlanId){
+    var rows=await supaGet('plans_maintenance','id=eq.'+editPlanId+'&select=id,titre,frequence,prochaine_date,intervenant,prestataire_id').catch(function(){return[];});
+    ep=rows[0]||{};
+  }
+  var eFreq=ep.frequence||'';
+  var fm=eFreq.match(/^(\d+)\s*(jour|semaine|mois|an|heure|km|cycle)/i);
+  var fVal=fm?fm[1]:'1';
+  var fUnit=fm?fm[2].toLowerCase():'mois';
+  var isC=fUnit==='heure'||fUnit==='km'||fUnit==='cycle';
+  var fType=isC?'compteur':'temps';
+  var prestOpts=prests.map(function(p){
+    return'<option value="'+p.id+'"'+(ep.prestataire_id===p.id?' selected':'')+'>'+escape_html(p.nom)+'</option>';
+  }).join('');
   _showCfgModal(
-    '<div style="font-size:15px;font-weight:700;margin-bottom:4px">📅 Nouveau plan — '+escape_html(eqNom)+'</div>'+
-    '<div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">'+
-      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">TITRE</label>'+
-        '<input id="ntache-titre" placeholder="ex: Nettoyage condenseur" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
-      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">FRÉQUENCE</label>'+
-        '<select id="ntache-freq" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:white">'+
-          '<option value="mensuel">Mensuel</option><option value="trimestriel">Trimestriel</option>'+
-          '<option value="semestriel">Semestriel</option><option value="annuel">Annuel</option>'+
+    '<div style="font-size:15px;font-weight:700;margin-bottom:4px">'+(editPlanId?'✏️ Modifier le plan':'📅 Nouveau plan')+'</div>'+
+    '<div style="font-size:11px;color:#64748b;margin-bottom:16px">'+escape_html(eqNom)+'</div>'+
+    '<div style="display:flex;flex-direction:column;gap:12px">'+
+      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">TITRE *</label>'+
+        '<input id="ntache-titre" value="'+escape_html(ep.titre||'')+'" placeholder="ex: Nettoyage condenseur" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:6px">TYPE DE FRÉQUENCE</label>'+
+        '<div style="display:flex;border:1.5px solid #e2e8f0;border-radius:8px;overflow:hidden">'+
+          '<button id="ntache-type-temps" onclick="_mntToggleFreqType(\'temps\')" style="flex:1;padding:8px;font-size:12px;font-weight:600;border:none;cursor:pointer">🕐 Temps</button>'+
+          '<button id="ntache-type-compteur" onclick="_mntToggleFreqType(\'compteur\')" style="flex:1;padding:8px;font-size:12px;font-weight:600;border:none;border-left:1.5px solid #e2e8f0;cursor:pointer">⏱ Compteur</button>'+
+        '</div></div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+        '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">VALEUR</label>'+
+          '<input id="ntache-freq-val" type="number" min="1" value="'+fVal+'" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">UNITÉ</label>'+
+          '<select id="ntache-freq-unit" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:white">'+
+            '<option id="ntache-unit-jour" value="jour"'+(fUnit==='jour'?' selected':'')+'>Jours</option>'+
+            '<option id="ntache-unit-semaine" value="semaine"'+(fUnit==='semaine'?' selected':'')+'>Semaines</option>'+
+            '<option id="ntache-unit-mois" value="mois"'+(fUnit==='mois'?' selected':'')+'>Mois</option>'+
+            '<option id="ntache-unit-an" value="an"'+(fUnit==='an'?' selected':'')+'>Ans</option>'+
+            '<option id="ntache-unit-heure" value="heure"'+(fUnit==='heure'?' selected':'')+'>Heures compteur</option>'+
+            '<option id="ntache-unit-km" value="km"'+(fUnit==='km'?' selected':'')+'>Kilomètres</option>'+
+          '</select></div>'+
+      '</div>'+
+      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">PRESTATAIRE</label>'+
+        '<select id="ntache-prest" onchange="_mntTogglePrestMode()" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;background:white">'+
+          '<option value="">— Interne —</option>'+prestOpts+
         '</select></div>'+
-      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">PROCHAINE DATE</label>'+
-        '<input id="ntache-date" type="date" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+      '<div id="ntache-interne-wrap"><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">INTERVENANT INTERNE</label>'+
+        '<input id="ntache-intervenant" value="'+escape_html(ep.intervenant||'')+'" placeholder="ex: Mamadou Diallo" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">PROCHAINE DATE / OCCURRENCE</label>'+
+        '<input id="ntache-date" type="date" value="'+escape_html(ep.prochaine_date||'')+'" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
     '</div>'+
     '<div style="display:flex;gap:10px;margin-top:18px">'+
       '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
-      '<button onclick="_mntSaveTacheEq(\''+eqId+'\',\''+sid+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:#1e293b;color:white;cursor:pointer">Créer</button>'+
+      '<button onclick="_mntSaveTacheEq(\''+eqId+'\',\''+sid+'\','+(editPlanId?'\''+editPlanId+'\'':'null')+')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:#1e293b;color:white;cursor:pointer">'+(editPlanId?'Mettre à jour':'Créer')+'</button>'+
+    '</div>'
+  );
+  // Apply initial toggle state
+  setTimeout(function(){
+    _mntToggleFreqType(fType);
+    if(ep.prestataire_id){var w=document.getElementById('ntache-interne-wrap');if(w)w.style.display='none';}
+  },0);
+}
+
+async function _mntSaveTacheEq(eqId,sid,editPlanId){
+  var titre=(document.getElementById('ntache-titre')||{}).value||'';
+  var fVal=(document.getElementById('ntache-freq-val')||{}).value||'1';
+  var fUnit=(document.getElementById('ntache-freq-unit')||{}).value||'mois';
+  var date=(document.getElementById('ntache-date')||{}).value||null;
+  var prestId=(document.getElementById('ntache-prest')||{}).value||null;
+  var intervenant=(document.getElementById('ntache-intervenant')||{}).value||null;
+  var freq=fVal+' '+fUnit;
+  var payload={site_id:sid,equipement_id:eqId,titre:titre||_mntFreqLabel(freq)||freq,frequence:freq,prochaine_date:date,
+    prestataire_id:prestId||null,intervenant:prestId?null:(intervenant||null),actif:true};
+  var ok=editPlanId?
+    await supaPatch('plans_maintenance',editPlanId,payload).catch(function(){return null;}):
+    await supaPost('plans_maintenance',payload).catch(function(){return null;});
+  if(ok!==null){
+    _closeCfgModal();
+    if(_mntSelectedTaskId)_mntSelectEq(_mntSelectedTaskId,'',sid);
+    _rtMaintenances(sid);
+  }else alert('Erreur lors de la sauvegarde.');
+}
+
+// ── Clôture plan préventif (Écran 6) ──────────────────────────────────────────
+function _mntCloturerPlan(planId,planTitre,freq,eqId,sid){
+  var today=new Date().toISOString().slice(0,10);
+  var nextDate=_calcNextDate(freq,today);
+  var isCompteur=freq&&(freq.indexOf('heure')>=0||freq.indexOf('km')>=0||freq.indexOf('cycle')>=0);
+  _showCfgModal(
+    '<div style="font-size:15px;font-weight:700;margin-bottom:4px">✅ Clôturer l\'intervention</div>'+
+    '<div style="font-size:11px;color:#64748b;margin-bottom:16px">'+escape_html(planTitre)+'</div>'+
+    '<input type="hidden" id="clot-plan-id" value="'+planId+'">'+
+    '<input type="hidden" id="clot-eq-id" value="'+eqId+'">'+
+    '<input type="hidden" id="clot-freq" value="'+escape_html(freq)+'">'+
+    '<input type="hidden" id="clot-titre" value="'+escape_html(planTitre)+'">'+
+    '<div style="display:flex;flex-direction:column;gap:12px">'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+        '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">DATE RÉALISATION</label>'+
+          '<input id="clot-date" type="date" value="'+today+'" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+        '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">COÛT (FCFA)</label>'+
+          '<input id="clot-cout" type="number" placeholder="0" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+      '</div>'+
+      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">INTERVENANT / PRESTATAIRE</label>'+
+        '<input id="clot-intervenant" placeholder="Nom de la personne ou société" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+      (freq&&freq.indexOf('heure')>=0?
+        '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">HEURES AU COMPTEUR</label>'+
+          '<input id="clot-heures" type="number" placeholder="ex: 1250" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>':'')+
+      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">COMPTE RENDU</label>'+
+        '<textarea id="clot-rapport" rows="4" placeholder="Travaux effectués, observations, pièces changées…" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;resize:vertical;box-sizing:border-box;font-family:inherit;line-height:1.5"></textarea></div>'+
+      (isCompteur?
+        '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">PROCHAINE OCCURRENCE <span style="color:#94a3b8;font-weight:400">(saisie manuelle — compteur)</span></label>'+
+          '<input id="clot-next-date" type="date" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'
+        :
+        '<div style="padding:10px 12px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0;display:flex;justify-content:space-between;align-items:center">'+
+          '<div><div style="font-size:11px;color:#16a34a;font-weight:600">📅 Prochaine date auto-calculée</div>'+
+            '<div style="font-size:12px;color:#166534;font-weight:700;margin-top:1px">'+(nextDate||'—')+'</div></div>'+
+          '<input type="hidden" id="clot-next-date" value="'+(nextDate||'')+'">'+
+        '</div>'
+      )+
+    '</div>'+
+    '<div style="display:flex;gap:10px;margin-top:18px">'+
+      '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
+      '<button onclick="_mntSaveCloture(\''+sid+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:#059669;color:white;cursor:pointer">Enregistrer</button>'+
     '</div>'
   );
 }
 
-async function _mntSaveTacheEq(eqId,sid){
-  var titre=(document.getElementById('ntache-titre')||{}).value||'';
-  var freq=(document.getElementById('ntache-freq')||{}).value||'mensuel';
-  var date=(document.getElementById('ntache-date')||{}).value||null;
-  var ok=await supaPost('plans_maintenance',{site_id:sid,equipement_id:eqId,titre:titre||freq,frequence:freq,prochaine_date:date,actif:true}).catch(function(){return null;});
-  if(ok!==null){_closeCfgModal();_rtMaintenances(sid);}
-  else alert('Erreur lors de la création.');
+async function _mntSaveCloture(sid){
+  var planId=(document.getElementById('clot-plan-id')||{}).value;
+  var eqId=(document.getElementById('clot-eq-id')||{}).value;
+  var titre=(document.getElementById('clot-titre')||{}).value||'Maintenance';
+  var dateReal=(document.getElementById('clot-date')||{}).value;
+  var cout=parseInt((document.getElementById('clot-cout')||{}).value)||null;
+  var intervenant=(document.getElementById('clot-intervenant')||{}).value||null;
+  var heures=parseFloat((document.getElementById('clot-heures')||{}).value)||null;
+  var rapport=(document.getElementById('clot-rapport')||{}).value||null;
+  var nextDate=(document.getElementById('clot-next-date')||{}).value||null;
+  if(!dateReal){alert('La date de réalisation est obligatoire.');return;}
+  var mntPayload={groupe_id:sid,equipement_id:eqId,plan_maintenance_id:planId||null,
+    titre:titre,type:'preventive',statut:'realise',date_realisee:dateReal,
+    cout:cout,technicien:intervenant,heures_au_compteur:heures,rapport_texte:rapport};
+  var ok=await supaPost('maintenances',mntPayload).catch(function(){return null;});
+  if(!ok){alert('Erreur lors de la création de la maintenance.');return;}
+  if(planId&&nextDate)await supaPatch('plans_maintenance',planId,{prochaine_date:nextDate}).catch(function(){});
+  _closeCfgModal();
+  if(_mntSelectedTaskId)_mntSelectEq(_mntSelectedTaskId,'',sid);
+  _rtMaintenances(sid);
 }
 
 async function _mntCompleteFiche(eqId,sid){
