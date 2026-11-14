@@ -3139,6 +3139,11 @@ async function _sgAffecterDirect(sgId,techNom,techWa,instr){
 var _mntFilter='tous';
 var _rtMntPeriod=30;
 var _mntSelectedTaskId=null;
+var _mntEqFilter='all';
+var _mntEqSearch='';
+var _mntCurrentData=null;
+var _mntRenderEqRowFn=null;
+var _mntCalMonth=null;
 
 var _MNT_TYPES={
   panne:{label:'Panne / Réparation',icon:'🔧',color:'var(--rouge)',bg:'var(--rouge-pale)'},
@@ -4138,6 +4143,9 @@ async function _rtMaintenances(sid){
     (valeurs||[]).forEach(function(v){if(v.equipement_id)valeurIdx[v.equipement_id]=v;});
   }
 
+  // Store globally for filter/search/calendar re-renders
+  _mntCurrentData={equips:equips,pannesIdx:pannesIdx,plansIdx:plansIdx,statutIdx:statutIdx,valeurIdx:valeurIdx,plans:plans,sid:sid,today:today};
+
   // KPIs
   var nbPannes=pannes.length;
   var nbSansPlan=equips.filter(function(e){return !plansIdx[e.id];}).length;
@@ -4203,21 +4211,14 @@ async function _rtMaintenances(sid){
       progressBar+
     '</div>';
   }
+  _mntRenderEqRowFn=renderEqRow;
 
-  var listHtml=Object.keys(byType).sort().map(function(typNom){
-    return '<div style="padding:7px 14px 3px;background:#f8fafc;border-bottom:1px solid #f1f5f9">'+
-        '<span style="font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:1.2px">'+escape_html(typNom)+'</span>'+
-      '</div>'+
-      byType[typNom].map(renderEqRow).join('');
-  }).join('');
-
-  if(!equips.length){
-    listHtml='<div style="text-align:center;padding:48px 24px;color:#94a3b8">'+
+  var listHtml=equips.length?_mntBuildList():
+    '<div style="text-align:center;padding:48px 24px;color:#94a3b8">'+
       '<div style="font-size:36px;margin-bottom:12px;opacity:.4">🔧</div>'+
       '<div style="font-size:14px;font-weight:600">Aucun équipement</div>'+
       '<div style="font-size:12px;margin-top:5px">Ajoutez des équipements dans les rondes</div>'+
     '</div>';
-  }
 
   var kpiHtml='<div style="display:flex;border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;background:white">'+
     _mntKpiTab('Équipements',nbEquips,'sur ce site','#1e293b')+
@@ -4227,10 +4228,8 @@ async function _rtMaintenances(sid){
     _mntKpiTab('Sans plan',nbSansPlan,'plan de maintenance à créer',nbSansPlan>0?'#f59e0b':'#94a3b8')+
   '</div>';
 
-  var rightPlaceholder='<div id="mnt-detail-panel" style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#94a3b8;text-align:center;padding:32px">'+
-    '<div style="font-size:36px;margin-bottom:12px;opacity:.35">🔧</div>'+
-    '<div style="font-size:13px;font-weight:600;color:#64748b">Sélectionnez un équipement</div>'+
-    '<div style="font-size:11px;margin-top:4px">pour voir ses pannes et son plan</div>'+
+  var rightPlaceholder='<div id="mnt-detail-panel" style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;overflow:hidden">'+
+    _mntRenderCalendarPanel()+
   '</div>';
 
   return '<div style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">'+
@@ -4245,8 +4244,17 @@ async function _rtMaintenances(sid){
     kpiHtml+
     '<div style="display:flex;gap:12px;align-items:flex-start">'+
       '<div style="flex:0 0 42%;min-width:0">'+
+        '<div style="display:flex;gap:6px;margin-bottom:7px;align-items:center">'+
+          '<input id="mnt-eq-search" type="text" placeholder="Rechercher un équipement…" oninput="_mntSetSearch(this.value)" '+
+            'style="flex:1;min-width:0;height:32px;border:1.5px solid #e2e8f0;border-radius:8px;padding:0 10px;font-size:12px;color:#1e293b;outline:none;background:white"/>'+
+        '</div>'+
+        '<div style="display:flex;gap:5px;margin-bottom:8px">'+
+          '<button id="mnt-filter-all" onclick="_mntSetFilter(\'all\')" style="padding:4px 11px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600;background:#0f172a;color:white">Tous</button>'+
+          '<button id="mnt-filter-retard" onclick="_mntSetFilter(\'retard\')" style="padding:4px 11px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600;background:#fef2f2;color:#ef4444">En retard</button>'+
+          '<button id="mnt-filter-avenir" onclick="_mntSetFilter(\'avenir\')" style="padding:4px 11px;border-radius:6px;border:none;cursor:pointer;font-size:11px;font-weight:600;background:#f1f5f9;color:#64748b">À venir</button>'+
+        '</div>'+
         '<div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;overflow:hidden">'+
-          listHtml+
+          '<div id="mnt-eq-list-inner">'+listHtml+'</div>'+
         '</div>'+
       '</div>'+
       '<div style="flex:1;min-width:0;position:sticky;top:16px">'+
@@ -4255,13 +4263,218 @@ async function _rtMaintenances(sid){
     '</div>';
 }
 
+// ── Maintenance list helpers ────────────────────────────────────────────────
+
+function _mntBuildList(){
+  if(!_mntCurrentData)return '';
+  var equips=_mntCurrentData.equips;
+  var pannesIdx=_mntCurrentData.pannesIdx;
+  var plansIdx=_mntCurrentData.plansIdx;
+  var today=_mntCurrentData.today;
+
+  // Compute urgency per equipment
+  var withUrg=equips.map(function(e){
+    var eqPlans=plansIdx[e.id]||[];
+    var urgDiff=null;
+    eqPlans.forEach(function(p){
+      if(!p.prochaine_date)return;
+      var d=Math.round((new Date(p.prochaine_date+'T00:00:00')-new Date().setHours(0,0,0,0))/(1000*60*60*24));
+      if(urgDiff===null||d<urgDiff)urgDiff=d;
+    });
+    return {eq:e,urgDiff:urgDiff};
+  });
+
+  // Sort: overdue first, then soonest, then no plan
+  withUrg.sort(function(a,b){
+    if(a.urgDiff===null&&b.urgDiff===null)return 0;
+    if(a.urgDiff===null)return 1;
+    if(b.urgDiff===null)return -1;
+    return a.urgDiff-b.urgDiff;
+  });
+
+  // Filter
+  var filtered=withUrg.filter(function(item){
+    var pannes=pannesIdx[item.eq.id]||[];
+    if(_mntEqFilter==='retard')return pannes.length>0||(item.urgDiff!==null&&item.urgDiff<0);
+    if(_mntEqFilter==='avenir')return item.urgDiff!==null&&item.urgDiff>=0&&item.urgDiff<=30;
+    return true;
+  });
+
+  // Search
+  var q=(_mntEqSearch||'').toLowerCase().trim();
+  if(q)filtered=filtered.filter(function(item){return item.eq.nom.toLowerCase().includes(q);});
+
+  if(!filtered.length)return '<div style="text-align:center;padding:32px;color:#94a3b8;font-size:12px">Aucun équipement trouvé</div>';
+  return filtered.map(function(item){return _mntRenderEqRowFn?_mntRenderEqRowFn(item.eq):'';}).join('');
+}
+
+function _mntSetFilter(f){
+  _mntEqFilter=f;
+  ['all','retard','avenir'].forEach(function(id){
+    var btn=document.getElementById('mnt-filter-'+id);
+    if(!btn)return;
+    if(id==='all'){btn.style.background=f==='all'?'#0f172a':'#f1f5f9';btn.style.color=f==='all'?'white':'#64748b';}
+    else if(id==='retard'){btn.style.background=f==='retard'?'#ef4444':'#fef2f2';btn.style.color=f==='retard'?'white':'#ef4444';}
+    else{btn.style.background=f==='avenir'?'#0f172a':'#f1f5f9';btn.style.color=f==='avenir'?'white':'#64748b';}
+  });
+  var inner=document.getElementById('mnt-eq-list-inner');
+  if(inner)inner.innerHTML=_mntBuildList();
+}
+
+function _mntSetSearch(val){
+  _mntEqSearch=val||'';
+  var inner=document.getElementById('mnt-eq-list-inner');
+  if(inner)inner.innerHTML=_mntBuildList();
+}
+
+function _mntCloseDetail(){
+  _mntSelectedTaskId=null;
+  var panel=document.getElementById('mnt-detail-panel');
+  if(!panel)return;
+  panel.style.cssText='background:white;border:1.5px solid #e2e8f0;border-radius:14px;overflow:hidden;';
+  panel.innerHTML=_mntRenderCalendarPanel();
+}
+
+function _mntRenderCalendarPanel(){
+  if(!_mntCurrentData)return '';
+  var todayD=new Date();todayD.setHours(0,0,0,0);
+  var d=_mntCalMonth||{year:todayD.getFullYear(),month:todayD.getMonth()};
+  var year=d.year,month=d.month;
+  var plans=_mntCurrentData.plans||[];
+  var equips=_mntCurrentData.equips||[];
+  var eqNomIdx={};
+  equips.forEach(function(e){eqNomIdx[e.id]=e.nom;});
+
+  // Build date → plans map
+  var dateMap={};
+  plans.forEach(function(p){
+    if(!p.prochaine_date)return;
+    var pDate=new Date(p.prochaine_date+'T00:00:00');
+    var key=pDate.getFullYear()+'-'+pDate.getMonth()+'-'+pDate.getDate();
+    (dateMap[key]=dateMap[key]||[]).push(p);
+  });
+
+  // Calendar grid
+  var firstDay=(new Date(year,month,1).getDay()+6)%7; // Mon=0
+  var daysInMonth=new Date(year,month+1,0).getDate();
+  var prevMonthDays=new Date(year,month,0).getDate();
+  var monthNames=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  var dayLabels=['L','M','M','J','V','S','D'];
+
+  var cells='';
+  for(var pi=firstDay-1;pi>=0;pi--){
+    cells+='<div style="text-align:center;font-size:10px;color:#cbd5e1;padding:3px 1px">'+(prevMonthDays-pi)+'</div>';
+  }
+  for(var day=1;day<=daysInMonth;day++){
+    var key=year+'-'+month+'-'+day;
+    var dayPlans=dateMap[key]||[];
+    var isToday=todayD.getFullYear()===year&&todayD.getMonth()===month&&todayD.getDate()===day;
+    var dots='';
+    dayPlans.slice(0,3).forEach(function(p){
+      var pDate=new Date(p.prochaine_date+'T00:00:00');
+      var diff=Math.round((pDate-todayD)/(1000*60*60*24));
+      var col=diff<0?'#ef4444':diff<=14?'#f59e0b':'#3b82f6';
+      dots+='<div style="width:4px;height:4px;border-radius:50%;background:'+col+'"></div>';
+    });
+    cells+='<div style="text-align:center;padding:2px 1px;border-radius:5px;'+(isToday?'background:#eff6ff':'')+'">'+
+      '<div style="font-size:10px;color:'+(isToday?'#3b82f6':dayPlans.length?'#1e293b':'#64748b')+';'+(isToday?'font-weight:700':'')+(dayPlans.length&&!isToday?'font-weight:600':'')+'">'+day+'</div>'+
+      (dots?'<div style="display:flex;justify-content:center;gap:1px;margin-top:1px">'+dots+'</div>':'<div style="height:5px"></div>')+
+    '</div>';
+  }
+  var total=firstDay+daysInMonth;
+  var rem=total%7===0?0:7-(total%7);
+  for(var nd=1;nd<=rem;nd++){
+    cells+='<div style="text-align:center;font-size:10px;color:#cbd5e1;padding:3px 1px">'+nd+'</div>';
+  }
+
+  // Agenda: next 7 plans sorted
+  var upcoming=plans
+    .filter(function(p){return p.prochaine_date;})
+    .map(function(p){
+      var pDate=new Date(p.prochaine_date+'T00:00:00');
+      var diff=Math.round((pDate-todayD)/(1000*60*60*24));
+      return {p:p,pDate:pDate,diff:diff};
+    })
+    .sort(function(a,b){return a.diff-b.diff;})
+    .slice(0,7);
+
+  var agendaHtml=upcoming.map(function(item){
+    var diff=item.diff;
+    var col=diff<0?'#ef4444':diff<=14?'#f59e0b':'#3b82f6';
+    var badge=diff<0?'En retard '+ Math.abs(diff)+'j':diff===0?"Aujourd'hui":'Dans '+diff+'j';
+    var badgeBg=diff<0?'#fef2f2':diff<=14?'#fffbeb':'#eff6ff';
+    var dayNum=item.pDate.getDate();
+    var monthAbbr=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'][item.pDate.getMonth()];
+    var eqNom=eqNomIdx[item.p.equipement_id]||'';
+    return '<div style="display:flex;align-items:flex-start;gap:9px;padding:7px 14px;border-bottom:1px solid #f1f5f9">'+
+      '<div style="min-width:30px;text-align:center;flex-shrink:0">'+
+        '<div style="font-size:14px;font-weight:700;color:#1e293b;line-height:1">'+dayNum+'</div>'+
+        '<div style="font-size:9px;color:#94a3b8;text-transform:uppercase">'+monthAbbr+'</div>'+
+      '</div>'+
+      '<div style="width:2px;min-height:36px;background:'+col+';border-radius:1px;flex-shrink:0;margin-top:2px"></div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:11px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(item.p.titre||'Maintenance')+'</div>'+
+        (eqNom?'<div style="font-size:10px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(eqNom)+'</div>':'')+
+        '<span style="font-size:9px;font-weight:600;color:'+col+';background:'+badgeBg+';padding:1px 5px;border-radius:3px">'+badge+'</span>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  if(!agendaHtml)agendaHtml='<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Aucune maintenance planifiée</div>';
+
+  return '<div style="padding:14px 16px 10px">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
+      '<span style="font-size:13px;font-weight:700;color:#1e293b">'+monthNames[month]+' '+year+'</span>'+
+      '<div style="display:flex;gap:4px">'+
+        '<button onclick="_mntCalPrev()" style="width:26px;height:26px;border:1px solid #e2e8f0;border-radius:7px;background:#f8fafc;cursor:pointer;color:#64748b;display:flex;align-items:center;justify-content:center;padding:0"><i class="ti ti-chevron-left" style="font-size:12px"></i></button>'+
+        '<button onclick="_mntCalNext()" style="width:26px;height:26px;border:1px solid #e2e8f0;border-radius:7px;background:#f8fafc;cursor:pointer;color:#64748b;display:flex;align-items:center;justify-content:center;padding:0"><i class="ti ti-chevron-right" style="font-size:12px"></i></button>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:6px">'+
+      dayLabels.map(function(l){return '<div style="text-align:center;font-size:9px;color:#94a3b8;font-weight:700;padding:2px 0">'+l+'</div>';}).join('')+
+      cells+
+    '</div>'+
+    '<div style="display:flex;gap:12px;padding:4px 2px 10px;border-bottom:1px solid #f1f5f9">'+
+      '<span style="display:flex;align-items:center;gap:4px;font-size:9px;color:#64748b"><span style="width:6px;height:6px;border-radius:50%;background:#ef4444;display:inline-block"></span>En retard</span>'+
+      '<span style="display:flex;align-items:center;gap:4px;font-size:9px;color:#64748b"><span style="width:6px;height:6px;border-radius:50%;background:#f59e0b;display:inline-block"></span>≤ 14 jours</span>'+
+      '<span style="display:flex;align-items:center;gap:4px;font-size:9px;color:#64748b"><span style="width:6px;height:6px;border-radius:50%;background:#3b82f6;display:inline-block"></span>Planifié</span>'+
+    '</div>'+
+  '</div>'+
+  '<div>'+
+    '<div style="padding:7px 14px 4px;background:#fafbfc;border-bottom:1px solid #f1f5f9;border-top:1px solid #f1f5f9">'+
+      '<span style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.8px">Prochaines interventions</span>'+
+    '</div>'+
+    agendaHtml+
+  '</div>';
+}
+
+function _mntCalPrev(){
+  var today=new Date();
+  var d=_mntCalMonth||{year:today.getFullYear(),month:today.getMonth()};
+  var m=d.month-1,y=d.year;
+  if(m<0){m=11;y--;}
+  _mntCalMonth={year:y,month:m};
+  var panel=document.getElementById('mnt-detail-panel');
+  if(panel&&!_mntSelectedTaskId)panel.innerHTML=_mntRenderCalendarPanel();
+}
+
+function _mntCalNext(){
+  var today=new Date();
+  var d=_mntCalMonth||{year:today.getFullYear(),month:today.getMonth()};
+  var m=d.month+1,y=d.year;
+  if(m>11){m=0;y++;}
+  _mntCalMonth={year:y,month:m};
+  var panel=document.getElementById('mnt-detail-panel');
+  if(panel&&!_mntSelectedTaskId)panel.innerHTML=_mntRenderCalendarPanel();
+}
+
 // ── Companion functions ─────────────────────────────────────────────────────
 
 async function _mntSelectEq(eqId,eqNom,sid){
   _mntSelectedTaskId=eqId;
   var panel=document.getElementById('mnt-detail-panel');
   if(!panel)return;
-  panel.style.cssText='background:white;border:1.5px solid #e2e8f0;border-radius:14px;overflow:hidden;padding:0;text-align:left;min-height:280px;';
+  panel.style.cssText='background:white;border:1.5px solid #e2e8f0;border-radius:14px;overflow:hidden;padding:0;text-align:left;min-height:280px;position:relative;';
   panel.innerHTML='<div style="padding:32px;text-align:center;color:#94a3b8"><i class="ti ti-loader" style="font-size:24px"></i></div>';
 
   var res=await Promise.all([
@@ -4444,6 +4657,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
   // ── Header ────────────────────────────────────────────────────────────────
   var headerHtml=
     '<div style="padding:14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:flex-start;gap:12px">'+
+      '<button onclick="_mntCloseDetail()" title="Retour au calendrier" style="position:absolute;top:8px;right:10px;background:none;border:none;cursor:pointer;color:#94a3b8;font-size:16px;padding:4px;border-radius:6px" aria-label="Fermer"><i class="ti ti-x"></i></button>'+
       '<div style="width:38px;height:38px;border-radius:10px;background:'+ti.bg+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
         '<i class="ti '+ti.icon+'" style="font-size:20px;color:'+ti.col+'" aria-hidden="true"></i>'+
       '</div>'+
