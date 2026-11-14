@@ -65,7 +65,8 @@ var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZ
 
 var _mission=null;
 var _missionPlans=[];
-var _taskStates={}; // planId → {statut, commentaire, heures, photoFiles}
+var _taskStates={}; // planId → {statut, commentaire, heures, photoFiles, motifBlocage, checklistCompletee}
+var _respTel='';
 
 async function sbGet(table,qs){
   var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+qs,{
@@ -140,21 +141,29 @@ async function init(){
   var params=new URLSearchParams(window.location.search);
   var token=params.get('token');
   if(!token){renderError('Lien invalide — token manquant.');return;}
+  _respTel=params.get('resp_tel')||'';
 
   // Fetch mission par token
   var missions=await sbGet('missions','token=eq.'+token+'&select=*,equipements(nom,types_equipements(nom)),sites(nom)');
   if(!missions||!missions.length){renderError('Mission introuvable ou expirée.');return;}
   _mission=missions[0];
+  if(!_respTel&&_mission.resp_tel)_respTel=_mission.resp_tel;
 
   if(_mission.statut==='realisee'){renderSuccess();return;}
 
-  // Fetch mission_plans + plans_maintenance
-  var mps=await sbGet('mission_plans','mission_id=eq.'+_mission.id+'&select=*,plans_maintenance(id,titre,frequence)');
+  // Fetch mission_plans + plans_maintenance (avec checklist)
+  var mps=await sbGet('mission_plans','mission_id=eq.'+_mission.id+'&select=*,plans_maintenance(id,titre,frequence,checklist)');
   _missionPlans=mps||[];
 
   // Init states
   _missionPlans.forEach(function(mp){
-    _taskStates[mp.id]={statut:'a_faire',commentaire:'',heures:null,photoFiles:[],photoUrls:[]};
+    var checklist=Array.isArray((mp.plans_maintenance||{}).checklist)?(mp.plans_maintenance.checklist):[];
+    _taskStates[mp.id]={
+      statut:'a_faire',commentaire:'',heures:null,
+      photoFiles:[],photoUrls:[],
+      motifBlocage:'',
+      checklistCompletee:checklist.map(function(){return false;})
+    };
   });
 
   var eqNom=(_mission.equipements&&_mission.equipements.nom)||'Équipement';
@@ -175,22 +184,42 @@ function renderApp(){
   _missionPlans.forEach(function(mp,i){
     var plan=mp.plans_maintenance||{};
     var st=_taskStates[mp.id];
-    var isOk=st.statut==='realise',isKo=st.statut==='echec';
+    var isOk=st.statut==='realise',isKo=st.statut==='bloque';
     var hasCounter=plan.frequence&&plan.frequence.toLowerCase().includes('heure');
+    var checklist=Array.isArray(plan.checklist)?plan.checklist:[];
     html+='<div class="card" id="task-card-'+mp.id+'">';
     html+='<div class="card-head">';
     html+='<div class="card-head-label">Tâche '+(i+1)+' / '+_missionPlans.length+'</div>';
     if(isOk)html+='<span class="badge badge-ok">✅ Réalisé</span>';
-    else if(isKo)html+='<span class="badge badge-ko">❌ Non réalisé</span>';
+    else if(isKo)html+='<span class="badge badge-ko">🔴 Bloqué</span>';
     else html+='<span class="badge badge-todo">À faire</span>';
     html+='</div>';
     html+='<div class="task-row">';
     html+='<div class="task-name">'+esc(plan.titre||plan.frequence||'Tâche')+'</div>';
     if(plan.frequence)html+='<div class="task-freq">'+esc(freqLabel(plan.frequence))+'</div>';
+    // Checklist points à vérifier
+    if(checklist.length){
+      html+='<div style="margin-bottom:12px">';
+      html+='<div class="field-label" style="margin-bottom:6px">Points à vérifier</div>';
+      checklist.forEach(function(item,ci){
+        var checked=st.checklistCompletee[ci];
+        html+='<label style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f1f5f9;cursor:pointer">';
+        html+='<input type="checkbox" '+(checked?'checked':'')+' onchange="_toggleCheck(\''+mp.id+'\','+ci+',this.checked)" '+
+          'style="width:16px;height:16px;accent-color:#22c55e;cursor:pointer">';
+        html+='<span style="font-size:13px;color:#374151'+(checked?';text-decoration:line-through;color:#94a3b8':'')+'" id="cl-text-'+mp.id+'-'+ci+'">'+esc(item.text||item)+'</span>';
+        html+='</label>';
+      });
+      html+='</div>';
+    }
     // Boutons statut
     html+='<div class="btn-group">';
     html+='<button class="btn-status'+(isOk?' ok':'')+'" onclick="_setStatut(\''+mp.id+'\',\'realise\')">✅ Réalisé</button>';
-    html+='<button class="btn-status'+(isKo?' ko':'')+'" onclick="_setStatut(\''+mp.id+'\',\'echec\')">❌ Non réalisé</button>';
+    html+='<button class="btn-status'+(isKo?' ko':'')+'" onclick="_setStatut(\''+mp.id+'\',\'bloque\')">🔴 Bloqué</button>';
+    html+='</div>';
+    // Motif blocage (affiché seulement si bloqué)
+    html+='<div id="motif-wrap-'+mp.id+'" style="'+(isKo?'':'display:none;')+'margin-bottom:10px">';
+    html+='<div class="field-label">Motif du blocage *</div>';
+    html+='<textarea class="field-input" rows="2" placeholder="Expliquez pourquoi cette tâche est bloquée…" onchange="_setMotif(\''+mp.id+'\',this.value)">'+esc(st.motifBlocage)+'</textarea>';
     html+='</div>';
     // Compteur heures
     if(hasCounter){
@@ -220,23 +249,31 @@ function renderApp(){
 
 function _setStatut(mpId,statut){
   _taskStates[mpId].statut=statut;
-  // Update badge
   var card=document.getElementById('task-card-'+mpId);
   if(!card)return;
   var badge=card.querySelector('.badge');
   if(badge){
-    badge.className='badge '+(statut==='realise'?'badge-ok':statut==='echec'?'badge-ko':'badge-todo');
-    badge.textContent=statut==='realise'?'✅ Réalisé':statut==='echec'?'❌ Non réalisé':'À faire';
+    badge.className='badge '+(statut==='realise'?'badge-ok':statut==='bloque'?'badge-ko':'badge-todo');
+    badge.textContent=statut==='realise'?'✅ Réalisé':statut==='bloque'?'🔴 Bloqué':'À faire';
   }
   var btns=card.querySelectorAll('.btn-status');
   btns.forEach(function(b){
     b.className='btn-status';
     if(b.textContent.includes('Réalisé')&&statut==='realise')b.className='btn-status ok';
-    if(b.textContent.includes('Non réalisé')&&statut==='echec')b.className='btn-status ko';
+    if(b.textContent.includes('Bloqué')&&statut==='bloque')b.className='btn-status ko';
   });
+  // Afficher/masquer champ motif
+  var motifWrap=document.getElementById('motif-wrap-'+mpId);
+  if(motifWrap)motifWrap.style.display=statut==='bloque'?'':'none';
 }
 function _setComment(mpId,val){_taskStates[mpId].commentaire=val;}
+function _setMotif(mpId,val){_taskStates[mpId].motifBlocage=val;}
 function _setHeures(mpId,val){_taskStates[mpId].heures=val?parseFloat(val):null;}
+function _toggleCheck(mpId,ci,checked){
+  _taskStates[mpId].checklistCompletee[ci]=checked;
+  var txt=document.getElementById('cl-text-'+mpId+'-'+ci);
+  if(txt){txt.style.textDecoration=checked?'line-through':'';txt.style.color=checked?'#94a3b8':'';}
+}
 function _addPhoto(mpId,input){
   var file=input.files[0];
   if(!file)return;
@@ -264,6 +301,7 @@ async function _submitMission(){
     var mp=_missionPlans[i];
     var st=_taskStates[mp.id];
     var plan=mp.plans_maintenance||{};
+    var checklist=Array.isArray(plan.checklist)?plan.checklist:[];
     // Upload photos
     var photoUrl=null;
     if(st.photoFiles&&st.photoFiles.length){
@@ -274,6 +312,13 @@ async function _submitMission(){
     var mpPatch={statut:st.statut,commentaire:st.commentaire||null};
     if(photoUrl)mpPatch.photo_url=photoUrl;
     if(st.heures!==null)mpPatch.heures_compteur=st.heures;
+    if(st.statut==='bloque'&&st.motifBlocage)mpPatch.motif_blocage=st.motifBlocage;
+    // Checklist complétée — [{text, done}]
+    if(checklist.length){
+      mpPatch.checklist_completee=checklist.map(function(item,ci){
+        return{text:item.text||item,done:!!st.checklistCompletee[ci]};
+      });
+    }
     await sbPatch('mission_plans',mp.id,mpPatch);
     // Si réalisé : mettre à jour plans_maintenance prochaine_date
     if(st.statut==='realise'&&plan.frequence){
@@ -302,21 +347,47 @@ async function _submitMission(){
   }
   // Marquer mission comme réalisée
   var allRealise=_missionPlans.every(function(mp){return _taskStates[mp.id].statut==='realise';});
-  var missionStatut=allRealise?'realisee':
-    _missionPlans.some(function(mp){return _taskStates[mp.id].statut==='realise';})
-      ?'realisee':'echec';
+  var anyRealise=_missionPlans.some(function(mp){return _taskStates[mp.id].statut==='realise';});
+  var missionStatut=allRealise?'realisee':anyRealise?'realisee':'echec';
   await sbPatch('missions',_mission.id,{statut:missionStatut,completed_at:new Date().toISOString()});
+
+  // Construire le résumé pour WhatsApp resp
+  var eqNom=(_mission.equipements&&_mission.equipements.nom)||'Équipement';
+  var siteNom=(_mission.sites&&_mission.sites.nom)||'';
+  var lines=['📋 Rapport mission · '+eqNom+(siteNom?' ('+siteNom+')':'')];
+  lines.push('Tech: '+(_mission.technicien_nom||'—'));
+  lines.push('Date: '+new Date().toLocaleDateString('fr-FR'));
+  lines.push('');
+  _missionPlans.forEach(function(mp,i){
+    var plan=mp.plans_maintenance||{};
+    var st=_taskStates[mp.id];
+    var ico=st.statut==='realise'?'✅':st.statut==='bloque'?'🔴':'⬜';
+    lines.push(ico+' '+(plan.titre||'Tâche '+(i+1)));
+    if(st.statut==='bloque'&&st.motifBlocage)lines.push('   Motif: '+st.motifBlocage);
+    if(st.commentaire)lines.push('   '+st.commentaire);
+  });
+  _waRapportMsg=lines.join('\n');
 
   renderSuccess();
 }
 
+var _waRapportMsg='';
+
 function renderSuccess(){
   document.getElementById('hdr-sub').textContent='Mission soumise';
+  var waBtn='';
+  if(_respTel){
+    var waUrl='https://wa.me/'+_respTel.replace(/^\+/,'').replace(/\s+/g,'')+'?text='+encodeURIComponent(_waRapportMsg||'Mission terminée.');
+    waBtn='<a href="'+waUrl+'" target="_blank" style="display:inline-flex;align-items:center;gap:8px;margin-top:20px;padding:13px 24px;background:#22c55e;color:white;border-radius:12px;font-size:14px;font-weight:700;text-decoration:none">'+
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.374 0 0 5.373 0 12c0 2.136.564 4.133 1.546 5.861L0 24l6.336-1.521A11.914 11.914 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.797 9.797 0 01-5.023-1.381l-.36-.214-3.729.896.927-3.635-.236-.374A9.771 9.771 0 012.182 12C2.182 6.577 6.577 2.182 12 2.182S21.818 6.577 21.818 12 17.423 21.818 12 21.818z"/></svg>'+
+      ' Envoyer le rapport au responsable</a>';
+  }
   document.getElementById('app').innerHTML=
     '<div class="success-screen">'+
       '<div class="success-icon">✅</div>'+
       '<div class="success-title">Mission soumise !</div>'+
-      '<div class="success-sub">Vos données ont bien été enregistrées.<br>Le responsable a été notifié.</div>'+
+      '<div class="success-sub">Vos données ont bien été enregistrées.</div>'+
+      waBtn+
     '</div>';
 }
 function renderError(msg){

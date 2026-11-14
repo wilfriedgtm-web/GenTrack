@@ -4099,6 +4099,7 @@ function _mntKpiTab(label,val,sub,col){
 }
 
 async function _rtMaintenances(sid){
+  _mntSelectedTaskId=null; // reset selection à chaque rechargement de la vue
   var dc=document.getElementById('dash-content-main');
   if(dc){dc.style.padding='12px 16px';dc.style.maxWidth='1200px';}
   var today=new Date();today.setHours(0,0,0,0);
@@ -4482,7 +4483,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
     supaGet('signalements','equipement_id=eq.'+eqId+'&type=eq.panne&statut=not.in.(traite,resolu,annule)&order=created_at.desc&select=id,description,statut,created_at').catch(function(){return[];}),
     supaGet('signalements','equipement_id=eq.'+eqId+'&order=created_at.desc&limit=15&select=id,type,description,statut,created_at,assigne_a').catch(function(){return[];}),
     supaGet('maintenances','equipement_id=eq.'+eqId+'&order=date_realisee.desc&limit=15&select=id,titre,type,statut,created_at,date_realisee,prestataire,prestataire_id,technicien,cout,rapport_texte,plan_maintenance_id').catch(function(){return[];}),
-    supaGet('plans_maintenance','equipement_id=eq.'+eqId+'&actif=eq.true&order=prochaine_date.asc&select=id,titre,frequence,prochaine_date,intervenant,prestataires(nom)').catch(function(){return[];}),
+    supaGet('plans_maintenance','equipement_id=eq.'+eqId+'&actif=eq.true&order=prochaine_date.asc&select=id,titre,frequence,prochaine_date,intervenant,checklist,prestataires(nom)').catch(function(){return[];}),
     supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom,telephone,email').catch(function(){return[];}),
     supaGet('reponses',
       'select=valeur,created_at,questions!inner(texte,unite,equipement_id,type_reponse)'+
@@ -4492,7 +4493,8 @@ async function _mntSelectEq(eqId,eqNom,sid){
       '&order=created_at.desc&limit=100'
     ).catch(function(){return[];}),
     (function(){var d90=new Date();d90.setDate(d90.getDate()-90);
-      return supaGet('signalements','equipement_id=eq.'+eqId+'&type=eq.panne&created_at=gte.'+d90.toISOString()+'&select=id').catch(function(){return[];});})()
+      return supaGet('signalements','equipement_id=eq.'+eqId+'&type=eq.panne&created_at=gte.'+d90.toISOString()+'&select=id').catch(function(){return[];});})(),
+    supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&role=in.(technicien,resp_tech)&select=id,nom,whatsapp&order=nom.asc').catch(function(){return[];})
   ]);
   var eq=res[0][0]||{nom:eqNom};
   var pannesOuv=res[1]||[];
@@ -4502,6 +4504,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
   var prests=res[5]||[];
   var allValeurs=res[6]||[];
   var pannes90=res[7]||[];
+  var techContacts=res[8]||[];
 
   // Dernière valeur par unité pour les cards métriques
   var valParUnite={};
@@ -4872,34 +4875,72 @@ async function _mntSelectEq(eqId,eqNom,sid){
   var tabBar='<div style="display:flex;border-bottom:1px solid #e2e8f0;overflow-x:auto;background:white">'+
     tbBtn('fiche','Fiche',true)+
     tbBtn('plan','Plan préventif',false)+
-    tbBtn('tech','📲 Envoyer tech',false)+
     tbBtn('prest','🏢 Prestataire',false)+
     tbBtn('hist','Historique',false)+
   '</div>';
 
-  // ── Onglet "Envoyer tech" ─────────────────────────────────────────────────
-  var planChecks=plans.length?plans.map(function(p){
-    return '<label style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #f1f5f9;cursor:pointer">'+
-      '<input type="checkbox" class="mnt-mission-plan" value="'+p.id+'" style="width:14px;height:14px;cursor:pointer">'+
+  // ── Onglet "Plan préventif" fusionné (sélection + envoi tech) ─────────────
+  // Cases à cocher sur chaque plan + barre flottante envoi
+  var planCheckRows=plans.length?plans.map(function(p){
+    var d=p.prochaine_date;
+    var diff=d?Math.round((new Date(d+'T00:00:00')-new Date().setHours(0,0,0,0))/(1000*60*60*24)):null;
+    var dateCol=diff===null?'#94a3b8':diff<0?'#ef4444':diff<=14?'#f59e0b':'#16a34a';
+    var urgBg=diff===null?'#f8fafc':diff<0?'#fef2f2':diff<=14?'#fffbeb':'#f0fdf4';
+    var freqLbl=_mntFreqLabel(p.frequence||'');
+    var who=(p.prestataires&&p.prestataires.nom)||p.intervenant||'';
+    var urgLabel=diff===null?'—':diff<0?'En retard '+Math.abs(diff)+'j':diff===0?'Aujourd\'hui':diff+'j';
+    return '<div style="padding:9px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:flex-start;gap:10px">'+
+      '<input type="checkbox" class="mnt-mission-plan" value="'+p.id+'" '+
+        'style="width:15px;height:15px;cursor:pointer;margin-top:2px;flex-shrink:0" '+
+        'onchange="_mntUpdatePlanSelCount()">'+
       '<div style="flex:1;min-width:0">'+
-        '<div style="font-size:12px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(p.titre||_mntFreqLabel(p.frequence||'')||'Plan')+'</div>'+
-        '<div style="font-size:10px;color:#64748b">'+escape_html(_mntFreqLabel(p.frequence||'')||p.frequence||'')+'</div>'+
+        '<div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">'+
+          '<span style="font-size:12px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+escape_html(p.titre||freqLbl||'Plan')+'</span>'+
+          '<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:'+urgBg+';color:'+dateCol+';font-weight:700;white-space:nowrap;flex-shrink:0">'+urgLabel+'</span>'+
+        '</div>'+
+        '<div style="font-size:10px;color:#64748b">'+escape_html(freqLbl||p.frequence||'')+(who?' · '+escape_html(who):'')+'</div>'+
+        '<div style="display:flex;align-items:center;gap:5px;margin-top:5px">'+
+          '<input type="date" value="'+(d||'')+'" '+
+            'onchange="_mntSetPlanDate(\''+p.id+'\',\''+sid+'\',this.value)" '+
+            'style="flex:1;border:1px solid '+dateCol+';border-radius:6px;padding:3px 7px;font-size:11px;color:'+dateCol+';background:white;cursor:pointer;outline:none"/>'+
+          '<button onclick="_mntCloturerPlan(\''+p.id+'\',\''+escape_html(p.titre||freqLbl||'Plan')+'\',\''+escape_html(p.frequence||'')+'\',\''+eqId+'\',\''+sid+'\')" '+
+            'style="padding:3px 7px;border:1px solid #bbf7d0;border-radius:6px;font-size:11px;color:#059669;background:#f0fdf4;cursor:pointer;white-space:nowrap;font-weight:600" title="Clôturer">'+
+            '<i class="ti ti-check" style="font-size:12px"></i></button>'+
+          '<button onclick="_mntNouvelleTachePourEq(\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\',\''+sid+'\',\''+p.id+'\')" '+
+            'style="padding:3px 7px;border:1px solid #e2e8f0;border-radius:6px;font-size:11px;color:#64748b;background:white;cursor:pointer" title="Modifier">'+
+            '<i class="ti ti-pencil" style="font-size:12px"></i></button>'+
+        '</div>'+
       '</div>'+
-    '</label>';
-  }).join(''):'<div style="padding:14px;text-align:center;color:#94a3b8;font-size:11px">Aucun plan actif à envoyer</div>';
+    '</div>';
+  }).join(''):'<div style="padding:12px;text-align:center;color:#94a3b8;font-size:11px">Aucun plan créé</div>';
 
-  var techTabHtml=
-    secHead('Sélectionner les tâches à réaliser')+
-    planChecks+
-    secHead('Technicien')+
-    '<div style="padding:12px 14px;display:flex;flex-direction:column;gap:9px">'+
-      '<input id="mnt-tech-nom" placeholder="Nom du technicien" style="border:1px solid #e2e8f0;border-radius:7px;padding:9px 11px;font-size:12px;outline:none;width:100%;box-sizing:border-box"/>'+
-      '<input id="mnt-tech-tel" placeholder="+225 XX XX XX XX XX" style="border:1px solid #e2e8f0;border-radius:7px;padding:9px 11px;font-size:12px;outline:none;width:100%;box-sizing:border-box"/>'+
-      '<button onclick="_mntCreerMission(\''+eqId+'\',\''+sid+'\')" style="background:#0f172a;color:white;border:none;border-radius:8px;padding:11px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px">'+
+  // Dropdown contacts
+  var techOpts=techContacts.length?
+    techContacts.map(function(c){
+      return '<option value="'+c.id+'" data-wa="'+escape_html(c.whatsapp||'')+'" data-nom="'+escape_html(c.nom)+'">'+escape_html(c.nom)+(c.whatsapp?' · '+escape_html(c.whatsapp):'')+'</option>';
+    }).join(''):
+    '<option value="">— Aucun technicien dans les contacts —</option>';
+
+  var planTabHtml=
+    secHead('Plans actifs',
+      '<button onclick="_mntNouvelleTachePourEq(\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\',\''+sid+'\')" '+
+        'style="font-size:10px;color:#3b82f6;background:none;border:none;cursor:pointer;padding:0;font-weight:600">+ Ajouter</button>')+
+    '<div id="mnt-plan-check-list">'+planCheckRows+'</div>'+
+    '<div style="border-top:1px solid #e2e8f0;padding:11px 14px;background:#f8fafc">'+
+      '<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px"><i class="ti ti-send" style="font-size:11px;vertical-align:-1px;margin-right:4px"></i>Envoyer au technicien</div>'+
+      '<select id="mnt-tech-contact" onchange="_mntUpdatePlanSelCount()" '+
+        'style="width:100%;border:1px solid #e2e8f0;border-radius:7px;padding:8px 10px;font-size:12px;background:white;margin-bottom:8px;box-sizing:border-box">'+
+        '<option value="">— Sélectionner un technicien —</option>'+techOpts+
+      '</select>'+
+      '<div id="mnt-sel-count" style="font-size:11px;color:#94a3b8;margin-bottom:8px">0 plan sélectionné</div>'+
+      '<button onclick="_mntCreerMission(\''+eqId+'\',\''+sid+'\')" '+
+        'style="width:100%;background:#0f172a;color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px">'+
         '<i class="ti ti-brand-whatsapp" style="font-size:16px;color:#22c55e"></i> Créer mission &amp; envoyer WhatsApp'+
       '</button>'+
-      '<div id="mnt-mission-status" style="display:none;text-align:center;font-size:11px;color:#16a34a;font-weight:600"></div>'+
-    '</div>';
+      '<div id="mnt-mission-status" style="display:none;text-align:center;font-size:11px;color:#16a34a;font-weight:600;margin-top:6px"></div>'+
+    '</div>'+
+    secHead('Charge — 6 mois à venir')+
+    '<div style="padding:10px 14px 12px">'+vizHtml+'</div>';
 
   // ── Onglet "Prestataire" ──────────────────────────────────────────────────
   var eqPrests=prests.filter(function(p){return true;}); // tous les prests du site
@@ -4934,15 +4975,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
     headerHtml+
     tabBar+
     '<div id="mnt-tab-fiche">'+ficheHtml+'</div>'+
-    '<div id="mnt-tab-plan" style="display:none">'+
-      secHead('Plans de maintenance',
-        '<button onclick="_mntNouvelleTachePourEq(\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\',\''+sid+'\')" '+
-          'style="font-size:10px;color:#3b82f6;background:none;border:none;cursor:pointer;padding:0;font-weight:600">+ Ajouter</button>')+
-      plansHtml+
-      secHead('Charge — 6 mois à venir')+
-      '<div style="padding:10px 14px 12px">'+vizHtml+'</div>'+
-    '</div>'+
-    '<div id="mnt-tab-tech" style="display:none">'+techTabHtml+'</div>'+
+    '<div id="mnt-tab-plan" style="display:none">'+planTabHtml+'</div>'+
     '<div id="mnt-tab-prest" style="display:none">'+prestTabHtml+'</div>'+
     '<div id="mnt-tab-hist" style="display:none">'+secHead('Historique — signalements & maintenances')+tlHtml+'</div>';
 }
@@ -4954,7 +4987,7 @@ async function _mntSetPlanDate(planId,sid,newDate){
 }
 
 function _mntSwitchTab(id){
-  ['fiche','plan','tech','prest','hist'].forEach(function(t){
+  ['fiche','plan','prest','hist'].forEach(function(t){
     var div=document.getElementById('mnt-tab-'+t);
     var btn=document.getElementById('mnt-tbtn-'+t);
     if(div)div.style.display=t===id?'':'none';
@@ -4966,20 +4999,32 @@ function _mntSwitchTab(id){
   });
 }
 
+function _mntUpdatePlanSelCount(){
+  var n=document.querySelectorAll('.mnt-mission-plan:checked').length;
+  var el=document.getElementById('mnt-sel-count');
+  if(el)el.textContent=n+' plan'+(n>1?'s':'')+' sélectionné'+(n>1?'s':'');
+}
+
 async function _mntCreerMission(eqId,sid){
-  var nom=(document.getElementById('mnt-tech-nom')||{}).value||'';
-  var tel=(document.getElementById('mnt-tech-tel')||{}).value||'';
+  var sel=document.getElementById('mnt-tech-contact');
+  var selOpt=sel&&sel.options[sel.selectedIndex];
+  var nom=selOpt&&sel.value?selOpt.getAttribute('data-nom')||'':'';
+  var tel=selOpt&&sel.value?selOpt.getAttribute('data-wa')||'':'';
+  // Numéro WhatsApp du responsable (depuis session courante)
+  var respTel=(_session&&_session.whatsapp)||(_session&&_session.telephone)||'';
   var checks=document.querySelectorAll('.mnt-mission-plan:checked');
   if(!checks.length){alert('Sélectionnez au moins une tâche.');return;}
   var planIds=Array.prototype.map.call(checks,function(c){return c.value;});
   var statusEl=document.getElementById('mnt-mission-status');
   if(statusEl){statusEl.style.display='';statusEl.textContent='Création de la mission...';}
   // Créer la mission
-  var mission=await supaPost('missions',{
+  var missionPayload={
     site_id:sid,equipement_id:eqId,
     technicien_nom:nom||null,technicien_tel:tel||null,
     statut:'envoyee'
-  }).catch(function(){return null;});
+  };
+  if(respTel)missionPayload.resp_tel=respTel;
+  var mission=await supaPost('missions',missionPayload).catch(function(){return null;});
   if(!mission||!mission.token){
     if(statusEl){statusEl.style.color='#ef4444';statusEl.textContent='Erreur création mission.';}
     return;
@@ -4987,9 +5032,9 @@ async function _mntCreerMission(eqId,sid){
   // Créer les lignes mission_plans
   var bulk=planIds.map(function(pid){return{mission_id:mission.id,plan_maintenance_id:pid,statut:'a_faire'};});
   await supaPostBulk('mission_plans',bulk).catch(function(){});
-  // Construire le lien
+  // Construire le lien (avec resp_tel embarqué pour le retour WhatsApp)
   var baseUrl=window.location.origin+'/mission.html';
-  var missionUrl=baseUrl+'?token='+mission.token;
+  var missionUrl=baseUrl+'?token='+mission.token+(respTel?'&resp_tel='+encodeURIComponent(respTel):'');
   var nbTaches=planIds.length;
   var eqNom=document.querySelector('#mnt-detail-panel [style*="font-size:15px"]');
   var eqNomTxt=eqNom?eqNom.textContent:'Équipement';
@@ -5079,11 +5124,13 @@ async function _mntNouvelleTachePourEq(eqId,eqNom,sid,editPlanId,tpl){
   var prests=await supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom').catch(function(){return[];});
   var ep={};
   if(editPlanId){
-    var rows=await supaGet('plans_maintenance','id=eq.'+editPlanId+'&select=id,titre,frequence,prochaine_date,intervenant,prestataire_id').catch(function(){return[];});
+    var rows=await supaGet('plans_maintenance','id=eq.'+editPlanId+'&select=id,titre,frequence,prochaine_date,intervenant,prestataire_id,checklist').catch(function(){return[];});
     ep=rows[0]||{};
   }
   if(tpl&&tpl.titre)ep.titre=tpl.titre;
   if(tpl&&tpl.frequence)ep.frequence=tpl.frequence;
+  if(tpl&&tpl.checklist)ep.checklist=tpl.checklist;
+  var epChecklist=Array.isArray(ep.checklist)?ep.checklist:[];
   var eFreq=ep.frequence||'';
   var fm=eFreq.match(/^(\d+)\s*(jour|semaine|mois|an|heure|km|cycle)/i);
   var fVal=fm?fm[1]:'1';
@@ -5126,17 +5173,40 @@ async function _mntNouvelleTachePourEq(eqId,eqNom,sid,editPlanId,tpl){
         '<input id="ntache-intervenant" value="'+escape_html(ep.intervenant||'')+'" placeholder="ex: Mamadou Diallo" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
       '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">PROCHAINE DATE / OCCURRENCE</label>'+
         '<input id="ntache-date" type="date" value="'+escape_html(ep.prochaine_date||'')+'" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+      '<div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'+
+          '<label style="font-size:11px;font-weight:700;color:#64748b">POINTS À VÉRIFIER (optionnel)</label>'+
+          '<button type="button" onclick="_mntAddChecklistItem()" style="font-size:11px;color:#3b82f6;background:none;border:none;cursor:pointer;font-weight:600;padding:0">+ Ajouter</button>'+
+        '</div>'+
+        '<div id="ntache-checklist" style="display:flex;flex-direction:column;gap:4px"></div>'+
+      '</div>'+
     '</div>'+
     '<div style="display:flex;gap:10px;margin-top:18px">'+
       '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
       '<button onclick="_mntSaveTacheEq(\''+eqId+'\',\''+sid+'\','+(editPlanId?'\''+editPlanId+'\'':'null')+')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:#1e293b;color:white;cursor:pointer">'+(editPlanId?'Mettre à jour':'Créer')+'</button>'+
     '</div>'
   );
-  // Apply initial toggle state
+  // Apply initial toggle state + populate checklist
   setTimeout(function(){
     _mntToggleFreqType(fType);
     if(ep.prestataire_id){var w=document.getElementById('ntache-interne-wrap');if(w)w.style.display='none';}
+    epChecklist.forEach(function(item){_mntAddChecklistItem(item.text||'');});
+    if(!epChecklist.length)_mntAddChecklistItem('');
   },0);
+}
+
+function _mntAddChecklistItem(val){
+  var container=document.getElementById('ntache-checklist');
+  if(!container)return;
+  var row=document.createElement('div');
+  row.style.cssText='display:flex;align-items:center;gap:6px';
+  row.innerHTML=
+    '<i class="ti ti-grip-vertical" style="color:#cbd5e1;font-size:14px;cursor:grab"></i>'+
+    '<input type="text" class="ntache-cl-item" value="'+escape_html(val||'')+'" placeholder="ex: Vérifier niveau d\'huile" '+
+      'style="flex:1;padding:7px 10px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px;box-sizing:border-box"/>'+
+    '<button type="button" onclick="this.parentElement.remove()" style="color:#94a3b8;background:none;border:none;cursor:pointer;padding:2px;font-size:14px;line-height:1" title="Supprimer">×</button>';
+  container.appendChild(row);
+  row.querySelector('input').focus();
 }
 
 // ── Templates de maintenance ────────────────────────────────────────────────
@@ -5261,8 +5331,14 @@ async function _mntSaveTacheEq(eqId,sid,editPlanId){
   var prestId=(document.getElementById('ntache-prest')||{}).value||null;
   var intervenant=(document.getElementById('ntache-intervenant')||{}).value||null;
   var freq=fVal+' '+fUnit;
+  // Lire la checklist
+  var checklistItems=[];
+  document.querySelectorAll('#ntache-checklist .ntache-cl-item').forEach(function(inp){
+    var t=(inp.value||'').trim();
+    if(t)checklistItems.push({text:t});
+  });
   var payload={site_id:sid,equipement_id:eqId,titre:titre||_mntFreqLabel(freq)||freq,frequence:freq,
-    prochaine_date:date||null,actif:true,intervenant:''};
+    prochaine_date:date||null,actif:true,intervenant:'',checklist:checklistItems};
   if(prestId){payload.prestataire_id=prestId;payload.intervenant='';}
   else if(intervenant&&intervenant.trim())payload.intervenant=intervenant.trim();
   var ok;
