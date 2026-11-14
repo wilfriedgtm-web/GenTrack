@@ -2513,10 +2513,14 @@ function _sgBuildCard(r,zones,colKey){
       '<button onclick="event.stopPropagation();_sgAffecter(\''+r.id+'\')" style="padding:5px 8px;font-size:11px;border:1.5px solid var(--border);border-radius:6px;background:white;color:var(--text2);cursor:pointer;font-family:inherit">↩</button>'+
     '</div>';
   }
+  var ficheBtn=r.equipement_id?
+    '<button onclick="event.stopPropagation();_openFicheEquipement(\''+r.equipement_id+'\',\''+escape_html(eqNom||'')+'\',window._sgSid)" '+
+      'title="Fiche équipement" style="padding:3px 8px;border:1px solid var(--border);border-radius:5px;background:var(--bg);font-size:10px;font-weight:700;color:var(--text2);cursor:pointer;white-space:nowrap;flex-shrink:0">📋 Fiche</button>':'';
   return '<div id="sg-card-'+r.id+'" onclick="_sgSelectCard(\''+r.id+'\')" style="border:1.5px solid '+(isSel?'var(--amber)':'var(--border)')+';border-left:4px solid '+accent+';border-radius:8px;padding:10px 11px;cursor:pointer;background:'+(isSel?'var(--amber-pale)':'white')+';transition:border-color .12s">'+
     '<div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">'+
       '<span style="font-size:11px">'+icon+'</span>'+
       '<span style="font-size:11px;font-weight:700;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(typeLabel)+(eqNom?' · '+escape_html(eqNom):'')+'</span>'+
+      ficheBtn+
     '</div>'+
     '<div style="font-size:12px;color:var(--dark);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+escape_html(r.description)+'</div>'+
     photoThumb+
@@ -2834,6 +2838,9 @@ var _sgAffecterChosen={nom:'',wa:''};
 var _sgAffecterPreviewId=null;
 var _sgAffecterPreviewNom=null;
 var _sgAffecterPreviewWa=null;
+var _sgAffPrestId=null;
+var _sgAffPrestNom=null;
+var _sgAffPrestTel=null;
 
 function _sgAffecterPreview(sgId,techNom,techWa){
   _sgAffecterPreviewId=sgId;
@@ -2894,53 +2901,174 @@ function _sgAffecterUpdatePreview(id){
 function _sgAffecter(id){
   var r=window._sgRows&&window._sgRows[id];
   var _doAffecter=function(r){
-    var sid=r.groupe_id||(_session&&_session.site_ids&&_session.site_ids[0]);
+    var sid=r.groupe_id||r.site_id||(_session&&_session.site_ids&&_session.site_ids[0]);
     if(!sid)return;
-    var ROLE_LABELS={technicien:'Technicien',resp_tech:'Resp. technique',dir_tech:'Dir. technique'};
     var typeLabel=_SG_TYPES[r.type]||r.type||'Signalement';
     var eqNom=(r.equipements&&r.equipements.nom)?r.equipements.nom
              :(r.equipements_zone&&r.equipements_zone.nom)?r.equipements_zone.nom:'';
-
-    supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&role=in.(technicien,resp_tech)&select=id,nom,whatsapp,role&order=role.asc,nom.asc').then(function(contacts){
-      if(!contacts||!contacts.length){
-        _showCfgModal('<p style="font-size:13px;color:var(--text2);padding:8px">Aucun contact configuré pour ce site.</p><div style="margin-top:12px"><button onclick="_closeCfgModal()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:13px;cursor:pointer">Fermer</button></div>');
-        return;
-      }
-
-      var contactsHtml=contacts.map(function(c){
-        var ini=c.nom.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
-        var roleLabel=ROLE_LABELS[c.role]||c.role||'';
-        var nomJs=c.nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-        var waJs=(c.whatsapp||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-        var hasWa=!!(c.whatsapp&&c.whatsapp.trim());
-        return '<button onclick="_sgAffecterPreview(\''+id+'\',\''+nomJs+'\',\''+waJs+'\')" style="width:100%;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;background:white;text-align:left">'+
-          '<div style="width:36px;height:36px;border-radius:50%;background:var(--bleu-pale);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--bleu);flex-shrink:0">'+escape_html(ini)+'</div>'+
-          '<div style="flex:1">'+
-            '<div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(c.nom)+'</div>'+
-            '<div style="font-size:11px;color:var(--text3)">'+escape_html(roleLabel)+'</div>'+
-          '</div>'+
-          (hasWa?'<span style="font-size:11px;font-weight:600;color:#25D366;background:#e8f5e9;border-radius:6px;padding:3px 8px">📱 WA</span>':'<span style="font-size:10px;color:var(--text3)">pas de WA</span>')+
-        '</button>';
-      }).join('');
-
-      _showCfgModal(
-        '<div style="font-size:15px;font-weight:700;color:var(--dark);margin-bottom:4px">👷 Affecter</div>'+
-        '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">'+escape_html(typeLabel)+(eqNom?' · '+escape_html(eqNom):'')+'</div>'+
-        '<div style="font-size:11px;background:var(--bg);border-radius:8px;padding:8px 12px;color:var(--text2);margin-bottom:14px;line-height:1.5">'+escape_html((r.description||'').substring(0,120))+((r.description||'').length>120?'…':'')+'</div>'+
-        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">Sélectionner · WhatsApp envoyé automatiquement</div>'+
-        contactsHtml+
-        '<button onclick="_closeCfgModal()" style="width:100%;margin-top:6px;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:white;cursor:pointer;color:var(--text2)">Annuler</button>'
-      );
-    });
+    var headerHtml=
+      '<div style="font-size:15px;font-weight:700;color:var(--dark);margin-bottom:4px">👷 Affecter</div>'+
+      '<div style="font-size:12px;color:var(--text2);margin-bottom:10px">'+escape_html(typeLabel)+(eqNom?' · '+escape_html(eqNom):'')+'</div>'+
+      '<div style="font-size:11px;background:var(--bg);border-radius:8px;padding:8px 12px;color:var(--text2);margin-bottom:12px;line-height:1.5">'+escape_html((r.description||'').substring(0,120))+((r.description||'').length>120?'…':'')+'</div>'+
+      '<div style="display:flex;gap:6px;margin-bottom:12px">'+
+        '<button id="sg-aff-tab-int" onclick="_sgAffecterShowTab(\''+id+'\',\'interne\')" style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--bleu);background:var(--bleu-pale);color:var(--bleu)">👷 Interne</button>'+
+        '<button id="sg-aff-tab-prest" onclick="_sgAffecterShowTab(\''+id+'\',\'prestataire\')" style="flex:1;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border);background:white;color:var(--text2)">🏢 Prestataire</button>'+
+      '</div>'+
+      '<div id="sg-aff-panel" style="max-height:280px;overflow-y:auto"></div>'+
+      '<button onclick="_closeCfgModal()" style="width:100%;margin-top:8px;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:white;cursor:pointer;color:var(--text2)">Annuler</button>';
+    _showCfgModal(headerHtml);
+    _sgAffecterShowTab(id,'interne',r,sid);
   };
   if(r){_doAffecter(r);}
   else{
-    supaGet('signalements','id=eq.'+id+'&select=id,groupe_id,type,description,statut,photo_url,equipement_id,equipement_zone_id,equipements(nom),equipements_zone(nom)').then(function(rows){
+    supaGet('signalements','id=eq.'+id+'&select=id,groupe_id,site_id,type,description,statut,photo_url,equipement_id,equipement_zone_id,equipements(nom),equipements_zone(nom)').then(function(rows){
       if(!rows||!rows.length)return;
       if(!window._sgRows)window._sgRows={};
       window._sgRows[id]=rows[0];
       _doAffecter(rows[0]);
     });
+  }
+}
+
+function _sgAffecterShowTab(id,tab,r,sid){
+  var panelEl=document.getElementById('sg-aff-panel');
+  if(!panelEl)return;
+  var tabInt=document.getElementById('sg-aff-tab-int');
+  var tabPrest=document.getElementById('sg-aff-tab-prest');
+  if(tabInt&&tabPrest){
+    if(tab==='interne'){
+      tabInt.style.borderColor='var(--bleu)';tabInt.style.background='var(--bleu-pale)';tabInt.style.color='var(--bleu)';
+      tabPrest.style.borderColor='var(--border)';tabPrest.style.background='white';tabPrest.style.color='var(--text2)';
+    }else{
+      tabPrest.style.borderColor='var(--amber)';tabPrest.style.background='var(--amber-pale)';tabPrest.style.color='var(--amber-dark)';
+      tabInt.style.borderColor='var(--border)';tabInt.style.background='white';tabInt.style.color='var(--text2)';
+    }
+  }
+  r=r||(window._sgRows&&window._sgRows[id]);
+  sid=sid||(r&&(r.groupe_id||r.site_id))||(_session&&_session.site_ids&&_session.site_ids[0]);
+  if(tab==='interne'){
+    var ROLE_LABELS={technicien:'Technicien',resp_tech:'Resp. technique',dir_tech:'Dir. technique'};
+    supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&role=in.(technicien,resp_tech)&select=id,nom,whatsapp,role&order=role.asc,nom.asc').then(function(contacts){
+      if(!contacts||!contacts.length){
+        panelEl.innerHTML='<div style="text-align:center;padding:20px;font-size:12px;color:var(--text3)">Aucun contact configuré pour ce site.</div>';
+        return;
+      }
+      panelEl.innerHTML='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">Sélectionner · WhatsApp envoyé automatiquement</div>'+
+        contacts.map(function(c){
+          var ini=c.nom.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+          var roleLabel=ROLE_LABELS[c.role]||c.role||'';
+          var nomJs=c.nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+          var waJs=(c.whatsapp||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+          var hasWa=!!(c.whatsapp&&c.whatsapp.trim());
+          return '<button onclick="_sgAffecterPreview(\''+id+'\',\''+nomJs+'\',\''+waJs+'\')" style="width:100%;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;background:white;text-align:left">'+
+            '<div style="width:36px;height:36px;border-radius:50%;background:var(--bleu-pale);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--bleu);flex-shrink:0">'+escape_html(ini)+'</div>'+
+            '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(c.nom)+'</div><div style="font-size:11px;color:var(--text3)">'+escape_html(roleLabel)+'</div></div>'+
+            (hasWa?'<span style="font-size:11px;font-weight:600;color:#25D366;background:#e8f5e9;border-radius:6px;padding:3px 8px">📱 WA</span>':'<span style="font-size:10px;color:var(--text3)">pas de WA</span>')+
+          '</button>';
+        }).join('');
+    });
+  }else{
+    panelEl.innerHTML='<div style="text-align:center;padding:16px;font-size:12px;color:var(--text3)">Chargement…</div>';
+    supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom,email,telephone,specialite').then(function(prest){
+      if(!prest||!prest.length){
+        panelEl.innerHTML='<div style="text-align:center;padding:16px;font-size:12px;color:var(--text3);line-height:1.6">Aucun prestataire configuré.<br>Ajoutez-en depuis l\'onglet Maintenance → Prestataires.</div>';
+        return;
+      }
+      panelEl.innerHTML='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">Sélectionner un prestataire</div>'+
+        prest.map(function(p){
+          var ini=p.nom.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
+          var hasTel=!!(p.telephone&&p.telephone.trim());
+          var nomJs=p.nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+          var telJs=(p.telephone||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+          return '<button onclick="_sgAffecterPrestatairePreview(\''+id+'\',\''+p.id+'\',\''+nomJs+'\',\''+telJs+'\')" style="width:100%;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;background:white;text-align:left">'+
+            '<div style="width:36px;height:36px;border-radius:50%;background:var(--amber-pale);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--amber-dark);flex-shrink:0">'+escape_html(ini)+'</div>'+
+            '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(p.nom)+'</div><div style="font-size:11px;color:var(--text3)">'+(p.specialite?escape_html(p.specialite):'Prestataire')+'</div></div>'+
+            (hasTel?'<span style="font-size:11px;font-weight:600;color:#25D366;background:#e8f5e9;border-radius:6px;padding:3px 8px">📱 WA</span>':'<span style="font-size:10px;color:var(--text3)">pas de WA</span>')+
+          '</button>';
+        }).join('');
+    });
+  }
+}
+
+function _sgAffecterPrestatairePreview(sgId,prestId,prestNom,prestTel){
+  _sgAffPrestId=prestId;
+  _sgAffPrestNom=prestNom;
+  _sgAffPrestTel=prestTel;
+  var r=window._sgRows&&window._sgRows[sgId];
+  var rapportUrl=location.origin+location.pathname.replace('dashboard.html','rapport.html')+'?sg='+sgId;
+  var eqNom=r?((r.equipements&&r.equipements.nom)?r.equipements.nom:(r.equipements_zone&&r.equipements_zone.nom?r.equipements_zone.nom:'')):'' ;
+  var typeLabel=r?(_SG_TYPES[r.type]||r.type||'Signalement'):'Signalement';
+  var msgPreview='🔧 *Demande d\'intervention — GenTrack*\n\n'+
+    '📍 *'+typeLabel+(eqNom?' · '+eqNom:'')+'*\n'+
+    (r&&r.lieu?'📍 Lieu : '+r.lieu+'\n':'')+
+    (r?'📝 '+(r.description||''):'')+
+    (r&&r.photo_url?'\n\n📸 Photo : '+r.photo_url:'')+
+    '\n\n✅ Fiche intervention :\n'+rapportUrl;
+  var hasWa=!!(prestTel&&prestTel.trim());
+  _showCfgModal(
+    '<div style="font-size:15px;font-weight:700;color:var(--dark);margin-bottom:4px">🏢 Envoyer au prestataire</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">À envoyer à <strong>'+escape_html(prestNom)+'</strong>'+(hasWa?'':' <span style="color:var(--rouge)">⚠️ pas de WA</span>')+'</div>'+
+    '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px;font-size:11px;color:var(--dark);white-space:pre-wrap;line-height:1.55;margin-bottom:12px;max-height:160px;overflow-y:auto">'+escape_html(msgPreview)+'</div>'+
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Note pour le prestataire (optionnel)</div>'+
+    '<textarea id="sg-aff-prest-note" rows="2" placeholder="Ex : Pièces à prévoir, accès par l\'entrée de service…" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;resize:none;font-family:inherit;outline:none;margin-bottom:12px;box-sizing:border-box"></textarea>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="_sgAffecter(\''+sgId+'\')" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:white;cursor:pointer;color:var(--text2)">← Retour</button>'+
+      '<button onclick="_sgAffecterPrestataireConfirm(\''+sgId+'\')" style="flex:2;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:'+(hasWa?'#25D366':'var(--amber-dark)')+';color:white;cursor:pointer">'+(hasWa?'📱 Envoyer WA':'✅ Affecter sans WA')+'</button>'+
+    '</div>'
+  );
+}
+
+async function _sgAffecterPrestataireConfirm(sgId){
+  var r=window._sgRows&&window._sgRows[sgId];
+  var prestId=_sgAffPrestId;
+  var prestNom=_sgAffPrestNom;
+  var prestTel=_sgAffPrestTel;
+  var sid=r&&(r.groupe_id||r.site_id)||(_session&&_session.site_ids&&_session.site_ids[0]);
+  var eqNom=r?((r.equipements&&r.equipements.nom)?r.equipements.nom:(r.equipements_zone&&r.equipements_zone.nom?r.equipements_zone.nom:'')):'' ;
+  var typeLabel=r?(_SG_TYPES[r.type]||r.type||'Signalement'):'Signalement';
+  var note=((document.getElementById('sg-aff-prest-note')||{}).value||'').trim();
+  // 1. Patch le signalement → en_cours + prestataire_id
+  await supaPatch('signalements',sgId,{
+    statut:'en_cours',
+    assigne_a:prestNom,
+    prestataire_id:prestId,
+    pris_en_charge_par:prestNom,
+    pris_en_charge_at:new Date().toISOString()
+  });
+  // 2. Créer l'entrée maintenances (corrective)
+  await supaPost('maintenances',{
+    groupe_id:sid,
+    equipement_id:r&&r.equipement_id||null,
+    equipement_zone_id:r&&r.equipement_zone_id||null,
+    type:'panne',
+    statut:'planifie',
+    titre:'Intervention · '+(eqNom||typeLabel),
+    description:(r&&r.description||'')+(note?'\n\nNote : '+note:''),
+    signalement_id:sgId,
+    prestataire:prestNom,
+    prestataire_id:prestId,
+    created_by:_session&&(_session.nom||_session.email)||'Resp Tech'
+  });
+  _closeCfgModal();
+  // 3. Ouvrir WhatsApp si numéro disponible
+  if(prestTel&&prestTel.trim()){
+    var rapportUrl=location.origin+location.pathname.replace('dashboard.html','rapport.html')+'?sg='+sgId;
+    var msg='🔧 *Demande d\'intervention — GenTrack*\n\n'+
+      '📍 *'+typeLabel+(eqNom?' · '+eqNom:'')+'*\n'+
+      (r&&r.lieu?'📍 Lieu : '+r.lieu+'\n':'')+
+      (r?'📝 '+(r.description||''):'')+
+      (r&&r.photo_url?'\n\n📸 Photo : '+r.photo_url:'')+
+      (note?'\n\n📋 Note : '+note:'')+
+      '\n\n✅ Fiche intervention :\n'+rapportUrl;
+    var waNum=prestTel.replace(/\D/g,'');
+    window.open('https://wa.me/'+waNum+'?text='+encodeURIComponent(msg),'_blank');
+  }
+  // 4. Rafraîchir
+  if(_session){
+    var nav=_pecFromNav||_currentNav||'signalements';
+    if(_doCurrentSite)renderDirOpsSite(_session,_doCurrentSite.id,_doCurrentSite.nom,nav);
+    else if(_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,nav);
+    else renderRespTech(_session,nav);
   }
 }
 
@@ -3901,12 +4029,13 @@ async function _rtMaintenances(sid){
   var typeAccents={vidange:'var(--orange)',ravitaillement:'var(--bleu)',preventive:'var(--vert)',panne:'var(--rouge)'};
   var cutoff=new Date();cutoff.setDate(cutoff.getDate()-_rtMntPeriod);
   var cutoffStr=cutoff.toISOString().slice(0,10);
-  var baseSelect='id,type,titre,description,date_ref,equipement_nom,cout,statut,intervenant,notes,created_at,source,photo_url';
+  var baseSelect='id,type,titre,description,date_ref,equipement_id,equipement_nom,cout,statut,intervenant,notes,created_at,source,photo_url';
   var results=await Promise.all([
     supaGet('vue_journal_maintenance','site_id=eq.'+sid+'&source=not.in.(signalement,plein)&statut=neq.planifie&date_ref=gte.'+cutoffStr+'&order=date_ref.desc&limit=200&select='+baseSelect),
-    supaGet('vue_journal_maintenance','site_id=eq.'+sid+'&source=not.in.(signalement,plein)&statut=eq.planifie&order=date_ref.asc&limit=50&select='+baseSelect)
+    supaGet('vue_journal_maintenance','site_id=eq.'+sid+'&source=not.in.(signalement,plein)&statut=eq.planifie&order=date_ref.asc&limit=50&select='+baseSelect),
+    supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom,email,telephone,specialite')
   ]);
-  var rows=results[0];var upcoming=results[1];
+  var rows=results[0];var upcoming=results[1];var prestataires=results[2]||[];
   /* KPIs */
   var nbRealises=rows.filter(function(r){return r.statut==='realise';}).length;
   var totalCout=rows.filter(function(r){return r.type!=='ravitaillement';}).reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
@@ -3929,10 +4058,10 @@ async function _rtMaintenances(sid){
     var a=_rtMntPeriod===d;
     return '<button onclick="_rtMntPeriod='+d+';_setMntFilter(_mntFilter)" style="padding:5px 12px;border-radius:20px;border:1.5px solid '+(a?'var(--amber)':'var(--border)')+';background:'+(a?'var(--amber-pale)':'white')+';font-size:11px;font-weight:'+(a?'700':'500')+';color:'+(a?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+d+' jours</button>';
   }).join('');
-  var allForCount=rows.filter(function(r){return r.type!=='panne';}).concat(upcoming);
-  var counts={tous:allForCount.length,vidange:0,ravitaillement:0,preventive:0};
+  var allForCount=rows.concat(upcoming);
+  var counts={tous:allForCount.length,vidange:0,ravitaillement:0,preventive:0,panne:0};
   allForCount.forEach(function(r){if(counts[r.type]!==undefined)counts[r.type]++;});
-  var typeHtml=[['tous','Tous types'],['vidange','Vidanges'],['ravitaillement','Ravitaillements'],['preventive','Préventive']].map(function(f){
+  var typeHtml=[['tous','Tous types'],['vidange','Vidanges'],['ravitaillement','Ravitaillements'],['preventive','Préventive'],['panne','🔴 Corrective']].map(function(f){
     var a=_mntFilter===f[0];
     var n=counts[f[0]]||0;
     return '<button onclick="_setMntFilter(\''+f[0]+'\')" style="padding:5px 12px;border-radius:20px;border:1.5px solid '+(a?'var(--amber)':'var(--border)')+';background:'+(a?'var(--amber-pale)':'white')+';font-size:11px;font-weight:'+(a?'700':'500')+';color:'+(a?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+f[1]+(n&&f[0]!=='tous'?' ('+n+')':'')+'</button>';
@@ -3943,7 +4072,7 @@ async function _rtMaintenances(sid){
     typeHtml+
   '</div>';
   /* bandeau planifiées */
-  var displayUpcoming=_mntFilter==='tous'||_mntFilter==='preventive'?upcoming:upcoming.filter(function(r){return r.type===_mntFilter;});
+  var displayUpcoming=_mntFilter==='tous'?upcoming:upcoming.filter(function(r){return r.type===_mntFilter;});
   var bannerHtml='';
   if(displayUpcoming.length){
     var snippet=displayUpcoming.slice(0,3).map(function(r){
@@ -3981,7 +4110,12 @@ async function _rtMaintenances(sid){
             '<div style="flex:1;min-width:0">'+
               '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">'+
                 '<span style="font-size:13px;font-weight:700;color:var(--dark)">'+escape_html(r.titre||r.type||'Opération')+'</span>'+
-                (isAnnule?'<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--border);color:var(--text3)">Annulé</span>':'')+
+                '<div style="display:flex;gap:5px;align-items:center;flex-shrink:0">'+
+                  (r.type==='panne'?'<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--rouge-pale);color:var(--rouge)">🔴 Corrective</span>':
+                  (isAnnule?'<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--border);color:var(--text3)">Annulé</span>':''))+
+                  (r.equipement_id?'<button onclick="event.stopPropagation();_openFicheEquipement(\''+r.equipement_id+'\',\''+escape_html(r.equipement_nom||'')+'\',\''+sid+'\')" '+
+                    'style="padding:2px 8px;border:1px solid #dbeafe;border-radius:5px;background:#eff6ff;font-size:10px;font-weight:700;color:#3b82f6;cursor:pointer">📋</button>':'')+
+                '</div>'+
               '</div>'+
               (r.equipement_nom?'<div style="font-size:11px;color:var(--text2);margin-bottom:4px">🔩 '+escape_html(r.equipement_nom)+'</div>':'')+
               (r.description?'<div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:4px">'+escape_html(r.description)+'</div>':'')+
@@ -4005,7 +4139,6 @@ async function _rtMaintenances(sid){
     '</div>';
   }
   var displayRows=rows.filter(function(r){
-    if(r.type==='panne')return false;
     if(_mntFilter!=='tous'&&r.type!==_mntFilter)return false;
     return true;
   });
@@ -4021,10 +4154,288 @@ async function _rtMaintenances(sid){
       displayRows.map(renderMntCard).join(''):'';
     cardsHtml=sectionPlan+sectionReal;
   }
+  // ── Section Prestataires ──────────────────────────────────────
+  var prestHtml='';
+  var prestItems=prestataires.map(function(p){
+    var badge=p.specialite?'<span style="display:inline-block;padding:2px 8px;border-radius:20px;background:#f0f4ff;color:#3b5bdb;font-size:10px;font-weight:700;margin-left:6px">'+escape_html(p.specialite)+'</span>':'';
+    var tel=p.telephone?'<a href="tel:'+escape_html(p.telephone)+'" style="color:var(--text2);font-size:11px;text-decoration:none">📞 '+escape_html(p.telephone)+'</a>':'';
+    var email=p.email?'<a href="mailto:'+escape_html(p.email)+'" style="color:var(--text2);font-size:11px;text-decoration:none">✉️ '+escape_html(p.email)+'</a>':'';
+    var contacts=[tel,email].filter(Boolean).join(' · ');
+    return '<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">'+
+      '<div>'+
+        '<span style="font-size:12px;font-weight:700;color:var(--dark)">'+escape_html(p.nom)+'</span>'+badge+
+        (contacts?'<div style="margin-top:4px">'+contacts+'</div>':'')+
+      '</div>'+
+      '<button onclick="_mntDesactiverPrestataire(\''+p.id+'\')" style="border:none;background:none;cursor:pointer;font-size:11px;color:var(--text3);padding:0 2px" title="Désactiver">✕</button>'+
+    '</div>';
+  }).join('');
+
+  if(!prestItems) prestItems='<p style="font-size:12px;color:var(--text3);margin:0;padding:8px 0">Aucun prestataire enregistré pour ce site.</p>';
+
+  var prestSectionHtml=
+    '<details style="margin-top:18px;border:1.5px solid var(--border);border-radius:10px;padding:12px 14px">'+
+      '<summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--dark);list-style:none;display:flex;justify-content:space-between;align-items:center">'+
+        '<span>🏢 Prestataires ('+prestataires.length+')</span>'+
+        '<span style="font-size:10px;color:var(--text3)">▼</span>'+
+      '</summary>'+
+      '<div style="margin-top:10px">'+
+        prestItems+
+        '<div style="text-align:center;margin-top:12px">'+
+          '<button onclick="_mntAddPrestataire(\''+sid+'\')" style="padding:7px 16px;border:1.5px dashed var(--border);border-radius:8px;background:transparent;font-size:11px;font-weight:700;color:var(--dark);cursor:pointer">＋ Ajouter un prestataire</button>'+
+        '</div>'+
+      '</div>'+
+    '</details>';
+
   return kpiHtml+filtersHtml+bannerHtml+cardsHtml+
     '<div style="text-align:center;margin-top:12px">'+
       '<button onclick="_mntCreer(\''+sid+'\')" style="padding:9px 18px;border:1.5px solid var(--border);border-radius:8px;background:white;font-size:12px;font-weight:700;color:var(--dark);cursor:pointer">＋ Nouvelle opération</button>'+
+    '</div>'+
+    prestSectionHtml;
+}
+
+// ── Prestataire management ──────────────────────────────────────────────────
+function _mntAddPrestataire(sid){
+  _showCfgModal(
+    '<div style="font-size:15px;font-weight:700;margin-bottom:16px">🏢 Nouveau prestataire</div>'+
+    '<div style="display:flex;flex-direction:column;gap:12px">'+
+      '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">NOM *</label>'+
+        '<input id="prest-nom" placeholder="ex: Froid Services SN" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+      '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">SPÉCIALITÉ</label>'+
+        '<input id="prest-spec" placeholder="ex: Froid, Électricité, Générateur…" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+      '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">TÉLÉPHONE (WhatsApp)</label>'+
+        '<input id="prest-tel" type="tel" placeholder="+221 77 000 00 00" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+      '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">EMAIL</label>'+
+        '<input id="prest-email" type="email" placeholder="contact@exemple.com" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:10px;margin-top:18px">'+
+      '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
+      '<button onclick="_mntSavePrestataire(\''+sid+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--dark);color:white;cursor:pointer">Enregistrer</button>'+
+    '</div>'
+  );
+}
+
+async function _mntSavePrestataire(sid){
+  var nom=(document.getElementById('prest-nom')||{}).value||'';
+  if(!nom.trim()){alert('Le nom est obligatoire.');return;}
+  var spec=(document.getElementById('prest-spec')||{}).value||'';
+  var tel=(document.getElementById('prest-tel')||{}).value||'';
+  var email=(document.getElementById('prest-email')||{}).value||'';
+  try{
+    await supaPost('prestataires',{site_id:sid,nom:nom.trim(),specialite:spec.trim()||null,telephone:tel.trim()||null,email:email.trim()||null,actif:true});
+    _closeCfgModal();
+    // Refresh maintenance tab
+    if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
+    else renderRespTech(_session,'maintenances');
+  }catch(e){
+    alert('Erreur : '+e.message);
+  }
+}
+
+async function _mntDesactiverPrestataire(id){
+  if(!confirm('Désactiver ce prestataire ?'))return;
+  try{
+    await supaPatch('prestataires',id,{actif:false});
+    if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
+    else renderRespTech(_session,'maintenances');
+  }catch(e){
+    alert('Erreur : '+e.message);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FICHE ÉQUIPEMENT — Overlay slide-up avec timeline unifiée
+// ══════════════════════════════════════════════════════════════════════════════
+async function _openFicheEquipement(eqId,eqNom,sid){
+  var old=document.getElementById('fiche-eq-overlay');if(old)old.remove();
+  // Inject CSS once
+  if(!document.getElementById('fiche-eq-css')){
+    var s=document.createElement('style');s.id='fiche-eq-css';
+    s.textContent=[
+      '@keyframes feSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}',
+      '@keyframes feFadeIn{from{opacity:0}to{opacity:1}}',
+      '.fe-overlay{position:fixed;inset:0;z-index:9000;background:rgba(10,10,20,.52);backdrop-filter:blur(2px);animation:feFadeIn .18s ease;display:flex;flex-direction:column;justify-content:flex-end}',
+      '.fe-panel{background:#fff;border-radius:20px 20px 0 0;max-height:92vh;display:flex;flex-direction:column;animation:feSlideUp .28s cubic-bezier(.22,.61,.36,1)}',
+      '.fe-header{background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%);border-radius:20px 20px 0 0;padding:20px 20px 16px;color:#fff;flex-shrink:0}',
+      '.fe-drag{width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,.3);margin:0 auto 16px}',
+      '.fe-kpi{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:10px 14px;text-align:center;flex:1}',
+      '.fe-kpi-val{font-size:22px;font-weight:800;line-height:1}',
+      '.fe-kpi-lbl{font-size:10px;opacity:.7;margin-top:3px;line-height:1.3}',
+      '.fe-body{flex:1;overflow-y:auto;padding:0 0 32px}',
+      '.fe-tl-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;position:relative;z-index:1}',
+      '.fe-tl-line{position:absolute;left:13px;top:28px;bottom:-4px;width:2px;background:var(--border)}',
+      '.fe-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;line-height:1.6}'
+    ].join('');
+    document.head.appendChild(s);
+  }
+  // Create overlay with loader
+  var ov=document.createElement('div');ov.className='fe-overlay';ov.id='fiche-eq-overlay';
+  ov.onclick=function(e){if(e.target===ov)_closeFicheEquipement();};
+  ov.innerHTML='<div class="fe-panel"><div class="fe-header"><div class="fe-drag"></div>'+
+    '<div style="font-size:15px;font-weight:700;opacity:.7">Chargement…</div></div>'+
+    '<div class="fe-body" style="display:flex;align-items:center;justify-content:center;min-height:200px">'+
+    '<div style="text-align:center;color:var(--text3)"><div style="font-size:32px;animation:spin 1s linear infinite">⚙️</div><div style="margin-top:12px;font-size:12px">Chargement de la fiche…</div></div></div></div>';
+  document.body.appendChild(ov);
+
+  // Parallel fetch
+  var sgsQ='equipement_id=eq.'+eqId+'&order=created_at.desc&limit=40&select=id,type,description,statut,created_at,assigne_a,pris_en_charge_par,resolu_at,source';
+  var mntsQ='equipement_id=eq.'+eqId+'&order=created_at.desc&limit=40&select=id,type,titre,statut,created_at,date_realisation,prestataire,intervenant,cout,rapport_texte,signalement_id';
+  var eqQ='id=eq.'+eqId+'&select=id,nom,actif,types_equipements(nom)&limit=1';
+  var res=await Promise.all([
+    supaGet('signalements',sgsQ).catch(function(){return[];}),
+    supaGet('maintenances',mntsQ).catch(function(){return[];}),
+    supaGet('equipements',eqQ).catch(function(){return[];})
+  ]);
+  var sigs=res[0]||[];var mnts=res[1]||[];var eqData=(res[2]||[])[0]||null;
+  var typeNom=eqData&&eqData.types_equipements?eqData.types_equipements.nom:'Équipement';
+  var nom=eqNom||(eqData&&eqData.nom)||'Équipement';
+
+  // KPIs
+  var nbPannes=sigs.filter(function(s){return s.type==='panne';}).length;
+  var nbInterv=mnts.length;
+  var lastMnt=mnts[0];
+  var lastMntDate=lastMnt&&(lastMnt.date_realisation||lastMnt.created_at)?
+    new Date((lastMnt.date_realisation||lastMnt.created_at)).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'2-digit'}):'—';
+  var nextPlan=mnts.find(function(m){return m.statut==='planifie';});
+  var nextDate=nextPlan&&nextPlan.created_at?
+    new Date(nextPlan.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
+
+  // Type icon
+  var eqIcon='🔧';
+  if(typeNom){var t=typeNom.toLowerCase();if(t.indexOf('froid')>=0||t.indexOf('cf')>=0)eqIcon='❄️';else if(t.indexOf('groupe')>=0||t.indexOf('ge')>=0)eqIcon='⚡';else if(t.indexOf('cuve')>=0||t.indexOf('gasoil')>=0)eqIcon='⛽';else if(t.indexOf('eau')>=0||t.indexOf('pompe')>=0)eqIcon='💧';else if(t.indexOf('elec')>=0||t.indexOf('tgbt')>=0)eqIcon='🔌';}
+
+  // Build timeline events (merge sigs + mnts)
+  var events=[];
+  sigs.forEach(function(s){
+    var typeLabel={panne:'Panne',anomalie:'Anomalie',niveau_bas:'Niveau bas',qr:'QR code',other:'Signalement'}[s.type]||s.type||'Signalement';
+    var col={ouvert:'#ef4444',en_cours:'#f59e0b',resolu:'#22c55e'}[s.statut]||'#94a3b8';
+    var colBg={ouvert:'#fef2f2',en_cours:'#fffbeb',resolu:'#f0fdf4'}[s.statut]||'#f8fafc';
+    var who=s.assigne_a||s.pris_en_charge_par||'';
+    events.push({date:s.created_at,kind:'sig',icon:'🔔',col:col,colBg:colBg,
+      title:typeLabel+' · '+escape_html(s.description||'').substring(0,60),
+      sub:who?'👷 '+escape_html(who):'',
+      badge:{ouvert:'Ouvert',en_cours:'En cours',resolu:'Résolu'}[s.statut]||s.statut,
+      badgeCol:col,id:s.id});
+  });
+  mnts.forEach(function(m){
+    var col={planifie:'#f59e0b',realise:'#22c55e',annule:'#94a3b8'}[m.statut]||'#94a3b8';
+    var colBg={planifie:'#fffbeb',realise:'#f0fdf4',annule:'#f8fafc'}[m.statut]||'#f8fafc';
+    var who=m.prestataire||m.intervenant||'';
+    var rapportBtn=m.statut==='realise'?
+      '<button onclick="event.stopPropagation();_ficheJoindreRapport(\''+m.id+'\')" style="margin-top:8px;padding:5px 12px;border:1.5px solid #3b82f6;border-radius:6px;font-size:11px;font-weight:700;color:#3b82f6;background:#eff6ff;cursor:pointer">'+
+        (m.rapport_texte?'📄 Voir rapport':'📎 Joindre rapport')+
+      '</button>':'';
+    var rapportPreview=m.rapport_texte?
+      '<div style="margin-top:7px;padding:8px 10px;background:#f8fafc;border-left:3px solid #3b82f6;border-radius:4px;font-size:11px;color:#334155;line-height:1.5">'+
+        escape_html(m.rapport_texte.substring(0,120))+(m.rapport_texte.length>120?'…':'')+
+      '</div>':'';
+    events.push({date:m.date_realisation||m.created_at,kind:'mnt',icon:m.type==='panne'?'🔴':'🔧',col:col,colBg:colBg,
+      title:escape_html(m.titre||m.type||'Intervention'),
+      sub:who?'👷 '+escape_html(who)+(m.cout?' · 💰 '+parseFloat(m.cout).toLocaleString('fr-FR')+' FCFA':''):
+              (m.cout?'💰 '+parseFloat(m.cout).toLocaleString('fr-FR')+' FCFA':''),
+      badge:{planifie:'Planifié',realise:'Réalisé',annule:'Annulé'}[m.statut]||m.statut,
+      badgeCol:col,extra:rapportPreview+rapportBtn,id:m.id});
+  });
+  events.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+
+  // Timeline HTML
+  var tlHtml='';
+  var lastMonthKey='';
+  events.forEach(function(ev,i){
+    var d=new Date(ev.date);
+    var mk=d.getFullYear()+'-'+(d.getMonth()+1);
+    if(mk!==lastMonthKey){
+      lastMonthKey=mk;
+      tlHtml+='<div style="padding:14px 20px 6px;font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1.2px">'+
+        d.toLocaleDateString('fr-FR',{month:'long',year:'numeric'})+'</div>';
+    }
+    var dateStr=d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+    tlHtml+=
+      '<div style="display:flex;gap:12px;padding:4px 20px;position:relative">'+
+        '<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:28px">'+
+          '<div class="fe-tl-dot" style="background:'+ev.colBg+';border:2px solid '+ev.col+'">'+ev.icon+'</div>'+
+          (i<events.length-1?'<div style="width:2px;flex:1;min-height:12px;background:#e2e8f0;margin-top:3px"></div>':'')+
+        '</div>'+
+        '<div style="flex:1;padding-bottom:14px">'+
+          '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">'+
+            '<div style="font-size:12px;font-weight:700;color:#1e293b;line-height:1.4">'+ev.title+'</div>'+
+            '<span class="fe-badge" style="background:'+ev.colBg+';color:'+ev.col+';border:1px solid '+ev.col+';flex-shrink:0">'+ev.badge+'</span>'+
+          '</div>'+
+          (ev.sub?'<div style="font-size:11px;color:#64748b;margin-bottom:3px">'+ev.sub+'</div>':'')+
+          '<div style="font-size:10px;color:#94a3b8">'+dateStr+'</div>'+
+          (ev.extra||'')+
+        '</div>'+
+      '</div>';
+  });
+  if(!events.length){
+    tlHtml='<div style="text-align:center;padding:48px 24px;color:#94a3b8">'+
+      '<div style="font-size:40px;margin-bottom:12px;opacity:.4">📋</div>'+
+      '<div style="font-size:14px">Aucun historique pour cet équipement.</div></div>';
+  }
+
+  // Assemble panel
+  var actifBadge=eqData&&!eqData.actif?
+    '<span class="fe-badge" style="background:rgba(239,68,68,.2);color:#fca5a5;border:1px solid rgba(239,68,68,.3)">Inactif</span>':'';
+  ov.innerHTML=
+    '<div class="fe-panel" onclick="event.stopPropagation()">'+
+      // Header gradient
+      '<div class="fe-header">'+
+        '<div class="fe-drag"></div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
+          '<div style="display:flex;align-items:center;gap:12px">'+
+            '<div style="width:46px;height:46px;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px">'+eqIcon+'</div>'+
+            '<div>'+
+              '<div style="font-size:17px;font-weight:800;line-height:1.2">'+escape_html(nom)+'</div>'+
+              '<div style="font-size:11px;opacity:.65;margin-top:2px">'+escape_html(typeNom)+(actifBadge?' · '+actifBadge:'')+'</div>'+
+            '</div>'+
+          '</div>'+
+          '<button onclick="_closeFicheEquipement()" style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit;line-height:1">✕</button>'+
+        '</div>'+
+        // KPIs row
+        '<div style="display:flex;gap:8px">'+
+          '<div class="fe-kpi"><div class="fe-kpi-val">'+nbPannes+'</div><div class="fe-kpi-lbl">Pannes<br>signalées</div></div>'+
+          '<div class="fe-kpi"><div class="fe-kpi-val">'+nbInterv+'</div><div class="fe-kpi-lbl">Interventions<br>totales</div></div>'+
+          '<div class="fe-kpi"><div class="fe-kpi-val" style="font-size:13px">'+lastMntDate+'</div><div class="fe-kpi-lbl">Dernière<br>intervention</div></div>'+
+          '<div class="fe-kpi"><div class="fe-kpi-val" style="font-size:13px">'+nextDate+'</div><div class="fe-kpi-lbl">Prochaine<br>planifiée</div></div>'+
+        '</div>'+
+      '</div>'+
+      // Timeline section header
+      '<div style="padding:16px 20px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f1f5f9;flex-shrink:0">'+
+        '<div style="font-size:13px;font-weight:700;color:#1e293b">📋 Historique complet</div>'+
+        '<div style="font-size:11px;color:#94a3b8">'+events.length+' événement'+(events.length>1?'s':'')+'</div>'+
+      '</div>'+
+      // Body timeline
+      '<div class="fe-body">'+tlHtml+'</div>'+
     '</div>';
+}
+
+function _closeFicheEquipement(){
+  var ov=document.getElementById('fiche-eq-overlay');
+  if(ov){ov.style.opacity='0';ov.style.transition='opacity .15s';setTimeout(function(){ov.remove();},150);}
+}
+
+function _ficheJoindreRapport(mntId){
+  _showCfgModal(
+    '<div style="font-size:15px;font-weight:700;margin-bottom:16px">📎 Rapport d\'intervention</div>'+
+    '<div style="margin-bottom:12px"><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:6px">COMPTE RENDU</label>'+
+      '<textarea id="fiche-rapport-txt" rows="6" placeholder="Décrivez l\'intervention réalisée : causes, travaux effectués, pièces changées, recommandations…" '+
+        'style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;resize:none;box-sizing:border-box;line-height:1.5"></textarea></div>'+
+    '<div style="display:flex;gap:10px;margin-top:4px">'+
+      '<button onclick="_closeCfgModal()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-weight:600;background:white;cursor:pointer">Annuler</button>'+
+      '<button onclick="_ficheSaveRapport(\''+mntId+'\')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;background:var(--dark);color:white;cursor:pointer">Enregistrer</button>'+
+    '</div>'
+  );
+}
+
+async function _ficheSaveRapport(mntId){
+  var txt=(document.getElementById('fiche-rapport-txt')||{}).value||'';
+  if(!txt.trim()){alert('Le rapport ne peut pas être vide.');return;}
+  try{
+    await supaPatch('maintenances',mntId,{rapport_texte:txt.trim()});
+    _closeCfgModal();
+    // Refresh fiche if open
+    var ov=document.getElementById('fiche-eq-overlay');
+    if(ov){var btn=ov.querySelector('[onclick*="'+mntId+'"]');if(btn)btn.textContent='📄 Voir rapport';}
+  }catch(e){alert('Erreur : '+e.message);}
 }
 
 function _setMntFilter(f){
