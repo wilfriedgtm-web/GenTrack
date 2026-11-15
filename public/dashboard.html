@@ -4535,23 +4535,30 @@ async function _mntSelectEq(eqId,eqNom,sid){
   var missionPlanStatuts={};
   var calPlanIds=plans.map(function(p){return p.id;});
   if(calPlanIds.length){
+    // Étape 1 : récupérer les mission_plans (sans embed pour éviter ambiguïté PostgREST)
     var mpRows=await supaGet('mission_plans',
-      'plan_maintenance_id=in.('+calPlanIds.join(',')+')'+'&select=plan_maintenance_id,statut,mission_id,missions!mission_id(id,created_at,statut,token)&order=created_at.desc'
+      'plan_maintenance_id=in.('+calPlanIds.join(',')+')'+'&select=plan_maintenance_id,statut,mission_id&order=created_at.desc'
     ).catch(function(){return[];});
-    // Garder uniquement le plus récent par plan
+    // Garder le plus récent par plan (premier dans le résultat trié desc)
     mpRows.forEach(function(mp){
-      // missions peut être objet ou tableau selon PostgREST
-      var mObj=mp.missions;
-      if(Array.isArray(mObj))mObj=mObj[0]||null;
-      if(!mObj&&mp.mission_id){mObj={id:mp.mission_id,created_at:'',statut:'',token:''};}
-      if(!mObj)return;
-      mp._mission=mObj; // normalise
-      var existing=missionPlanStatuts[mp.plan_maintenance_id];
-      var mpDate=mObj.created_at||'';
-      if(!existing||(existing._mission&&mpDate>(existing._mission.created_at||''))){
+      if(!mp.mission_id)return;
+      if(!missionPlanStatuts[mp.plan_maintenance_id]){
         missionPlanStatuts[mp.plan_maintenance_id]=mp;
       }
     });
+    // Étape 2 : récupérer les missions correspondantes pour avoir token + created_at
+    var missionIds=Object.values(missionPlanStatuts).map(function(mp){return mp.mission_id;}).filter(Boolean);
+    if(missionIds.length){
+      var mRows=await supaGet('missions',
+        'id=in.('+missionIds.join(',')+')'+'&select=id,created_at,statut,token'
+      ).catch(function(){return[];});
+      var missionsById={};
+      mRows.forEach(function(m){missionsById[m.id]=m;});
+      Object.keys(missionPlanStatuts).forEach(function(pid){
+        var mp=missionPlanStatuts[pid];
+        mp._mission=missionsById[mp.mission_id]||{id:mp.mission_id,created_at:'',statut:'',token:''};
+      });
+    }
   }
   // Peupler _mntEqPlanTokens pour les liens rapport dans la timeline
   _mntEqPlanTokens={};
