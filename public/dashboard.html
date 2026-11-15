@@ -4553,6 +4553,14 @@ async function _mntSelectEq(eqId,eqNom,sid){
       }
     });
   }
+  // Peupler _mntEqPlanTokens pour les liens rapport dans la timeline
+  _mntEqPlanTokens={};
+  Object.keys(missionPlanStatuts).forEach(function(pid){
+    var mp=missionPlanStatuts[pid];
+    var mObj=mp._mission||mp.missions||{};
+    if(Array.isArray(mObj))mObj=mObj[0]||{};
+    if(mObj.token)_mntEqPlanTokens[pid]=mObj.token;
+  });
 
   // Dernière valeur par unité pour les cards métriques
   var valParUnite={};
@@ -4791,10 +4799,19 @@ async function _mntSelectEq(eqId,eqNom,sid){
     var badge={planifie:'Planifié',realise:'Réalisé',bloque:'🔒 Bloqué',partiel:'Partiel',annule:'Annulé'}[m.statut]||m.statut;
     var who=m.prestataire||m.technicien||'';
     var mPhotos=[];try{if(m.photo_url)mPhotos=JSON.parse(m.photo_url);}catch(e){if(m.photo_url)mPhotos=[m.photo_url];}
+    // Motif de blocage stocké dans rapport_texte (format "🔒 Bloqué — motif")
+    var motifBlocage='';
+    if(m.statut==='bloque'&&m.rapport_texte){
+      var mt=m.rapport_texte.replace(/^🔒\s*Bloqué\s*—?\s*/i,'').trim();
+      if(mt)motifBlocage=mt;
+    }
+    var subParts=[];
+    if(who)subParts.push('→ '+escape_html(who)+(m.cout?' · '+parseFloat(m.cout).toLocaleString('fr-FR')+' FCFA':''));
+    if(motifBlocage)subParts.push('⚠️ '+escape_html(motifBlocage));
     events.push({date:m.date_realisee||m.created_at,col:col,colBg:colBg,badge:badge,
       title:escape_html(m.titre||m.type||'Intervention'),
-      sub:who?'→ '+escape_html(who)+(m.cout?' · '+parseFloat(m.cout).toLocaleString('fr-FR')+' FCFA':''):'',
-      photos:mPhotos,mntId:m.id,statut:m.statut});
+      sub:subParts.join(' · '),
+      photos:mPhotos,mntId:m.id,statut:m.statut,planId:m.plan_maintenance_id||null});
   });
   events.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
   // Stocker en cache + reset au mois courant quand on change d'équipement
@@ -5550,6 +5567,10 @@ async function _mntSaveTacheEq(eqId,sid,editPlanId){
   }else alert('Erreur lors de la sauvegarde. Vérifiez la console.');
 }
 
+// Token de rapport pour un plan (utilisé dans la timeline historique)
+var _mntEqPlanTokens={}; // planId → token
+function _mntEqRapportToken(planId){return _mntEqPlanTokens[planId]||'';}
+
 // ── Navigation mois par mois dans l'historique équipement ────────────────────
 function _mntBuildEqHistHtml(){
   var now=new Date();
@@ -5596,7 +5617,8 @@ function _mntBuildEqHistHtml(){
         (ev.photos&&ev.photos.length?'<div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap">'+ev.photos.map(function(u){return'<img src="'+u+'" onclick="_mntLightbox(\''+u+'\')" style="width:48px;height:48px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid #e2e8f0" onerror="this.style.display=\'none\'">';}).join('')+'</div>':'')+
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:3px">'+
           '<div style="font-size:10px;color:#94a3b8">'+dStr+'</div>'+
-          (ev.mntId&&ev.statut==='realise'?'<button onclick="event.stopPropagation();_mntGeneratePDF(\''+ev.mntId+'\')" style="font-size:9px;padding:2px 7px;border:1px solid #e2e8f0;border-radius:5px;background:white;color:#64748b;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:3px"><i class="ti ti-file-type-pdf" style="font-size:11px;color:#ef4444"></i>PDF</button>':'')+
+          (ev.mntId&&ev.statut==='realise'?'<button onclick="event.stopPropagation();_mntGeneratePDF(\''+ev.mntId+'\')" style="font-size:9px;padding:2px 7px;border:1px solid #e2e8f0;border-radius:5px;background:white;color:#64748b;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:3px"><i class="ti ti-file-type-pdf" style="font-size:11px;color:#ef4444"></i>PDF</button>':
+           ev.statut==='bloque'&&ev.planId&&_mntEqRapportToken(ev.planId)?'<a href="mission.html?token='+_mntEqRapportToken(ev.planId)+'" target="_blank" style="font-size:9px;padding:2px 7px;border:1px solid #fecaca;border-radius:5px;background:#fef2f2;color:#ef4444;text-decoration:none;font-weight:600;display:flex;align-items:center;gap:3px">🔒 Rapport</a>':'')+
         '</div>'+
       '</div>'+
     '</div>';
