@@ -5641,7 +5641,11 @@ function _mntBuildEqHistHtml(){
         (ev.photos&&ev.photos.length?'<div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap">'+ev.photos.map(function(u){return'<img src="'+u+'" onclick="_mntLightbox(\''+u+'\')" style="width:48px;height:48px;object-fit:cover;border-radius:6px;cursor:pointer;border:1px solid #e2e8f0" onerror="this.style.display=\'none\'">';}).join('')+'</div>':'')+
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:3px">'+
           '<div style="font-size:10px;color:#94a3b8">'+dStr+'</div>'+
-          (ev.mntId&&ev.statut==='realise'?'<button onclick="event.stopPropagation();_mntGeneratePDF(\''+ev.mntId+'\')" style="font-size:9px;padding:2px 7px;border:1px solid #e2e8f0;border-radius:5px;background:white;color:#64748b;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:3px"><i class="ti ti-file-type-pdf" style="font-size:11px;color:#ef4444"></i>PDF</button>':
+          (ev.mntId&&ev.statut==='realise'?
+            '<div style="display:flex;align-items:center;gap:4px">'+
+            (ev.planId&&_mntEqRapportToken(ev.planId)?'<a href="mission.html?token='+_mntEqRapportToken(ev.planId)+'" target="_blank" style="font-size:9px;padding:2px 7px;border:1px solid #bbf7d0;border-radius:5px;background:#f0fdf4;color:#16a34a;text-decoration:none;font-weight:600;display:flex;align-items:center;gap:3px">✅ Rapport</a>':'')+
+            '<button onclick="event.stopPropagation();_mntGeneratePDF(\''+ev.mntId+'\')" style="font-size:9px;padding:2px 7px;border:1px solid #e2e8f0;border-radius:5px;background:white;color:#64748b;cursor:pointer;font-weight:600;display:flex;align-items:center;gap:3px"><i class="ti ti-file-type-pdf" style="font-size:11px;color:#ef4444"></i>PDF</button>'+
+            '</div>':
            ev.statut==='bloque'&&ev.planId&&_mntEqRapportToken(ev.planId)?'<a href="mission.html?token='+_mntEqRapportToken(ev.planId)+'" target="_blank" style="font-size:9px;padding:2px 7px;border:1px solid #fecaca;border-radius:5px;background:#fef2f2;color:#ef4444;text-decoration:none;font-weight:600;display:flex;align-items:center;gap:3px">🔒 Rapport</a>':'')+
         '</div>'+
       '</div>'+
