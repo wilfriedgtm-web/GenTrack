@@ -4536,14 +4536,19 @@ async function _mntSelectEq(eqId,eqNom,sid){
   var calPlanIds=plans.map(function(p){return p.id;});
   if(calPlanIds.length){
     var mpRows=await supaGet('mission_plans',
-      'plan_maintenance_id=in.('+calPlanIds.join(',')+')'+'&select=plan_maintenance_id,statut,missions(id,created_at,statut,token)'
+      'plan_maintenance_id=in.('+calPlanIds.join(',')+')'+'&select=plan_maintenance_id,statut,mission_id,missions!mission_id(id,created_at,statut,token)&order=created_at.desc'
     ).catch(function(){return[];});
     // Garder uniquement le plus récent par plan
     mpRows.forEach(function(mp){
-      if(!mp.missions)return;
+      // missions peut être objet ou tableau selon PostgREST
+      var mObj=mp.missions;
+      if(Array.isArray(mObj))mObj=mObj[0]||null;
+      if(!mObj&&mp.mission_id){mObj={id:mp.mission_id,created_at:'',statut:'',token:''};}
+      if(!mObj)return;
+      mp._mission=mObj; // normalise
       var existing=missionPlanStatuts[mp.plan_maintenance_id];
-      var mpDate=mp.missions.created_at||'';
-      if(!existing||(existing.missions&&mpDate>existing.missions.created_at)){
+      var mpDate=mObj.created_at||'';
+      if(!existing||(existing._mission&&mpDate>(existing._mission.created_at||''))){
         missionPlanStatuts[mp.plan_maintenance_id]=mp;
       }
     });
@@ -4921,8 +4926,10 @@ async function _mntSelectEq(eqId,eqNom,sid){
     // Badge bloqué : priorité absolue, peu importe prochaine_date
     var mp=missionPlanStatuts[p.id];
     if(mp&&(mp.statut==='realise'||mp.statut==='bloque')){
-      var mpD=mp.missions&&mp.missions.created_at?new Date(mp.missions.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'numeric'}):null;
-      rapportToken=(mp.missions&&mp.missions.token)||'';
+      var _mObj=mp._mission||mp.missions||{};
+      if(Array.isArray(_mObj))_mObj=_mObj[0]||{};
+      var mpD=_mObj.created_at?new Date(_mObj.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'numeric'}):null;
+      rapportToken=_mObj.token||'';
       if(mp.statut==='realise'){
         badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#f0fdf4;color:#16a34a;font-weight:700;border:1px solid #bbf7d0;white-space:nowrap">✓ Fait'+(mpD?' le '+mpD:'')+'</span>';
       } else {
