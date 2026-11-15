@@ -4569,6 +4569,18 @@ async function _mntSelectEq(eqId,eqNom,sid){
     if(mObj.token)_mntEqPlanTokens[pid]=mObj.token;
   });
 
+  // Index maintenances par plan — source de vérité pour les badges
+  // (plus fiable que mission_plans car pas de join PostgREST)
+  var recentMntByPlan={};
+  mnts.forEach(function(m){
+    if(!m.plan_maintenance_id)return;
+    var ex=recentMntByPlan[m.plan_maintenance_id];
+    var mDate=m.date_realisee||m.created_at||'';
+    if(!ex||(mDate>(ex.date_realisee||ex.created_at||''))){
+      recentMntByPlan[m.plan_maintenance_id]=m;
+    }
+  });
+
   // Dernière valeur par unité pour les cards métriques
   var valParUnite={};
   allValeurs.forEach(function(r){
@@ -4947,14 +4959,19 @@ async function _mntSelectEq(eqId,eqNom,sid){
     var typeP=(p.type_plan||'calendrier');
     var badgeHtml='';
     var rapportToken='';
-    // Badge bloqué : priorité absolue, peu importe prochaine_date
-    var mp=missionPlanStatuts[p.id];
-    if(mp&&(mp.statut==='realise'||mp.statut==='bloque')){
-      var _mObj=mp._mission||mp.missions||{};
+    // Badge : source principale = maintenances (fiable, pas de join)
+    // Fallback token = missionPlanStatuts (pour lien rapport)
+    var recentMnt=recentMntByPlan[p.id];
+    var mntStatut=recentMnt?recentMnt.statut:null;
+    var mp=missionPlanStatuts[p.id]; // token only
+    if(mntStatut==='realise'||mntStatut==='bloque'){
+      var mntDateRaw=recentMnt.date_realisee||recentMnt.created_at||'';
+      var mpD=mntDateRaw?new Date(mntDateRaw).toLocaleDateString('fr-FR',{day:'numeric',month:'numeric'}):null;
+      // token depuis missionPlanStatuts si dispo
+      var _mObj=(mp&&(mp._mission||mp.missions))||{};
       if(Array.isArray(_mObj))_mObj=_mObj[0]||{};
-      var mpD=_mObj.created_at?new Date(_mObj.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'numeric'}):null;
-      rapportToken=_mObj.token||'';
-      if(mp.statut==='realise'){
+      rapportToken=(_mObj.token)||_mntEqPlanTokens[p.id]||'';
+      if(mntStatut==='realise'){
         badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#f0fdf4;color:#16a34a;font-weight:700;border:1px solid #bbf7d0;white-space:nowrap">✓ Fait'+(mpD?' le '+mpD:'')+'</span>';
       } else {
         badgeHtml='<span style="font-size:9px;padding:2px 6px;border-radius:8px;background:#fef2f2;color:#ef4444;font-weight:700;border:1px solid #fecaca;white-space:nowrap">🔒 Bloqué'+(mpD?' le '+mpD:'')+'</span>';
