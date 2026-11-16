@@ -15660,11 +15660,41 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     h+='<div style="background:#FEF3E5;border:1px solid #F5C87A;border-radius:8px;padding:10px 14px;flex:1;min-width:80px;text-align:center"><div style="font-size:20px;font-weight:700;color:#D46B0A">'+rzCounts.warn+'</div><div style="font-size:11px;color:var(--text2)">Dû bientôt</div></div>';
     h+='<div style="background:#F4F5FA;border:1px solid #E4E6EF;border-radius:8px;padding:10px 14px;flex:1;min-width:80px;text-align:center"><div style="font-size:20px;font-weight:700;color:#5A5F78">'+rzCounts.never+'</div><div style="font-size:11px;color:var(--text2)">Jamais visitée</div></div>';
     h+='</div>';
+    // Tableau détail zones
+    h+='<table><thead><tr><th>Zone</th><th>Bâtiment</th><th>Dernière visite</th><th>Prochaine (j+)</th><th>Statut</th></tr></thead><tbody>';
+    var _bats={};
+    zonesRes.forEach(function(z){var b=z.batiment||'—';if(!_bats[b])_bats[b]=[];_bats[b].push(z);});
+    Object.keys(_bats).sort().forEach(function(bat){
+      _bats[bat].forEach(function(z){
+        var lr=lastRelZ[z.id];
+        var freq=z.frequence_passage||30;
+        var days=lr?Math.floor((today2-new Date(lr.date))/(86400000)):null;
+        var left=days!=null?freq-days:null;
+        var dateVisite=lr?new Date(lr.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'2-digit'}):null;
+        var incident=lr&&(lr.statut==='incident'||lr.nb_anomalies>0);
+        var late=!lr||(left!=null&&left<=0)||incident;
+        var warn=!late&&left!=null&&left<=3;
+        var badgeLbl,badgeCls;
+        if(!lr){badgeLbl='Jamais visitée';badgeCls='badge-ko';}
+        else if(incident){badgeLbl='⚠ Incident';badgeCls='badge-ko';}
+        else if(late){badgeLbl='En retard';badgeCls='badge-ko';}
+        else if(warn){badgeLbl='Dû bientôt';badgeCls='badge-warn';}
+        else{badgeLbl='✓ OK';badgeCls='badge-ok';}
+        var prochaine=left!=null?(left>0?'+'+left+' j':'Dû'):days===null?'—':'Dû';
+        h+='<tr>'+
+          '<td><strong>'+escape_html(z.nom)+'</strong></td>'+
+          '<td style="font-size:11px;color:var(--text2)">'+escape_html(bat)+'</td>'+
+          '<td style="font-size:11px;color:var(--text2)">'+(dateVisite||'—')+'</td>'+
+          '<td style="font-size:11px;font-weight:600;color:'+(left!=null&&left<=3&&left>0?'#D46B0A':late?'var(--rouge)':'var(--text2)')+'">'+prochaine+'</td>'+
+          '<td><span class="badge '+badgeCls+'">'+badgeLbl+'</span></td>'+
+        '</tr>';
+      });
+    });
+    h+='</tbody></table>';
   }
 
-  // Relevés horaires (tous clients)
+  // Relevés horaires (tous clients) — résumé KPI uniquement
   if(relevesHoraires.length>0){
-    var _rhNow=new Date();
     var _rhValides=relevesHoraires.filter(function(r){return r.statut==='validé';}).length;
     var _rhAlertesTotal=relevesHoraires.reduce(function(s,r){return s+(r.nb_alertes||0);},0);
     var _rhValeursTotal=relevesHoraires.reduce(function(s,r){return s+(r.nb_valeurs||0);},0);
@@ -15675,24 +15705,6 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     h+='<div class="fluid-card" style="margin:0;padding:10px 12px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Valeurs saisies</div><div style="font-size:18px;font-weight:700">'+_rhValeursTotal+'</div></div>';
     h+='<div class="fluid-card" style="margin:0;padding:10px 12px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Alertes</div><div style="font-size:18px;font-weight:700;color:'+(_rhAlertesTotal>0?'var(--rouge)':'var(--vert)')+'">'+_rhAlertesTotal+'</div></div>';
     h+='</div>';
-    h+='<table><thead><tr><th>Date</th><th style="text-align:center">Valeurs</th><th style="text-align:center">Alertes</th><th>Statut</th></tr></thead><tbody>';
-    relevesHoraires.slice(0,30).forEach(function(r){
-      var _isExp=r.statut==='expiré'||(r.statut==='ouvert'&&r.expires_at&&new Date(r.expires_at)<=_rhNow);
-      var _statut,_statCls;
-      if(r.statut==='validé'){_statut='✓ Validé';_statCls='badge-ok';}
-      else if(_isExp&&(r.nb_valeurs||0)>=1){_statut='Expiré partiel';_statCls='badge-warn';}
-      else if(_isExp){_statut='Expiré (vide)';_statCls='badge-ko';}
-      else{_statut='En cours';_statCls='badge-warn';}
-      var _rhDate=new Date(r.created_at).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-      h+='<tr>'+
-        '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+_rhDate+'</td>'+
-        '<td style="text-align:center">'+((r.nb_valeurs||0))+'</td>'+
-        '<td style="text-align:center;color:'+((r.nb_alertes||0)>0?'var(--rouge)':'var(--text3)')+'">'+((r.nb_alertes||0))+'</td>'+
-        '<td><span class="badge '+_statCls+'">'+_statut+'</span></td>'+
-      '</tr>';
-    });
-    if(relevesHoraires.length>30)h+='<tr><td colspan="4" style="text-align:center;font-size:11px;color:var(--text3)">…et '+(relevesHoraires.length-30)+' relevé(s) supplémentaire(s)</td></tr>';
-    h+='</tbody></table>';
   }
 
   // Signalements
