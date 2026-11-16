@@ -4785,7 +4785,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
     supaGet('signalements','equipement_id=eq.'+eqId+'&order=created_at.desc&limit=90&select=id,type,description,statut,created_at,assigne_a').catch(function(){return[];}),
     supaGet('maintenances','equipement_id=eq.'+eqId+'&order=date_realisee.desc&limit=90&select=id,titre,type,statut,created_at,date_realisee,prestataire,prestataire_id,technicien,cout,rapport_texte,plan_maintenance_id').catch(function(){return[];}),
     supaGet('plans_maintenance','equipement_id=eq.'+eqId+'&actif=eq.true&order=prochaine_date.asc&select=id,titre,frequence,prochaine_date,intervenant,checklist,type_plan,prestataire_id,prestataires(nom)').catch(function(){return[];}),
-    supaGet('missions','equipement_id=eq.'+eqId+'&statut=eq.realisee&select=id,statut,cout,completed_at,created_at,plan_maintenance_id,devise,prestataires(nom)&order=completed_at.desc&limit=90').catch(function(){return[];}),
+    supaGet('missions','equipement_id=eq.'+eqId+'&statut=eq.realisee&select=id,statut,cout,completed_at,created_at,plan_maintenance_id,devise,prestataires(nom),plans_maintenance(titre)&order=completed_at.desc&limit=90').catch(function(){return[];}),
     supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom,telephone,email').catch(function(){return[];}),
     supaGet('reponses',
       'select=valeur,created_at,questions!inner(texte,unite,equipement_id,type_reponse)'+
@@ -5111,8 +5111,9 @@ async function _mntSelectEq(eqId,eqNom,sid){
     var who=(m.prestataires&&m.prestataires.nom)||'Prestataire';
     var subParts=['→ '+escape_html(who)];
     if(m.cout!=null){var dev=m.devise||'XOF';subParts.push(parseFloat(m.cout).toLocaleString('fr-FR')+' '+dev);}
+    var mTitre=(m.plans_maintenance&&m.plans_maintenance.titre)||'Mission prestataire';
     events.push({date:dateMs,col:'#22c55e',colBg:'#f0fdf4',badge:'Réalisé',
-      title:'Mission prestataire',sub:subParts.join(' · ')});
+      title:escape_html(mTitre),sub:subParts.join(' · ')});
   });
   mnts.forEach(function(m){
     var col={planifie:'#f59e0b',realise:'#22c55e',bloque:'#ef4444',partiel:'#f59e0b',annule:'#94a3b8'}[m.statut]||'#94a3b8';
@@ -15025,7 +15026,7 @@ async function _openRapportHebdo(period){
       supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+cutoff+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=200'),
       supaGet('signalements','groupe_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,type,description,statut,signale_par,equipement_id,equipement_zone_id,cout_intervention,created_at,resolved_at,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=60'),
       supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+cutoff+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=40'),
-      supaGet('missions','site_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,statut,cout,devise,completed_at,created_at,equipements(nom),prestataires(nom)&order=created_at.desc&limit=100').catch(function(){return[];})
+      supaGet('missions','site_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,statut,cout,devise,completed_at,created_at,equipements(nom),prestataires(nom),plans_maintenance(titre,type_plan)&order=created_at.desc&limit=100').catch(function(){return[];})
     ]);
     missions=missions||[];
     var siteNom=siteRow.length?siteRow[0].nom:'Mon site';
@@ -15833,8 +15834,11 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
       var dateMs=m.completed_at||m.created_at;
       var ts=dateMs?new Date(String(dateMs).replace(' ','T').replace(/([+-]\d{2})$/,'$1:00')).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
       var prestNom=(m.prestataires&&m.prestataires.nom)||'Prestataire';
+      var planTitre=(m.plans_maintenance&&m.plans_maintenance.titre)||null;
+      var planType=(m.plans_maintenance&&m.plans_maintenance.type_plan)||null;
+      var titreMission=planTitre||'Mission prestataire';
       h+='<tr>'+
-        '<td><strong>Mission prestataire</strong></td>'+
+        '<td><strong>'+escape_html(titreMission)+'</strong>'+(planType?'<br><span style="font-size:9px;color:var(--text3);text-transform:uppercase">'+escape_html(planType)+'</span>':'')+'</td>'+
         '<td style="font-size:11px;color:var(--text2)">'+escape_html(eqNom)+'</td>'+
         '<td style="font-size:11px">'+escape_html(prestNom)+'</td>'+
         '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
