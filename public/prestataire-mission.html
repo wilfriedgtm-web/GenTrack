@@ -360,7 +360,9 @@ async function _submit(){
     var mpPatch={
       statut:st.statut,
       commentaire:st.commentaire||null,
-      checklist_completee:JSON.stringify(st.checklistCompletee),
+      checklist_completee:st.checklistCompletee,
+      recommandation:st.recommandation||null,
+      photo_url:photoUrl||null,
       motif_blocage:(st.statut==='bloque'&&st.motifBlocage)||null,
       mission_id:_mission.id
     };
@@ -450,7 +452,10 @@ function renderRapport(){
     var plan=mp.plans_maintenance||{};
     var stOk=mp.statut==='realise',stBloq=mp.statut==='bloque';
     var checklist=Array.isArray(plan.checklist)?plan.checklist:[];
-    var checkDone=Array.isArray(mp.checklist_completee)?mp.checklist_completee:[];
+    var checkDone=Array.isArray(mp.checklist_completee)?mp.checklist_completee:
+      (typeof mp.checklist_completee==='string'&&mp.checklist_completee?
+        (function(){try{return JSON.parse(mp.checklist_completee);}catch(e){return[];}}()):
+        []);
     var doneCount=checkDone.filter(Boolean).length;
 
     html+='<div class="rapport-section">';
@@ -460,12 +465,21 @@ function renderRapport(){
     html+='</div>';
 
     if(checklist.length){
-      html+='<div class="rapport-row"><span class="rapport-row-label">Checklist</span><span class="rapport-row-val">'+doneCount+'/'+checklist.length+'</span></div>';
+      html+='<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px">Checklist ('+doneCount+'/'+checklist.length+' validés)</div>';
+      checklist.forEach(function(item,ci){
+        var done=checkDone[ci]?true:false;
+        html+='<div style="display:flex;align-items:flex-start;gap:6px;padding:3px 0;font-size:12px;color:'+(done?'#16a34a':'#94a3b8')+'">'+
+          '<span style="font-weight:700;min-width:12px;flex-shrink:0">'+(done?'✓':'○')+'</span>'+
+          '<span>'+esc(_clItemText(item))+'</span>'+
+        '</div>';
+      });
+      html+='</div>';
     }
+    if(mp.photo_url)html+='<div style="margin-bottom:8px"><img src="'+mp.photo_url+'" alt="Photo intervention" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid #e2e8f0;display:block"></div>';
     if(mp.commentaire)html+='<div class="rapport-row"><span class="rapport-row-label">Commentaire</span><span class="rapport-row-val">'+esc(mp.commentaire)+'</span></div>';
+    if(mp.recommandation)html+='<div class="rapport-row" style="color:#1e40af"><span class="rapport-row-label">💡 Recommandation</span><span class="rapport-row-val">'+esc(mp.recommandation)+'</span></div>';
     if(mp.motif_blocage)html+='<div class="rapport-row" style="color:#ef4444"><span class="rapport-row-label">Motif blocage</span><span class="rapport-row-val">'+esc(mp.motif_blocage)+'</span></div>';
 
-    // Recommandation : extraire du rapport_texte maintenances si présent
     html+='</div>';
   });
 
@@ -487,8 +501,21 @@ function _loadJsPDF(cb){
   s.onload=cb;document.head.appendChild(s);
 }
 
+function _imgToBase64(url){
+  return new Promise(function(resolve){
+    var img=new Image();img.crossOrigin='anonymous';
+    img.onload=function(){
+      var c=document.createElement('canvas');c.width=img.width;c.height=img.height;
+      c.getContext('2d').drawImage(img,0,0);
+      try{resolve(c.toDataURL('image/jpeg',0.8));}catch(e){resolve(null);}
+    };
+    img.onerror=function(){resolve(null);};
+    img.src=url;
+  });
+}
+
 function _downloadPDF(){
-  _loadJsPDF(function(){
+  _loadJsPDF(async function(){
     var jsPDF=window.jspdf.jsPDF;
     var doc=new jsPDF({unit:'mm',format:'a4'});
     var eqNom=(_mission.equipements&&_mission.equipements.nom)||'Équipement';
@@ -508,6 +535,13 @@ function _downloadPDF(){
     doc.setFontSize(9);doc.setFont('helvetica','normal');
     doc.text(eqNom+(typeNom?' — '+typeNom:'')+'  |  '+(siteNom||''),14,21);
     doc.text('GenTrack · GMAO',14,27);
+
+    // Pré-charger les photos en base64
+    var photoB64Map={};
+    for(var pi=0;pi<_missionPlans.length;pi++){
+      var purl=_missionPlans[pi].photo_url;
+      if(purl){var b64=await _imgToBase64(purl).catch(function(){return null;});if(b64)photoB64Map[_missionPlans[pi].id]=b64;}
+    }
 
     var y=38;
     doc.setTextColor(30,41,59);
@@ -535,9 +569,11 @@ function _downloadPDF(){
       var stOk=mp.statut==='realise',stBloq=mp.statut==='bloque';
       var checklist=Array.isArray(plan.checklist)?plan.checklist:[];
       var checkDone=Array.isArray(mp.checklist_completee)?mp.checklist_completee:
-        (_taskStates[mp.id]&&_taskStates[mp.id].checklistCompletee)||[];
+        (typeof mp.checklist_completee==='string'&&mp.checklist_completee?
+          (function(){try{return JSON.parse(mp.checklist_completee);}catch(e){return[];}}()):
+          ((_taskStates[mp.id]&&_taskStates[mp.id].checklistCompletee)||[]));
       var commentaire=mp.commentaire||(_taskStates[mp.id]&&_taskStates[mp.id].commentaire)||'';
-      var recommandation=(_taskStates[mp.id]&&_taskStates[mp.id].recommandation)||'';
+      var recommandation=mp.recommandation||(_taskStates[mp.id]&&_taskStates[mp.id].recommandation)||'';
       var motif=mp.motif_blocage||(_taskStates[mp.id]&&_taskStates[mp.id].motifBlocage)||'';
 
       if(y>260){doc.addPage();y=14;}
@@ -582,6 +618,20 @@ function _downloadPDF(){
         doc.setFont('helvetica','normal');doc.setTextColor(30,41,59);
         var mlines=doc.splitTextToSize(motif,180);
         mlines.forEach(function(l){if(y>270){doc.addPage();y=14;}doc.text(l,18,y);y+=4;});
+      }
+      if(photoB64Map[mp.id]){
+        if(y>230){doc.addPage();y=14;}
+        doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(30,41,59);
+        doc.text('Photo intervention :',14,y);y+=4;
+        try{
+          var imgData=photoB64Map[mp.id];
+          var imgW=100,imgH=70;
+          doc.addImage(imgData,'JPEG',14,y,imgW,imgH);y+=imgH+4;
+        }catch(e){
+          doc.setFont('helvetica','italic');doc.setFontSize(8);doc.setTextColor(100,116,139);
+          doc.text('(Photo non intégrée)',14,y);y+=5;
+        }
+        doc.setTextColor(30,41,59);
       }
       y+=5;
     });

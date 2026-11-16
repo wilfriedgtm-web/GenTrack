@@ -5331,7 +5331,8 @@ function _mntCloseDossierModal(){
   if(m)m.remove();
 }
 
-async function _mntDossierPrestataire(prestId,prestNom,sid){
+async function _mntDossierPrestataire(prestId,prestNom,sid,months){
+  months=(months===undefined||months===null)?3:months;
   // Remove any existing modal
   _mntCloseDossierModal();
   // Build modal overlay
@@ -5351,12 +5352,24 @@ async function _mntDossierPrestataire(prestId,prestNom,sid){
     '</div>';
   document.body.appendChild(overlay);
 
-  var missions=await supaGet('missions','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+'&order=created_at.desc&limit=20&select=id,token,statut,created_at,completed_at,equipements(nom)').catch(function(){return[];});
+  var monthsFilter='';
+  if(months>0){var mfd=new Date();mfd.setMonth(mfd.getMonth()-months);monthsFilter='&created_at=gte.'+mfd.toISOString();}
+  var missions=await supaGet('missions','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+monthsFilter+'&order=created_at.desc&select=id,token,statut,created_at,completed_at,equipements(nom)').catch(function(){return[];});
   var docs=await supaGet('documents_prestataire','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+'&order=created_at.desc&select=*').catch(function(){return[];});
 
   var html='';
   // Missions
-  html+='<div style="font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Missions passées</div>';
+  var _safePn=prestNom.replace(/'/g,'').replace(/"/g,'').replace(/\\/g,'');
+  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+  html+='<div style="font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.6px">Missions passées</div>';
+  html+='<div style="display:flex;gap:3px">';
+  [[1,'1m'],[3,'3m'],[6,'6m'],[0,'Tout']].forEach(function(fi){
+    var fm=fi[0],fl=fi[1],active=(fm===months);
+    html+='<button onclick="_mntDossierPrestataire(\''+prestId+'\',\''+_safePn+'\',\''+sid+'\','+fm+')" '+
+      'style="padding:2px 7px;border:1px solid '+(active?'#1e40af':'#e2e8f0')+';border-radius:4px;font-size:9px;'+
+      'background:'+(active?'#1e40af':'#f8fafc')+';color:'+(active?'white':'#64748b')+';cursor:pointer;font-weight:'+(active?'700':'500')+'">'+fl+'</button>';
+  });
+  html+='</div></div>';
   if(missions.length){
     missions.forEach(function(m){
       var stCol=m.statut==='realisee'?'#16a34a':m.statut==='echec'?'#ef4444':m.statut==='envoyee'?'#d97706':'#64748b';
@@ -5388,7 +5401,7 @@ async function _mntDossierPrestataire(prestId,prestNom,sid){
           '<div style="font-size:12px;font-weight:500;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escape_html(d.nom)+'</div>'+
           '<div style="font-size:10px;color:#94a3b8">'+escape_html(d.type_doc)+' · '+new Date(d.created_at).toLocaleDateString('fr-FR')+'</div>'+
         '</div>'+
-        (d.url?'<a href="'+d.url+'" target="_blank" style="font-size:10px;padding:3px 7px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;color:#64748b;text-decoration:none">↗ Ouvrir</a>':'')+
+        (function(){var dUrl=d.url||(d.storage_path?'https://zbpoxjlkqxnqjzxohasq.supabase.co/storage/v1/object/public/maintenance-photos/'+d.storage_path:'');return dUrl?'<a href="'+dUrl+'" target="_blank" style="font-size:10px;padding:3px 7px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;color:#64748b;text-decoration:none">↗ Ouvrir</a>':'';})()+
       '</div>';
     });
   } else {
