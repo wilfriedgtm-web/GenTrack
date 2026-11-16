@@ -4785,7 +4785,6 @@ async function _mntSelectEq(eqId,eqNom,sid){
     supaGet('signalements','equipement_id=eq.'+eqId+'&order=created_at.desc&limit=90&select=id,type,description,statut,created_at,assigne_a').catch(function(){return[];}),
     supaGet('maintenances','equipement_id=eq.'+eqId+'&order=date_realisee.desc&limit=90&select=id,titre,type,statut,created_at,date_realisee,prestataire,prestataire_id,technicien,cout,rapport_texte,plan_maintenance_id').catch(function(){return[];}),
     supaGet('plans_maintenance','equipement_id=eq.'+eqId+'&actif=eq.true&order=prochaine_date.asc&select=id,titre,frequence,prochaine_date,intervenant,checklist,type_plan,prestataire_id,prestataires(nom)').catch(function(){return[];}),
-    supaGet('missions','equipement_id=eq.'+eqId+'&statut=eq.realisee&select=id,statut,cout,completed_at,created_at,plan_maintenance_id,devise,prestataires(nom),plans_maintenance(titre)&order=completed_at.desc&limit=90').catch(function(){return[];}),
     supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom,telephone,email').catch(function(){return[];}),
     supaGet('reponses',
       'select=valeur,created_at,questions!inner(texte,unite,equipement_id,type_reponse)'+
@@ -4796,7 +4795,8 @@ async function _mntSelectEq(eqId,eqNom,sid){
     ).catch(function(){return[];}),
     (function(){var d90=new Date();d90.setDate(d90.getDate()-90);
       return supaGet('signalements','equipement_id=eq.'+eqId+'&type=eq.panne&created_at=gte.'+d90.toISOString()+'&select=id').catch(function(){return[];});})(),
-    supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&role=in.(technicien,resp_tech)&select=id,nom,whatsapp&order=nom.asc').catch(function(){return[];})
+    supaGet('contacts','site_id=eq.'+sid+'&actif=eq.true&role=in.(technicien,resp_tech)&select=id,nom,whatsapp&order=nom.asc').catch(function(){return[];}),
+    supaGet('missions','equipement_id=eq.'+eqId+'&statut=eq.realisee&select=id,statut,cout,completed_at,created_at,plan_maintenance_id,devise,prestataires(nom),plans_maintenance(titre)&order=completed_at.desc&limit=90').catch(function(){return[];})
   ]);
   var eq=res[0][0]||{nom:eqNom};
   var pannesOuv=res[1]||[];
