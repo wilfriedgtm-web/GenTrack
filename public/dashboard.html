@@ -5129,7 +5129,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
     '<div style="position:relative;background:linear-gradient(160deg,#1a2234 0%,#0f172a 100%);padding:20px 16px 18px;overflow:hidden">'+
       '<div style="position:absolute;top:10px;right:10px;display:flex;gap:6px;align-items:center">'+
         '<button onclick="_mntCompleteFiche(\''+eqId+'\',\''+sid+'\')" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);cursor:pointer;color:#e2e8f0;font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;line-height:1;display:flex;align-items:center;gap:5px"><i class="ti ti-pencil" style="font-size:12px"></i> Modifier</button>'+
-        '<button onclick="_mntCloseDetail()" title="Retour au calendrier" style="background:rgba(255,255,255,.1);border:none;cursor:pointer;color:#94a3b8;font-size:14px;padding:5px 7px;border-radius:7px;line-height:1" aria-label="Fermer"><i class="ti ti-x"></i></button>'+
+        '<button onclick="_mntCloseDetail()" title="Fermer" style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.25);cursor:pointer;color:white;font-size:14px;padding:5px 8px;border-radius:7px;line-height:1;font-weight:700" aria-label="Fermer"><i class="ti ti-x"></i></button>'+
       '</div>'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
         (modStr?'<span style="font-size:10px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:.8px;background:rgba(251,191,36,.12);padding:3px 9px;border-radius:5px;border:1px solid rgba(251,191,36,.2)">'+escape_html(eq.marque||typNom||'')+'</span>':'<span></span>')+
@@ -5491,12 +5491,55 @@ async function _mntDossierPrestataire(prestId,prestNom,sid,months){
 
   var monthsFilter='';
   if(months>0){var mfd=new Date();mfd.setMonth(mfd.getMonth()-months);monthsFilter='&created_at=gte.'+mfd.toISOString();}
-  var missions=await supaGet('missions','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+monthsFilter+'&order=created_at.desc&select=id,token,statut,created_at,completed_at,equipements(nom)').catch(function(){return[];});
+  var missions=await supaGet('missions','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+monthsFilter+'&order=created_at.desc&select=id,token,statut,created_at,completed_at,cout,duree_heures,devise,equipements(nom)').catch(function(){return[];});
   var docs=await supaGet('documents_prestataire','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+'&order=created_at.desc&select=*').catch(function(){return[];});
 
   var html='';
-  // Missions
   var _safePn=prestNom.replace(/'/g,'').replace(/"/g,'').replace(/\\/g,'');
+
+  // ── Suivi financier ─────────────────────────────────────────────────────
+  var totalCout=0,totalH=0,nbReal=0,hasCoutData=false;
+  missions.forEach(function(m){
+    if(m.statut==='realisee')nbReal++;
+    if(m.cout!=null){hasCoutData=true;totalCout+=parseFloat(m.cout)||0;}
+    if(m.duree_heures!=null)totalH+=parseFloat(m.duree_heures)||0;
+  });
+  var devise=(missions.find(function(m){return m.devise;})||{}).devise||'FCFA';
+  var fmtMnt=function(n){return n.toLocaleString('fr-FR')+(n%1!==0?'':'')+' '+devise;};
+
+  html+='<div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:12px;padding:14px 16px;margin-bottom:14px;color:white">';
+  html+='<div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">Suivi financier · '+(months>0?months+'m':'Tout')+'</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+
+  // Coût total
+  html+='<div style="background:rgba(255,255,255,.07);border-radius:8px;padding:9px 10px">';
+  html+='<div style="font-size:9px;color:#94a3b8;margin-bottom:3px">Coût total</div>';
+  if(hasCoutData){
+    html+='<div style="font-size:14px;font-weight:800;color:#fbbf24">'+fmtMnt(totalCout)+'</div>';
+  } else {
+    html+='<div style="font-size:11px;color:#64748b;font-style:italic">—</div>';
+    html+='<div style="font-size:9px;color:#475569;margin-top:2px">Saisir via mission</div>';
+  }
+  html+='</div>';
+
+  // Missions réalisées
+  html+='<div style="background:rgba(255,255,255,.07);border-radius:8px;padding:9px 10px">';
+  html+='<div style="font-size:9px;color:#94a3b8;margin-bottom:3px">Missions</div>';
+  html+='<div style="font-size:14px;font-weight:800;color:white">'+nbReal+' <span style="font-size:10px;font-weight:500;color:#94a3b8">réalisées</span></div>';
+  html+='</div>';
+
+  // Durée totale
+  html+='<div style="background:rgba(255,255,255,.07);border-radius:8px;padding:9px 10px">';
+  html+='<div style="font-size:9px;color:#94a3b8;margin-bottom:3px">Durée totale</div>';
+  if(totalH>0){
+    html+='<div style="font-size:14px;font-weight:800;color:white">'+totalH.toFixed(totalH%1===0?0:1)+' <span style="font-size:10px;font-weight:500;color:#94a3b8">h</span></div>';
+  } else {
+    html+='<div style="font-size:11px;color:#64748b;font-style:italic">—</div>';
+  }
+  html+='</div>';
+  html+='</div></div>';
+
+  // Missions
   html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
   html+='<div style="font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.6px">Missions passées</div>';
   html+='<div style="display:flex;gap:3px">';
@@ -5514,10 +5557,17 @@ async function _mntDossierPrestataire(prestId,prestNom,sid,months){
       var eqN=(m.equipements&&m.equipements.nom)||'—';
       var dateStr=m.completed_at?new Date(m.completed_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):
         new Date(m.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
+      var mCout=m.cout!=null?parseFloat(m.cout):null;
+      var mH=m.duree_heures!=null?parseFloat(m.duree_heures):null;
+      var mDev=m.devise||devise;
       html+='<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f1f5f9;">'+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-size:12px;font-weight:600;color:#1e293b">'+escape_html(eqN)+'</div>'+
-          '<div style="font-size:10px;color:#94a3b8">'+dateStr+'</div>'+
+          '<div style="font-size:10px;color:#94a3b8;display:flex;gap:8px;margin-top:1px">'+
+            '<span>'+dateStr+'</span>'+
+            (mH!=null?'<span>'+mH.toFixed(mH%1===0?0:1)+'h</span>':'')+
+            (mCout!=null?'<span style="color:#d97706;font-weight:600">'+mCout.toLocaleString('fr-FR')+' '+mDev+'</span>':'')+
+          '</div>'+
         '</div>'+
         '<span style="font-size:10px;font-weight:700;color:'+stCol+'">'+stLbl+'</span>'+
         (m.statut==='realisee'||m.statut==='echec'?'<a href="prestataire-mission.html?token='+m.token+'" target="_blank" style="font-size:10px;padding:3px 7px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:5px;color:#1e40af;text-decoration:none;font-weight:600">Voir</a>':'')+
