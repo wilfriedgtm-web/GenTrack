@@ -12110,8 +12110,9 @@ async function _dtMaintenances(sids){
   var baseSelect='id,groupe_id,type,titre,statut,date_intervention,cout,prestataire,quantite,unite,equipements(nom)';
   var qPast='groupe_id=in.('+sidStr+')&statut=neq.planifie&date_intervention=gte.'+cutoffStr+'&order=date_intervention.desc&limit=300&select='+baseSelect;
   var qUpcoming='groupe_id=in.('+sidStr+')&statut=eq.planifie&date_intervention=gte.'+todayStr+'&order=date_intervention.asc&limit=100&select='+baseSelect;
-  var results=await Promise.all([supaGet('maintenances',qPast),supaGet('maintenances',qUpcoming)]);
-  var rows=results[0];var upcoming=results[1];
+  var qPannes='groupe_id=in.('+sidStr+')&type=eq.panne&statut=not.in.(traite,resolu,annule)&select=id,groupe_id,equipement_id,description,created_at,ref_code,statut,equipements(nom)&order=created_at.asc&limit=20';
+  var results=await Promise.all([supaGet('maintenances',qPast),supaGet('maintenances',qUpcoming),supaGet('signalements',qPannes).catch(function(){return[];})]);
+  var rows=results[0];var upcoming=results[1];var pannesOuvertes=results[2]||[];
   /* filtered views */
   var displayRows=rows.filter(function(r){
     if(_dtMntFilter!=='tous'&&r.type!==_dtMntFilter)return false;
@@ -12124,20 +12125,27 @@ async function _dtMaintenances(sids){
   });
   /* KPIs */
   var nbRealises=rows.filter(function(r){return r.statut==='realise';}).length;
-  var totalCout=rows.filter(function(r){return r.statut==='realise'&&r.type!=='ravitaillement';}).reduce(function(s,r){return s+(Number(r.cout)||0);},0);
-  var sitesActifs=new Set(rows.map(function(r){return r.groupe_id;}));
+  var nbTotal=rows.length;
+  var tauxCloture=nbTotal>0?Math.round(nbRealises/nbTotal*100):null;
+  var tauxCol=tauxCloture===null?'var(--text3)':tauxCloture>=80?'var(--vert)':tauxCloture>=50?'var(--amber)':'var(--rouge)';
+  var nbPreventif=rows.filter(function(r){return r.type==='preventive';}).length;
+  var nbCorrectif=rows.filter(function(r){return r.type==='panne';}).length;
+  var ratioLabel=nbPreventif+' préventif / '+nbCorrectif+' correctif';
+  var nbPannesActives=pannesOuvertes.length;
+  var pannesCol=nbPannesActives===0?'var(--vert)':nbPannesActives<=3?'var(--amber)':'var(--rouge)';
   /* per-site stats */
   var siteStats={};
-  sites.forEach(function(s,i){siteStats[s.id]={nb:0,cout:0,planif:0,col:HCOLS[i%HCOLS.length],pale:HCOLS_PALE[i%HCOLS_PALE.length],nom:s.nom};});
-  rows.forEach(function(r){if(siteStats[r.groupe_id]){siteStats[r.groupe_id].nb++;if(r.statut==='realise'&&r.type!=='ravitaillement')siteStats[r.groupe_id].cout+=(Number(r.cout)||0);}});
+  sites.forEach(function(s,i){siteStats[s.id]={nb:0,realises:0,cout:0,planif:0,pannes:0,col:HCOLS[i%HCOLS.length],pale:HCOLS_PALE[i%HCOLS_PALE.length],nom:s.nom};});
+  rows.forEach(function(r){if(siteStats[r.groupe_id]){siteStats[r.groupe_id].nb++;if(r.statut==='realise'){siteStats[r.groupe_id].realises++;if(r.type!=='ravitaillement')siteStats[r.groupe_id].cout+=(Number(r.cout)||0);}}});
   upcoming.forEach(function(r){if(siteStats[r.groupe_id])siteStats[r.groupe_id].planif++;});
+  pannesOuvertes.forEach(function(p){if(siteStats[p.groupe_id])siteStats[p.groupe_id].pannes++;});
   var maxNb=1;Object.values(siteStats).forEach(function(s){if(s.nb>maxNb)maxNb=s.nb;});
   /* KPI bar */
   var kpiHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">'+
-    _mntKpi('Interventions réalisées',nbRealises,_dtMntPeriod+' derniers jours','')+
-    _mntKpi('Coût interventions',totalCout.toLocaleString('fr-FR')+' FCFA','hors ravitaillement carburant','')+
-    _mntKpi('Planifiées à venir',upcoming.length,'à partir d\'aujourd\'hui',upcoming.length>0?'var(--orange)':'')+
-    _mntKpi('Sites actifs',sitesActifs.size+' / '+sites.length,'avec activité sur la période','')+
+    _mntKpi('Interventions (période)',nbTotal,_dtMntPeriod+' derniers jours · '+nbRealises+' réalisées','')+
+    _mntKpi('Taux de clôture',tauxCloture!=null?tauxCloture+'%':'—',nbRealises+'/'+nbTotal+' interventions clôturées',tauxCol)+
+    _mntKpi('Prév. / Correctif',ratioLabel,'répartition sur la période',nbCorrectif>nbPreventif?'var(--rouge)':'')+
+    _mntKpi('Pannes actives',nbPannesActives,nbPannesActives===0?'Aucune panne ouverte':nbPannesActives+' en attente de traitement',pannesCol)+
   '</div>';
   /* period pills */
   var periodHtml=[7,30,90].map(function(d){
@@ -12164,9 +12172,14 @@ async function _dtMaintenances(sids){
   '</div>';
   /* recap table */
   var siteRows=sites.map(function(s){
-    var st=siteStats[s.id]||{nb:0,cout:0,planif:0,col:'#aaa'};
-    var pct=rows.length?Math.round(st.nb/rows.length*100):0;
+    var st=siteStats[s.id]||{nb:0,realises:0,cout:0,planif:0,pannes:0,col:'#aaa'};
     var barPct=Math.round(st.nb/maxNb*100);
+    var stTaux=st.nb>0?Math.round(st.realises/st.nb*100):null;
+    var tauxC=stTaux===null?'var(--text3)':stTaux>=80?'var(--vert)':stTaux>=50?'var(--amber)':'var(--rouge)';
+    var critique=st.pannes>=3;var warn=st.pannes>0&&st.pannes<3;
+    var criticiteHtml=critique?'<span style="background:#fef2f2;color:var(--rouge);font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px">🔴 '+st.pannes+' panne'+(st.pannes>1?'s':'')+'</span>':
+      warn?'<span style="background:var(--orange-pale);color:var(--orange);font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px">⚠ '+st.pannes+' panne</span>':
+      '<span style="font-size:11px;color:var(--vert)">✓ OK</span>';
     return '<tr>'+
       '<td style="padding:8px 10px;border-bottom:0.5px solid var(--border)">'+
         '<div style="display:flex;align-items:center;gap:7px">'+
@@ -12178,9 +12191,10 @@ async function _dtMaintenances(sids){
           '<div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;min-width:50px"><div style="height:100%;border-radius:3px;background:'+st.col+';width:'+barPct+'%"></div></div>'+
           '<span style="font-size:11px;font-weight:600;min-width:16px;color:var(--dark)">'+st.nb+'</span>'+
         '</div></td>'+
+      '<td style="padding:8px 10px;border-bottom:0.5px solid var(--border);font-size:12px;font-weight:700;color:'+tauxC+'">'+(stTaux!=null?stTaux+'%':'—')+'</td>'+
       '<td style="padding:8px 10px;border-bottom:0.5px solid var(--border);font-size:12px;font-weight:600;color:var(--dark)">'+(st.cout?st.cout.toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
-      '<td style="padding:8px 10px;border-bottom:0.5px solid var(--border);font-size:11px;color:var(--text3)">'+(pct?pct+'%':'—')+'</td>'+
       '<td style="padding:8px 10px;border-bottom:0.5px solid var(--border)">'+(st.planif>0?'<span style="background:var(--orange-pale);color:var(--orange);font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px">'+st.planif+' planifiée'+(st.planif>1?'s':'')+'</span>':'<span style="font-size:11px;color:var(--text3)">—</span>')+'</td>'+
+      '<td style="padding:8px 10px;border-bottom:0.5px solid var(--border)">'+criticiteHtml+'</td>'+
     '</tr>';
   }).join('');
   var recapHtml='<div style="margin-bottom:16px">'+
@@ -12190,9 +12204,10 @@ async function _dtMaintenances(sids){
         '<thead><tr>'+
           '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Hôtel</th>'+
           '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Interventions</th>'+
+          '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Taux clôture</th>'+
           '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Coût réalisé</th>'+
-          '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Part</th>'+
           '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Planifiées</th>'+
+          '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Criticité</th>'+
         '</tr></thead>'+
         '<tbody>'+siteRows+'</tbody>'+
       '</table>'+
@@ -12212,6 +12227,44 @@ async function _dtMaintenances(sids){
       '<div style="font-size:18px;flex-shrink:0;margin-top:1px">📅</div>'+
       '<div><div style="font-size:12px;font-weight:700;color:var(--orange-dark)">'+displayUpcoming.length+' intervention'+(displayUpcoming.length>1?'s':'')+' planifiée'+(displayUpcoming.length>1?'s':'')+' à venir</div>'+
         '<div style="font-size:11px;color:var(--orange-dark);margin-top:3px;line-height:1.6">'+snippet+extra+'</div>'+
+      '</div>'+
+    '</div>';
+  }
+  /* top pannes ouvertes */
+  var topPannesHtml='';
+  if(pannesOuvertes.length>0){
+    var now2=new Date();
+    topPannesHtml='<div style="margin-bottom:16px">'+
+      '<div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">Pannes ouvertes — toutes priorités</div>'+
+      '<div style="background:white;border:1.5px solid #fca5a5;border-radius:12px;overflow:hidden">'+
+        '<table style="width:100%;border-collapse:collapse">'+
+          '<thead><tr>'+
+            '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Hôtel</th>'+
+            '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Équipement</th>'+
+            '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Description</th>'+
+            '<th style="font-size:10px;font-weight:600;color:var(--text3);text-align:left;padding:7px 10px;border-bottom:1.5px solid var(--border)">Âge</th>'+
+          '</tr></thead>'+
+          '<tbody>'+
+          pannesOuvertes.slice(0,10).map(function(p,pi){
+            var sInfo=siteMap[p.groupe_id]||{nom:'—',col:'#aaa'};
+            var eqNom=p.equipements&&p.equipements.nom?p.equipements.nom:'—';
+            var jours=Math.floor((now2-new Date(p.created_at))/86400000);
+            var ageCol=jours>=7?'var(--rouge)':jours>=3?'var(--amber)':'var(--text2)';
+            var ageStr=jours===0?'Aujourd\'hui':jours+'j';
+            return '<tr style="background:'+(pi%2?'#fafafa':'white')+';border-bottom:0.5px solid var(--border)">'+
+              '<td style="padding:8px 10px">'+
+                '<div style="display:flex;align-items:center;gap:6px">'+
+                  '<span style="width:8px;height:8px;border-radius:50%;background:'+sInfo.col+';flex-shrink:0;display:inline-block"></span>'+
+                  '<span style="font-weight:700;font-size:12px;color:var(--dark)">'+escape_html(sInfo.nom)+'</span>'+
+                '</div>'+
+              '</td>'+
+              '<td style="padding:8px 10px;font-size:12px;font-weight:500;color:var(--dark)">'+escape_html(eqNom)+'</td>'+
+              '<td style="padding:8px 10px;font-size:11px;color:var(--text2);max-width:260px">'+escape_html((p.description||'—').substring(0,80))+'</td>'+
+              '<td style="padding:8px 10px;font-size:12px;font-weight:700;color:'+ageCol+'">'+ageStr+'</td>'+
+            '</tr>';
+          }).join('')+
+          '</tbody>'+
+        '</table>'+
       '</div>'+
     '</div>';
   }
@@ -12255,7 +12308,7 @@ async function _dtMaintenances(sids){
       '</div>';
     }).join('');
   }
-  return kpiHtml+filtersHtml+recapHtml+bannerHtml+listTitle+cards;
+  return kpiHtml+filtersHtml+recapHtml+topPannesHtml+bannerHtml+listTitle+cards;
 }
 function _dtSetMntFilter(f){_dtMntFilter=f;if(_session)renderDirTech(_session,'maintenances');}
 
