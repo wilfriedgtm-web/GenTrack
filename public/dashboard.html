@@ -5052,6 +5052,18 @@ async function _mntSelectEq(eqId,eqNom,sid){
       '</button>'+
       '<div id="mnt-mission-status" style="display:none;text-align:center;font-size:11px;color:#16a34a;font-weight:600;margin-top:6px"></div>'+
     '</div>'+
+    '<div style="border-top:1px solid #e2e8f0;padding:11px 14px;background:#eff6ff">'+
+      '<div style="font-size:10px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px"><i class="ti ti-building" style="font-size:11px;vertical-align:-1px;margin-right:4px"></i>Envoyer au prestataire</div>'+
+      '<select id="mnt-prest-contact" style="width:100%;border:1px solid #bfdbfe;border-radius:7px;padding:8px 10px;font-size:12px;background:white;margin-bottom:8px;box-sizing:border-box">'+
+        '<option value="">— Sélectionner un prestataire —</option>'+
+        prests.map(function(p){return'<option value="'+p.id+'" data-nom="'+escape_html(p.nom||'')+'" data-tel="'+escape_html(p.telephone||'')+'" data-email="'+escape_html(p.email||'')+'">'+escape_html(p.nom)+(p.specialite?' ('+p.specialite+')':'')+'</option>';}).join('')+
+      '</select>'+
+      '<button onclick="_mntCreerMissionPrest(\''+eqId+'\',\''+sid+'\')" '+
+        'style="width:100%;background:#1e40af;color:white;border:none;border-radius:8px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px">'+
+        '<i class="ti ti-building" style="font-size:14px"></i> Créer mission prestataire'+
+      '</button>'+
+      '<div id="mnt-prest-status" style="display:none;text-align:center;font-size:11px;color:#1e40af;font-weight:600;margin-top:6px"></div>'+
+    '</div>'+
     secHead('Charge — 6 mois à venir')+
     '<div style="padding:10px 14px 12px">'+vizHtml+'</div>';
 
@@ -5073,6 +5085,8 @@ async function _mntSelectEq(eqId,eqNom,sid){
           (p.telephone?'<div style="font-size:10px;color:#64748b">'+escape_html(p.telephone)+'</div>':'')+
         '</div>'+
         '<div style="display:flex;gap:5px;flex-shrink:0">'+
+          '<button onclick="_mntDossierPrestataire(\''+p.id+'\',\''+escape_html(p.nom)+'\',\''+sid+'\')" '+
+            'style="padding:5px 8px;border:1px solid #bfdbfe;border-radius:7px;font-size:11px;background:#eff6ff;cursor:pointer;color:#1e40af;font-weight:600" title="Dossier">📂 Dossier</button>'+
           '<button onclick="_mntEditPrestataire(\''+p.id+'\',\''+sid+'\',\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\')" '+
             'style="padding:5px 8px;border:1px solid #e2e8f0;border-radius:7px;font-size:11px;background:white;cursor:pointer;color:#64748b" title="Modifier">✏️</button>'+
           '<button onclick="_mntDesactiverPrestataire(\''+p.id+'\',\''+sid+'\',\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\')" '+
@@ -5162,6 +5176,157 @@ async function _mntCreerMission(eqId,sid){
   var waUrl='https://wa.me/'+(telClean?telClean.replace(/^\+/,''):'')+'?text='+encodeURIComponent(msg);
   window.open(waUrl,'_blank');
   if(statusEl){statusEl.style.color='#16a34a';statusEl.textContent='✅ Mission créée ! Lien WhatsApp ouvert.';}
+}
+
+// ── Créer mission prestataire ─────────────────────────────────────────────
+async function _mntCreerMissionPrest(eqId,sid){
+  var sel=document.getElementById('mnt-prest-contact');
+  if(!sel||!sel.value){alert('Sélectionnez un prestataire.');return;}
+  var selOpt=sel.options[sel.selectedIndex];
+  var prestId=sel.value;
+  var prestNom=selOpt.getAttribute('data-nom')||'';
+  var prestTel=selOpt.getAttribute('data-tel')||'';
+  var prestEmail=selOpt.getAttribute('data-email')||'';
+  var checks=document.querySelectorAll('.mnt-mission-plan:checked');
+  if(!checks.length){alert('Sélectionnez au moins une tâche.');return;}
+  var planIds=Array.prototype.map.call(checks,function(c){return c.value;});
+  var statusEl=document.getElementById('mnt-prest-status');
+  if(statusEl){statusEl.style.display='';statusEl.textContent='Création de la mission...';}
+  var missionPayload={
+    site_id:sid,equipement_id:eqId,
+    type:'prestataire',
+    prestataire_id:prestId||null,
+    nom_prestataire:prestNom||null,
+    contact_prest_tel:prestTel||null,
+    contact_prest_email:prestEmail||null,
+    statut:'envoyee'
+  };
+  var mission=await supaPost('missions',missionPayload).catch(function(){return null;});
+  if(!mission||!mission.token){
+    if(statusEl){statusEl.style.color='#ef4444';statusEl.textContent='Erreur création mission.';}
+    return;
+  }
+  var bulk=planIds.map(function(pid){return{mission_id:mission.id,plan_maintenance_id:pid,statut:'a_faire'};});
+  await supaPostBulk('mission_plans',bulk).catch(function(){});
+  var baseUrl=window.location.origin+'/prestataire-mission.html';
+  var missionUrl=baseUrl+'?token='+mission.token;
+  var nbTaches=planIds.length;
+  var eqEl=document.querySelector('#mnt-detail-panel [style*="font-size:15px"]');
+  var eqNomTxt=eqEl?eqEl.textContent:'Équipement';
+  var msg='🏢 Mission de maintenance — Prestataire\n'+( prestNom?'Société : '+prestNom+'\n':'')+eqNomTxt+' · '+nbTaches+' tâche'+(nbTaches>1?'s':'')+'\n\nAccédez à votre mission :\n'+missionUrl;
+  // WhatsApp
+  if(prestTel){
+    var telClean=prestTel.replace(/\s+/g,'');
+    var waUrl='https://wa.me/'+telClean.replace(/^\+/,'')+'?text='+encodeURIComponent(msg);
+    window.open(waUrl,'_blank');
+  }
+  // Email
+  if(prestEmail){
+    var mailSub=encodeURIComponent('Mission maintenance — '+eqNomTxt);
+    var mailBody=encodeURIComponent(msg);
+    window.open('mailto:'+prestEmail+'?subject='+mailSub+'&body='+mailBody,'_blank');
+  }
+  if(!prestTel&&!prestEmail){
+    prompt('Copiez ce lien à envoyer au prestataire :',missionUrl);
+  }
+  if(statusEl){statusEl.style.color='#1e40af';statusEl.textContent='✅ Mission créée ! '+(prestTel?'WhatsApp ':'')+(prestEmail?'Email ':'')+' ouvert'+(prestTel||prestEmail?'s.':'');}
+}
+
+// ── Dossier prestataire ───────────────────────────────────────────────────
+async function _mntDossierPrestataire(prestId,prestNom,sid){
+  var modal=document.getElementById('generic-modal');
+  if(!modal)return;
+  document.getElementById('generic-modal-title').textContent='📂 Dossier — '+prestNom;
+  document.getElementById('generic-modal-body').innerHTML='<div style="text-align:center;padding:20px;color:#94a3b8">Chargement...</div>';
+  modal.style.display='flex';
+
+  var missions=await supaGet('missions','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+'&order=created_at.desc&limit=20&select=id,token,statut,created_at,completed_at,equipements(nom)').catch(function(){return[];});
+  var docs=await supaGet('documents_prestataire','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+'&order=created_at.desc&select=*').catch(function(){return[];});
+
+  var html='';
+  // Missions
+  html+='<div style="font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Missions passées</div>';
+  if(missions.length){
+    missions.forEach(function(m){
+      var stCol=m.statut==='realisee'?'#16a34a':m.statut==='echec'?'#ef4444':m.statut==='envoyee'?'#d97706':'#64748b';
+      var stLbl=m.statut==='realisee'?'✅ Réalisé':m.statut==='echec'?'🔒 Bloqué':m.statut==='envoyee'?'⏳ Envoyée':'En cours';
+      var eqN=(m.equipements&&m.equipements.nom)||'—';
+      var dateStr=m.completed_at?new Date(m.completed_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):
+        new Date(m.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f1f5f9;">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:12px;font-weight:600;color:#1e293b">'+escape_html(eqN)+'</div>'+
+          '<div style="font-size:10px;color:#94a3b8">'+dateStr+'</div>'+
+        '</div>'+
+        '<span style="font-size:10px;font-weight:700;color:'+stCol+'">'+stLbl+'</span>'+
+        (m.statut==='realisee'||m.statut==='echec'?'<a href="prestataire-mission.html?token='+m.token+'" target="_blank" style="font-size:10px;padding:3px 7px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:5px;color:#1e40af;text-decoration:none;font-weight:600">Voir</a>':'')+
+      '</div>';
+    });
+  } else {
+    html+='<div style="font-size:12px;color:#94a3b8;padding:8px 0">Aucune mission pour ce prestataire.</div>';
+  }
+
+  // Documents
+  html+='<div style="font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.6px;margin:14px 0 8px">Documents</div>';
+  if(docs.length){
+    docs.forEach(function(d){
+      var ico={'facture':'📄','contrat':'📋','rapport':'📊','garantie':'🔒','autre':'📎'}[d.type_doc]||'📎';
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f1f5f9;">'+
+        '<span style="font-size:16px">'+ico+'</span>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:12px;font-weight:500;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escape_html(d.nom)+'</div>'+
+          '<div style="font-size:10px;color:#94a3b8">'+escape_html(d.type_doc)+' · '+new Date(d.created_at).toLocaleDateString('fr-FR')+'</div>'+
+        '</div>'+
+        (d.url?'<a href="'+d.url+'" target="_blank" style="font-size:10px;padding:3px 7px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;color:#64748b;text-decoration:none">↗ Ouvrir</a>':'')+
+      '</div>';
+    });
+  } else {
+    html+='<div style="font-size:12px;color:#94a3b8;padding:4px 0">Aucun document importé.</div>';
+  }
+
+  // Import document
+  html+='<div style="margin-top:12px;padding-top:12px;border-top:1px solid #e2e8f0">'+
+    '<div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:6px">Importer un document</div>'+
+    '<div style="display:flex;gap:6px;margin-bottom:7px">'+
+      '<select id="doc-type-sel" style="flex:1;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px;background:white">'+
+        '<option value="facture">Facture</option>'+
+        '<option value="contrat">Contrat</option>'+
+        '<option value="rapport">Rapport</option>'+
+        '<option value="garantie">Garantie</option>'+
+        '<option value="autre">Autre</option>'+
+      '</select>'+
+    '</div>'+
+    '<label style="display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:8px;font-size:11px;font-weight:600;color:#64748b;cursor:pointer">'+
+      '<input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display:none" onchange="_mntUploadDocPrest(this,\''+prestId+'\',\''+sid+'\')">'+
+      '📎 Sélectionner un fichier'+
+    '</label>'+
+    '<div id="doc-upload-status" style="display:none;font-size:11px;color:#16a34a;font-weight:600;margin-top:5px;text-align:center"></div>'+
+  '</div>';
+
+  document.getElementById('generic-modal-body').innerHTML=html;
+}
+
+async function _mntUploadDocPrest(input,prestId,sid){
+  var file=input.files&&input.files[0];
+  if(!file)return;
+  var status=document.getElementById('doc-upload-status');
+  if(status){status.style.display='';status.textContent='⏳ Envoi en cours...';}
+  var ext=file.name.split('.').pop();
+  var path='documents/prestataire/'+prestId+'/'+Date.now()+'.'+ext;
+  var r=await fetch('https://zbpoxjlkqxnqjzxohasq.supabase.co/storage/v1/object/maintenance-photos/'+path,{
+    method:'POST',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':file.type},
+    body:file
+  });
+  var url=r.ok?'https://zbpoxjlkqxnqjzxohasq.supabase.co/storage/v1/object/public/maintenance-photos/'+path:null;
+  var typeSel=document.getElementById('doc-type-sel');
+  var typeDoc=typeSel?typeSel.value:'autre';
+  await supaPost('documents_prestataire',{
+    prestataire_id:prestId,site_id:sid,
+    nom:file.name,type_doc:typeDoc,
+    storage_path:path,url:url
+  }).catch(function(){});
+  if(status){status.style.color='#16a34a';status.textContent='✅ Document importé !';}
 }
 
 async function _mntDispatchSig(sigId,sid,mode,prestId,prestNom,prestEmail,prestTel){

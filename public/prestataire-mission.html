@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Intervention prestataire · GenTrack</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f9ff;min-height:100vh;}
+    .header{background:#1e40af;color:white;padding:16px 18px;position:sticky;top:0;z-index:10;}
+    .header-brand{font-size:11px;color:#93c5fd;text-transform:uppercase;letter-spacing:1px;margin-bottom:2px;}
+    .header-title{font-size:17px;font-weight:700;}
+    .header-sub{font-size:11px;color:#93c5fd;margin-top:2px;}
+    .content{padding:16px;max-width:600px;margin:0 auto;}
+    .card{background:white;border-radius:14px;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.07);}
+    .card-head{padding:12px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:8px;}
+    .card-head-label{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.7px;flex:1;}
+    .task-row{padding:14px;border-bottom:1px solid #f1f5f9;}
+    .task-row:last-child{border-bottom:none;}
+    .task-name{font-size:14px;font-weight:700;color:#1e293b;margin-bottom:3px;}
+    .task-freq{font-size:11px;color:#64748b;margin-bottom:12px;}
+    .btn-group{display:flex;gap:8px;margin-bottom:10px;}
+    .btn-status{flex:1;padding:9px;border-radius:9px;border:2px solid #e2e8f0;background:white;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+    .btn-status.ok{border-color:#22c55e;background:#f0fdf4;color:#16a34a;}
+    .btn-status.ko{border-color:#ef4444;background:#fef2f2;color:#ef4444;}
+    .field-label{font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+    .field-input{width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:9px 11px;font-size:12px;outline:none;font-family:inherit;resize:vertical;}
+    .field-input:focus{border-color:#3b82f6;}
+    .photo-label{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:8px;font-size:11px;font-weight:600;color:#64748b;cursor:pointer;transition:all .15s;width:100%;justify-content:center;}
+    .photo-label:hover{border-color:#3b82f6;color:#3b82f6;background:#eff6ff;}
+    .photo-preview{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+    .photo-preview img{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #e2e8f0;}
+    .submit-btn{width:100%;padding:16px;background:#1e40af;color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
+    .submit-btn:disabled{opacity:.5;cursor:not-allowed;}
+    .pdf-btn{width:100%;padding:14px;background:white;color:#1e40af;border:2px solid #1e40af;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;}
+    .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;}
+    .badge-ok{background:#f0fdf4;color:#16a34a;}
+    .badge-ko{background:#fef2f2;color:#ef4444;}
+    .badge-todo{background:#fffbeb;color:#d97706;}
+    .loading{text-align:center;padding:60px 20px;color:#94a3b8;}
+    .loading-spinner{font-size:32px;margin-bottom:12px;animation:spin 1s linear infinite;display:block;}
+    @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    .error-box{background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:20px;text-align:center;color:#ef4444;font-weight:600;}
+    .success-screen{text-align:center;padding:40px 20px;}
+    .success-icon{font-size:56px;margin-bottom:16px;}
+    .success-title{font-size:20px;font-weight:800;color:#1e293b;margin-bottom:8px;}
+    .success-sub{font-size:13px;color:#64748b;margin-bottom:6px;}
+    .recap-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:14px 16px;margin:16px 0;text-align:left;}
+    .recap-row{display:flex;align-items:center;gap:8px;font-size:12px;color:#166534;margin-bottom:4px;}
+    .recap-row:last-child{margin-bottom:0;}
+    .checklist-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;}
+    .checklist-item:last-child{border-bottom:none;}
+    .check-box{width:20px;height:20px;border-radius:5px;border:2px solid #cbd5e1;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;}
+    .check-box.checked{background:#22c55e;border-color:#22c55e;color:white;}
+    .check-text{font-size:12px;color:#374151;flex:1;}
+    .check-text.checked{color:#94a3b8;text-decoration:line-through;}
+    .progress-bar{height:4px;background:#e2e8f0;border-radius:2px;margin:8px 0;}
+    .progress-fill{height:4px;background:#22c55e;border-radius:2px;transition:width .3s;}
+    .rapport-section{background:#f8fafc;border-radius:10px;padding:12px 14px;margin-bottom:12px;}
+    .rapport-section-title{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;}
+    .rapport-row{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid #f1f5f9;}
+    .rapport-row:last-child{border-bottom:none;}
+    .rapport-row-label{color:#64748b;}
+    .rapport-row-val{color:#1e293b;font-weight:500;}
+    .motif-box{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;margin-top:8px;}
+  </style>
+</head>
+<body>
+<div class="header">
+  <div class="header-brand">GenTrack · Intervention prestataire</div>
+  <div class="header-title" id="hdr-title">Chargement...</div>
+  <div class="header-sub" id="hdr-sub"></div>
+</div>
+<div class="content" id="app">
+  <div class="loading"><span class="loading-spinner">⟳</span>Chargement de la mission...</div>
+</div>
+
+<script>
+var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+
+var _mission=null;
+var _missionPlans=[];
+var _taskStates={};
+
+async function sbGet(table,qs){
+  var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?'+qs,{
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Accept':'application/json'}
+  });
+  if(!r.ok)return[];
+  return await r.json();
+}
+async function sbPost(table,data){
+  var r=await fetch(SUPA_URL+'/rest/v1/'+table,{
+    method:'POST',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+    body:JSON.stringify(data)
+  });
+  if(!r.ok){var e=await r.text();console.error('POST error',e);}
+  return r.ok;
+}
+async function sbPatch(table,id,data){
+  var r=await fetch(SUPA_URL+'/rest/v1/'+table+'?id=eq.'+id,{
+    method:'PATCH',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify(data)
+  });
+  return r.ok;
+}
+async function sbUploadPhoto(missionId,file){
+  var ext=file.name.split('.').pop();
+  var path='prestataire/'+missionId+'/'+Date.now()+'.'+ext;
+  var r=await fetch(SUPA_URL+'/storage/v1/object/maintenance-photos/'+path,{
+    method:'POST',
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':file.type},
+    body:file
+  });
+  if(!r.ok)return null;
+  return SUPA_URL+'/storage/v1/object/public/maintenance-photos/'+path;
+}
+
+function freqLabel(freq){
+  if(!freq)return '';
+  var m=freq.match(/^(\d+(?:\.\d+)?)\s*(\w+)/);
+  if(!m)return freq;
+  var n=m[1],u=m[2].toLowerCase();
+  if(u.startsWith('sem'))return 'Toutes les '+n+' semaine'+(n>1?'s':'');
+  if(u.startsWith('mois'))return 'Tous les '+n+' mois';
+  if(u.startsWith('jour'))return 'Tous les '+n+' jour'+(n>1?'s':'');
+  if(u.startsWith('an'))return 'Tous les '+n+' an'+(n>1?'s':'');
+  if(u.startsWith('heure'))return 'Tous les '+n+'h compteur';
+  return freq;
+}
+function nextDateFromFreq(freq){
+  if(!freq)return null;
+  var today=new Date();today.setHours(0,0,0,0);
+  var m=freq.match(/^(\d+(?:\.\d+)?)\s*(\w+)/);
+  if(!m)return null;
+  var n=parseFloat(m[1]),u=m[2].toLowerCase();
+  var d=new Date(today);
+  if(u.startsWith('heure'))return null;
+  if(u.startsWith('jour'))d.setDate(d.getDate()+n);
+  else if(u.startsWith('sem'))d.setDate(d.getDate()+n*7);
+  else if(u.startsWith('mois'))d.setMonth(d.getMonth()+n);
+  else if(u.startsWith('an'))d.setFullYear(d.getFullYear()+n);
+  else return null;
+  return d.toISOString().slice(0,10);
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtDate(d){if(!d)return'—';return new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});}
+
+async function init(){
+  var params=new URLSearchParams(window.location.search);
+  var token=params.get('token');
+  if(!token){renderError('Lien invalide — token manquant.');return;}
+
+  var missions=await sbGet('missions','token=eq.'+token+'&select=*,equipements(nom,marque,modele,types_equipements(nom)),sites(nom)');
+  if(!missions||!missions.length){renderError('Mission introuvable ou expirée.');return;}
+  _mission=missions[0];
+
+  var mps=await sbGet('mission_plans','mission_id=eq.'+_mission.id+'&select=*,plans_maintenance(id,titre,frequence,checklist)');
+  _missionPlans=mps||[];
+
+  _missionPlans.forEach(function(mp){
+    var checklist=Array.isArray((mp.plans_maintenance||{}).checklist)?(mp.plans_maintenance.checklist):[];
+    _taskStates[mp.id]={
+      statut:'a_faire',commentaire:'',recommandation:'',
+      photoFiles:[],photoUrls:[],
+      motifBlocage:'',
+      checklistCompletee:checklist.map(function(){return false;})
+    };
+  });
+
+  var eqNom=(_mission.equipements&&_mission.equipements.nom)||'Équipement';
+  var siteNom=(_mission.sites&&_mission.sites.nom)||'';
+  var typeNom=(_mission.equipements&&_mission.equipements.types_equipements&&_mission.equipements.types_equipements.nom)||'';
+  document.getElementById('hdr-title').textContent=eqNom+(typeNom?' — '+typeNom:'');
+  document.getElementById('hdr-sub').textContent=(siteNom?siteNom+' · ':'')+_missionPlans.length+' tâche'+(_missionPlans.length>1?'s':'');
+
+  if(_mission.statut==='realisee'||_mission.statut==='echec'){renderRapport();return;}
+  renderApp();
+}
+
+function renderApp(){
+  var app=document.getElementById('app');
+  if(!_missionPlans.length){
+    app.innerHTML='<div class="card"><div style="padding:24px;text-align:center;color:#94a3b8">Aucune tâche dans cette mission.</div></div>';
+    return;
+  }
+  var html='';
+  _missionPlans.forEach(function(mp,i){
+    var plan=mp.plans_maintenance||{};
+    var st=_taskStates[mp.id];
+    var isOk=st.statut==='realise',isKo=st.statut==='bloque';
+    var checklist=Array.isArray(plan.checklist)?plan.checklist:[];
+    var doneCount=st.checklistCompletee.filter(Boolean).length;
+    html+='<div class="card" id="task-card-'+mp.id+'">';
+    html+='<div class="card-head">';
+    html+='<div class="card-head-label">Tâche '+(i+1)+' / '+_missionPlans.length+'</div>';
+    if(isOk)html+='<span class="badge badge-ok">✅ Réalisé</span>';
+    else if(isKo)html+='<span class="badge badge-ko">🔴 Bloqué</span>';
+    else html+='<span class="badge badge-todo">À faire</span>';
+    html+='</div>';
+    html+='<div class="task-row">';
+    html+='<div class="task-name">'+esc(plan.titre||'Tâche')+'</div>';
+    if(plan.frequence)html+='<div class="task-freq">'+esc(freqLabel(plan.frequence))+'</div>';
+
+    // Checklist
+    if(checklist.length){
+      html+='<div class="progress-bar"><div class="progress-fill" id="prog-'+mp.id+'" style="width:'+(checklist.length?Math.round(doneCount/checklist.length*100):0)+'%"></div></div>';
+      html+='<div style="margin-bottom:10px">';
+      checklist.forEach(function(item,ci){
+        var checked=st.checklistCompletee[ci];
+        html+='<div class="checklist-item" onclick="_toggleCheck(\''+mp.id+'\','+ci+')">';
+        html+='<div class="check-box'+(checked?' checked':'')+'">'+( checked?'✓':'')+'</div>';
+        html+='<span class="check-text'+(checked?' checked':'')+'">'+esc(item.label||item)+'</span>';
+        html+='</div>';
+      });
+      html+='</div>';
+    }
+
+    // Statut
+    html+='<div class="btn-group">';
+    html+='<button class="btn-status'+(isOk?' ok':'')+'" onclick="_setStatut(\''+mp.id+'\',\'realise\')">✅ Réalisé</button>';
+    html+='<button class="btn-status'+(isKo?' ko':'')+'" onclick="_setStatut(\''+mp.id+'\',\'bloque\')">🔒 Bloqué</button>';
+    html+='</div>';
+
+    // Motif blocage
+    if(isKo){
+      html+='<div class="motif-box">';
+      html+='<div class="field-label">Motif du blocage *</div>';
+      html+='<textarea class="field-input" rows="2" placeholder="Décrivez pourquoi l\'intervention est bloquée..." oninput="_setState(\''+mp.id+'\',\'motifBlocage\',this.value)">'+esc(st.motifBlocage)+'</textarea>';
+      html+='</div>';
+    }
+
+    // Commentaire
+    html+='<div style="margin-top:8px">';
+    html+='<div class="field-label">Commentaire</div>';
+    html+='<textarea class="field-input" rows="2" placeholder="Observations, constats..." oninput="_setState(\''+mp.id+'\',\'commentaire\',this.value)">'+esc(st.commentaire)+'</textarea>';
+    html+='</div>';
+
+    // Recommandation
+    html+='<div style="margin-top:8px">';
+    html+='<div class="field-label">Recommandations</div>';
+    html+='<textarea class="field-input" rows="2" placeholder="Actions à prévoir, pièces à commander..." oninput="_setState(\''+mp.id+'\',\'recommandation\',this.value)">'+esc(st.recommandation)+'</textarea>';
+    html+='</div>';
+
+    // Photo
+    html+='<div style="margin-top:10px">';
+    html+='<div class="field-label">Photos (optionnel)</div>';
+    html+='<label class="photo-label"><input type="file" accept="image/*" multiple style="display:none" onchange="_addPhotos(\''+mp.id+'\',this)">📷 Ajouter des photos</label>';
+    html+='<div class="photo-preview" id="photos-'+mp.id+'"></div>';
+    html+='</div>';
+
+    html+='</div></div>';
+  });
+
+  // Bouton clôture
+  html+='<div style="padding:4px 0 24px">';
+  html+='<button class="submit-btn" id="submit-btn" onclick="_submit()">🏁 Clôturer mon passage</button>';
+  html+='</div>';
+  app.innerHTML=html;
+}
+
+function _toggleCheck(mpId,idx){
+  var st=_taskStates[mpId];
+  if(!st)return;
+  st.checklistCompletee[idx]=!st.checklistCompletee[idx];
+  var plan=(_missionPlans.find(function(m){return m.id===mpId;})||{}).plans_maintenance||{};
+  var checklist=Array.isArray(plan.checklist)?plan.checklist:[];
+  var doneCount=st.checklistCompletee.filter(Boolean).length;
+  var prog=document.getElementById('prog-'+mpId);
+  if(prog)prog.style.width=(checklist.length?Math.round(doneCount/checklist.length*100):0)+'%';
+  var box=document.querySelectorAll('#task-card-'+mpId+' .checklist-item')[idx];
+  if(box){
+    var cb=box.querySelector('.check-box');
+    var ct=box.querySelector('.check-text');
+    if(st.checklistCompletee[idx]){cb.classList.add('checked');cb.textContent='✓';if(ct)ct.classList.add('checked');}
+    else{cb.classList.remove('checked');cb.textContent='';if(ct)ct.classList.remove('checked');}
+  }
+}
+function _setStatut(mpId,newStatut){
+  var st=_taskStates[mpId];
+  if(!st)return;
+  st.statut=newStatut;
+  renderApp();
+}
+function _setState(mpId,key,val){
+  if(_taskStates[mpId])_taskStates[mpId][key]=val;
+}
+function _addPhotos(mpId,input){
+  var st=_taskStates[mpId];
+  if(!st||!input.files)return;
+  Array.from(input.files).forEach(function(f){
+    st.photoFiles.push(f);
+    var url=URL.createObjectURL(f);
+    var prev=document.getElementById('photos-'+mpId);
+    if(prev){var img=document.createElement('img');img.src=url;prev.appendChild(img);}
+  });
+}
+
+async function _submit(){
+  var btn=document.getElementById('submit-btn');
+  if(btn)btn.disabled=true;
+
+  // Validation
+  var allDone=true;
+  for(var i=0;i<_missionPlans.length;i++){
+    var mp=_missionPlans[i];
+    var st=_taskStates[mp.id];
+    if(st.statut==='a_faire'){allDone=false;break;}
+    if(st.statut==='bloque'&&!st.motifBlocage.trim()){
+      alert('Veuillez indiquer le motif de blocage pour toutes les tâches bloquées.');
+      if(btn)btn.disabled=false;return;
+    }
+  }
+  if(!allDone){
+    alert('Veuillez indiquer le statut de chaque tâche avant de clôturer.');
+    if(btn)btn.disabled=false;return;
+  }
+
+  if(btn)btn.textContent='⏳ Enregistrement...';
+
+  var allBloque=_missionPlans.every(function(mp){return _taskStates[mp.id].statut==='bloque';});
+  var missionStatut=allBloque?'echec':'realisee';
+  var today=new Date().toISOString().split('T')[0];
+
+  // 1. Mettre à jour chaque mission_plan + créer maintenances
+  for(var j=0;j<_missionPlans.length;j++){
+    var mp=_missionPlans[j];
+    var st=_taskStates[mp.id];
+    var plan=mp.plans_maintenance||{};
+
+    // Upload photo
+    var photoUrl=null;
+    if(st.photoFiles&&st.photoFiles.length){
+      photoUrl=await sbUploadPhoto(_mission.id+'/plan_'+j,st.photoFiles[0]);
+    }
+
+    // Patch mission_plan
+    var mpPatch={
+      statut:st.statut,
+      commentaire:st.commentaire||null,
+      checklist_completee:JSON.stringify(st.checklistCompletee),
+      motif_blocage:(st.statut==='bloque'&&st.motifBlocage)||null,
+      mission_id:_mission.id
+    };
+    await sbPatch('mission_plans',mp.id,mpPatch);
+
+    // Créer maintenances
+    var rapportTexte='';
+    if(st.statut==='bloque')rapportTexte='🔒 Bloqué — '+(st.motifBlocage||'');
+    else if(st.recommandation)rapportTexte=st.commentaire+(st.commentaire&&st.recommandation?' | ':'')+'💡 '+st.recommandation;
+    else rapportTexte=st.commentaire||'';
+
+    var mntRecord={
+      groupe_id:_mission.site_id||null,
+      equipement_id:_mission.equipement_id||null,
+      plan_maintenance_id:plan.id||null,
+      type:'preventif',
+      titre:plan.titre||('Maintenance '+(plan.frequence||'')),
+      date_realisee:today,
+      statut:st.statut==='realise'?'realise':'bloque',
+      technicien:_mission.nom_prestataire||null,
+      prestataire:_mission.nom_prestataire||null,
+      prestataire_id:_mission.prestataire_id||null,
+      rapport_texte:rapportTexte||null,
+      photo_url:photoUrl||null
+    };
+    await sbPost('maintenances',mntRecord);
+
+    // Mettre à jour prochaine_date sur le plan
+    if(st.statut==='realise'&&plan.frequence&&plan.id){
+      var nextDate=nextDateFromFreq(plan.frequence);
+      if(nextDate)await sbPatch('plans_maintenance',plan.id,{prochaine_date:nextDate});
+    }
+  }
+
+  // 2. Mettre à jour mission
+  await sbPatch('missions',_mission.id,{statut:missionStatut,completed_at:new Date().toISOString()});
+  _mission.statut=missionStatut;
+
+  // 3. Recharger mission_plans mis à jour
+  var mps=await sbGet('mission_plans','mission_id=eq.'+_mission.id+'&select=*,plans_maintenance(id,titre,frequence,checklist)');
+  _missionPlans=mps||[];
+
+  renderSuccess();
+}
+
+function renderSuccess(){
+  var allBloque=_missionPlans.every(function(mp){return _taskStates[mp.id]&&_taskStates[mp.id].statut==='bloque';});
+  var realiseCount=_missionPlans.filter(function(mp){return _taskStates[mp.id]&&_taskStates[mp.id].statut==='realise';}).length;
+  var bloqueCount=_missionPlans.length-realiseCount;
+
+  var html='<div class="success-screen">';
+  html+='<div class="success-icon">'+(allBloque?'🔒':'✅')+'</div>';
+  html+='<div class="success-title">'+(allBloque?'Intervention bloquée':'Passage clôturé')+'</div>';
+  html+='<div class="success-sub">Votre rapport a été enregistré.</div>';
+  html+='</div>';
+
+  html+='<div class="recap-box">';
+  html+='<div class="recap-row">✅ '+realiseCount+' tâche'+(realiseCount>1?'s':'')+' réalisée'+(realiseCount>1?'s':'')+'</div>';
+  if(bloqueCount)html+='<div class="recap-row" style="color:#ef4444">🔒 '+bloqueCount+' tâche'+(bloqueCount>1?'s':'')+' bloquée'+(bloqueCount>1?'s':'')+'</div>';
+  html+='<div class="recap-row">📅 Prochaines dates calculées automatiquement</div>';
+  html+='</div>';
+
+  html+='<button class="pdf-btn" onclick="_downloadPDF()">📄 Télécharger mon rapport PDF</button>';
+
+  document.getElementById('app').innerHTML=html;
+}
+
+function renderRapport(){
+  var eqNom=(_mission.equipements&&_mission.equipements.nom)||'Équipement';
+  var siteNom=(_mission.sites&&_mission.sites.nom)||'';
+  var dateComp=_mission.completed_at?new Date(_mission.completed_at).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}):'';
+  var allBloque=_missionPlans.every(function(mp){return mp.statut==='bloque';});
+
+  var html='<div class="card">';
+  html+='<div class="card-head"><div class="card-head-label">Rapport d\'intervention</div>';
+  html+='<span class="badge '+(allBloque?'badge-ko':'badge-ok')+'">'+(allBloque?'🔒 Bloqué':'✅ Réalisé')+'</span></div>';
+  html+='<div style="padding:14px">';
+  html+='<div class="rapport-section">';
+  html+='<div class="rapport-section-title">Équipement</div>';
+  html+='<div class="rapport-row"><span class="rapport-row-label">Nom</span><span class="rapport-row-val">'+esc(eqNom)+'</span></div>';
+  if(siteNom)html+='<div class="rapport-row"><span class="rapport-row-label">Site</span><span class="rapport-row-val">'+esc(siteNom)+'</span></div>';
+  if(dateComp)html+='<div class="rapport-row"><span class="rapport-row-label">Date</span><span class="rapport-row-val">'+esc(dateComp)+'</span></div>';
+  if(_mission.nom_prestataire)html+='<div class="rapport-row"><span class="rapport-row-label">Prestataire</span><span class="rapport-row-val">'+esc(_mission.nom_prestataire)+'</span></div>';
+  html+='</div>';
+
+  _missionPlans.forEach(function(mp,i){
+    var plan=mp.plans_maintenance||{};
+    var stOk=mp.statut==='realise',stBloq=mp.statut==='bloque';
+    var checklist=Array.isArray(plan.checklist)?plan.checklist:[];
+    var checkDone=Array.isArray(mp.checklist_completee)?mp.checklist_completee:[];
+    var doneCount=checkDone.filter(Boolean).length;
+
+    html+='<div class="rapport-section">';
+    html+='<div class="rapport-section-title" style="display:flex;justify-content:space-between">';
+    html+='<span>Tâche '+(i+1)+' — '+esc(plan.titre||'Tâche')+'</span>';
+    html+='<span class="badge '+(stOk?'badge-ok':stBloq?'badge-ko':'badge-todo')+'">'+(stOk?'✅':stBloq?'🔒':'—')+'</span>';
+    html+='</div>';
+
+    if(checklist.length){
+      html+='<div class="rapport-row"><span class="rapport-row-label">Checklist</span><span class="rapport-row-val">'+doneCount+'/'+checklist.length+'</span></div>';
+    }
+    if(mp.commentaire)html+='<div class="rapport-row"><span class="rapport-row-label">Commentaire</span><span class="rapport-row-val">'+esc(mp.commentaire)+'</span></div>';
+    if(mp.motif_blocage)html+='<div class="rapport-row" style="color:#ef4444"><span class="rapport-row-label">Motif blocage</span><span class="rapport-row-val">'+esc(mp.motif_blocage)+'</span></div>';
+
+    // Recommandation : extraire du rapport_texte maintenances si présent
+    html+='</div>';
+  });
+
+  html+='</div></div>';
+  html+='<button class="pdf-btn" onclick="_downloadPDF()">📄 Télécharger le rapport PDF</button>';
+
+  document.getElementById('app').innerHTML=html;
+}
+
+function renderError(msg){
+  document.getElementById('app').innerHTML='<div class="error-box">'+esc(msg)+'</div>';
+}
+
+// ─── PDF ───────────────────────────────────────────────────────────────────
+function _loadJsPDF(cb){
+  if(window.jspdf){cb();return;}
+  var s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  s.onload=cb;document.head.appendChild(s);
+}
+
+function _downloadPDF(){
+  _loadJsPDF(function(){
+    var jsPDF=window.jspdf.jsPDF;
+    var doc=new jsPDF({unit:'mm',format:'a4'});
+    var eqNom=(_mission.equipements&&_mission.equipements.nom)||'Équipement';
+    var siteNom=(_mission.sites&&_mission.sites.nom)||'';
+    var typeNom=(_mission.equipements&&_mission.equipements.types_equipements&&_mission.equipements.types_equipements.nom)||'';
+    var marque=(_mission.equipements&&_mission.equipements.marque)||'';
+    var modele=(_mission.equipements&&_mission.equipements.modele)||'';
+    var today=new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+    var prestNom=_mission.nom_prestataire||'—';
+
+    // Header bleu
+    doc.setFillColor(30,64,175);
+    doc.rect(0,0,210,30,'F');
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(16);doc.setFont('helvetica','bold');
+    doc.text('Rapport d\'intervention prestataire',14,13);
+    doc.setFontSize(9);doc.setFont('helvetica','normal');
+    doc.text(eqNom+(typeNom?' — '+typeNom:'')+'  |  '+(siteNom||''),14,21);
+    doc.text('GenTrack · GMAO',14,27);
+
+    var y=38;
+    doc.setTextColor(30,41,59);
+    doc.setFontSize(10);doc.setFont('helvetica','bold');
+    doc.text('Informations générales',14,y);y+=5;
+    doc.setDrawColor(220,220,220);doc.line(14,y,196,y);y+=5;
+    doc.setFont('helvetica','normal');doc.setFontSize(9);
+
+    var infos=[
+      ['Équipement',eqNom+(marque?' — '+marque+' '+modele:'')],
+      ['Site',siteNom||'—'],
+      ['Prestataire',prestNom],
+      ['Date intervention',today],
+      ['Statut',_mission.statut==='realisee'?'Réalisé':_mission.statut==='echec'?'Bloqué':'En cours']
+    ];
+    infos.forEach(function(row){
+      doc.setFont('helvetica','bold');doc.text(row[0]+' :',14,y);
+      doc.setFont('helvetica','normal');doc.text(String(row[1]),70,y);
+      y+=5;
+    });
+
+    y+=4;
+    _missionPlans.forEach(function(mp,i){
+      var plan=mp.plans_maintenance||{};
+      var stOk=mp.statut==='realise',stBloq=mp.statut==='bloque';
+      var checklist=Array.isArray(plan.checklist)?plan.checklist:[];
+      var checkDone=Array.isArray(mp.checklist_completee)?mp.checklist_completee:
+        (_taskStates[mp.id]&&_taskStates[mp.id].checklistCompletee)||[];
+      var commentaire=mp.commentaire||(_taskStates[mp.id]&&_taskStates[mp.id].commentaire)||'';
+      var recommandation=(_taskStates[mp.id]&&_taskStates[mp.id].recommandation)||'';
+      var motif=mp.motif_blocage||(_taskStates[mp.id]&&_taskStates[mp.id].motifBlocage)||'';
+
+      if(y>260){doc.addPage();y=14;}
+
+      doc.setFont('helvetica','bold');doc.setFontSize(10);
+      doc.setTextColor(30,41,59);
+      doc.text('Tâche '+(i+1)+' — '+(plan.titre||'Tâche'),14,y);
+      var stLabel=stOk?'Réalisé':stBloq?'Bloqué':'—';
+      var stColor=stOk?[22,163,74]:stBloq?[239,68,68]:[100,116,139];
+      doc.setFont('helvetica','bold');doc.setFontSize(9);
+      doc.setTextColor(stColor[0],stColor[1],stColor[2]);
+      doc.text(stLabel,196,y,{align:'right'});
+      y+=4;
+      doc.setDrawColor(220,220,220);doc.line(14,y,196,y);y+=4;
+      doc.setTextColor(30,41,59);doc.setFont('helvetica','normal');doc.setFontSize(9);
+
+      if(checklist.length){
+        var doneC=checkDone.filter(Boolean).length;
+        doc.text('Checklist : '+doneC+'/'+checklist.length+' points validés',14,y);y+=5;
+        checklist.forEach(function(item,ci){
+          if(y>270){doc.addPage();y=14;}
+          var done=checkDone[ci]?'✓':'○';
+          doc.setTextColor(checkDone[ci]?22:150,checkDone[ci]?163:150,checkDone[ci]?74:150);
+          doc.text('  '+done+' '+(item.label||item),18,y);y+=4;
+        });
+        doc.setTextColor(30,41,59);y+=1;
+      }
+      if(commentaire){
+        doc.setFont('helvetica','bold');doc.text('Commentaire :',14,y);y+=4;
+        doc.setFont('helvetica','normal');
+        var lines=doc.splitTextToSize(commentaire,180);
+        lines.forEach(function(l){if(y>270){doc.addPage();y=14;}doc.text(l,18,y);y+=4;});
+      }
+      if(recommandation){
+        doc.setFont('helvetica','bold');doc.setTextColor(30,64,175);doc.text('💡 Recommandation :',14,y);y+=4;
+        doc.setFont('helvetica','normal');doc.setTextColor(30,41,59);
+        var rlines=doc.splitTextToSize(recommandation,180);
+        rlines.forEach(function(l){if(y>270){doc.addPage();y=14;}doc.text(l,18,y);y+=4;});
+      }
+      if(motif){
+        doc.setFont('helvetica','bold');doc.setTextColor(239,68,68);doc.text('Motif de blocage :',14,y);y+=4;
+        doc.setFont('helvetica','normal');doc.setTextColor(30,41,59);
+        var mlines=doc.splitTextToSize(motif,180);
+        mlines.forEach(function(l){if(y>270){doc.addPage();y=14;}doc.text(l,18,y);y+=4;});
+      }
+      y+=5;
+    });
+
+    // Footer
+    doc.setFontSize(8);doc.setTextColor(148,163,184);
+    doc.text('Généré par GenTrack · '+today,14,290);
+
+    var fname='rapport_prestataire_'+eqNom.replace(/[^a-z0-9]/gi,'_').toLowerCase()+'_'+new Date().toISOString().slice(0,10)+'.pdf';
+    doc.save(fname);
+  });
+}
+
+window.addEventListener('load',init);
+</script>
+</body>
+</html>
