@@ -331,24 +331,8 @@ async function _submitMission(){
       if(st.heures!==null&&plan.frequence.toLowerCase().includes('heure'))planPatch.prochaine_date=null;
       if(Object.keys(planPatch).length)await sbPatch('plans_maintenance',plan.id,planPatch);
     }
-    // Créer un enregistrement dans maintenances pour l'historique
-    if(st.statut==='realise'||st.statut==='partiel'||st.statut==='bloque'){
-      var mntStatut=st.statut==='realise'?'realise':st.statut==='bloque'?'bloque':'partiel';
-      var mntRecord={
-        groupe_id:_mission.site_id||null,
-        equipement_id:_mission.equipement_id||null,
-        plan_maintenance_id:plan.id||null,
-        mission_id:_mission.id||null,
-        type:'preventif',
-        titre:plan.titre||('Maintenance '+(plan.frequence||'')),
-        date_realisee:new Date().toISOString().split('T')[0],
-        statut:mntStatut,
-        technicien:_mission.technicien_nom||null,
-        rapport_texte:(st.statut==='bloque'&&st.motifBlocage?'🔒 Bloqué — '+st.motifBlocage:(st.commentaire||null)),
-        photo_url:photoUrl||null
-      };
-      await sbPost('maintenances',mntRecord);
-    }
+    // La mission elle-même est la source de vérité pour l'historique prestataire
+    // (Option B : pas de doublon maintenances pour les missions prestataire)
   }
   // Marquer mission comme réalisée
   var allRealise=_missionPlans.every(function(mp){return _taskStates[mp.id].statut==='realise';});
