@@ -148,6 +148,13 @@ function nextDateFromFreq(freq){
 }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fmtDate(d){if(!d)return'—';return new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});}
+// Indique si un item checklist (done) est validé — supporte booléen ET {done,text}
+function _clItemDone(item){
+  if(item===true)return true;
+  if(!item)return false;
+  if(typeof item==='object'&&item!==null)return item.done===true;
+  return false;
+}
 // Extrait le texte d'un item checklist quel que soit son format
 function _clItemText(item){
   if(item===null||item===undefined)return '';
@@ -484,7 +491,7 @@ function renderRapport(){
       (typeof mp.checklist_completee==='string'&&mp.checklist_completee?
         (function(){try{return JSON.parse(mp.checklist_completee);}catch(e){return[];}}()):
         []);
-    var doneCount=checkDone.filter(Boolean).length;
+    var doneCount=checkDone.filter(_clItemDone).length;
 
     html+='<div class="rapport-section">';
     html+='<div class="rapport-section-title" style="display:flex;justify-content:space-between">';
@@ -495,7 +502,7 @@ function renderRapport(){
     if(checklist.length){
       html+='<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px">Checklist ('+doneCount+'/'+checklist.length+' validés)</div>';
       checklist.forEach(function(item,ci){
-        var done=checkDone[ci]?true:false;
+        var done=_clItemDone(checkDone[ci]);
         var txt=_clItemText(item)||('Point '+(ci+1));
         html+='<div style="display:flex;align-items:flex-start;gap:6px;padding:3px 0;font-size:12px;color:'+(done?'#16a34a':'#94a3b8')+'">'+
           '<span style="font-weight:700;min-width:12px;flex-shrink:0">'+(done?'✓':'○')+'</span>'+
@@ -623,11 +630,11 @@ function _downloadPDF(){
       doc.setTextColor(30,41,59);doc.setFont('helvetica','normal');doc.setFontSize(9);
 
       if(checklist.length){
-        var doneC=checkDone.filter(Boolean).length;
+        var doneC=checkDone.filter(_clItemDone).length;
         doc.text('Checklist : '+doneC+'/'+checklist.length+' points validés',14,y);y+=5;
         checklist.forEach(function(item,ci){
           if(y>270){doc.addPage();y=14;}
-          var done=checkDone[ci]?'✓':'○';
+          var done=_clItemDone(checkDone[ci])?'✓':'○';
           var clTxt=_clItemText(item)||('Point '+(ci+1));
           doc.setTextColor(checkDone[ci]?22:150,checkDone[ci]?163:150,checkDone[ci]?74:150);
           doc.text('  '+done+' '+clTxt,18,y);y+=4;
