@@ -15198,7 +15198,7 @@ async function _openRapportHebdoMois(offset){
       supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+moisDebut+'&date_ronde=lte.'+moisFin+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=200'),
       supaGet('signalements','groupe_id=eq.'+sid+'&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'T23:59:59&select=id,type,description,statut,signale_par,equipement_id,equipement_zone_id,cout_intervention,created_at,resolved_at,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=60'),
       supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+moisDebut+'&date_intervention=lte.'+moisFin+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=40'),
-      supaGet('missions','site_id=eq.'+sid+'&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'T23:59:59&select=id,statut,cout,devise&order=created_at.desc&limit=100').catch(function(){return[];})
+      supaGet('missions','site_id=eq.'+sid+'&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'T23:59:59&select=id,statut,cout,devise,completed_at,created_at,equipements(nom),prestataires(nom),plans_maintenance(titre,type_plan)&order=created_at.desc&limit=100').catch(function(){return[];})
     ]);
     missionsMens=missionsMens||[];
     var siteNom=siteRow.length?siteRow[0].nom:'Mon site';
