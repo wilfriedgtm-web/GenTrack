@@ -5127,7 +5127,10 @@ async function _mntSelectEq(eqId,eqNom,sid){
     new Date(eq.date_mise_en_service+'T00:00:00').toLocaleDateString('fr-FR',{month:'short',year:'numeric'}):'';
   var headerHtml=
     '<div style="position:relative;background:linear-gradient(160deg,#1a2234 0%,#0f172a 100%);padding:20px 16px 18px;overflow:hidden">'+
-      '<button onclick="_mntCloseDetail()" title="Retour au calendrier" style="position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);border:none;cursor:pointer;color:#94a3b8;font-size:14px;padding:5px 7px;border-radius:7px;line-height:1" aria-label="Fermer"><i class="ti ti-x"></i></button>'+
+      '<div style="position:absolute;top:10px;right:10px;display:flex;gap:6px;align-items:center">'+
+        '<button onclick="_mntCompleteFiche(\''+eqId+'\',\''+sid+'\')" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);cursor:pointer;color:#e2e8f0;font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;line-height:1;display:flex;align-items:center;gap:5px"><i class="ti ti-pencil" style="font-size:12px"></i> Modifier</button>'+
+        '<button onclick="_mntCloseDetail()" title="Retour au calendrier" style="background:rgba(255,255,255,.1);border:none;cursor:pointer;color:#94a3b8;font-size:14px;padding:5px 7px;border-radius:7px;line-height:1" aria-label="Fermer"><i class="ti ti-x"></i></button>'+
+      '</div>'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
         (modStr?'<span style="font-size:10px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:.8px;background:rgba(251,191,36,.12);padding:3px 9px;border-radius:5px;border:1px solid rgba(251,191,36,.2)">'+escape_html(eq.marque||typNom||'')+'</span>':'<span></span>')+
         hdrStatus+
