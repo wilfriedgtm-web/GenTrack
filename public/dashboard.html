@@ -4258,15 +4258,21 @@ async function _rtMaintenances(sid){
     _mntRenderCalendarPanel()+
   '</div>';
 
-  return '<div style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between">'+
+  return '<div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">'+
       '<div>'+
         '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:1px">Maintenance</div>'+
-        '<div style="font-size:20px;font-weight:800;color:#1e293b">Équipements</div>'+
+        '<div style="font-size:20px;font-weight:800;color:#1e293b">Gestion technique</div>'+
       '</div>'+
-      '<button onclick="_mntAddPrestataire(\''+sid+'\')" style="display:flex;align-items:center;gap:6px;padding:7px 13px;background:#0f172a;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">'+
-        '<i class="ti ti-building" style="font-size:14px"></i> Nouveau prestataire'+
-      '</button>'+
     '</div>'+
+    '<div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:14px">'+
+      '<button id="mnt-main-tab-eq" onclick="_mntSwitchMainTab(\'eq\',\''+sid+'\')" '+
+        'style="padding:8px 18px;font-size:13px;font-weight:700;border:none;background:none;cursor:pointer;color:#3b82f6;border-bottom:2px solid #3b82f6;margin-bottom:-2px">'+
+        '<i class="ti ti-tool" style="font-size:13px;vertical-align:-1px;margin-right:5px"></i>Équipements</button>'+
+      '<button id="mnt-main-tab-prest" onclick="_mntSwitchMainTab(\'prest\',\''+sid+'\')" '+
+        'style="padding:8px 18px;font-size:13px;font-weight:700;border:none;background:none;cursor:pointer;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px">'+
+        '<i class="ti ti-building" style="font-size:13px;vertical-align:-1px;margin-right:5px"></i>Prestataires</button>'+
+    '</div>'+
+    '<div id="mnt-main-view-eq">'+
     kpiHtml+
     '<div style="display:flex;gap:12px;align-items:flex-start">'+
       '<div style="flex:0 0 42%;min-width:0">'+
@@ -4286,7 +4292,9 @@ async function _rtMaintenances(sid){
       '<div style="flex:1;min-width:0;position:sticky;top:16px">'+
         rightPlaceholder+
       '</div>'+
-    '</div>';
+    '</div>'+
+    '</div>'+ // end mnt-main-view-eq
+    '<div id="mnt-main-view-prest" style="display:none"></div>';
 }
 
 // ── Maintenance list helpers ────────────────────────────────────────────────
@@ -4332,6 +4340,71 @@ function _mntBuildList(){
 
   if(!filtered.length)return '<div style="text-align:center;padding:32px;color:#94a3b8;font-size:12px">Aucun équipement trouvé</div>';
   return filtered.map(function(item){return _mntRenderEqRowFn?_mntRenderEqRowFn(item.eq):'';}).join('');
+}
+
+function _mntSwitchMainTab(tab, sid){
+  var eqView=document.getElementById('mnt-main-view-eq');
+  var prestView=document.getElementById('mnt-main-view-prest');
+  var tabEq=document.getElementById('mnt-main-tab-eq');
+  var tabPrest=document.getElementById('mnt-main-tab-prest');
+  if(!eqView||!prestView||!tabEq||!tabPrest)return;
+  if(tab==='eq'){
+    eqView.style.display='';
+    prestView.style.display='none';
+    tabEq.style.color='#3b82f6';tabEq.style.borderBottomColor='#3b82f6';
+    tabPrest.style.color='#64748b';tabPrest.style.borderBottomColor='transparent';
+  } else {
+    eqView.style.display='none';
+    prestView.style.display='';
+    tabEq.style.color='#64748b';tabEq.style.borderBottomColor='transparent';
+    tabPrest.style.color='#3b82f6';tabPrest.style.borderBottomColor='#3b82f6';
+    _mntShowPrestatairesGlobal(sid);
+  }
+}
+
+function _mntShowPrestatairesGlobal(sid){
+  var container=document.getElementById('mnt-main-view-prest');
+  if(!container)return;
+  container.innerHTML='<div style="text-align:center;padding:28px;color:#94a3b8;font-size:13px">Chargement...</div>';
+  var prests=(_mntCurrentData&&_mntCurrentData.prestataires)||[];
+  if(!prests.length){
+    container.innerHTML='<div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:32px;text-align:center;color:#94a3b8">'+
+      '<div style="font-size:28px;margin-bottom:8px">🏢</div>'+
+      '<div style="font-size:14px;font-weight:600;color:#374151;margin-bottom:4px">Aucun prestataire</div>'+
+      '<div style="font-size:12px;margin-bottom:16px">Ajoutez votre premier prestataire externe</div>'+
+      '<button onclick="_mntAddPrestataire(\''+sid+'\')" style="padding:8px 18px;background:#0f172a;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">+ Nouveau prestataire</button>'+
+    '</div>';
+    return;
+  }
+  var rows=prests.map(function(p){
+    var specBadge=p.specialite?'<span style="display:inline-block;padding:2px 8px;background:#eff6ff;color:#1e40af;border-radius:5px;font-size:10px;font-weight:600;margin-left:6px">'+p.specialite+'</span>':'';
+    var activeBadge=p.actif===false?'<span style="display:inline-block;padding:2px 8px;background:#fef2f2;color:#ef4444;border-radius:5px;font-size:10px;font-weight:600;margin-left:4px">Inactif</span>':'';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #f1f5f9">'+
+      '<div style="display:flex;flex-direction:column;gap:3px">'+
+        '<div style="font-size:13px;font-weight:700;color:#1e293b">'+p.nom+specBadge+activeBadge+'</div>'+
+        '<div style="font-size:11px;color:#64748b;display:flex;gap:12px">'+
+          (p.email?'<span>✉ '+p.email+'</span>':'')+
+          (p.telephone?'<span>📞 '+p.telephone+'</span>':'')+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:6px;align-items:center">'+
+        '<button onclick="_mntDossierPrestataire(\''+p.id+'\',\''+p.nom.replace(/'/g,'').replace(/"/g,'')+'\',\''+sid+'\')" '+
+          'style="padding:5px 10px;border:1px solid #bfdbfe;border-radius:7px;font-size:11px;background:#eff6ff;cursor:pointer;color:#1e40af;font-weight:600">📂 Dossier</button>'+
+        '<button onclick="_mntEditPrestataire(\''+p.id+'\',\''+sid+'\')" '+
+          'style="padding:5px 10px;border:1px solid #e2e8f0;border-radius:7px;font-size:11px;background:white;cursor:pointer;color:#374151;font-weight:600">✏️ Modifier</button>'+
+        '<button onclick="_mntDesactiverPrestataire(\''+p.id+'\',\''+sid+'\')" '+
+          'style="padding:5px 10px;border:1px solid #fecaca;border-radius:7px;font-size:11px;background:#fef2f2;cursor:pointer;color:#ef4444;font-weight:600">'+(p.actif===false?'✅ Activer':'⛔ Désactiver')+'</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  container.innerHTML='<div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;overflow:hidden">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e2e8f0;background:#f8fafc">'+
+      '<div style="font-size:14px;font-weight:800;color:#1e293b"><i class="ti ti-building" style="margin-right:6px;color:#3b82f6"></i>Prestataires externes</div>'+
+      '<button onclick="_mntAddPrestataire(\''+sid+'\')" style="display:flex;align-items:center;gap:5px;padding:7px 13px;background:#0f172a;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">+ Nouveau</button>'+
+    '</div>'+
+    rows+
+  '</div>';
 }
 
 function _mntSetFilter(f){
@@ -5067,33 +5140,33 @@ async function _mntSelectEq(eqId,eqNom,sid){
     secHead('Charge — 6 mois à venir')+
     '<div style="padding:10px 14px 12px">'+vizHtml+'</div>';
 
-  // ── Onglet "Prestataire" ──────────────────────────────────────────────────
-  var eqPrests=prests.filter(function(p){return true;}); // tous les prests du site
+  // ── Onglet "Prestataire" (simplifié : prestataire attitré par plan) ───────
+  var prestOptList=prests.map(function(p){
+    return '<option value="'+p.id+'">'+escape_html(p.nom)+(p.specialite?' — '+escape_html(p.specialite):'')+'</option>';
+  }).join('');
+
+  var planPrestRows=eqPlans.length?eqPlans.map(function(pl){
+    var assignedPrest=prests.find(function(p){return p.id===pl.prestataire_id;})||null;
+    var assignedName=assignedPrest?escape_html(assignedPrest.nom):'<span style="color:#94a3b8;font-style:italic">Non assigné</span>';
+    return '<div style="padding:10px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px">'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:11px;font-weight:700;color:#374151">'+escape_html(pl.nom||pl.type_plan||'Plan')+'</div>'+
+        '<div style="font-size:10px;color:#64748b;margin-top:1px">Prestataire attitré : '+assignedName+'</div>'+
+      '</div>'+
+      '<select onchange="_mntAssignPrestToPlan(\''+pl.id+'\',this.value,\''+sid+'\',\''+eqId+'\')" '+
+        'style="font-size:11px;border:1px solid #e2e8f0;border-radius:7px;padding:4px 7px;background:white;color:#374151;max-width:140px">'+
+        '<option value="">— Aucun —</option>'+
+        prests.map(function(p){
+          return '<option value="'+p.id+'"'+(pl.prestataire_id===p.id?' selected':'')+'>'+escape_html(p.nom)+'</option>';
+        }).join('')+
+      '</select>'+
+    '</div>';
+  }).join(''):'<div style="padding:14px;text-align:center;color:#94a3b8;font-size:11px">Aucun plan de maintenance sur cet équipement.</div>';
+
   var prestTabHtml=
-    secHead('Prestataires du site',
-      '<button onclick="_mntAddPrestataire(\''+sid+'\',\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\')" '+
-        'style="font-size:10px;color:#3b82f6;background:none;border:none;cursor:pointer;padding:0;font-weight:600">+ Ajouter</button>')+
-    (eqPrests.length?eqPrests.map(function(p){
-      return '<div style="padding:11px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:10px">'+
-        '<div style="width:36px;height:36px;border-radius:9px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
-          '<i class="ti ti-building" style="font-size:17px;color:#64748b"></i>'+
-        '</div>'+
-        '<div style="flex:1;min-width:0">'+
-          '<div style="font-size:12px;font-weight:700;color:#1e293b">'+escape_html(p.nom)+'</div>'+
-          (p.specialite?'<div style="font-size:10px;color:#3b82f6;font-weight:600">'+escape_html(p.specialite)+'</div>':'')+
-          (p.email?'<div style="font-size:10px;color:#64748b">'+escape_html(p.email)+'</div>':'')+
-          (p.telephone?'<div style="font-size:10px;color:#64748b">'+escape_html(p.telephone)+'</div>':'')+
-        '</div>'+
-        '<div style="display:flex;gap:5px;flex-shrink:0">'+
-          '<button onclick="_mntDossierPrestataire(\''+p.id+'\',\''+escape_html(p.nom)+'\',\''+sid+'\')" '+
-            'style="padding:5px 8px;border:1px solid #bfdbfe;border-radius:7px;font-size:11px;background:#eff6ff;cursor:pointer;color:#1e40af;font-weight:600" title="Dossier">📂 Dossier</button>'+
-          '<button onclick="_mntEditPrestataire(\''+p.id+'\',\''+sid+'\',\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\')" '+
-            'style="padding:5px 8px;border:1px solid #e2e8f0;border-radius:7px;font-size:11px;background:white;cursor:pointer;color:#64748b" title="Modifier">✏️</button>'+
-          '<button onclick="_mntDesactiverPrestataire(\''+p.id+'\',\''+sid+'\',\''+eqId+'\',\''+escape_html(eq.nom||eqNom)+'\')" '+
-            'style="padding:5px 8px;border:1px solid #fecaca;border-radius:7px;font-size:11px;background:#fef2f2;cursor:pointer;color:#ef4444" title="Désactiver">🗑️</button>'+
-        '</div>'+
-      '</div>';
-    }).join(''):'<div style="padding:14px;text-align:center;color:#94a3b8;font-size:11px">Aucun prestataire sur ce site.</div>')+
+    secHead('Prestataire par plan')+
+    '<div style="font-size:11px;color:#64748b;padding:8px 14px 4px;line-height:1.5">Assignez un prestataire attitré à chaque plan. Pour gérer les prestataires, utilisez l\'onglet <b>Prestataires</b> dans la vue principale.</div>'+
+    planPrestRows+
     secHead('Fiche équipement PDF')+
     '<div style="padding:12px 14px;display:flex;flex-direction:column;gap:9px">'+
       '<div style="font-size:11px;color:#64748b;line-height:1.5">Génère un PDF avec les 5 dernières maintenances, les plans actifs et les signalements récents — à envoyer par email au prestataire.</div>'+
@@ -5109,6 +5182,17 @@ async function _mntSelectEq(eqId,eqNom,sid){
     '<div id="mnt-tab-plan" style="display:none">'+planTabHtml+'</div>'+
     '<div id="mnt-tab-prest" style="display:none">'+prestTabHtml+'</div>'+
     '<div id="mnt-tab-hist" style="display:none">'+secHead('Historique — signalements & maintenances')+'<div id="mnt-hist-content">'+tlHtml+'</div></div>';
+}
+
+async function _mntAssignPrestToPlan(planId,prestId,sid,eqId){
+  var payload=prestId?{prestataire_id:prestId}:{prestataire_id:null};
+  await supaPatch('plans_maintenance',planId,payload).catch(function(){});
+  // Reload the equipment panel silently
+  if(_mntCurrentData){
+    var plansList=_mntCurrentData.plansIdx[eqId]||[];
+    var plan=plansList.find(function(p){return p.id===planId;});
+    if(plan)plan.prestataire_id=prestId||null;
+  }
 }
 
 async function _mntSetPlanDate(planId,sid,newDate){
@@ -5233,12 +5317,30 @@ async function _mntCreerMissionPrest(eqId,sid){
 }
 
 // ── Dossier prestataire ───────────────────────────────────────────────────
+function _mntCloseDossierModal(){
+  var m=document.getElementById('_prest-dossier-modal');
+  if(m)m.remove();
+}
+
 async function _mntDossierPrestataire(prestId,prestNom,sid){
-  var modal=document.getElementById('generic-modal');
-  if(!modal)return;
-  document.getElementById('generic-modal-title').textContent='📂 Dossier — '+prestNom;
-  document.getElementById('generic-modal-body').innerHTML='<div style="text-align:center;padding:20px;color:#94a3b8">Chargement...</div>';
-  modal.style.display='flex';
+  // Remove any existing modal
+  _mntCloseDossierModal();
+  // Build modal overlay
+  var overlay=document.createElement('div');
+  overlay.id='_prest-dossier-modal';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
+  overlay.addEventListener('click',function(e){if(e.target===overlay)_mntCloseDossierModal();});
+  overlay.innerHTML=
+    '<div style="background:white;border-radius:16px;width:100%;max-width:580px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.18)">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e2e8f0;flex-shrink:0">'+
+        '<div style="font-size:15px;font-weight:800;color:#1e293b">📂 Dossier — '+escape_html(prestNom)+'</div>'+
+        '<button onclick="_mntCloseDossierModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;line-height:1">×</button>'+
+      '</div>'+
+      '<div id="_prest-dossier-body" style="overflow-y:auto;padding:18px 20px;flex:1">'+
+        '<div style="text-align:center;padding:20px;color:#94a3b8">Chargement...</div>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(overlay);
 
   var missions=await supaGet('missions','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+'&order=created_at.desc&limit=20&select=id,token,statut,created_at,completed_at,equipements(nom)').catch(function(){return[];});
   var docs=await supaGet('documents_prestataire','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+'&order=created_at.desc&select=*').catch(function(){return[];});
@@ -5303,7 +5405,8 @@ async function _mntDossierPrestataire(prestId,prestNom,sid){
     '<div id="doc-upload-status" style="display:none;font-size:11px;color:#16a34a;font-weight:600;margin-top:5px;text-align:center"></div>'+
   '</div>';
 
-  document.getElementById('generic-modal-body').innerHTML=html;
+  var body=document.getElementById('_prest-dossier-body');
+  if(body)body.innerHTML=html;
 }
 
 async function _mntUploadDocPrest(input,prestId,sid){
@@ -6258,23 +6361,47 @@ async function _mntSavePrestataire(sid,eqId,eqNom,editId){
   }
   if(ok){
     _closeCfgModal();
-    if(eqId){_mntSelectEq(eqId,eqNom||'',sid);}
-    else if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
-    else renderRespTech(_session,'maintenances');
+    // Refresh prestataires in local cache
+    var freshPrests=await supaGet('prestataires','site_id=eq.'+sid+'&order=nom').catch(function(){return null;});
+    if(freshPrests&&_mntCurrentData)_mntCurrentData.prestataires=freshPrests;
+    var prestView=document.getElementById('mnt-main-view-prest');
+    if(prestView&&prestView.style.display!=='none'){
+      _mntShowPrestatairesGlobal(sid);
+    } else if(eqId){
+      _mntSelectEq(eqId,eqNom||'',sid);
+    } else if(_session.role==='dir_tech'&&_dtCurrentSite){
+      renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
+    } else {
+      renderRespTech(_session,'maintenances');
+    }
   }else{
     alert('Erreur lors de la sauvegarde. Vérifiez la console.');
   }
 }
 
 async function _mntDesactiverPrestataire(id,sid,eqId,eqNom){
-  if(!confirm('Désactiver ce prestataire ?'))return;
-  var ok=await supaPatch('prestataires',id,{actif:false}).catch(function(){return false;});
+  var prest=(_mntCurrentData&&_mntCurrentData.prestataires||[]).find(function(p){return p.id===id;});
+  var isActive=!prest||prest.actif!==false;
+  var msg=isActive?'Désactiver ce prestataire ?':'Réactiver ce prestataire ?';
+  var newState=!isActive;
+  if(!confirm(msg))return;
+  var ok=await supaPatch('prestataires',id,{actif:newState}).catch(function(){return false;});
   if(ok){
-    if(eqId){_mntSelectEq(eqId,eqNom||'',sid);}
-    else if(_session.role==='dir_tech'&&_dtCurrentSite)renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
-    else renderRespTech(_session,'maintenances');
+    // Update local cache
+    if(prest)prest.actif=newState;
+    // Refresh view
+    var prestView=document.getElementById('mnt-main-view-prest');
+    if(prestView&&prestView.style.display!=='none'){
+      _mntShowPrestatairesGlobal(sid);
+    } else if(eqId){
+      _mntSelectEq(eqId,eqNom||'',sid);
+    } else if(_session.role==='dir_tech'&&_dtCurrentSite){
+      renderDirTechSite(_session,_dtCurrentSite.id,_dtCurrentSite.nom,'maintenances');
+    } else {
+      renderRespTech(_session,'maintenances');
+    }
   }else{
-    alert('Erreur lors de la désactivation.');
+    alert('Erreur lors de la modification.');
   }
 }
 
