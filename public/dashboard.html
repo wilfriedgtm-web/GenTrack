@@ -4124,10 +4124,11 @@ function _mntKpiTab(label,val,sub,col){
   '</div>';
 }
 
-function _mntKpiCard(label,val,sub,col,icon){
-  return '<div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:14px 16px;min-height:88px">'+
-    '<div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">'+
+function _mntKpiCard(label,val,sub,col,icon,tooltip){
+  return '<div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:14px 16px;min-height:88px;position:relative">'+
+    '<div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;display:flex;align-items:center;gap:4px">'+
       (icon?'<i class="ti '+icon+'" style="font-size:11px;margin-right:3px"></i>':'')+label+
+      (tooltip?'<span class="kpi-info-btn" title="'+tooltip.replace(/"/g,"&quot;")+'" style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:9px;font-weight:800;cursor:default;flex-shrink:0;font-style:normal">i</span>':'')+
     '</div>'+
     '<div style="font-size:26px;font-weight:800;color:'+col+';line-height:1;margin-bottom:4px">'+val+'</div>'+
     (sub?'<div style="font-size:11px;color:#94a3b8">'+sub+'</div>':'')+
@@ -4297,10 +4298,10 @@ async function _rtMaintenances(sid){
 
   // ─── 4 KPI cards ────────────────────────────────────────────────
   var kpiHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">'+
-    _mntKpiCard('Équipements suivis',nbEquips,nbPlansActifs+' plan'+(nbPlansActifs>1?'s':'')+' actif'+(nbPlansActifs>1?'s':''),'#1e293b','ti-tool')+
-    _mntKpiCard('Échéances ce mois',nbEcheancesMois,nbEcheancesMois>0?'À planifier':'Aucune ce mois',nbEcheancesMois>0?'#f59e0b':'#94a3b8','ti-calendar')+
-    _mntKpiCard('Coût maintenance',_mntFmtCout(cout30j,devMnt),nbMissionsAvecCout?nbMissionsAvecCout+' intervention'+(nbMissionsAvecCout>1?'s':''):'30 derniers jours','#1e40af','ti-currency')+
-    _mntKpiCard('Taux réalisation',tauxReal!=null?tauxReal+'%':'—',nbMissionsTotal?nbMissionsRealisees+'/'+nbMissionsTotal+' missions':'Pas de missions',tauxReal==null?'#94a3b8':tauxReal>=80?'#16a34a':tauxReal>=50?'#f59e0b':'#ef4444','ti-check')+
+    _mntKpiCard('Équipements suivis',nbEquips,nbPlansActifs+' plan'+(nbPlansActifs>1?'s':'')+' actif'+(nbPlansActifs>1?'s':''),'#1e293b','ti-tool','Nombre d\'équipements avec au moins un plan de maintenance actif sur ce site.')+
+    _mntKpiCard('Échéances ce mois',nbEcheancesMois,nbEcheancesMois>0?'À planifier':'Aucune ce mois',nbEcheancesMois>0?'#f59e0b':'#94a3b8','ti-calendar','Plans de maintenance dont la prochaine date tombe dans le mois en cours. Vérifiez qu\'une mission a bien été créée pour chacun.')+
+    _mntKpiCard('Coût maintenance',_mntFmtCout(cout30j,devMnt),nbMissionsAvecCout?nbMissionsAvecCout+' intervention'+(nbMissionsAvecCout>1?'s':''):'30 derniers jours','#1e40af','ti-currency','Total des coûts saisis sur les missions prestataires des 30 derniers jours. Renseignez le coût lors de la création d\'une mission prestataire.')+
+    _mntKpiCard('Taux réalisation',tauxReal!=null?tauxReal+'%':'—',nbMissionsTotal?nbMissionsRealisees+'/'+nbMissionsTotal+' missions':'Pas de missions',tauxReal==null?'#94a3b8':tauxReal>=80?'#16a34a':tauxReal>=50?'#f59e0b':'#ef4444','ti-check','Pourcentage de missions marquées "Réalisé" ou "Bloqué" sur le total des missions créées ces 30 derniers jours.')+
   '</div>';
 
   // ─── Alertes ────────────────────────────────────────────────────
@@ -6418,9 +6419,10 @@ async function _mntCompleteFiche(eqId,sid){
   var rows=await supaGet('equipements','id=eq.'+eqId+'&select=nom,marque,modele,numero_serie,date_mise_en_service,garantie_fin,contrat_type,contrat_actif,notes_tech').catch(function(){return[];});
   var eq=rows[0]||{};
   _showCfgModal(
-    '<div style="font-size:15px;font-weight:700;margin-bottom:4px">📋 Fiche équipement</div>'+
-    '<div style="font-size:11px;color:#64748b;margin-bottom:16px">'+escape_html(eq.nom||eqId)+'</div>'+
+    '<div style="font-size:15px;font-weight:700;margin-bottom:16px">📋 Modifier la fiche équipement</div>'+
     '<div style="display:flex;flex-direction:column;gap:12px">'+
+      '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">NOM DE L\'ÉQUIPEMENT</label>'+
+        '<input id="feq-nom" value="'+escape_html(eq.nom||'')+'" placeholder="ex: GE 2 — CAT 800 kVA" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;box-sizing:border-box"/></div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
         '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">MARQUE</label>'+
           '<input id="feq-marque" value="'+escape_html(eq.marque||'')+'" placeholder="ex: Carrier" style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:12px;box-sizing:border-box"/></div>'+
@@ -6461,6 +6463,7 @@ async function _mntCompleteFiche(eqId,sid){
 
 async function _mntSaveFiche(eqId,sid){
   var payload={
+    nom:(document.getElementById('feq-nom')||{}).value||null,
     marque:(document.getElementById('feq-marque')||{}).value||null,
     modele:(document.getElementById('feq-modele')||{}).value||null,
     numero_serie:(document.getElementById('feq-serie')||{}).value||null,
