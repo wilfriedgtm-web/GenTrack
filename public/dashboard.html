@@ -12319,7 +12319,25 @@ async function _dtMaintenances(sids){
     eqTableHtml='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px;opacity:.4">🔧</div><div style="font-size:14px">Aucune intervention enregistrée pour cette période.</div></div>';
   }
 
-  return kpiHtml+filtersHtml+topPannesHtml+siteCardsHtml+eqTableHtml+bannerHtml;
+  /* upcoming banner */
+  var bannerHtml='';
+  if(displayUpcoming.length){
+    var snippet=displayUpcoming.slice(0,3).map(function(r){
+      var t=MNT[r.type]||{label:r.type,icon:'🔧'};
+      var sInfo=siteMap[r.groupe_id]||{nom:''};
+      var dStr=r.date_intervention?new Date(r.date_intervention).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'';
+      return '<span style="margin-right:12px">'+t.icon+' '+escape_html(r.titre||t.label)+' · <span style="opacity:.8">'+escape_html(sInfo.nom)+'</span>'+(dStr?' <span style="opacity:.6">'+dStr+'</span>':'')+'</span>';
+    }).join('');
+    var extra=displayUpcoming.length>3?'<span style="opacity:.6"> +'+(displayUpcoming.length-3)+'</span>':'';
+    bannerHtml='<div style="background:var(--orange-pale);border:1.5px solid var(--orange);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:flex-start;gap:10px">'+
+      '<div style="font-size:18px;flex-shrink:0;margin-top:1px">📅</div>'+
+      '<div><div style="font-size:12px;font-weight:700;color:var(--orange-dark)">'+displayUpcoming.length+' intervention'+(displayUpcoming.length>1?'s':'')+' planifiée'+(displayUpcoming.length>1?'s':'')+' à venir</div>'+
+        '<div style="font-size:11px;color:var(--orange-dark);margin-top:3px;line-height:1.6">'+snippet+extra+'</div>'+
+      '</div>'+
+    '</div>';
+  }
+
+  return kpiHtml+filtersHtml+topPannesHtml+siteCardsHtml+bannerHtml+eqTableHtml;
 
 }
 function _dtSetMntFilter(f){_dtMntFilter=f;if(_session)renderDirTech(_session,'maintenances');}
