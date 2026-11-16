@@ -15007,7 +15007,7 @@ async function _openRapportHebdo(period){
       supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,capacite_litres,conso_theorique_lh,types_equipements(nom)&order=ordre_ronde.asc'),
       supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+cutoff+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=200'),
       supaGet('signalements','groupe_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,type,description,statut,signale_par,equipement_id,equipement_zone_id,cout_intervention,created_at,resolved_at,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=60'),
-      supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+cutoff+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom),missions(id,cout,statut,prestataires(nom))&order=date_intervention.desc&limit=40'),
+      supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+cutoff+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom),missions(id,cout,statut)&order=date_intervention.desc&limit=40'),
       supaGet('missions','site_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,statut,cout,devise,completed_at,created_at,equipements(nom)&order=created_at.desc&limit=100').catch(function(){return[];})
     ]);
     missions=missions||[];
@@ -15800,7 +15800,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
       var realise=m.statut==='realise';
       var eqNom=m.equipements&&m.equipements.nom?m.equipements.nom:'—';
       // Si mission liée : utiliser le vrai coût et le nom du prestataire
-      var intervenant=m.missions?(m.missions.prestataires&&m.missions.prestataires.nom||m.prestataire||'—'):(m.prestataire||'—');
+      var intervenant=m.prestataire||'—';
       var coutVal=m.missions?parseFloat(m.missions.cout)||0:parseFloat(m.cout)||0;
       h+='<tr>'+
         '<td><strong>'+escape_html(m.titre||'Intervention')+'</strong></td>'+
@@ -15815,7 +15815,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     _standaloneMissions.forEach(function(m){
       var eqNom=(m.equipements&&m.equipements.nom)||'—';
       var dateMs=m.completed_at||m.created_at;
-      var ts=dateMs?new Date(String(dateMs).replace(' ','T')).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
+      var ts=dateMs?new Date(String(dateMs).replace(' ','T').replace(/([+-]\d{2})$/,'$1:00')).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
       var realise=m.statut==='realisee';
       h+='<tr>'+
         '<td><strong>Mission prestataire</strong></td>'+
