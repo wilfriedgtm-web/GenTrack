@@ -4125,15 +4125,22 @@ function _mntKpiTab(label,val,sub,col){
 }
 
 function _mntKpiCard(label,val,sub,col,icon,tooltip){
+  var tipId=tooltip?'kpi-tip-'+Math.random().toString(36).slice(2):'';
   return '<div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:14px 16px;min-height:88px;position:relative">'+
     '<div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;display:flex;align-items:center;gap:4px">'+
       (icon?'<i class="ti '+icon+'" style="font-size:11px;margin-right:3px"></i>':'')+label+
-      (tooltip?'<span class="kpi-info-btn" title="'+tooltip.replace(/"/g,"&quot;")+'" style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:9px;font-weight:800;cursor:default;flex-shrink:0;font-style:normal">i</span>':'')+
+      (tooltip?
+        '<span onclick="var t=document.getElementById(\''+tipId+'\');t.style.display=t.style.display===\'none\'?\'block\':\'none\';event.stopPropagation()" '+
+          'style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:9px;font-weight:800;cursor:pointer;flex-shrink:0;font-style:normal;line-height:1">i</span>'+
+        '<div id="'+tipId+'" style="display:none;position:absolute;top:36px;left:0;right:0;background:#1e293b;color:white;font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;line-height:1.5;padding:10px 12px;border-radius:10px;z-index:50;box-shadow:0 4px 16px rgba(0,0,0,.18)">'+tooltip+'</div>'
+      :'')+
     '</div>'+
     '<div style="font-size:26px;font-weight:800;color:'+col+';line-height:1;margin-bottom:4px">'+val+'</div>'+
     (sub?'<div style="font-size:11px;color:#94a3b8">'+sub+'</div>':'')+
   '</div>';
 }
+// Ferme tous les tooltips KPI au clic ailleurs
+document.addEventListener('click',function(){document.querySelectorAll('[id^="kpi-tip-"]').forEach(function(t){t.style.display='none';});});
 
 function _mntFmtCout(v,devise){
   if(v==null||isNaN(v))return '—';
@@ -4983,7 +4990,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
   var infosHtml=
     secHead('Informations',
       '<button onclick="_mntCompleteFiche(\''+eqId+'\',\''+sid+'\')" '+
-        'style="font-size:10px;color:#3b82f6;background:none;border:none;cursor:pointer;padding:0;font-weight:600">Modifier</button>')+
+        'style="font-size:11px;color:#3b82f6;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;padding:3px 10px;font-weight:600;display:flex;align-items:center;gap:4px"><i class="ti ti-pencil" style="font-size:12px"></i> Modifier</button>')+
     '<div style="padding:4px 14px 8px;display:grid;grid-template-columns:1fr 1fr;gap:0 16px">'+
       infoCell('Mise en service',dmsStr)+
       infoCell('Marque / modèle',modStr||'—')+
