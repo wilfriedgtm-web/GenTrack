@@ -4723,7 +4723,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
     supaGet('equipements','id=eq.'+eqId+'&select=id,nom,marque,modele,numero_serie,date_mise_en_service,garantie_fin,contrat_type,contrat_actif,notes_tech,types_equipements(nom)').catch(function(){return[];}),
     supaGet('signalements','equipement_id=eq.'+eqId+'&type=eq.panne&statut=not.in.(traite,resolu,annule)&order=created_at.desc&select=id,description,statut,created_at').catch(function(){return[];}),
     supaGet('signalements','equipement_id=eq.'+eqId+'&order=created_at.desc&limit=90&select=id,type,description,statut,created_at,assigne_a').catch(function(){return[];}),
-    supaGet('maintenances','equipement_id=eq.'+eqId+'&order=date_realisee.desc&limit=90&select=id,titre,type,statut,created_at,date_realisee,prestataire,prestataire_id,technicien,cout,rapport_texte,plan_maintenance_id').catch(function(){return[];}),
+    supaGet('maintenances','equipement_id=eq.'+eqId+'&order=date_realisee.desc&limit=90&select=id,titre,type,statut,created_at,date_realisee,prestataire,prestataire_id,technicien,cout,duree_heures,devise,rapport_texte,plan_maintenance_id').catch(function(){return[];}),
     supaGet('plans_maintenance','equipement_id=eq.'+eqId+'&actif=eq.true&order=prochaine_date.asc&select=id,titre,frequence,prochaine_date,intervenant,checklist,type_plan,prestataire_id,prestataires(nom)').catch(function(){return[];}),
     supaGet('prestataires','site_id=eq.'+sid+'&actif=eq.true&order=nom.asc&select=id,nom,telephone,email').catch(function(){return[];}),
     supaGet('reponses',
@@ -5041,7 +5041,9 @@ async function _mntSelectEq(eqId,eqNom,sid){
       if(mt)motifBlocage=mt;
     }
     var subParts=[];
-    if(who)subParts.push('→ '+escape_html(who)+(m.cout?' · '+parseFloat(m.cout).toLocaleString('fr-FR')+' FCFA':''));
+    if(who)subParts.push('→ '+escape_html(who));
+    if(m.duree_heures!=null){var dh=parseFloat(m.duree_heures);subParts.push(dh.toFixed(dh%1===0?0:1)+'h');}
+    if(m.cout!=null){var mCoutDev=m.devise||'FCFA';subParts.push(parseFloat(m.cout).toLocaleString('fr-FR')+' '+mCoutDev);}
     if(motifBlocage)subParts.push('⚠️ '+escape_html(motifBlocage));
     events.push({date:m.date_realisee||m.created_at,col:col,colBg:colBg,badge:badge,
       title:escape_html(m.titre||m.type||'Intervention'),

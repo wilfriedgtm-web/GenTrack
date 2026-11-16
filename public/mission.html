@@ -388,7 +388,13 @@ function renderRapport(){
   html+='<span style="font-size:28px">✅</span>';
   html+='<div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1e293b">Mission réalisée</div>';
   if(_mission.technicien_nom)html+='<div style="font-size:11px;color:#64748b;margin-top:1px">Tech : '+esc(_mission.technicien_nom)+(dateComp?' · '+dateComp:'')+'</div>';
-  html+='</div></div></div>';
+  html+='</div></div>';
+  // Durée + coût si renseignés
+  var mInfoParts=[];
+  if(_mission.duree_heures!=null){var _dh=parseFloat(_mission.duree_heures);mInfoParts.push('⏱ '+_dh.toFixed(_dh%1===0?0:1)+' h');}
+  if(_mission.cout!=null){var _dev=_mission.devise||'FCFA';mInfoParts.push('💰 '+parseFloat(_mission.cout).toLocaleString('fr-FR')+' '+_dev);}
+  if(mInfoParts.length){html+='<div style="display:flex;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid #f1f5f9">'+mInfoParts.map(function(p){return'<span style="font-size:12px;font-weight:600;color:#1e293b;background:#f8fafc;padding:4px 10px;border-radius:6px;border:1px solid #e2e8f0">'+p+'</span>';}).join('')+'</div>';}
+  html+='</div>';
 
   _missionPlans.forEach(function(mp,i){
     var plan=mp.plans_maintenance||{};
