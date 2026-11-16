@@ -157,7 +157,7 @@ async function init(){
   _missionPlans.forEach(function(mp){
     var checklist=Array.isArray((mp.plans_maintenance||{}).checklist)?(mp.plans_maintenance.checklist):[];
     _taskStates[mp.id]={
-      statut:'a_faire',commentaire:'',heures:null,
+      statut:'a_faire',commentaire:'',recommandation:'',heures:null,
       photoFiles:[],photoUrls:[],
       motifBlocage:'',
       checklistCompletee:checklist.map(function(){return false;})
@@ -228,6 +228,9 @@ function renderApp(){
     // Commentaire
     html+='<div class="field-label" style="margin-top:8px">Commentaire</div>';
     html+='<textarea class="field-input" rows="2" placeholder="Notes sur cette tâche..." onchange="_setComment(\''+mp.id+'\',this.value)">'+esc(st.commentaire)+'</textarea>';
+    // Recommandation
+    html+='<div class="field-label" style="margin-top:8px">💡 Recommandation (optionnel)</div>';
+    html+='<textarea class="field-input" rows="2" placeholder="Actions à prévoir, pièces à commander..." onchange="_setRecommandation(\''+mp.id+'\',this.value)">'+esc(st.recommandation||'')+'</textarea>';
     // Photo
     html+='<div style="margin-top:10px">';
     html+='<div class="field-label">Photo</div>';
@@ -266,6 +269,7 @@ function _setStatut(mpId,statut){
   if(motifWrap)motifWrap.style.display=statut==='bloque'?'':'none';
 }
 function _setComment(mpId,val){_taskStates[mpId].commentaire=val;}
+function _setRecommandation(mpId,val){_taskStates[mpId].recommandation=val;}
 function _setMotif(mpId,val){_taskStates[mpId].motifBlocage=val;}
 function _setHeures(mpId,val){_taskStates[mpId].heures=val?parseFloat(val):null;}
 function _toggleCheck(mpId,ci,checked){
@@ -308,7 +312,7 @@ async function _submitMission(){
       if(url)photoUrl=url;
     }
     // Update mission_plan
-    var mpPatch={statut:st.statut,commentaire:st.commentaire||null};
+    var mpPatch={statut:st.statut,commentaire:st.commentaire||null,recommandation:st.recommandation||null};
     if(photoUrl)mpPatch.photo_url=photoUrl;
     if(st.heures!==null)mpPatch.heures_compteur=st.heures;
     if(st.statut==='bloque'&&st.motifBlocage)mpPatch.motif_blocage=st.motifBlocage;
@@ -446,6 +450,9 @@ function renderRapport(){
     }
     if(mp.commentaire){
       html+='<div style="background:#f8fafc;border-radius:8px;padding:9px 12px;margin-bottom:8px;font-size:12px;color:#374151">'+esc(mp.commentaire)+'</div>';
+    }
+    if(mp.recommandation){
+      html+='<div style="background:#eff6ff;border-radius:8px;padding:9px 12px;margin-bottom:8px;font-size:12px;color:#1e40af"><strong>💡 Recommandation :</strong> '+esc(mp.recommandation)+'</div>';
     }
     if(mp.photo_url){
       html+='<div style="margin-top:6px"><img src="'+esc(mp.photo_url)+'" style="width:100%;max-width:280px;border-radius:10px;border:1px solid #e2e8f0"/></div>';
