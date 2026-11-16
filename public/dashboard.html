@@ -5746,15 +5746,27 @@ async function _mntUploadDocPrest(input,prestId,sid,prestNom){
     var nmEqEl=document.getElementById('doc-nm-eq');
     var nmDescEl=document.getElementById('doc-nm-desc');
     var nmDateEl=document.getElementById('doc-nm-date');
+    var nmTitre=nmDescEl&&nmDescEl.value.trim()?nmDescEl.value.trim():'Intervention prestataire';
     var nmPayload={site_id:sid,prestataire_id:prestId,statut:'realisee'};
     if(nmEqEl&&nmEqEl.value)nmPayload.equipement_id=nmEqEl.value;
-    if(nmDescEl&&nmDescEl.value.trim())nmPayload.notes=nmDescEl.value.trim();
     if(nmDateEl&&nmDateEl.value)nmPayload.completed_at=nmDateEl.value;
     if(montant!==null&&!isNaN(montant))nmPayload.cout=montant;
     if(status){status.style.display='';status.style.color='#64748b';status.textContent='⏳ Création de la mission...';}
     var newMission=await supaPost('missions',nmPayload).catch(function(){return null;});
     if(newMission&&newMission.id){
       missionId=newMission.id;
+      // Créer un enregistrement maintenances pour l'historique équipement
+      var mntDossierPayload={
+        groupe_id:sid,
+        equipement_id:nmPayload.equipement_id||null,
+        mission_id:newMission.id,
+        type:'preventif',
+        titre:nmTitre,
+        date_realisee:nmPayload.completed_at||new Date().toISOString().split('T')[0],
+        statut:'realise',
+        prestataire:prestNom||null
+      };
+      await supaPost('maintenances',mntDossierPayload).catch(function(){});
     } else {
       if(status){status.style.color='#f59e0b';status.textContent='⚠ Mission non créée, document importé sans lien.';}
     }
@@ -14996,7 +15008,7 @@ async function _openRapportHebdo(period){
       supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+cutoff+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=200'),
       supaGet('signalements','groupe_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,type,description,statut,signale_par,equipement_id,equipement_zone_id,cout_intervention,created_at,resolved_at,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=60'),
       supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+cutoff+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom),missions(id,cout,statut,prestataires(nom))&order=date_intervention.desc&limit=40'),
-      supaGet('missions','site_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,statut,cout,devise,completed_at,equipements(nom),prestataires(nom)&order=created_at.desc&limit=100').catch(function(){return[];})
+      supaGet('missions','site_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,statut,cout,devise,completed_at,created_at,equipements(nom)&order=created_at.desc&limit=100').catch(function(){return[];})
     ]);
     missions=missions||[];
     var siteNom=siteRow.length?siteRow[0].nom:'Mon site';
@@ -15802,14 +15814,13 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     // Missions sans maintenance liée (créées depuis le dossier, hors plan)
     _standaloneMissions.forEach(function(m){
       var eqNom=(m.equipements&&m.equipements.nom)||'—';
-      var prestNom=(m.prestataires&&m.prestataires.nom)||'—';
       var dateMs=m.completed_at||m.created_at;
-      var ts=new Date(dateMs).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+      var ts=dateMs?new Date(String(dateMs).replace(' ','T')).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
       var realise=m.statut==='realisee';
       h+='<tr>'+
         '<td><strong>Mission prestataire</strong></td>'+
         '<td style="font-size:11px;color:var(--text2)">'+escape_html(eqNom)+'</td>'+
-        '<td style="font-size:11px">'+escape_html(prestNom)+'</td>'+
+        '<td style="font-size:11px">Prestataire</td>'+
         '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
         '<td>'+(realise?'<span class="badge badge-ok">Réalisé</span>':'<span class="badge badge-warn">En cours</span>')+'</td>'+
         '<td style="font-size:11px">'+(m.cout?fmtCout(parseFloat(m.cout)||0,'XOF'):'—')+'</td>'+
