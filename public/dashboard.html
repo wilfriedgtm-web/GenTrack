@@ -15587,49 +15587,40 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   // ════════════════════════ PAGE 3 — RONDES, RELEVÉS, SIGNALEMENTS ════════════════════════
   h+='<div class="page-break"></div>';
 
-  // Rondes journalières
+  // Rondes — KPI synthèse (journalières + hebdo/mensuel)
   h+='<h2>Rondes journalières</h2>'+
     '<p class="narrative" contenteditable="true">'+escape_html(narRondes)+'</p>';
-  if(rondesJ.length>0){
-    h+='<table><thead><tr><th>Date</th><th>Progression</th><th>Résultat</th></tr></thead><tbody>';
-    rondesJ.forEach(function(r){
-      var eq=reByRonde[r.id]||[];
-      var val=eq.filter(function(re){return re.statut==='valide';}).length;
-      var tot=eq.length;
-      var pct=tot>0?Math.round(val/tot*100):0;
-      var ok=val===tot&&tot>0;
-      var fillCol=ok?'#2D7A4F':pct>0?'#C49A1C':'#C0392B';
-      var dateDisp=new Date(r.date_ronde).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
-      h+='<tr>'+
-        '<td style="white-space:nowrap;color:var(--text2);font-size:11px">'+dateDisp+'</td>'+
-        '<td style="min-width:120px">'+(tot>0?'<div style="display:flex;align-items:center;gap:8px"><div class="pbar-wrap" style="flex:1"><div class="pbar-fill" style="width:'+pct+'%;background:'+fillCol+'"></div></div><span style="font-size:11px;color:var(--text2)">'+val+'/'+tot+'</span></div>':'—')+'</td>'+
-        '<td>'+(tot===0?'<span class="badge badge-warn">Non commencée</span>':ok?'<span class="badge badge-ok">✓ Validée</span>':'<span class="badge badge-warn">'+pct+'%</span>')+'</td>'+
-      '</tr>';
-    });
-    h+='</tbody></table>';
-  }else{h+='<div class="empty-msg">Aucune ronde journalière enregistrée</div>';}
+  (function(){
+    var _rjVal=0,_rjTot=0,_rjOk=0;
+    rondesJ.forEach(function(r){var eq=reByRonde[r.id]||[];var val=eq.filter(function(re){return re.statut==='valide';}).length;var tot=eq.length;_rjTot++;_rjVal+=val;if(val===tot&&tot>0)_rjOk++;});
+    var _rjConf=rondesJ.length>0&&_rjTot?Math.round(_rjVal/(_rjTot*(rondesJ[0]?(reByRonde[rondesJ[0].id]||[]).length||1:1))*100):null;
+    // Conformité = rondes 100% validées / total rondes
+    var _rjPct=rondesJ.length?Math.round(_rjOk/rondesJ.length*100):null;
+    var _rjCol=_rjPct===null?'var(--text3)':_rjPct===100?'var(--vert)':_rjPct>=70?'var(--amber)':'var(--rouge)';
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:16px">';
+    h+='<div class="fluid-card" style="margin:0;padding:10px 12px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Total</div><div style="font-size:18px;font-weight:700">'+rondesJ.length+'</div></div>';
+    h+='<div class="fluid-card" style="margin:0;padding:10px 12px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Validées 100%</div><div style="font-size:18px;font-weight:700;color:var(--vert)">'+_rjOk+'</div></div>';
+    h+='<div class="fluid-card" style="margin:0;padding:10px 12px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Conformité</div><div style="font-size:18px;font-weight:700;color:'+_rjCol+'">'+(_rjPct!==null?_rjPct+'%':'—')+'</div></div>';
+    h+='<div class="fluid-card" style="margin:0;padding:10px 12px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Incomplètes</div><div style="font-size:18px;font-weight:700;color:'+(rondesJ.length-_rjOk>0?'var(--rouge)':'var(--vert)')+'">'+Math.max(0,rondesJ.length-_rjOk)+'</div></div>';
+    h+='</div>';
+  })();
 
-  // Rondes hebdo/mensuel
+  // Rondes hebdo/mensuel — KPI
   var rondesAutres=rondes.filter(function(r){return r.frequence!=='journalier';});
   if(rondesAutres.length>0){
-    h+='<h2>Rondes hebdomadaires &amp; mensuelles</h2>'+
-      '<table><thead><tr><th>Date</th><th>Type</th><th>Progression</th><th>Résultat</th></tr></thead><tbody>';
-    rondesAutres.forEach(function(r){
-      var eq=reByRonde[r.id]||[];
-      var val=eq.filter(function(re){return re.statut==='valide';}).length;
-      var tot=eq.length;
-      var pct=tot>0?Math.round(val/tot*100):0;
-      var ok=val===tot&&tot>0;
-      var fillCol=ok?'#2D7A4F':pct>0?'#C49A1C':'#C0392B';
-      var dateDisp=new Date(r.date_ronde).toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'});
-      h+='<tr>'+
-        '<td style="white-space:nowrap;color:var(--text2);font-size:11px">'+dateDisp+'</td>'+
-        '<td style="font-size:11px">'+(_FREQ_LABELS[r.frequence]||r.frequence)+'</td>'+
-        '<td style="min-width:100px">'+(tot>0?'<div style="display:flex;align-items:center;gap:8px"><div class="pbar-wrap" style="flex:1"><div class="pbar-fill" style="width:'+pct+'%;background:'+fillCol+'"></div></div><span style="font-size:11px;color:var(--text2)">'+val+'/'+tot+'</span></div>':'—')+'</td>'+
-        '<td>'+(tot===0?'<span class="badge badge-warn">Non commencée</span>':ok?'<span class="badge badge-ok">✓ Validée</span>':'<span class="badge badge-warn">'+pct+'%</span>')+'</td>'+
-      '</tr>';
-    });
-    h+='</tbody></table>';
+    h+='<h2>Rondes hebdomadaires &amp; mensuelles</h2>';
+    (function(){
+      var _raOk=0;
+      rondesAutres.forEach(function(r){var eq=reByRonde[r.id]||[];var val=eq.filter(function(re){return re.statut==='valide';}).length;var tot=eq.length;if(val===tot&&tot>0)_raOk++;});
+      var _raPct=rondesAutres.length?Math.round(_raOk/rondesAutres.length*100):null;
+      var _raCol=_raPct===null?'var(--text3)':_raPct===100?'var(--vert)':_raPct>=70?'var(--amber)':'var(--rouge)';
+      h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:16px">';
+      h+='<div class="fluid-card" style="margin:0;padding:10px 12px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Total</div><div style="font-size:18px;font-weight:700">'+rondesAutres.length+'</div></div>';
+      h+='<div class="fluid-card" style="margin:0;padding:10px 12px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Validées 100%</div><div style="font-size:18px;font-weight:700;color:var(--vert)">'+_raOk+'</div></div>';
+      h+='<div class="fluid-card" style="margin:0;padding:10px 12px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Conformité</div><div style="font-size:18px;font-weight:700;color:'+_raCol+'">'+(_raPct!==null?_raPct+'%':'—')+'</div></div>';
+      h+='<div class="fluid-card" style="margin:0;padding:10px 12px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Incomplètes</div><div style="font-size:18px;font-weight:700;color:'+(rondesAutres.length-_raOk>0?'var(--rouge)':'var(--vert)')+'">'+Math.max(0,rondesAutres.length-_raOk)+'</div></div>';
+      h+='</div>';
+    })();
   }
 
   // Rondes zones (résidence seulement)
