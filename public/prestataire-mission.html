@@ -392,28 +392,7 @@ async function _submit(){
     };
     await sbPatch('mission_plans',mp.id,mpPatch);
 
-    // Créer maintenances
-    var rapportTexte='';
-    if(st.statut==='bloque')rapportTexte='🔒 Bloqué — '+(st.motifBlocage||'');
-    else if(st.recommandation)rapportTexte=st.commentaire+(st.commentaire&&st.recommandation?' | ':'')+'💡 '+st.recommandation;
-    else rapportTexte=st.commentaire||'';
-
-    var mntRecord={
-      groupe_id:_mission.site_id||null,
-      equipement_id:_mission.equipement_id||null,
-      plan_maintenance_id:plan.id||null,
-      type:'preventif',
-      titre:plan.titre||('Maintenance '+(plan.frequence||'')),
-      date_realisee:today,
-      statut:st.statut==='realise'?'realise':'bloque',
-      technicien:_mission.nom_prestataire||null,
-      prestataire:_mission.nom_prestataire||null,
-      prestataire_id:_mission.prestataire_id||null,
-      rapport_texte:rapportTexte||null,
-      photo_url:photoUrl||null
-    };
-    await sbPost('maintenances',mntRecord);
-
+    // Option B : missions est la source de vérité — pas de doublon maintenances
     // Mettre à jour prochaine_date sur le plan
     if(st.statut==='realise'&&plan.frequence&&plan.id){
       var nextDate=nextDateFromFreq(plan.frequence);
