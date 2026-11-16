@@ -5553,8 +5553,12 @@ async function _mntDossierPrestataire(prestId,prestNom,sid,months){
 
   var monthsFilter='';
   if(months>0){var mfd=new Date();mfd.setMonth(mfd.getMonth()-months);monthsFilter='&created_at=gte.'+mfd.toISOString();}
-  var missions=await supaGet('missions','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+monthsFilter+'&order=created_at.desc&select=id,token,statut,created_at,completed_at,cout,duree_heures,devise,equipements(nom)').catch(function(){return[];});
-  var docs=await supaGet('documents_prestataire','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+'&order=created_at.desc&select=*').catch(function(){return[];});
+  var [missions,docs,_siteEqs]=await Promise.all([
+    supaGet('missions','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+monthsFilter+'&order=created_at.desc&select=id,token,statut,created_at,completed_at,cout,duree_heures,devise,equipements(nom)').catch(function(){return[];}),
+    supaGet('documents_prestataire','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+'&order=created_at.desc&select=*').catch(function(){return[];}),
+    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc').catch(function(){return[];})
+  ]);
+  window._prestEquipements=_siteEqs||[];
 
   var html='';
   var _safePn=prestNom.replace(/'/g,'').replace(/"/g,'').replace(/\\/g,'');
@@ -5681,7 +5685,15 @@ async function _mntDossierPrestataire(prestId,prestNom,sid,months){
       '<input type="date" id="doc-date-sel" style="flex:1;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px;background:white" value="'+new Date().toISOString().slice(0,10)+'">'+
     '</div>'+
     '<input type="text" id="doc-nom-sel" placeholder="Nom du document (ex: Facture révision GE)" style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px;margin-bottom:6px">'+
-    (missions.length?'<select id="doc-mission-sel" style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px;background:white;margin-bottom:6px">'+missOptHtml+'</select>':'<input type="hidden" id="doc-mission-sel" value="">')+
+    '<input type="hidden" id="doc-new-mission-mode" value="0">'+
+    (missions.length?'<select id="doc-mission-sel" style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px;background:white;margin-bottom:4px">'+missOptHtml+'</select>':'<input type="hidden" id="doc-mission-sel" value="">')+
+    '<div style="text-align:right;margin-bottom:6px"><button id="btn-new-mission-toggle" onclick="_mntToggleNewMission()" style="background:none;border:none;font-size:11px;color:#1e40af;cursor:pointer;font-weight:600;padding:0;text-decoration:underline">＋ Créer une mission</button></div>'+
+    '<div id="doc-new-mission-form" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px;margin-bottom:6px">'+
+      '<div style="font-size:11px;font-weight:700;color:#1e40af;margin-bottom:8px">Nouvelle mission prestataire</div>'+
+      '<select id="doc-nm-eq" style="width:100%;box-sizing:border-box;border:1px solid #bfdbfe;border-radius:7px;padding:6px 8px;font-size:11px;background:white;margin-bottom:6px"><option value="">— Équipement (optionnel) —</option></select>'+
+      '<input type="text" id="doc-nm-desc" placeholder="Description courte (ex: Révision complète GE)" style="width:100%;box-sizing:border-box;border:1px solid #bfdbfe;border-radius:7px;padding:6px 8px;font-size:11px;margin-bottom:6px">'+
+      '<input type="date" id="doc-nm-date" value="'+new Date().toISOString().slice(0,10)+'" style="width:100%;box-sizing:border-box;border:1px solid #bfdbfe;border-radius:7px;padding:6px 8px;font-size:11px">'+
+    '</div>'+
     '<input type="number" id="doc-montant-sel" placeholder="Montant facture (optionnel, ex: 3000000)" min="0" style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px;margin-bottom:6px">'+
     '<label style="display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:8px;font-size:11px;font-weight:600;color:#64748b;cursor:pointer">'+
       '<input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display:none" onchange="_mntUploadDocPrest(this,\''+prestId+'\',\''+sid+'\',\''+prestNom.replace(/'/g,'').replace(/\\/g,'')+'\')">'+
@@ -5724,23 +5736,70 @@ async function _mntUploadDocPrest(input,prestId,sid,prestNom){
   var dateSel=document.getElementById('doc-date-sel');
   var dateDoc=dateSel&&dateSel.value?dateSel.value:null;
   var missionSel=document.getElementById('doc-mission-sel');
-  var missionId=missionSel&&missionSel.value?missionSel.value:null;
+  var missionId=missionSel&&!missionSel.disabled&&missionSel.value?missionSel.value:null;
   var montantSel=document.getElementById('doc-montant-sel');
   var montant=montantSel&&montantSel.value?parseFloat(montantSel.value.replace(/\s/g,'').replace(',','.')):null;
+
+  // Création d'une nouvelle mission si mode actif
+  var newMissionModeEl=document.getElementById('doc-new-mission-mode');
+  if(newMissionModeEl&&newMissionModeEl.value==='1'){
+    var nmEqEl=document.getElementById('doc-nm-eq');
+    var nmDescEl=document.getElementById('doc-nm-desc');
+    var nmDateEl=document.getElementById('doc-nm-date');
+    var nmPayload={site_id:sid,prestataire_id:prestId,statut:'realisee'};
+    if(nmEqEl&&nmEqEl.value)nmPayload.equipement_id=nmEqEl.value;
+    if(nmDescEl&&nmDescEl.value.trim())nmPayload.notes=nmDescEl.value.trim();
+    if(nmDateEl&&nmDateEl.value)nmPayload.completed_at=nmDateEl.value;
+    if(montant!==null&&!isNaN(montant))nmPayload.cout=montant;
+    if(status){status.style.display='';status.style.color='#64748b';status.textContent='⏳ Création de la mission...';}
+    var newMission=await supaPost('missions',nmPayload).catch(function(){return null;});
+    if(newMission&&newMission.id){
+      missionId=newMission.id;
+    } else {
+      if(status){status.style.color='#f59e0b';status.textContent='⚠ Mission non créée, document importé sans lien.';}
+    }
+  }
+
   var payload={prestataire_id:prestId,site_id:sid,nom:nomDoc,type_doc:typeDoc,storage_path:path,url:url};
   if(dateDoc)payload.date_document=dateDoc;
   if(missionId)payload.mission_id=missionId;
   var rec=await supaPost('documents_prestataire',payload).catch(function(){return null;});
 
   if(rec){
-    // Mise à jour du coût de la mission si montant saisi
-    if(missionId&&montant!==null&&!isNaN(montant)){
+    // Mise à jour du coût de la mission si montant saisi et mission existante (pas nouvelle, déjà défini dans nmPayload)
+    var isNewMission=newMissionModeEl&&newMissionModeEl.value==='1';
+    if(missionId&&montant!==null&&!isNaN(montant)&&!isNewMission){
       await supaPatch('missions',missionId,{cout:montant}).catch(function(){});
     }
-    if(status){status.style.color='#16a34a';status.textContent='✅ Document importé !'+(missionId&&montant?' Coût mission mis à jour.':'');}
+    var msg=isNewMission?'✅ Mission créée et document importé !'+(montant?' Coût : '+montant.toLocaleString('fr-FR')+' FCFA.':''):'✅ Document importé !'+(missionId&&montant?' Coût mission mis à jour.':'');
+    if(status){status.style.color='#16a34a';status.textContent=msg;}
     setTimeout(function(){_mntDossierPrestataire(prestId,prestNom||'',sid);},400);
   } else {
     if(status){status.style.color='#ef4444';status.textContent='❌ Erreur sauvegarde document.';}
+  }
+}
+
+function _mntToggleNewMission(){
+  var form=document.getElementById('doc-new-mission-form');
+  var mode=document.getElementById('doc-new-mission-mode');
+  var btn=document.getElementById('btn-new-mission-toggle');
+  var missionSel=document.getElementById('doc-mission-sel');
+  if(!form||!mode)return;
+  var isOpen=form.style.display!=='none';
+  if(!isOpen){
+    var eqSel=document.getElementById('doc-nm-eq');
+    if(eqSel&&eqSel.options.length<=1){
+      (window._prestEquipements||[]).forEach(function(e){
+        var opt=document.createElement('option');opt.value=e.id;opt.textContent=e.nom;eqSel.appendChild(opt);
+      });
+    }
+    form.style.display='';mode.value='1';
+    if(missionSel){missionSel.value='';missionSel.disabled=true;missionSel.style.opacity='.4';}
+    if(btn)btn.textContent='← Annuler nouvelle mission';
+  }else{
+    form.style.display='none';mode.value='0';
+    if(missionSel){missionSel.disabled=false;missionSel.style.opacity='';}
+    if(btn)btn.textContent='＋ Créer une mission';
   }
 }
 
