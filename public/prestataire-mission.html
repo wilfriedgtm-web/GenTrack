@@ -148,6 +148,25 @@ function nextDateFromFreq(freq){
 }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fmtDate(d){if(!d)return'—';return new Date(d+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});}
+// Extrait le texte d'un item checklist quel que soit son format
+function _clItemText(item){
+  if(item===null||item===undefined)return '';
+  if(typeof item==='string')return item;
+  if(typeof item!=='object')return String(item);
+  // Essaie les clés connues dans l'ordre
+  var keys=['text','label','tache','titre','nom','description','value','name','libelle','intitule'];
+  for(var i=0;i<keys.length;i++){
+    var v=item[keys[i]];
+    if(v===null||v===undefined)continue;
+    if(typeof v==='string'&&v.trim())return v.trim();
+    if(typeof v==='object')return _clItemText(v);
+  }
+  // Cherche la première valeur string non-vide
+  for(var k in item){
+    if(typeof item[k]==='string'&&item[k].trim())return item[k].trim();
+  }
+  return '';
+}
 
 async function init(){
   var params=new URLSearchParams(window.location.search);
@@ -213,7 +232,7 @@ function renderApp(){
         var checked=st.checklistCompletee[ci];
         html+='<div class="checklist-item" onclick="_toggleCheck(\''+mp.id+'\','+ci+')">';
         html+='<div class="check-box'+(checked?' checked':'')+'">'+( checked?'✓':'')+'</div>';
-        html+='<span class="check-text'+(checked?' checked':'')+'">'+esc(item.label||item)+'</span>';
+        html+='<span class="check-text'+(checked?' checked':'')+'">'+esc(_clItemText(item))+'</span>';
         html+='</div>';
       });
       html+='</div>';
@@ -542,7 +561,7 @@ function _downloadPDF(){
           if(y>270){doc.addPage();y=14;}
           var done=checkDone[ci]?'✓':'○';
           doc.setTextColor(checkDone[ci]?22:150,checkDone[ci]?163:150,checkDone[ci]?74:150);
-          doc.text('  '+done+' '+(item.label||item),18,y);y+=4;
+          doc.text('  '+done+' '+_clItemText(item),18,y);y+=4;
         });
         doc.setTextColor(30,41,59);y+=1;
       }

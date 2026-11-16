@@ -5408,7 +5408,7 @@ async function _mntDossierPrestataire(prestId,prestNom,sid){
       '</select>'+
     '</div>'+
     '<label style="display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:8px;font-size:11px;font-weight:600;color:#64748b;cursor:pointer">'+
-      '<input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display:none" onchange="_mntUploadDocPrest(this,\''+prestId+'\',\''+sid+'\')">'+
+      '<input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display:none" onchange="_mntUploadDocPrest(this,\''+prestId+'\',\''+sid+'\',\''+prestNom.replace(/'/g,'').replace(/\\/g,'')+'\')">'+
       '📎 Sélectionner un fichier'+
     '</label>'+
     '<div id="doc-upload-status" style="display:none;font-size:11px;color:#16a34a;font-weight:600;margin-top:5px;text-align:center"></div>'+
@@ -5418,27 +5418,44 @@ async function _mntDossierPrestataire(prestId,prestNom,sid){
   if(body)body.innerHTML=html;
 }
 
-async function _mntUploadDocPrest(input,prestId,sid){
+async function _mntUploadDocPrest(input,prestId,sid,prestNom){
   var file=input.files&&input.files[0];
   if(!file)return;
   var status=document.getElementById('doc-upload-status');
-  if(status){status.style.display='';status.textContent='⏳ Envoi en cours...';}
-  var ext=file.name.split('.').pop();
+  if(status){status.style.display='';status.style.color='#64748b';status.textContent='⏳ Envoi en cours...';}
+  var ext=file.name.split('.').pop().toLowerCase();
   var path='documents/prestataire/'+prestId+'/'+Date.now()+'.'+ext;
-  var r=await fetch('https://zbpoxjlkqxnqjzxohasq.supabase.co/storage/v1/object/maintenance-photos/'+path,{
-    method:'POST',
-    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':file.type},
-    body:file
-  });
-  var url=r.ok?'https://zbpoxjlkqxnqjzxohasq.supabase.co/storage/v1/object/public/maintenance-photos/'+path:null;
+  var url=null;
+  try{
+    // PUT = upsert (plus fiable que POST sur Storage)
+    var r=await fetch('https://zbpoxjlkqxnqjzxohasq.supabase.co/storage/v1/object/maintenance-photos/'+path,{
+      method:'PUT',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':file.type||'application/octet-stream','x-upsert':'true'},
+      body:file
+    });
+    if(r.ok){
+      url='https://zbpoxjlkqxnqjzxohasq.supabase.co/storage/v1/object/public/maintenance-photos/'+path;
+    } else {
+      var errText=await r.text().catch(function(){return'';});
+      console.error('Upload storage error',r.status,errText);
+    }
+  }catch(e){console.error('Upload fetch error',e);}
+
   var typeSel=document.getElementById('doc-type-sel');
   var typeDoc=typeSel?typeSel.value:'autre';
-  await supaPost('documents_prestataire',{
+  var rec=await supaPost('documents_prestataire',{
     prestataire_id:prestId,site_id:sid,
     nom:file.name,type_doc:typeDoc,
     storage_path:path,url:url
-  }).catch(function(){});
-  if(status){status.style.color='#16a34a';status.textContent='✅ Document importé !';}
+  }).catch(function(){return null;});
+
+  if(rec){
+    if(status){status.style.color='#16a34a';status.textContent='✅ Document importé !';}
+    // Recharge le dossier pour afficher le nouveau doc avec son lien
+    setTimeout(function(){_mntDossierPrestataire(prestId,prestNom||'',sid);},400);
+  } else {
+    if(status){status.style.color='#ef4444';status.textContent='❌ Erreur sauvegarde document.';}
+  }
 }
 
 async function _mntDispatchSig(sigId,sid,mode,prestId,prestNom,prestEmail,prestTel){
