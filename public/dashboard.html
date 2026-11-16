@@ -5632,7 +5632,8 @@ async function _mntDossierPrestataire(prestId,prestNom,sid,months){
           '</div>'+
         '</div>'+
         '<span style="font-size:10px;font-weight:700;color:'+stCol+'">'+stLbl+'</span>'+
-        (m.statut==='realisee'||m.statut==='echec'?'<a href="prestataire-mission.html?token='+m.token+'" target="_blank" style="font-size:10px;padding:3px 7px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:5px;color:#1e40af;text-decoration:none;font-weight:600">Voir</a>':'')+
+        (m.statut==='realisee'||m.statut==='echec'?'<a href="prestataire-mission.html?token='+m.token+'" target="_blank" style="font-size:10px;padding:3px 6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:5px;color:#1e40af;text-decoration:none;font-weight:600">Voir</a>':'')+
+        '<button onclick="_mntEditMissionCoutPrompt(\''+m.id+'\','+(mCout!=null?mCout:'0')+',\''+prestId+'\',\''+sid+'\',\''+_safePn+'\')" title="Modifier le coût" style="font-size:11px;padding:3px 6px;background:#fffbeb;border:1px solid #fcd34d;border-radius:5px;color:#92400e;cursor:pointer;flex-shrink:0">💰</button>'+
       '</div>';
     });
   } else {
@@ -5641,6 +5642,7 @@ async function _mntDossierPrestataire(prestId,prestNom,sid,months){
 
   // Documents
   var _missById={};missions.forEach(function(m){_missById[m.id]=m;});
+  window._prestDocs={};docs.forEach(function(d){window._prestDocs[d.id]=d;});
   var missOptHtml='<option value="">— Mission (optionnel) —</option>';
   missions.forEach(function(m){var eqN=(m.equipements&&m.equipements.nom)||'Mission';var ds=new Date(m.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'2-digit'});missOptHtml+='<option value="'+m.id+'">'+escape_html(eqN)+' · '+ds+'</option>';});
   html+='<div style="font-size:11px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.6px;margin:14px 0 8px">Documents</div>';
@@ -5649,13 +5651,16 @@ async function _mntDossierPrestataire(prestId,prestNom,sid,months){
       var ico={'facture':'📄','contrat':'📋','rapport':'📊','garantie':'🔒','autre':'📎'}[d.type_doc]||'📎';
       var linkedM=d.mission_id?_missById[d.mission_id]:null;
       var linkedMLabel=linkedM?((linkedM.equipements&&linkedM.equipements.nom)||'Mission')+' · '+new Date(linkedM.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'2-digit'}):null;
-      html+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f1f5f9;">'+
+      var dUrl=d.url||(d.storage_path?'https://zbpoxjlkqxnqjzxohasq.supabase.co/storage/v1/object/public/maintenance-photos/'+d.storage_path:'');
+      html+='<div style="display:flex;align-items:center;gap:5px;padding:7px 0;border-bottom:1px solid #f1f5f9;">'+
         '<span style="font-size:16px">'+ico+'</span>'+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-size:12px;font-weight:500;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escape_html(d.nom)+'</div>'+
           '<div style="font-size:10px;color:#94a3b8">'+escape_html(d.type_doc)+' · '+(d.date_document?new Date(d.date_document+'T12:00:00').toLocaleDateString('fr-FR'):new Date(d.created_at).toLocaleDateString('fr-FR'))+(linkedMLabel?' · <span style="color:#d97706">🔗 '+escape_html(linkedMLabel)+'</span>':'')+'</div>'+
         '</div>'+
-        (function(){var dUrl=d.url||(d.storage_path?'https://zbpoxjlkqxnqjzxohasq.supabase.co/storage/v1/object/public/maintenance-photos/'+d.storage_path:'');return dUrl?'<a href="'+dUrl+'" target="_blank" style="font-size:10px;padding:3px 7px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;color:#64748b;text-decoration:none">↗ Ouvrir</a>':'';})()+
+        (dUrl?'<a href="'+dUrl+'" target="_blank" style="font-size:10px;padding:3px 6px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;color:#64748b;text-decoration:none;flex-shrink:0">↗</a>':'')+
+        '<button onclick="_mntShowEditDoc(\''+d.id+'\',\''+prestId+'\',\''+sid+'\',\''+_safePn+'\')" style="font-size:11px;padding:3px 6px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:5px;color:#1e40af;cursor:pointer;font-weight:600;flex-shrink:0">✏️</button>'+
+        '<button onclick="_mntDeleteDoc(\''+d.id+'\',\''+prestId+'\',\''+sid+'\',\''+_safePn+'\')" style="font-size:11px;padding:3px 6px;background:#fef2f2;border:1px solid #fca5a5;border-radius:5px;color:#ef4444;cursor:pointer;flex-shrink:0">🗑</button>'+
       '</div>';
     });
   } else {
@@ -5737,6 +5742,77 @@ async function _mntUploadDocPrest(input,prestId,sid,prestNom){
   } else {
     if(status){status.style.color='#ef4444';status.textContent='❌ Erreur sauvegarde document.';}
   }
+}
+
+async function _mntShowEditDoc(docId,prestId,sid,prestNom){
+  var d=window._prestDocs&&window._prestDocs[docId];
+  if(!d){return;}
+  var body=document.getElementById('_prest-dossier-body');
+  if(!body)return;
+  var mfd=new Date();mfd.setMonth(mfd.getMonth()-3);
+  var missions=await supaGet('missions','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+'&created_at=gte.'+mfd.toISOString()+'&order=created_at.desc&select=id,statut,created_at,cout,equipements(nom)').catch(function(){return[];});
+  var missOptHtml='<option value="">— Mission (optionnel) —</option>';
+  missions.forEach(function(m){var eqN=(m.equipements&&m.equipements.nom)||'Mission';var ds=new Date(m.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'2-digit'});missOptHtml+='<option value="'+m.id+'"'+(d.mission_id&&d.mission_id===m.id?' selected':'')+'>'+escape_html(eqN)+' · '+ds+'</option>';});
+  var linkedM=d.mission_id?missions.find(function(m){return m.id===d.mission_id;}):null;
+  var currentCout=linkedM&&linkedM.cout!=null?linkedM.cout:'';
+  var _sp=(prestNom||'').replace(/'/g,'').replace(/"/g,'').replace(/\\/g,'');
+  var html='<div style="padding:4px 0">';
+  html+='<div style="font-size:13px;font-weight:800;color:var(--dark);margin-bottom:14px">✏️ Modifier le document</div>';
+  html+='<div style="display:flex;gap:6px;margin-bottom:6px">';
+  html+='<select id="doc-edit-type" style="flex:1;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px;background:white">';
+  [{v:'facture',l:'Facture'},{v:'contrat',l:'Contrat'},{v:'rapport',l:'Rapport'},{v:'garantie',l:'Garantie'},{v:'autre',l:'Autre'}].forEach(function(t){html+='<option value="'+t.v+'"'+(d.type_doc===t.v?' selected':'')+'>'+t.l+'</option>';});
+  html+='</select>';
+  html+='<input type="date" id="doc-edit-date" value="'+(d.date_document||'')+'" style="flex:1;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px;background:white">';
+  html+='</div>';
+  html+='<input type="text" id="doc-edit-nom" value="'+escape_html(d.nom||'')+'" placeholder="Nom du document" style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px;margin-bottom:6px">';
+  if(missions.length){html+='<select id="doc-edit-mission" style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px;background:white;margin-bottom:6px">'+missOptHtml+'</select>';}
+  html+='<input type="number" id="doc-edit-montant" value="'+(currentCout||'')+'" placeholder="Montant facture (optionnel)" min="0" style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px;margin-bottom:10px">';
+  html+='<div style="display:flex;gap:6px">';
+  html+='<button onclick="_mntDossierPrestataire(\''+prestId+'\',\''+_sp+'\',\''+sid+'\')" style="flex:1;padding:9px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:white;cursor:pointer;color:var(--text2)">← Annuler</button>';
+  html+='<button onclick="_mntSaveEditDoc(\''+docId+'\',\''+prestId+'\',\''+sid+'\',\''+_sp+'\')" style="flex:2;padding:9px;border:none;border-radius:8px;font-size:12px;font-weight:700;background:#1e40af;color:white;cursor:pointer">✅ Enregistrer</button>';
+  html+='</div></div>';
+  body.innerHTML=html;
+}
+
+async function _mntSaveEditDoc(docId,prestId,sid,prestNom){
+  var nomEl=document.getElementById('doc-edit-nom');
+  var typeEl=document.getElementById('doc-edit-type');
+  var dateEl=document.getElementById('doc-edit-date');
+  var missionEl=document.getElementById('doc-edit-mission');
+  var montantEl=document.getElementById('doc-edit-montant');
+  var nom=nomEl?nomEl.value.trim():'';
+  if(!nom){alert('Le nom est requis.');return;}
+  var typeDoc=typeEl?typeEl.value:'autre';
+  var dateDoc=dateEl&&dateEl.value?dateEl.value:null;
+  var missionId=missionEl&&missionEl.value?missionEl.value:null;
+  var montant=montantEl&&montantEl.value?parseFloat(montantEl.value.replace(/\s/g,'').replace(',','.')):null;
+  var patch={nom:nom,type_doc:typeDoc,mission_id:missionId||null};
+  if(dateDoc)patch.date_document=dateDoc;
+  await supaPatch('documents_prestataire',docId,patch).catch(function(){});
+  if(missionId&&montant!==null&&!isNaN(montant)){
+    await supaPatch('missions',missionId,{cout:montant}).catch(function(){});
+  }
+  _mntDossierPrestataire(prestId,prestNom||'',sid);
+}
+
+async function _mntDeleteDoc(docId,prestId,sid,prestNom){
+  if(!confirm('Supprimer ce document définitivement ?'))return;
+  var d=window._prestDocs&&window._prestDocs[docId];
+  await supaDelete('documents_prestataire','id=eq.'+docId).catch(function(){});
+  if(d&&d.storage_path){
+    fetch('https://zbpoxjlkqxnqjzxohasq.supabase.co/storage/v1/object/maintenance-photos/'+d.storage_path,{method:'DELETE',headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}}).catch(function(){});
+  }
+  _mntDossierPrestataire(prestId,prestNom||'',sid);
+}
+
+function _mntEditMissionCoutPrompt(missionId,currentCout,prestId,sid,prestNom){
+  var v=prompt('Montant de la mission (FCFA) :',(currentCout!=null&&currentCout!==''?String(currentCout):''));
+  if(v===null)return;
+  var n=parseFloat(v.replace(/\s/g,'').replace(',','.'));
+  if(isNaN(n)||n<0){alert('Montant invalide.');return;}
+  supaPatch('missions',missionId,{cout:n}).then(function(){
+    _mntDossierPrestataire(prestId,prestNom||'',sid);
+  }).catch(function(){alert('Erreur lors de la mise à jour.');});
 }
 
 async function _mntDispatchSig(sigId,sid,mode,prestId,prestNom,prestEmail,prestTel){
@@ -12255,32 +12331,80 @@ async function _dtMaintenances(sids){
     siteSelectHtml+
   '</div>';
 
-  /* pannes ouvertes — inline badges */
-  var topPannesHtml='';
-  if(pannesOuvertes.length>0){
-    var now2=new Date();
-    var panneBadges=pannesOuvertes.slice(0,8).map(function(p){
-      var sInfo=siteMap[p.groupe_id]||{nom:'—',col:'#aaa'};
-      var eqNom=p.equipements&&p.equipements.nom?p.equipements.nom:'—';
-      var jours=Math.floor((now2-new Date(p.created_at))/86400000);
-      var urgCol=jours>=14?'#b91c1c':jours>=7?'#d97706':'#92400e';
-      var urgBg=jours>=14?'#fef2f2':jours>=7?'var(--orange-pale)':'#fffbeb';
-      var urgBorder=jours>=14?'#fca5a5':jours>=7?'var(--orange)':'#fcd34d';
-      return '<div style="display:flex;flex-direction:column;gap:3px;padding:8px 12px;background:'+urgBg+';border:1.5px solid '+urgBorder+';border-radius:10px;min-width:200px;max-width:300px">'+
-        '<div style="display:flex;align-items:center;gap:5px">'+
-          '<span style="width:7px;height:7px;border-radius:50%;background:'+sInfo.col+';display:inline-block;flex-shrink:0"></span>'+
-          '<span style="font-size:10px;font-weight:700;color:var(--text2)">'+escape_html(sInfo.nom)+'</span>'+
-        '</div>'+
-        '<div style="font-size:11px;font-weight:600;color:var(--dark)">'+escape_html(eqNom.length>30?eqNom.slice(0,30)+'…':eqNom)+'</div>'+
-        '<div style="font-size:10px;color:'+urgCol+';font-weight:700">'+(jours===0?'Signalé aujourd\'hui':jours+'j ouvert')+'</div>'+
-      '</div>';
-    }).join('');
-    var extraPannes=pannesOuvertes.length>8?'<div style="display:flex;align-items:center;justify-content:center;padding:8px 14px;font-size:11px;font-weight:600;color:var(--rouge);background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px">+'+(pannesOuvertes.length-8)+' autres</div>':'';
-    topPannesHtml='<div style="margin-bottom:16px">'+
-      '<div style="font-size:10px;font-weight:600;color:var(--rouge);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">⚠ '+pannesOuvertes.length+' panne'+(pannesOuvertes.length>1?'s':'')+' ouverte'+(pannesOuvertes.length>1?'s':'')+'</div>'+
-      '<div style="display:flex;flex-wrap:wrap;gap:8px">'+panneBadges+extraPannes+'</div>'+
-    '</div>';
+  /* ── planning 2 colonnes : préventif planifié + correctif actif ── */
+  var now2=new Date();
+  var upcomingBySite={};
+  displayUpcoming.forEach(function(r){if(!upcomingBySite[r.groupe_id])upcomingBySite[r.groupe_id]=[];upcomingBySite[r.groupe_id].push(r);});
+  var pannesBySite={};
+  pannesOuvertes.forEach(function(p){if(!pannesBySite[p.groupe_id])pannesBySite[p.groupe_id]=[];pannesBySite[p.groupe_id].push(p);});
+  var colPrev='';
+  if(!displayUpcoming.length){
+    colPrev='<div style="font-size:12px;color:var(--text3);padding:12px 0;text-align:center">Aucune maintenance planifiée</div>';
+  }else{
+    sites.forEach(function(s){
+      var items=upcomingBySite[s.id];if(!items||!items.length)return;
+      var col=(siteMap[s.id]||{col:'#aaa'}).col;
+      colPrev+='<div style="margin-bottom:10px">'+
+        '<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">'+
+          '<span style="width:7px;height:7px;border-radius:50%;background:'+col+';display:inline-block;flex-shrink:0"></span>'+
+          '<span style="font-size:11px;font-weight:700;color:var(--dark)">'+escape_html(s.nom)+'</span>'+
+          '<span style="font-size:10px;color:var(--text3);margin-left:3px">'+items.length+' planifiée'+(items.length>1?'s':'')+'</span>'+
+        '</div>';
+      items.slice(0,5).forEach(function(r){
+        var t=MNT[r.type]||{label:r.type||'Maintenance',icon:'🔧'};
+        var dStr=r.date_intervention?new Date(r.date_intervention).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
+        var daysFromNow=r.date_intervention?Math.round((new Date(r.date_intervention)-now2)/86400000):999;
+        var urgCol=daysFromNow<=3?'#b91c1c':daysFromNow<=7?'#d97706':'#16a34a';
+        var label=(r.titre||t.label);if(label.length>26)label=label.slice(0,26)+'…';
+        colPrev+='<div style="display:flex;align-items:center;gap:5px;padding:4px 7px;background:#f8fafc;border-radius:6px;margin-bottom:3px">'+
+          '<span style="font-size:11px">'+t.icon+'</span>'+
+          '<span style="flex:1;font-size:11px;color:var(--dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(label)+'</span>'+
+          '<span style="font-size:10px;font-weight:700;color:'+urgCol+';flex-shrink:0">'+dStr+'</span>'+
+        '</div>';
+      });
+      if(items.length>5)colPrev+='<div style="font-size:10px;color:var(--text3);text-align:right;margin-top:1px">+'+(items.length-5)+' autre'+(items.length-5>1?'s':'')+'</div>';
+      colPrev+='</div>';
+    });
   }
+  var colCorr='';
+  if(!pannesOuvertes.length){
+    colCorr='<div style="font-size:12px;color:var(--vert);padding:12px 0;text-align:center">✅ Aucune panne active</div>';
+  }else{
+    sites.forEach(function(s){
+      var items=pannesBySite[s.id];if(!items||!items.length)return;
+      var col=(siteMap[s.id]||{col:'#aaa'}).col;
+      colCorr+='<div style="margin-bottom:10px">'+
+        '<div style="display:flex;align-items:center;gap:5px;margin-bottom:5px">'+
+          '<span style="width:7px;height:7px;border-radius:50%;background:'+col+';display:inline-block;flex-shrink:0"></span>'+
+          '<span style="font-size:11px;font-weight:700;color:var(--dark)">'+escape_html(s.nom)+'</span>'+
+          '<span style="font-size:10px;color:var(--rouge);font-weight:600;margin-left:3px">'+items.length+' panne'+(items.length>1?'s':'')+'</span>'+
+        '</div>';
+      items.slice(0,5).forEach(function(p){
+        var eqNom=p.equipements&&p.equipements.nom?p.equipements.nom:'—';
+        if(eqNom.length>24)eqNom=eqNom.slice(0,24)+'…';
+        var jours=Math.floor((now2-new Date(p.created_at))/86400000);
+        var urgCol=jours>=14?'#b91c1c':jours>=7?'#d97706':'#92400e';
+        var urgBg=jours>=14?'#fef2f2':jours>=7?'var(--orange-pale)':'#fffbeb';
+        colCorr+='<div style="display:flex;align-items:center;gap:5px;padding:4px 7px;background:'+urgBg+';border-radius:6px;margin-bottom:3px">'+
+          '<span style="font-size:11px">🔴</span>'+
+          '<span style="flex:1;font-size:11px;color:var(--dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(eqNom)+'</span>'+
+          '<span style="font-size:10px;font-weight:700;color:'+urgCol+';flex-shrink:0">'+(jours===0?'Auj.':jours+'j')+'</span>'+
+        '</div>';
+      });
+      if(items.length>5)colCorr+='<div style="font-size:10px;color:var(--rouge);text-align:right;margin-top:1px">+'+(items.length-5)+' autre'+(items.length-5>1?'s':'')+'</div>';
+      colCorr+='</div>';
+    });
+  }
+  var planningHtml='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">'+
+    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px">'+
+      '<div style="font-size:10px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">📅 Préventif planifié</div>'+
+      colPrev+
+    '</div>'+
+    '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:14px 16px">'+
+      '<div style="font-size:10px;font-weight:700;color:var(--rouge);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">🔴 Correctif actif</div>'+
+      colCorr+
+    '</div>'+
+  '</div>';
 
   /* cards par site */
   var eqBySite={};
@@ -12402,25 +12526,7 @@ async function _dtMaintenances(sids){
     eqTableHtml='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px;opacity:.4">🔧</div><div style="font-size:14px">Aucune intervention enregistrée pour cette période.</div></div>';
   }
 
-  /* upcoming banner */
-  var bannerHtml='';
-  if(displayUpcoming.length){
-    var snippet=displayUpcoming.slice(0,3).map(function(r){
-      var t=MNT[r.type]||{label:r.type,icon:'🔧'};
-      var sInfo=siteMap[r.groupe_id]||{nom:''};
-      var dStr=r.date_intervention?new Date(r.date_intervention).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'';
-      return '<span style="margin-right:12px">'+t.icon+' '+escape_html(r.titre||t.label)+' · <span style="opacity:.8">'+escape_html(sInfo.nom)+'</span>'+(dStr?' <span style="opacity:.6">'+dStr+'</span>':'')+'</span>';
-    }).join('');
-    var extra=displayUpcoming.length>3?'<span style="opacity:.6"> +'+(displayUpcoming.length-3)+'</span>':'';
-    bannerHtml='<div style="background:var(--orange-pale);border:1.5px solid var(--orange);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:flex-start;gap:10px">'+
-      '<div style="font-size:18px;flex-shrink:0;margin-top:1px">📅</div>'+
-      '<div><div style="font-size:12px;font-weight:700;color:var(--orange-dark)">'+displayUpcoming.length+' intervention'+(displayUpcoming.length>1?'s':'')+' planifiée'+(displayUpcoming.length>1?'s':'')+' à venir</div>'+
-        '<div style="font-size:11px;color:var(--orange-dark);margin-top:3px;line-height:1.6">'+snippet+extra+'</div>'+
-      '</div>'+
-    '</div>';
-  }
-
-  return kpiHtml+filtersHtml+topPannesHtml+siteCardsHtml+bannerHtml+eqTableHtml;
+  return kpiHtml+planningHtml+filtersHtml+siteCardsHtml+eqTableHtml;
 
 }
 function _dtSetMntFilter(f){_dtMntFilter=f;if(_session)renderDirTech(_session,'maintenances');}
