@@ -15021,7 +15021,7 @@ function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,relev
   var h='<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport Énergie — '+escape_html(moisLabel)+'</title><style>';
   h+='*{box-sizing:border-box;margin:0;padding:0;}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f5f0;color:#1A1411;padding:24px;}';
   h+='.page{max-width:840px;margin:0 auto;}h2{font-size:11px;font-weight:700;color:#888;margin:24px 0 10px;text-transform:uppercase;letter-spacing:.06em;}';
-  h+='.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}';
+  h+='.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:24px;}';
   h+='.kpi{background:white;border:1px solid #e5e0d8;border-radius:10px;padding:14px 16px;}';
   h+='.kpi-lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}';
   h+='.kpi-val{font-size:18px;font-weight:700;line-height:1.2;}';
@@ -15118,6 +15118,10 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   var nbSgResolus=signalements.filter(function(s){return s.statut==='resolu';}).length;
   var coutTotal=maintenances.filter(function(m){return m.type!=='ravitaillement';}).reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
   var nbMaintenances=maintenances.length;
+  var nbPreventif=maintenances.filter(function(m){return m.type==='preventive';}).length;
+  var coutPreventif=maintenances.filter(function(m){return m.type==='preventive';}).reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
+  var nbCorrectif=maintenances.filter(function(m){return m.type==='panne'||m.type==='corrective';}).length;
+  var coutCorrectif=maintenances.filter(function(m){return m.type==='panne'||m.type==='corrective';}).reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
   var cuves=equips.filter(function(e){return e.capacite_litres!=null;});
   var ges=equips.filter(function(e){return e.conso_theorique_lh!=null&&e.capacite_litres==null;});
 
@@ -15183,7 +15187,8 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   else{
     var realises=maintenances.filter(function(m){return m.statut==='realise';});
     narMaint+=realises.length+' intervention'+(realises.length>1?'s':'')+(realises.length>1?' réalisées':' réalisée')+' sur la période. ';
-    if(coutTotal>0)narMaint+='Coût total : '+coutTotal.toLocaleString('fr-FR')+' FCFA.';
+    if(coutPreventif>0||coutCorrectif>0){narMaint+='Coût préventif : '+(coutPreventif>0?coutPreventif.toLocaleString('fr-FR')+' FCFA':'—')+'. Coût correctif : '+(coutCorrectif>0?coutCorrectif.toLocaleString('fr-FR')+' FCFA':'—')+'.';}
+    else if(coutTotal>0){narMaint+='Coût total : '+coutTotal.toLocaleString('fr-FR')+' FCFA.';}
   }
 
   // ── KPI couleurs ──
@@ -15472,7 +15477,8 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   h+='<div class="kpi-row">'+
     '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+kpiCol(tauxRondes,70,90,false)+'">'+(tauxRondes!==null?tauxRondes+'%':'—')+'</div><div class="kpi-sub">'+rondes.length+' ronde(s)</div></div>'+
     '<div class="kpi"><div class="kpi-label">Signalements actifs</div><div class="kpi-value" style="color:'+kpiCol(nbSgOuverts,1,3,true)+'">'+nbSgOuverts+'</div><div class="kpi-sub">'+nbSgResolus+' résolu(s)</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Interventions</div><div class="kpi-value">'+nbMaintenances+'</div><div class="kpi-sub">'+(coutTotal>0?fmtCout(coutTotal,'XOF'):'aucun coût')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Maint. préventif</div><div class="kpi-value">'+nbPreventif+'</div><div class="kpi-sub">'+(coutPreventif>0?fmtCout(coutPreventif,'XOF'):'aucun coût')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Maint. correctif</div><div class="kpi-value" style="color:'+(nbCorrectif>0?'var(--rouge)':'var(--vert)')+'">'+nbCorrectif+'</div><div class="kpi-sub">'+(coutCorrectif>0?fmtCout(coutCorrectif,'XOF'):'aucun coût')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Équipements actifs</div><div class="kpi-value">'+equips.length+'</div><div class="kpi-sub">'+ges.length+' groupe(s) · '+cuves.length+' cuve(s)</div></div>'+
     '<div class="kpi"><div class="kpi-label">MTTR moyen</div><div class="kpi-value" style="color:'+(mttrH===null?'var(--text3)':mttrH<24?'var(--vert)':mttrH<72?'var(--amber)':'var(--rouge)')+'">'+fmtDur(mttrH)+'</div><div class="kpi-sub">'+(sgsResolus.length>0?sgsResolus.length+' résolution(s)':'—')+'</div></div>'+
   '</div>';
