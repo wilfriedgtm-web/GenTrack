@@ -5471,7 +5471,8 @@ async function _mntCreerMission(eqId,sid){
   var missionPayload={
     site_id:sid,equipement_id:eqId,
     technicien_nom:nom||null,technicien_tel:tel||null,
-    statut:'envoyee'
+    statut:'envoyee',
+    plan_maintenance_id:planIds[0]||null
   };
   if(respTel)missionPayload.resp_tel=respTel;
   var mission=await supaPost('missions',missionPayload).catch(function(){return null;});
@@ -5518,7 +5519,8 @@ async function _mntCreerMissionPrest(eqId,sid){
     nom_prestataire:prestNom||null,
     contact_prest_tel:prestTel||null,
     contact_prest_email:prestEmail||null,
-    statut:'envoyee'
+    statut:'envoyee',
+    plan_maintenance_id:planIds[0]||null
   };
   var mission=await supaPost('missions',missionPayload).catch(function(){return null;});
   if(!mission||!mission.token){
