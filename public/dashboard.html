@@ -12129,7 +12129,10 @@ async function _dtMaintenances(sids){
   var tauxCloture=nbTotal>0?Math.round(nbRealises/nbTotal*100):null;
   var tauxCol=tauxCloture===null?'var(--text3)':tauxCloture>=80?'var(--vert)':tauxCloture>=50?'var(--amber)':'var(--rouge)';
   var nbPreventif=rows.filter(function(r){return r.type==='preventive';}).length;
-  var nbCorrectif=rows.filter(function(r){return r.type==='panne';}).length;
+  var nbCorrectif=rows.filter(function(r){return r.type==='panne'||r.type==='corrective';}).length;
+  var coutPreventifW=rows.filter(function(r){return r.type==='preventive';}).reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
+  var coutCorrectifW=rows.filter(function(r){return r.type==='panne'||r.type==='corrective';}).reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
+  function _fmtKW(v){if(!v)return'0';if(v>=1000000)return(v/1000000).toFixed(1)+' M';if(v>=1000)return Math.round(v/1000)+' k';return Math.round(v);}
   var ratioLabel=nbPreventif+' préventif / '+nbCorrectif+' correctif';
   var nbPannesActives=pannesOuvertes.length;
   var pannesCol=nbPannesActives===0?'var(--vert)':nbPannesActives<=3?'var(--amber)':'var(--rouge)';
@@ -12146,7 +12149,7 @@ async function _dtMaintenances(sids){
   var kpiHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">'+
     _mntKpi('Interventions',nbTotal,_dtMntPeriod+'j · '+nbRealises+' réalisées','')+
     _mntKpi('Taux de clôture',tauxCloture!=null?tauxCloture+'%':'—',nbRealises+'/'+nbTotal+' clôturées',tauxCol)+
-    _mntKpi('Prév. / Correctif',nbPreventif+' / '+nbCorrectif,'préventif vs correctif',nbCorrectif>nbPreventif*2?'var(--rouge)':'')+
+    _mntKpi('Prév. / Correctif',nbPreventif+' / '+nbCorrectif,_fmtKW(coutPreventifW)+' · '+_fmtKW(coutCorrectifW)+' k XOF',nbCorrectif>nbPreventif*2?'var(--rouge)':'')+
     _mntKpi('Pannes actives',nbPannesActives,nbPannesActives===0?'Aucune panne ouverte':nbPannesActives+' en attente',pannesCol)+
   '</div>';
 
@@ -14183,7 +14186,7 @@ function _reportShell(title,bodyHtml,autoPrint){
       '.report-meta{text-align:right;font-size:11px;color:var(--text2);line-height:1.7}'+
       '.report-site{font-family:"Cormorant Garamond",serif;font-size:20px;font-weight:600;color:var(--dark);margin-bottom:2px}'+
       'h2{font-family:"Cormorant Garamond",serif;font-size:17px;font-weight:600;color:var(--dark);margin:32px 0 8px;border-bottom:1px solid var(--border);padding-bottom:6px}'+
-      '.kpi-row{display:flex;gap:10px;margin:20px 0 24px}'+
+      '.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:20px 0 24px}'+
       '.kpi{flex:1;background:#F9F6F0;border:1px solid var(--border);border-radius:8px;padding:14px 16px}'+
       '.kpi-label{font-size:9px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text2);font-weight:600;margin-bottom:6px}'+
       '.kpi-value{font-family:"Cormorant Garamond",serif;font-size:26px;font-weight:600;line-height:1}'+
@@ -14313,9 +14316,9 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
 
   // ── Agrégation par site ──
   var siteData={};
-  sites.forEach(function(s){siteData[s.id]={nom:s.nom,litres:0,coutCarb:0,pannes:0,pannesTot:0,panneCout:0,mntCout:0,mntCount:0,rondes:0,rondesVal:0,rondesTot:0,mttrH:[],mttr:null,toVals:[],toMoy:null,couvertsTotal:null};});
+  sites.forEach(function(s){siteData[s.id]={nom:s.nom,litres:0,coutCarb:0,pannes:0,pannesTot:0,panneCout:0,mntCout:0,mntCount:0,mntPreventif:0,mntCoutPreventif:0,mntCorrectif:0,mntCoutCorrectif:0,rondes:0,rondesVal:0,rondesTot:0,mttrH:[],mttr:null,toVals:[],toMoy:null,couvertsTotal:null};});
   pleins.forEach(function(p){if(siteData[p.site_id]){siteData[p.site_id].litres+=Number(p.litres_ajoutes)||0;siteData[p.site_id].coutCarb+=Number(p.cout)||0;}});
-  maintenances.forEach(function(m){if(siteData[m.groupe_id]){if(m.type!=='ravitaillement')siteData[m.groupe_id].mntCout+=Number(m.cout)||0;siteData[m.groupe_id].mntCount++;}});
+  maintenances.forEach(function(m){if(siteData[m.groupe_id]){if(m.type!=='ravitaillement'){siteData[m.groupe_id].mntCout+=Number(m.cout)||0;}siteData[m.groupe_id].mntCount++;if(m.type==='preventive'){siteData[m.groupe_id].mntPreventif++;siteData[m.groupe_id].mntCoutPreventif+=Number(m.cout)||0;}else if(m.type==='panne'||m.type==='corrective'){siteData[m.groupe_id].mntCorrectif++;siteData[m.groupe_id].mntCoutCorrectif+=Number(m.cout)||0;}}});
   signalements.forEach(function(s){if(siteData[s.groupe_id]){siteData[s.groupe_id].pannesTot++;if(s.statut!=='resolu')siteData[s.groupe_id].pannes++;siteData[s.groupe_id].panneCout+=Number(s.cout_intervention)||0;if(s.statut==='resolu'&&s.created_at&&s.resolved_at){var ttr=(new Date(s.resolved_at)-new Date(s.created_at))/3600000;if(ttr>=0)siteData[s.groupe_id].mttrH.push(ttr);}}});
   var reByRonde={};rondesEq.forEach(function(re){if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];reByRonde[re.ronde_id].push(re);});
   rondes.forEach(function(r){if(siteData[r.site_id]){siteData[r.site_id].rondes++;var eq=reByRonde[r.id]||[];siteData[r.site_id].rondesTot+=eq.length;siteData[r.site_id].rondesVal+=eq.filter(function(re){return re.statut==='valide';}).length;}});
@@ -14332,8 +14335,8 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   });
 
   // ── KPI globaux ──
-  var totLitres=0,totCarb=0,totPannes=0,totMnt=0,totMntCout=0,totRVal=0,totRTot=0;
-  Object.values(siteData).forEach(function(d){totLitres+=d.litres;totCarb+=d.coutCarb;totPannes+=d.pannes;totMnt+=d.mntCount;totMntCout+=d.mntCout;totRVal+=d.rondesVal;totRTot+=d.rondesTot;});
+  var totLitres=0,totCarb=0,totPannes=0,totMnt=0,totMntCout=0,totRVal=0,totRTot=0,totMntPreventif=0,totMntCoutPreventif=0,totMntCorrectif=0,totMntCoutCorrectif=0;
+  Object.values(siteData).forEach(function(d){totLitres+=d.litres;totCarb+=d.coutCarb;totPannes+=d.pannes;totMnt+=d.mntCount;totMntCout+=d.mntCout;totRVal+=d.rondesVal;totRTot+=d.rondesTot;totMntPreventif+=d.mntPreventif;totMntCoutPreventif+=d.mntCoutPreventif;totMntCorrectif+=d.mntCorrectif;totMntCoutCorrectif+=d.mntCoutCorrectif;});
   var confPct=totRTot>0?Math.round(totRVal/totRTot*100):null;
   var allTtrs=signalements.filter(function(s){return s.statut==='resolu'&&s.created_at&&s.resolved_at;}).map(function(s){return(new Date(s.resolved_at)-new Date(s.created_at))/3600000;});
   var avgMttr=allTtrs.length?allTtrs.reduce(function(a,b){return a+b;},0)/allTtrs.length:null;
@@ -14466,7 +14469,8 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
     '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+kpiCol(confPct,70,90,false)+'">'+(confPct!==null?confPct+'%':'—')+'</div><div class="kpi-sub">Tous sites · '+period+' jours</div></div>'+
     '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+' FCFA':'Coût non saisi')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+kpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-sub">MTTR moy. : '+fmtDur(avgMttr)+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Coût total</div><div class="kpi-value">'+(totCarb+totMntCout>0?(totCarb+totMntCout).toLocaleString('fr-FR'):'—')+'</div><div class="kpi-sub">FCFA (carburant + maintenance)</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Maint. préventif</div><div class="kpi-value">'+totMntPreventif+'</div><div class="kpi-sub">'+(totMntCoutPreventif>0?fmtCout(totMntCoutPreventif,'XOF'):'aucun coût')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Maint. correctif</div><div class="kpi-value" style="color:'+(totMntCorrectif>0?'#C0392B':'#2D7A4F')+'">'+totMntCorrectif+'</div><div class="kpi-sub">'+(totMntCoutCorrectif>0?fmtCout(totMntCoutCorrectif,'XOF'):'aucun coût')+'</div></div>'+
   '</div>';
 
   // ── Légende couleurs (réutilisée partout) ──
