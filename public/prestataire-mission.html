@@ -173,7 +173,7 @@ async function init(){
   var token=params.get('token');
   if(!token){renderError('Lien invalide — token manquant.');return;}
 
-  var missions=await sbGet('missions','token=eq.'+token+'&select=*,equipements(nom,marque,modele,types_equipements(nom)),sites(nom)');
+  var missions=await sbGet('missions','token=eq.'+token+'&select=*,duree_heures,cout,devise,equipements(nom,marque,modele,types_equipements(nom)),sites(nom)');
   if(!missions||!missions.length){renderError('Mission introuvable ou expirée.');return;}
   _mission=missions[0];
 
@@ -232,7 +232,7 @@ function renderApp(){
         var checked=st.checklistCompletee[ci];
         html+='<div class="checklist-item" onclick="_toggleCheck(\''+mp.id+'\','+ci+')">';
         html+='<div class="check-box'+(checked?' checked':'')+'">'+( checked?'✓':'')+'</div>';
-        html+='<span class="check-text'+(checked?' checked':'')+'">'+esc(_clItemText(item))+'</span>';
+        html+='<span class="check-text'+(checked?' checked':'')+'">'+esc(_clItemText(item)||('Point '+(ci+1)))+'</span>';
         html+='</div>';
       });
       html+='</div>';
@@ -273,6 +273,23 @@ function renderApp(){
 
     html+='</div></div>';
   });
+
+  // Infos intervention (durée + coût)
+  html+='<div class="card" style="margin-top:4px">';
+  html+='<div style="padding:14px 16px">';
+  html+='<div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:12px">📋 Informations intervention</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  html+='<div>';
+  html+='<label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:5px">⏱ Durée (heures)</label>';
+  html+='<input id="inp-duree" type="number" min="0" max="99" step="0.5" placeholder="ex: 2.5" '+
+    'style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box">';
+  html+='</div>';
+  html+='<div>';
+  html+='<label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:5px">💰 Coût total (FCFA)</label>';
+  html+='<input id="inp-cout" type="number" min="0" step="100" placeholder="ex: 85000" '+
+    'style="width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box">';
+  html+='</div>';
+  html+='</div></div></div>';
 
   // Bouton clôture
   html+='<div style="padding:4px 0 24px">';
@@ -397,8 +414,17 @@ async function _submit(){
     }
   }
 
-  // 2. Mettre à jour mission
-  await sbPatch('missions',_mission.id,{statut:missionStatut,completed_at:new Date().toISOString()});
+  // 2. Mettre à jour mission (statut + coût + durée)
+  var dureeInp=document.getElementById('inp-duree');
+  var coutInp=document.getElementById('inp-cout');
+  var dureeVal=dureeInp&&dureeInp.value?parseFloat(dureeInp.value):null;
+  var coutVal=coutInp&&coutInp.value?parseFloat(coutInp.value):null;
+  await sbPatch('missions',_mission.id,{
+    statut:missionStatut,
+    completed_at:new Date().toISOString(),
+    duree_heures:dureeVal,
+    cout:coutVal
+  });
   _mission.statut=missionStatut;
 
   // 3. Recharger mission_plans mis à jour
@@ -446,6 +472,8 @@ function renderRapport(){
   if(siteNom)html+='<div class="rapport-row"><span class="rapport-row-label">Site</span><span class="rapport-row-val">'+esc(siteNom)+'</span></div>';
   if(dateComp)html+='<div class="rapport-row"><span class="rapport-row-label">Date</span><span class="rapport-row-val">'+esc(dateComp)+'</span></div>';
   if(_mission.nom_prestataire)html+='<div class="rapport-row"><span class="rapport-row-label">Prestataire</span><span class="rapport-row-val">'+esc(_mission.nom_prestataire)+'</span></div>';
+  if(_mission.duree_heures!=null)html+='<div class="rapport-row"><span class="rapport-row-label">⏱ Durée</span><span class="rapport-row-val">'+_mission.duree_heures+'h</span></div>';
+  if(_mission.cout!=null){var devMission=_mission.devise||'FCFA';html+='<div class="rapport-row"><span class="rapport-row-label">💰 Coût</span><span class="rapport-row-val" style="font-weight:700;color:#1e40af">'+Number(_mission.cout).toLocaleString('fr-FR')+' '+devMission+'</span></div>';}
   html+='</div>';
 
   _missionPlans.forEach(function(mp,i){
@@ -468,9 +496,10 @@ function renderRapport(){
       html+='<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px">Checklist ('+doneCount+'/'+checklist.length+' validés)</div>';
       checklist.forEach(function(item,ci){
         var done=checkDone[ci]?true:false;
+        var txt=_clItemText(item)||('Point '+(ci+1));
         html+='<div style="display:flex;align-items:flex-start;gap:6px;padding:3px 0;font-size:12px;color:'+(done?'#16a34a':'#94a3b8')+'">'+
           '<span style="font-weight:700;min-width:12px;flex-shrink:0">'+(done?'✓':'○')+'</span>'+
-          '<span>'+esc(_clItemText(item))+'</span>'+
+          '<span>'+esc(txt)+'</span>'+
         '</div>';
       });
       html+='</div>';
@@ -550,6 +579,7 @@ function _downloadPDF(){
     doc.setDrawColor(220,220,220);doc.line(14,y,196,y);y+=5;
     doc.setFont('helvetica','normal');doc.setFontSize(9);
 
+    var devPdf=_mission.devise||'FCFA';
     var infos=[
       ['Équipement',eqNom+(marque?' — '+marque+' '+modele:'')],
       ['Site',siteNom||'—'],
@@ -557,6 +587,8 @@ function _downloadPDF(){
       ['Date intervention',today],
       ['Statut',_mission.statut==='realisee'?'Réalisé':_mission.statut==='echec'?'Bloqué':'En cours']
     ];
+    if(_mission.duree_heures!=null)infos.push(['Durée intervention',_mission.duree_heures+'h']);
+    if(_mission.cout!=null)infos.push(['Coût total',Number(_mission.cout).toLocaleString('fr-FR')+' '+devPdf]);
     infos.forEach(function(row){
       doc.setFont('helvetica','bold');doc.text(row[0]+' :',14,y);
       doc.setFont('helvetica','normal');doc.text(String(row[1]),70,y);
@@ -596,8 +628,9 @@ function _downloadPDF(){
         checklist.forEach(function(item,ci){
           if(y>270){doc.addPage();y=14;}
           var done=checkDone[ci]?'✓':'○';
+          var clTxt=_clItemText(item)||('Point '+(ci+1));
           doc.setTextColor(checkDone[ci]?22:150,checkDone[ci]?163:150,checkDone[ci]?74:150);
-          doc.text('  '+done+' '+_clItemText(item),18,y);y+=4;
+          doc.text('  '+done+' '+clTxt,18,y);y+=4;
         });
         doc.setTextColor(30,41,59);y+=1;
       }

@@ -3169,6 +3169,7 @@ var _mntEqSearch='';
 var _mntCurrentData=null;
 var _mntRenderEqRowFn=null;
 var _mntCalMonth=null;
+var _mntCalSelectedDay=null; // {year,month,day} quand l'utilisateur clique sur une date
 
 var _MNT_TYPES={
   panne:{label:'Panne / Réparation',icon:'🔧',color:'var(--rouge)',bg:'var(--rouge-pale)'},
@@ -4123,6 +4124,24 @@ function _mntKpiTab(label,val,sub,col){
   '</div>';
 }
 
+function _mntKpiCard(label,val,sub,col,icon){
+  return '<div style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;padding:14px 16px;min-height:88px">'+
+    '<div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">'+
+      (icon?'<i class="ti '+icon+'" style="font-size:11px;margin-right:3px"></i>':'')+label+
+    '</div>'+
+    '<div style="font-size:26px;font-weight:800;color:'+col+';line-height:1;margin-bottom:4px">'+val+'</div>'+
+    (sub?'<div style="font-size:11px;color:#94a3b8">'+sub+'</div>':'')+
+  '</div>';
+}
+
+function _mntFmtCout(v,devise){
+  if(v==null||isNaN(v))return '—';
+  devise=devise||'FCFA';
+  if(v>=1000000)return (v/1000000).toFixed(1).replace(/\.0$/,'')+'M '+devise;
+  if(v>=1000)return Math.round(v/1000)+'k '+devise;
+  return v+' '+devise;
+}
+
 async function _rtMaintenances(sid){
   _mntSelectedTaskId=null; // reset selection à chaque rechargement de la vue
   var dc=document.getElementById('dash-content-main');
@@ -4163,6 +4182,12 @@ async function _rtMaintenances(sid){
   });
   statuts.forEach(function(s){if(s.equipement_id)statutIdx[s.equipement_id]=s;});
 
+  // Fetch missions récentes (30j) pour KPI coût/taux
+  var dMissions30=new Date();dMissions30.setDate(dMissions30.getDate()-30);
+  var missions30=await supaGet('missions',
+    'site_id=eq.'+sid+'&created_at=gte.'+dMissions30.toISOString()+'&select=id,statut,cout,duree_heures,devise'
+  ).catch(function(){return[];});
+
   // Fetch valeurs mesurées filtrées par les équipements de ce site
   var valeurIdx={};
   if(equips.length){
@@ -4176,10 +4201,30 @@ async function _rtMaintenances(sid){
   // Store globally for filter/search/calendar re-renders
   _mntCurrentData={equips:equips,pannesIdx:pannesIdx,plansIdx:plansIdx,statutIdx:statutIdx,valeurIdx:valeurIdx,plans:plans,sid:sid,today:today,prestataires:prestataires};
 
-  // KPIs
+  // ─── KPI data ────────────────────────────────────────────────────
   var nbPannes=pannes.length;
   var nbSansPlan=equips.filter(function(e){return !plansIdx[e.id];}).length;
   var nbEquips=equips.length;
+  var nbPlansActifs=plans.length;
+  // Échéances ce mois
+  var moisDebMnt=new Date(today.getFullYear(),today.getMonth(),1);
+  var moisFinMnt=new Date(today.getFullYear(),today.getMonth()+1,0);
+  var nbEcheancesMois=plans.filter(function(p){
+    if(!p.prochaine_date)return false;
+    var d=new Date(p.prochaine_date+'T00:00:00');
+    return d>=moisDebMnt&&d<=moisFinMnt;
+  }).length;
+  // Plans en retard
+  var plansEnRetard=plans.filter(function(p){
+    return p.prochaine_date&&new Date(p.prochaine_date+'T00:00:00')<today;
+  });
+  // Coût 30j
+  var cout30j=missions30.reduce(function(s,m){return s+(m.cout||0);},0);
+  var nbMissionsAvecCout=missions30.filter(function(m){return m.cout!=null;}).length;
+  var nbMissionsRealisees=missions30.filter(function(m){return m.statut==='realisee';}).length;
+  var nbMissionsTotal=missions30.length;
+  var devMnt=missions30.length&&missions30[0].devise?missions30[0].devise:'FCFA';
+  var tauxReal=nbMissionsTotal?Math.round(nbMissionsRealisees/nbMissionsTotal*100):null;
 
   // Grouper équipements par type
   var byType={};
@@ -4250,13 +4295,42 @@ async function _rtMaintenances(sid){
       '<div style="font-size:12px;margin-top:5px">Ajoutez des équipements dans les rondes</div>'+
     '</div>';
 
-  var kpiHtml='<div style="display:flex;border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:16px;background:white">'+
-    _mntKpiTab('Équipements',nbEquips,'sur ce site','#1e293b')+
-    '<div style="width:1px;background:#e2e8f0"></div>'+
-    _mntKpiTab('Pannes ouvertes',nbPannes,'à traiter',nbPannes>0?'#ef4444':'#94a3b8')+
-    '<div style="width:1px;background:#e2e8f0"></div>'+
-    _mntKpiTab('Sans plan',nbSansPlan,'plan de maintenance à créer',nbSansPlan>0?'#f59e0b':'#94a3b8')+
+  // ─── 4 KPI cards ────────────────────────────────────────────────
+  var kpiHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">'+
+    _mntKpiCard('Équipements suivis',nbEquips,nbPlansActifs+' plan'+(nbPlansActifs>1?'s':'')+' actif'+(nbPlansActifs>1?'s':''),'#1e293b','ti-tool')+
+    _mntKpiCard('Échéances ce mois',nbEcheancesMois,nbEcheancesMois>0?'À planifier':'Aucune ce mois',nbEcheancesMois>0?'#f59e0b':'#94a3b8','ti-calendar')+
+    _mntKpiCard('Coût maintenance',_mntFmtCout(cout30j,devMnt),nbMissionsAvecCout?nbMissionsAvecCout+' intervention'+(nbMissionsAvecCout>1?'s':''):'30 derniers jours','#1e40af','ti-currency')+
+    _mntKpiCard('Taux réalisation',tauxReal!=null?tauxReal+'%':'—',nbMissionsTotal?nbMissionsRealisees+'/'+nbMissionsTotal+' missions':'Pas de missions',tauxReal==null?'#94a3b8':tauxReal>=80?'#16a34a':tauxReal>=50?'#f59e0b':'#ef4444','ti-check')+
   '</div>';
+
+  // ─── Alertes ────────────────────────────────────────────────────
+  var alertsHtml='';
+  // Plans en retard (1er seulement)
+  if(plansEnRetard.length){
+    var pr=plansEnRetard[0];
+    var prEq=equips.find(function(e){return e.id===pr.equipement_id;})||{};
+    var prDiff=Math.round((today-new Date(pr.prochaine_date+'T00:00:00'))/(1000*60*60*24));
+    alertsHtml+='<div style="background:#fffbeb;border:1.5px solid #fcd34d;border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px">'+
+      '<span style="font-size:18px;flex-shrink:0">⚠️</span>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:12px;font-weight:700;color:#92400e">'+escape_html(prEq.nom||'Équipement')+' · '+escape_html(pr.titre||'Maintenance')+'</div>'+
+        '<div style="font-size:11px;color:#b45309">En retard de '+prDiff+' jour'+(prDiff>1?'s':'')+'. Intervention requise.</div>'+
+      '</div>'+
+      (prEq.id?'<button onclick="_mntSelectEq(\''+prEq.id+'\',\''+escape_html(prEq.nom||'')+'\',\''+sid+'\')" '+
+        'style="padding:6px 12px;background:#f59e0b;color:white;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">Voir la fiche</button>':'')+
+    '</div>';
+  }
+  // Pannes ouvertes
+  if(nbPannes>0){
+    alertsHtml+='<div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px">'+
+      '<span style="font-size:18px;flex-shrink:0">🔴</span>'+
+      '<div style="flex:1">'+
+        '<div style="font-size:12px;font-weight:700;color:#991b1b">'+nbPannes+' panne'+(nbPannes>1?'s':'')+' ouverte'+(nbPannes>1?'s':'')+' en attente</div>'+
+        '<div style="font-size:11px;color:#b91c1c">Consultez les fiches équipements pour traiter.</div>'+
+      '</div>'+
+    '</div>';
+  }
+  kpiHtml=kpiHtml+alertsHtml;
 
   var rightPlaceholder='<div id="mnt-detail-panel" style="background:white;border:1.5px solid #e2e8f0;border-radius:14px;overflow:hidden">'+
     _mntRenderCalendarPanel()+
@@ -4477,6 +4551,7 @@ function _mntRenderCalendarPanel(){
     var key=year+'-'+month+'-'+day;
     var dayPlans=dateMap[key]||[];
     var isToday=todayD.getFullYear()===year&&todayD.getMonth()===month&&todayD.getDate()===day;
+    var isSel=_mntCalSelectedDay&&_mntCalSelectedDay.year===year&&_mntCalSelectedDay.month===month&&_mntCalSelectedDay.day===day;
     var dots='';
     dayPlans.slice(0,3).forEach(function(p){
       var pDate=new Date(p.prochaine_date+'T00:00:00');
@@ -4484,8 +4559,12 @@ function _mntRenderCalendarPanel(){
       var col=diff<0?'#ef4444':diff<=14?'#f59e0b':'#3b82f6';
       dots+='<div style="width:4px;height:4px;border-radius:50%;background:'+col+'"></div>';
     });
-    cells+='<div style="text-align:center;padding:2px 1px;border-radius:5px;'+(isToday?'background:#eff6ff':'')+'">'+
-      '<div style="font-size:10px;color:'+(isToday?'#3b82f6':dayPlans.length?'#1e293b':'#64748b')+';'+(isToday?'font-weight:700':'')+(dayPlans.length&&!isToday?'font-weight:600':'')+'">'+day+'</div>'+
+    var cellBg=isSel?'#1e40af':isToday?'#eff6ff':'';
+    var dayCol=isSel?'white':isToday?'#3b82f6':dayPlans.length?'#1e293b':'#64748b';
+    cells+='<div onclick="_mntCalSelectDay('+year+','+month+','+day+')" '+
+      'style="text-align:center;padding:3px 1px;border-radius:5px;cursor:pointer;'+(cellBg?'background:'+cellBg+';':'')+'" '+
+      'onmouseenter="if(!'+isSel+')this.style.background=\''+(isToday?'#dbeafe':'#f8fafc')+'\'" onmouseleave="if(!'+isSel+')this.style.background=\''+cellBg+'\'">'+
+      '<div style="font-size:10px;color:'+dayCol+';font-weight:'+(isToday||isSel||dayPlans.length?'700':'400')+'">'+day+'</div>'+
       (dots?'<div style="display:flex;justify-content:center;gap:1px;margin-top:1px">'+dots+'</div>':'<div style="height:5px"></div>')+
     '</div>';
   }
@@ -4495,40 +4574,74 @@ function _mntRenderCalendarPanel(){
     cells+='<div style="text-align:center;font-size:10px;color:#cbd5e1;padding:3px 1px">'+nd+'</div>';
   }
 
-  // Agenda: next 7 plans sorted
-  var upcoming=plans
-    .filter(function(p){return p.prochaine_date;})
-    .map(function(p){
-      var pDate=new Date(p.prochaine_date+'T00:00:00');
-      var diff=Math.round((pDate-todayD)/(1000*60*60*24));
-      return {p:p,pDate:pDate,diff:diff};
-    })
-    .sort(function(a,b){return a.diff-b.diff;})
-    .slice(0,7);
+  // ─── Agenda ou détail du jour sélectionné ───────────────────────
+  var agendaTitle='Prochaines interventions';
+  var agendaHtml='';
 
-  var agendaHtml=upcoming.map(function(item){
-    var diff=item.diff;
-    var col=diff<0?'#ef4444':diff<=14?'#f59e0b':'#3b82f6';
-    var badge=diff<0?'En retard '+ Math.abs(diff)+'j':diff===0?"Aujourd'hui":'Dans '+diff+'j';
-    var badgeBg=diff<0?'#fef2f2':diff<=14?'#fffbeb':'#eff6ff';
-    var dayNum=item.pDate.getDate();
-    var monthAbbr=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'][item.pDate.getMonth()];
-    var eqNom=eqNomIdx[item.p.equipement_id]||'';
-    return '<div style="display:flex;align-items:flex-start;gap:9px;padding:7px 14px;border-bottom:1px solid #f1f5f9">'+
-      '<div style="min-width:30px;text-align:center;flex-shrink:0">'+
-        '<div style="font-size:14px;font-weight:700;color:#1e293b;line-height:1">'+dayNum+'</div>'+
-        '<div style="font-size:9px;color:#94a3b8;text-transform:uppercase">'+monthAbbr+'</div>'+
-      '</div>'+
-      '<div style="width:2px;min-height:36px;background:'+col+';border-radius:1px;flex-shrink:0;margin-top:2px"></div>'+
-      '<div style="flex:1;min-width:0">'+
-        '<div style="font-size:11px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(item.p.titre||'Maintenance')+'</div>'+
-        (eqNom?'<div style="font-size:10px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(eqNom)+'</div>':'')+
-        '<span style="font-size:9px;font-weight:600;color:'+col+';background:'+badgeBg+';padding:1px 5px;border-radius:3px">'+badge+'</span>'+
-      '</div>'+
-    '</div>';
-  }).join('');
+  if(_mntCalSelectedDay&&_mntCalSelectedDay.year===year&&_mntCalSelectedDay.month===month){
+    // Afficher le détail du jour sélectionné
+    var selKey=_mntCalSelectedDay.year+'-'+_mntCalSelectedDay.month+'-'+_mntCalSelectedDay.day;
+    var selPlans=dateMap[selKey]||[];
+    var selDate=new Date(_mntCalSelectedDay.year,_mntCalSelectedDay.month,_mntCalSelectedDay.day);
+    var selDateStr=selDate.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+    agendaTitle='📅 '+selDateStr.charAt(0).toUpperCase()+selDateStr.slice(1)+
+      ' <button onclick="_mntCalSelectedDay=null;var p=document.getElementById(\'mnt-detail-panel\');if(p&&!_mntSelectedTaskId)p.innerHTML=_mntRenderCalendarPanel();" '+
+      'style="margin-left:8px;padding:1px 7px;border:1px solid #e2e8f0;border-radius:5px;font-size:9px;background:#f8fafc;color:#64748b;cursor:pointer;font-weight:600">← Retour</button>';
+    if(selPlans.length){
+      agendaHtml=selPlans.map(function(p){
+        var pDate=new Date(p.prochaine_date+'T00:00:00');
+        var diff=Math.round((pDate-todayD)/(1000*60*60*24));
+        var col=diff<0?'#ef4444':diff<=14?'#f59e0b':'#3b82f6';
+        var eqNom=eqNomIdx[p.equipement_id]||'';
+        var prestNom=p.prestataires&&p.prestataires.nom?p.prestataires.nom:(p.intervenant||'');
+        return '<div style="padding:9px 14px;border-bottom:1px solid #f1f5f9">'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+            '<div style="width:8px;height:8px;border-radius:50%;background:'+col+';flex-shrink:0"></div>'+
+            '<span style="font-size:12px;font-weight:700;color:#1e293b;flex:1">'+escape_html(p.titre||'Maintenance')+'</span>'+
+          '</div>'+
+          (eqNom?'<div style="font-size:11px;color:#64748b;padding-left:16px">🔧 '+escape_html(eqNom)+'</div>':'')+
+          (prestNom?'<div style="font-size:11px;color:#64748b;padding-left:16px">👤 '+escape_html(prestNom)+'</div>':'')+
+          '<div style="font-size:10px;color:#94a3b8;padding-left:16px;margin-top:2px">'+escape_html(p.frequence||'')+'</div>'+
+        '</div>';
+      }).join('');
+    } else {
+      agendaHtml='<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Aucune maintenance prévue ce jour</div>';
+    }
+  } else {
+    // Vue agenda : prochaines interventions
+    var upcoming=plans
+      .filter(function(p){return p.prochaine_date;})
+      .map(function(p){
+        var pDate=new Date(p.prochaine_date+'T00:00:00');
+        var diff=Math.round((pDate-todayD)/(1000*60*60*24));
+        return {p:p,pDate:pDate,diff:diff};
+      })
+      .sort(function(a,b){return a.diff-b.diff;})
+      .slice(0,7);
 
-  if(!agendaHtml)agendaHtml='<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Aucune maintenance planifiée</div>';
+    agendaHtml=upcoming.map(function(item){
+      var diff=item.diff;
+      var col=diff<0?'#ef4444':diff<=14?'#f59e0b':'#3b82f6';
+      var badge=diff<0?'En retard '+Math.abs(diff)+'j':diff===0?"Aujourd'hui":'Dans '+diff+'j';
+      var badgeBg=diff<0?'#fef2f2':diff<=14?'#fffbeb':'#eff6ff';
+      var dayNum=item.pDate.getDate();
+      var monthAbbr=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'][item.pDate.getMonth()];
+      var eqNom=eqNomIdx[item.p.equipement_id]||'';
+      return '<div style="display:flex;align-items:flex-start;gap:9px;padding:7px 14px;border-bottom:1px solid #f1f5f9">'+
+        '<div style="min-width:30px;text-align:center;flex-shrink:0">'+
+          '<div style="font-size:14px;font-weight:700;color:#1e293b;line-height:1">'+dayNum+'</div>'+
+          '<div style="font-size:9px;color:#94a3b8;text-transform:uppercase">'+monthAbbr+'</div>'+
+        '</div>'+
+        '<div style="width:2px;min-height:36px;background:'+col+';border-radius:1px;flex-shrink:0;margin-top:2px"></div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:11px;font-weight:600;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(item.p.titre||'Maintenance')+'</div>'+
+          (eqNom?'<div style="font-size:10px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(eqNom)+'</div>':'')+
+          '<span style="font-size:9px;font-weight:600;color:'+col+';background:'+badgeBg+';padding:1px 5px;border-radius:3px">'+badge+'</span>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+    if(!agendaHtml)agendaHtml='<div style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Aucune maintenance planifiée</div>';
+  }
 
   return '<div style="padding:14px 16px 10px">'+
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
@@ -4549,8 +4662,8 @@ function _mntRenderCalendarPanel(){
     '</div>'+
   '</div>'+
   '<div>'+
-    '<div style="padding:7px 14px 4px;background:#fafbfc;border-bottom:1px solid #f1f5f9;border-top:1px solid #f1f5f9">'+
-      '<span style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.8px">Prochaines interventions</span>'+
+    '<div style="padding:7px 14px 4px;background:#fafbfc;border-bottom:1px solid #f1f5f9;border-top:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between">'+
+      '<span style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.8px">'+agendaTitle+'</span>'+
     '</div>'+
     agendaHtml+
   '</div>';
@@ -4572,6 +4685,19 @@ function _mntCalNext(){
   var m=d.month+1,y=d.year;
   if(m>11){m=0;y++;}
   _mntCalMonth={year:y,month:m};
+  var panel=document.getElementById('mnt-detail-panel');
+  if(panel&&!_mntSelectedTaskId)panel.innerHTML=_mntRenderCalendarPanel();
+}
+
+function _mntCalSelectDay(year,month,day){
+  // Toggle : re-cliquer sur le même jour désélectionne
+  if(_mntCalSelectedDay&&_mntCalSelectedDay.year===year&&_mntCalSelectedDay.month===month&&_mntCalSelectedDay.day===day){
+    _mntCalSelectedDay=null;
+  } else {
+    _mntCalSelectedDay={year:year,month:month,day:day};
+    // S'assurer qu'on est sur le bon mois affiché
+    _mntCalMonth={year:year,month:month};
+  }
   var panel=document.getElementById('mnt-detail-panel');
   if(panel&&!_mntSelectedTaskId)panel.innerHTML=_mntRenderCalendarPanel();
 }
