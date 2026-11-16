@@ -14358,6 +14358,992 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
 
   // ── HTML ──
   var h='';
+  // Barre d'action
+  h+='<div class="print-bar">'+
+    '<span class="print-note">✏️ Cliquez sur les zones de texte pour les modifier avant impression</span>'+
+    '<button class="btn-print" onclick="window.print()">🖨 Imprimer / PDF</button>'+
+    '<button class="btn-close" onclick="window.close()">Fermer</button>'+
+  '</div>';
+
+  // ── COUVERTURE (fond sombre) ──
+  h+='<div style="background:#1A1411;border-radius:10px;padding:32px 36px;margin-bottom:32px;page-break-after:avoid">'+
+    '<div class="report-logo" style="color:#E8C87A;margin-bottom:3px">GenTrack</div>'+
+    '<div class="report-sub" style="margin-bottom:20px">Rapport de direction technique</div>'+
+    '<div style="font-size:15px;font-weight:600;color:white;margin-bottom:5px">Bilan multi-sites · '+period+' derniers jours</div>'+
+    '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:2px">Période : '+escape_html(periodeStr)+'</div>'+
+    '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:2px">Directeur technique : '+escape_html(dirNom)+'</div>'+
+    '<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:20px">Généré le '+genDate+'</div>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:7px">'+
+      sites.map(function(s,i){var col=HCOLS[i%HCOLS.length];return'<div style="display:inline-flex;align-items:center;gap:6px;background:'+col+'22;border:1px solid '+col+'55;border-radius:6px;padding:4px 11px;font-size:11px;color:'+col+';font-weight:500"><div style="width:7px;height:7px;border-radius:50%;background:'+col+'"></div>'+escape_html(s.nom)+'</div>';}).join('')+
+    '</div>'+
+  '</div>';
+
+  // ── KPIs globaux ──
+  h+='<div class="kpi-row">'+
+    '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+kpiCol(confPct,70,90,false)+'">'+(confPct!==null?confPct+'%':'—')+'</div><div class="kpi-sub">Tous sites · '+period+' jours</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+' FCFA':'Coût non saisi')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+kpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-sub">MTTR moy. : '+fmtDur(avgMttr)+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Coût total</div><div class="kpi-value">'+(totCarb+totMntCout>0?(totCarb+totMntCout).toLocaleString('fr-FR'):'—')+'</div><div class="kpi-sub">FCFA (carburant + maintenance)</div></div>'+
+  '</div>';
+
+  // ── Légende couleurs (réutilisée partout) ──
+  h+='<div style="display:flex;flex-wrap:wrap;gap:12px;margin:-8px 0 20px">'+
+    sites.map(function(s,i){var col=HCOLS[i%HCOLS.length];return'<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)"><div style="width:9px;height:9px;border-radius:50%;background:'+col+'"></div>'+escape_html(s.nom)+'</div>';}).join('')+
+  '</div>';
+
+  // ── Tableau comparatif ──
+  var hasEnergie=Object.keys(energieBySite).length>0;
+  var hasTO=sites.some(function(s){return siteData[s.id]&&siteData[s.id].toMoy!=null;});
+  var hasCouv=sites.some(function(s){return siteData[s.id]&&siteData[s.id].couvertsTotal!=null;});
+  h+='<h2>Comparatif par hôtel</h2>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px"><thead><tr>'+
+      '<th>Hôtel</th>'+
+      '<th style="text-align:center">Rondes</th>'+
+      '<th style="text-align:center">Pannes</th>'+
+      '<th style="text-align:center">MTTR</th>'+
+      '<th style="text-align:center">Carburant</th>'+
+      '<th style="text-align:center">Coût total</th>'+
+      (hasEnergie?'<th style="text-align:center">Énergie</th>':'')+
+      (hasTO?'<th style="text-align:center">TO%</th>':'')+
+      (hasCouv?'<th style="text-align:center">Couverts</th>':'')+
+      '<th style="text-align:center">Statut</th>'+
+    '</tr></thead><tbody>'+
+    sites.map(function(site,i){
+      var d=siteData[site.id];
+      var sConf=d.rondesTot>0?Math.round(d.rondesVal/d.rondesTot*100):null;
+      var total=d.coutCarb+d.mntCout+d.panneCout;
+      var critique=sConf!==null&&sConf<70||d.pannes>=3;
+      var excellent=(sConf===null||sConf>=90)&&d.pannes===0;
+      var scoreLabel=critique?'Critique':excellent?'Bon':'À surveiller';
+      var scoreCol=critique?'#C0392B':excellent?'#2D7A4F':'#C49A1C';
+      var scoreBg=critique?'#FDECEA':excellent?'#E8F5EE':'#FEF3E2';
+      var mttrCol=d.mttr===null?'#888':d.mttr<=2?'#2D7A4F':d.mttr<=8?'#C49A1C':'#C0392B';
+      var col=HCOLS[i%HCOLS.length];
+      var rBarW=sConf!=null?Math.min(100,sConf):0;
+      var rBarCol=kpiCol(sConf,70,90,false);
+      var efData=energieBySite[site.id]||null;
+      var efItems=efData?efData.items:[];
+      var efWithPct=efItems.filter(function(f){return f.pct!=null;});
+      var efAvgPct=efWithPct.length?Math.round(efWithPct.reduce(function(a,f){return a+f.pct;},0)/efWithPct.length):null;
+      var efCol=efAvgPct==null?'#888':efAvgPct>100?'#C0392B':efAvgPct>85?'#C49A1C':'#2D7A4F';
+      var efLabel=efAvgPct==null?'—':efAvgPct+'%';
+      return '<tr style="background:'+(i%2?'#FAFAF8':'white')+';border-bottom:1px solid #EDE5D8">'+
+        '<td style="padding:9px 11px"><div style="display:flex;align-items:center;gap:7px"><div style="width:9px;height:9px;border-radius:50%;background:'+col+';flex-shrink:0"></div><span style="font-weight:600;color:var(--dark)">'+escape_html(site.nom)+'</span></div></td>'+
+        '<td style="padding:9px 11px"><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;height:5px;background:#EDE5D8;border-radius:3px;overflow:hidden;min-width:40px"><div style="width:'+rBarW+'%;height:100%;border-radius:3px;background:'+rBarCol+'"></div></div><span style="font-size:11px;font-weight:600;color:'+rBarCol+';min-width:28px;text-align:right">'+(sConf!==null?sConf+'%':'—')+'</span></div></td>'+
+        '<td style="text-align:center;padding:9px 11px;font-weight:700;color:'+kpiCol(d.pannes,1,3,true)+'">'+d.pannes+'</td>'+
+        '<td style="text-align:center;padding:9px 11px;font-weight:600;color:'+mttrCol+'">'+fmtDur(d.mttr)+'</td>'+
+        '<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</td>'+
+        '<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+(total>0?total.toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+        (hasEnergie?'<td style="text-align:center;padding:9px 11px;font-weight:600;color:'+efCol+'">'+efLabel+'</td>':'')+
+        (hasTO?'<td style="text-align:center;padding:9px 11px;font-weight:600;color:'+kpiCol(d.toMoy,60,80,false)+'">'+(d.toMoy!=null?d.toMoy+'%':'—')+'</td>':'')+
+        (hasCouv?'<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+(d.couvertsTotal!=null?d.couvertsTotal.toLocaleString('fr-FR'):'—')+'</td>':'')+
+        '<td style="text-align:center;padding:9px 11px"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:'+scoreBg+';color:'+scoreCol+'">'+scoreLabel+'</span></td>'+
+      '</tr>';
+    }).join('')+
+    '</tbody></table>';
+
+  // ── Section Énergie ──
+  var efSitesList=sites.filter(function(s){return energieBySite[s.id]&&energieBySite[s.id].items.length;});
+  if(efSitesList.length){
+    h+='<h2>Énergie — consommation · coût · budget</h2>';
+    efSitesList.forEach(function(site){
+      var si=sites.indexOf(site);var col=HCOLS[si%HCOLS.length];
+      var ef=energieBySite[site.id];var items=ef.items;
+      var indexItems=items.filter(function(it){return !it.isInstant&&it.pts.length>=2;});
+      h+='<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;page-break-inside:avoid">'+
+        '<div style="background:'+col+'18;border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:8px">'+
+          '<div style="width:10px;height:10px;border-radius:50%;background:'+col+'"></div>'+
+          '<div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(site.nom)+'</div>'+
+          (ef.totalCout!=null?'<div style="margin-left:auto;font-size:11px;color:var(--text2)">Coût : <strong>'+fmtCout(ef.totalCout,'XOF')+'</strong>'+(ef.totalBudget!=null?' / Budget : '+fmtCout(ef.totalBudget,'XOF'):'')+
+            (ef.totalVs!=null?' <span style="color:'+(ef.totalVs>0?'#C0392B':'#2D7A4F')+';font-weight:700">'+(ef.totalVs>0?'+':'')+fmtCout(ef.totalVs,'XOF')+'</span>':'')+'</div>':'')+
+        '</div>'+
+        '<div style="padding:12px 16px">'+
+          (indexItems.length?_svgMultiChartDT(indexItems):'')+
+          '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'+
+            '<th style="text-align:left;padding:5px 8px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Fluide</th>'+
+            '<th style="text-align:right;padding:5px 8px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Conso</th>'+
+            '<th style="text-align:right;padding:5px 8px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Coût réel</th>'+
+            '<th style="text-align:right;padding:5px 8px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Budget</th>'+
+            '<th style="text-align:right;padding:5px 8px;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Écart</th>'+
+          '</tr></thead><tbody>'+
+          items.map(function(it,ii){
+            var pctCol=it.pct!=null?(it.pct>100?'#C0392B':it.pct>85?'#C49A1C':'#2D7A4F'):'#888';
+            var vsCol=it.vs==null?'#888':it.vs>0?'#C0392B':'#2D7A4F';
+            var _consoUnit=it.isInstant&&it.cap!=null?'L':(it.unite||'');
+            var consoStr=it.conso!=null?(it.conso.toLocaleString('fr-FR')+(_consoUnit?' '+_consoUnit:'')):'—';
+            var sub=it.isInstant&&it.restants!=null?'<div style="font-size:10px;color:var(--text3)">Niveau : '+it.restants.toLocaleString('fr-FR')+' L'+(it.lastValPct!=null?' ('+it.lastValPct+'%)':'')+'</div>':'';
+            return '<tr style="background:'+(ii%2?'#FAFAF8':'white')+';border-bottom:1px solid #EDE5D8">'+
+              '<td style="padding:7px 8px"><span style="font-weight:500">'+escape_html(it.f.nom)+'</span>'+sub+'</td>'+
+              '<td style="text-align:right;padding:7px 8px;color:'+pctCol+'">'+consoStr+(it.pct!=null?' <span style="font-size:10px">('+it.pct+'%)</span>':'')+'</td>'+
+              '<td style="text-align:right;padding:7px 8px;font-weight:600">'+(it.cout!=null?fmtCout(it.cout,'XOF'):'—')+'</td>'+
+              '<td style="text-align:right;padding:7px 8px;color:var(--text3)">'+(it.budget!=null?fmtCout(it.budget,'XOF'):'—')+'</td>'+
+              '<td style="text-align:right;padding:7px 8px;font-weight:600;color:'+vsCol+'">'+(it.vs!=null?(it.vs>0?'+':'')+fmtCout(it.vs,'XOF'):'—')+'</td>'+
+            '</tr>';
+          }).join('')+
+          '</tbody></table>'+
+          (ef.totalCout!=null||ef.totalBudget!=null?
+            '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
+              (ef.totalCout!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Coût total énergie</div><div style="font-size:16px;font-weight:700;color:'+col+'">'+fmtCout(ef.totalCout,'XOF')+'</div></div>':'')+
+              (ef.totalBudget!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Budget pro-rata '+period+'j</div><div style="font-size:16px;font-weight:700;color:var(--text2)">'+fmtCout(ef.totalBudget,'XOF')+'</div></div>':'')+
+              (ef.totalVs!=null?
+                (function(){var vCol=ef.totalVs>0?'#C0392B':'#2D7A4F';var vPct=ef.totalBudget?Math.round(ef.totalVs/ef.totalBudget*100):null;return'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Écart vs budget</div><div style="font-size:16px;font-weight:700;color:'+vCol+'">'+(vPct!=null?(vPct>0?'+':'')+vPct+'%':'—')+'</div><div style="font-size:10px;color:'+vCol+'">'+(ef.totalVs>0?'+':'')+fmtCout(ef.totalVs,'XOF')+'</div></div>';})()
+              :'')+
+              (ef.fcfaPerCh!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">FCFA / ch. nuitée</div><div style="font-size:16px;font-weight:700">'+ef.fcfaPerCh.toLocaleString('fr-FR')+'<span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:2px">XOF/ch</span></div>'+(ef.fcfaPerChBudget!=null?'<div style="font-size:10px;color:var(--text3)">Budget : '+ef.fcfaPerChBudget.toLocaleString('fr-FR')+' XOF/ch</div>':'')+(ef.toMoy!=null?'<div style="font-size:10px;color:var(--text3)">'+ef.chambresOcc+' ch.occ./j · TO '+ef.toMoy+'%</div>':'')+'</div>':'')+
+            '</div>'
+          :'')+
+        '</div>'+
+      '</div>';
+    });
+  }
+
+  // ── Top signalements ──
+  if(topSigsList.length){
+    h+='<h2>Top signalements · '+period+' jours</h2>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:24px"><thead><tr>'+
+        '<th>Équipement / Zone / Lieu</th>'+
+        '<th>Hôtel</th>'+
+        '<th style="text-align:center">Occurrences</th>'+
+      '</tr></thead><tbody>'+
+      topSigsList.map(function(t,i){
+        var siteIdx=sites.findIndex(function(s){return s.id===t.siteId;});
+        var col=siteIdx>=0?HCOLS[siteIdx%HCOLS.length]:'#888';
+        return '<tr style="background:'+(i%2?'#FAFAF8':'white')+';border-bottom:1px solid #EDE5D8">'+
+          '<td style="padding:8px 11px;font-weight:500;color:var(--dark)">'+escape_html(t.eqLabel)+'</td>'+
+          '<td style="padding:8px 11px"><div style="display:flex;align-items:center;gap:6px"><div style="width:8px;height:8px;border-radius:50%;background:'+col+'"></div><span style="color:var(--text2)">'+escape_html(t.siteNom)+'</span></div></td>'+
+          '<td style="text-align:center;padding:8px 11px;font-weight:700;font-size:13px;color:'+col+'">'+t.count+'×</td>'+
+        '</tr>';
+      }).join('')+
+      '</tbody></table>';
+  }
+
+  // ── Synthèse narrative ──
+  h+='<h2>Synthèse de direction</h2>'+
+    '<div class="edit-hint">✏️ Modifiable — cliquez pour éditer</div>'+
+    '<p class="narrative" contenteditable="true">'+escape_html(narGlobal)+'</p>';
+
+  // ── Détail par hôtel ──
+  h+='<h2>Détail par hôtel</h2>';
+  sites.forEach(function(site,si){
+    var d=siteData[site.id];
+    var sConf=d.rondesTot>0?Math.round(d.rondesVal/d.rondesTot*100):null;
+    var total=d.coutCarb+d.mntCout+d.panneCout;
+    var siteSignalements=signalements.filter(function(s){return s.groupe_id===site.id;});
+    var siteMaintenances=maintenances.filter(function(m){return m.groupe_id===site.id;});
+    var col=HCOLS[si%HCOLS.length];
+    var pale=HCOLS_PALE[si%HCOLS_PALE.length];
+    var critique=sConf!==null&&sConf<70||d.pannes>=3;
+    var excellent=(sConf===null||sConf>=90)&&d.pannes===0;
+    var scoreLabel=critique?'Critique':excellent?'Bon':'À surveiller';
+    var scoreCol=critique?'#C0392B':excellent?'#2D7A4F':'#C49A1C';
+    var scoreBg=critique?'#FDECEA':excellent?'#E8F5EE':'#FEF3E2';
+
+    h+='<div style="display:grid;grid-template-columns:4px 1fr;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:24px;page-break-inside:avoid">'+
+      '<div style="background:'+col+'"></div>'+
+      '<div style="padding:18px 22px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'+
+          '<div style="display:flex;align-items:center;gap:8px">'+
+            '<div style="width:10px;height:10px;border-radius:50%;background:'+col+'"></div>'+
+            '<span style="font-family:\'Cormorant Garamond\',serif;font-size:16px;font-weight:600;color:var(--dark)">'+escape_html(site.nom)+'</span>'+
+          '</div>'+
+          '<span style="display:inline-block;padding:3px 10px;border-radius:5px;font-size:10px;font-weight:600;background:'+scoreBg+';color:'+scoreCol+'">'+scoreLabel+'</span>'+
+        '</div>'+
+        '<div class="kpi-row" style="margin-bottom:14px">'+
+          '<div class="kpi"><div class="kpi-label">Rondes</div><div class="kpi-value" style="font-size:20px;color:'+kpiCol(sConf,70,90,false)+'">'+(sConf!==null?sConf+'%':'—')+'</div><div class="kpi-sub">'+d.rondes+' rondes</div></div>'+
+          '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="font-size:20px;color:'+kpiCol(d.pannes,1,3,true)+'">'+d.pannes+'</div><div class="kpi-sub">'+d.pannesTot+' total période</div></div>'+
+          '<div class="kpi"><div class="kpi-label">MTTR moyen</div><div class="kpi-value" style="font-size:20px;color:'+(d.mttr===null?'#888':d.mttr<=2?'#2D7A4F':d.mttr<=8?'#C49A1C':'#C0392B')+'">'+fmtDur(d.mttr)+'</div><div class="kpi-sub">temps résolution</div></div>'+
+          '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value" style="font-size:20px">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
+          (d.toMoy!=null?'<div class="kpi"><div class="kpi-label">TO moyen</div><div class="kpi-value" style="font-size:20px;color:'+kpiCol(d.toMoy,60,80,false)+'">'+d.toMoy+'%</div><div class="kpi-sub">taux d\'occupation</div></div>':'')+
+          (d.couvertsTotal!=null?'<div class="kpi"><div class="kpi-label">Couverts</div><div class="kpi-value" style="font-size:20px">'+d.couvertsTotal.toLocaleString('fr-FR')+'</div><div class="kpi-sub">servis sur la période</div></div>':'')+
+          (rzBySite[site.id]&&rzBySite[site.id].count?'<div class="kpi"><div class="kpi-label">Rondes zones</div><div class="kpi-value" style="font-size:20px;color:#2D7A4F">'+rzBySite[site.id].count+'</div><div class="kpi-sub">'+(rzBySite[site.id].anomalies>0?rzBySite[site.id].anomalies+' anomalie'+(rzBySite[site.id].anomalies>1?'s':''):'0 anomalie')+'</div></div>':'')+
+          (total>0?'<div class="kpi" style="border-color:'+col+'55;background:'+pale+'"><div class="kpi-label">Coût total</div><div class="kpi-value" style="font-size:20px;color:'+col+'">'+total.toLocaleString('fr-FR')+'</div><div class="kpi-sub">FCFA</div></div>':'')+
+        '</div>'+
+        '<div class="edit-hint">Observations (modifiable)</div>'+
+        '<div class="obs-zone" contenteditable="true" data-placeholder="Observations pour '+escape_html(site.nom)+' : constats, recommandations, actions..."></div>'+
+        (siteSignalements.length>0?
+          '<div style="margin-top:14px"><div style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Signalements</div>'+
+          '<table><thead><tr><th>Équipement / Zone / Lieu</th><th>Description</th><th>Date</th><th>Statut</th><th>Coût</th></tr></thead><tbody>'+
+          siteSignalements.slice(0,15).map(function(s){
+            var ts=new Date(s.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+            var resolu=s.statut==='resolu';
+            var eqNom=s.equipements&&s.equipements.nom?s.equipements.nom
+              :s.equipements_zone&&s.equipements_zone.nom?(s.equipements_zone.nom+(s.equipements_zone.zones&&s.equipements_zone.zones.nom?' · '+s.equipements_zone.zones.nom:''))
+              :s.lieu||'—';
+            return '<tr>'+
+              '<td style="font-weight:500">'+escape_html(eqNom)+'</td>'+
+              '<td style="max-width:220px;color:var(--text2)">'+escape_html((s.description||'').substring(0,70))+'</td>'+
+              '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
+              '<td>'+(resolu?'<span class="badge badge-ok">Résolu</span>':'<span class="badge badge-ko">En cours</span>')+'</td>'+
+              '<td style="font-size:11px">'+(s.cout_intervention?Number(s.cout_intervention).toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+            '</tr>';
+          }).join('')+
+          '</tbody></table></div>':'')+
+        (siteMaintenances.length>0?
+          '<div style="margin-top:14px"><div style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Interventions maintenance</div>'+
+          '<table><thead><tr><th>Intervention</th><th>Type</th><th>Intervenant</th><th>Date</th><th>Coût</th></tr></thead><tbody>'+
+          siteMaintenances.slice(0,15).map(function(m){
+            var ts=m.date_intervention?new Date(m.date_intervention).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
+            var eqNom=m.equipements&&m.equipements.nom?' · '+m.equipements.nom:'';
+            return '<tr>'+
+              '<td><strong>'+escape_html(m.titre||'Intervention')+'</strong>'+escape_html(eqNom)+'</td>'+
+              '<td style="font-size:11px;color:var(--text2)">'+escape_html(m.type||'—')+'</td>'+
+              '<td style="font-size:11px">'+escape_html(m.prestataire||'—')+'</td>'+
+              '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
+              '<td style="font-size:11px">'+(m.cout?(Number(m.cout)||0).toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+            '</tr>';
+          }).join('')+
+          '</tbody></table></div>':'')+
+      '</div>'+
+    '</div>';
+  });
+
+  // Signature
+  h+='<div class="sig-row">'+
+    '<div class="sig-block">Fait à ________________, le '+new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+'<br><br><br>'+escape_html(dirNom)+'<br><span style="font-size:10px;color:var(--text3)">Directeur Technique</span></div>'+
+    '<div class="sig-block">Visa direction générale<br><br><br>____________________</div>'+
+  '</div>';
+  h+='<div class="footer-doc"><span>GenTrack · Pilotage technique hôtelier</span><span>Rapport généré le '+new Date().toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+'</span></div>';
+
+  return _reportShell('Rapport DT — '+period+' jours',h,false);
+}
+
+// ── Rapport hebdomadaire professionnel (resp_tech) ─────────────────────────────
+var _rtRapportMoisOffset=0;
+function _toggleRapportMenu(){
+  var m=document.getElementById('rapport-menu');
+  if(!m)return;
+  var open=m.style.display==='none';
+  m.style.display=open?'block':'none';
+  if(open){
+    _rtUpdateRapportMoisLabel();
+    var close=function(e){if(!m.contains(e.target)&&e.target.id!=='rapport-btn'){m.style.display='none';document.removeEventListener('click',close);}};
+    setTimeout(function(){document.addEventListener('click',close);},0);
+  }
+}
+function _rtUpdateRapportMoisLabel(){
+  var now=new Date();
+  var tgt=new Date(now.getFullYear(),now.getMonth()+_rtRapportMoisOffset,1);
+  var ml=tgt.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  var lbl=document.getElementById('rapport-rt-mois-lbl');
+  if(lbl)lbl.textContent=ml.charAt(0).toUpperCase()+ml.slice(1);
+  var nxt=document.getElementById('rapport-rt-mois-next');
+  if(nxt){nxt.disabled=_rtRapportMoisOffset>=0;nxt.style.opacity=_rtRapportMoisOffset>=0?'0.3':'1';}
+}
+function _rtNavRapportMois(d){
+  _rtRapportMoisOffset=Math.min(0,_rtRapportMoisOffset+d);
+  _rtUpdateRapportMoisLabel();
+}
+
+function _openAfficheBotRT(){
+  var siteNom=(_session&&_session.siteNom)||'';
+  var url='affiche-bot.html'+(siteNom?'?nom='+encodeURIComponent(siteNom):'');
+  window.open(url,'_blank');
+}
+
+async function _openRapportHebdo(period){
+  period=period||7;
+  var m=document.getElementById('rapport-menu');if(m)m.style.display='none';
+  var btn=document.getElementById('rapport-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Chargement...';}
+  try{
+    var sid=_activeSiteId||(_session.site_ids&&_session.site_ids[0]);
+    if(!sid){alert('Aucun site configuré.');return;}
+    var cutoff=dateNJours(period);
+    var dateDebut=new Date();dateDebut.setDate(dateDebut.getDate()-period);
+    var dateFin=new Date();
+    var periodeStr=dateDebut.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})+' – '+dateFin.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+
+    var[siteRow,equips,rondes,signalements,maintenances]=await Promise.all([
+      supaGet('sites','id=eq.'+sid+'&select=nom,nb_chambres&limit=1'),
+      supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,capacite_litres,conso_theorique_lh,types_equipements(nom)&order=ordre_ronde.asc'),
+      supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+cutoff+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=200'),
+      supaGet('signalements','groupe_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,type,description,statut,signale_par,equipement_id,equipement_zone_id,cout_intervention,created_at,resolved_at,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=60'),
+      supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+cutoff+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=40')
+    ]);
+    var siteNom=siteRow.length?siteRow[0].nom:'Mon site';
+    var rIds=rondes.map(function(r){return r.id;});
+    var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=id,ronde_id,equipement_id,statut'):[];
+
+    var eqIds=equips.map(function(e){return e.id;});
+    // questions dict (used for both rondes + relevés)
+    var questions=eqIds.length?await supaGet('questions','equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&select=id,equipement_id,texte,unite'):[];
+    var qMap={};questions.forEach(function(q){qMap[q.id]=q;});
+    var eqMap={};equips.forEach(function(e){eqMap[e.id]=e;});
+
+    var lastRepsByEq={};
+
+    // ── Source 1 : rondes (ronde_equipement_id) ──
+    if(eqIds.length){
+      var allLastRE=await supaGet('rondes_equipements','equipement_id=in.('+eqIds.join(',')+')'+'&statut=eq.valide&valide_at=not.is.null&select=id,equipement_id,valide_at&order=valide_at.desc&limit='+eqIds.length*5);
+      var seenEq=new Set();var topREIds=[];
+      allLastRE.forEach(function(re){if(!seenEq.has(re.equipement_id)){seenEq.add(re.equipement_id);topREIds.push(re.id);lastRepsByEq[re.equipement_id]={valide_at:re.valide_at,re_id:re.id,vals:[]};}});
+      if(topREIds.length){
+        var repsRonde=await supaGet('reponses','ronde_equipement_id=in.('+topREIds.join(',')+')'+'&select=ronde_equipement_id,question_id,valeur');
+        repsRonde.forEach(function(r){
+          var q=qMap[r.question_id];if(!q)return;
+          var eqId=q.equipement_id;
+          if(!lastRepsByEq[eqId]||lastRepsByEq[eqId].re_id!==r.ronde_equipement_id)return;
+          lastRepsByEq[eqId].vals.push({texte:q.texte,valeur:r.valeur,unite:q.unite||''});
+        });
+      }
+    }
+
+    // ── Source 2 : relevés horaires (releve_id) ──
+    var cuveHistory={};// {eqId:{nom,cap,points:[{t,v}]}}
+    var releveExportRows=[];// pour CSV
+    var relevesH=await supaGet('releves_horaires','site_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,created_at&order=created_at.asc&limit=500');
+    if(relevesH.length){
+      var relDateMap={};relevesH.forEach(function(r){relDateMap[r.id]=r.created_at;});
+      var relIds=relevesH.map(function(r){return r.id;});
+      var repsReleve=await supaGet('reponses','releve_id=in.('+relIds.join(',')+')'+'&select=releve_id,question_id,valeur,created_at&order=created_at.asc');
+
+      // groupe par releve_id+equipement → dernière lecture par équipement
+      var latestRelByEq={};// {eqId: releve_id avec ts le plus récent}
+      repsReleve.forEach(function(r){
+        var q=qMap[r.question_id];if(!q)return;
+        var eqId=q.equipement_id;if(!eqId)return;
+        var ts=relDateMap[r.releve_id]||r.created_at||'';
+        if(!latestRelByEq[eqId]||ts>(relDateMap[latestRelByEq[eqId]]||'')){latestRelByEq[eqId]=r.releve_id;}
+      });
+      // collecte vals pour le dernier relevé de chaque équipement
+      var releveVals={};// {eqId:[{texte,valeur,unite}]}
+      repsReleve.forEach(function(r){
+        var q=qMap[r.question_id];if(!q)return;
+        var eqId=q.equipement_id;if(!eqId)return;
+        if(r.releve_id!==latestRelByEq[eqId])return;
+        if(!releveVals[eqId])releveVals[eqId]=[];
+        releveVals[eqId].push({texte:q.texte,valeur:r.valeur,unite:q.unite||''});
+      });
+      // Merge : remplace lastRepsByEq si plus récent
+      Object.keys(latestRelByEq).forEach(function(eqId){
+        var ts=relDateMap[latestRelByEq[eqId]]||'';
+        if(!lastRepsByEq[eqId]||(ts&&ts>(lastRepsByEq[eqId].valide_at||''))){
+          lastRepsByEq[eqId]={valide_at:ts,vals:releveVals[eqId]||[]};
+        }
+      });
+
+      // historique cuve : toutes les lectures niveau dans la période
+      repsReleve.forEach(function(r){
+        var q=qMap[r.question_id];if(!q)return;
+        if(!q.texte.toLowerCase().includes('niveau'))return;
+        var eqId=q.equipement_id;if(!eqId)return;
+        var eq=eqMap[eqId];if(!eq||!eq.capacite_litres)return;
+        var niveau=parseFloat(r.valeur);if(isNaN(niveau))return;
+        var ts=relDateMap[r.releve_id]||r.created_at||'';
+        if(!cuveHistory[eqId])cuveHistory[eqId]={nom:eq.nom,cap:parseFloat(eq.capacite_litres),points:[]};
+        if(!cuveHistory[eqId].points.some(function(p){return p.t===ts;}))
+          cuveHistory[eqId].points.push({t:ts,v:niveau});
+      });
+      Object.values(cuveHistory).forEach(function(h){h.points.sort(function(a,b){return a.t<b.t?-1:1;});});
+
+      // prépare export CSV relevés
+      repsReleve.forEach(function(r){
+        var q=qMap[r.question_id];if(!q)return;
+        var ts=relDateMap[r.releve_id]||r.created_at||'';
+        var eq=eqMap[q.equipement_id];
+        releveExportRows.push([
+          ts.replace('T',' ').substring(0,16),
+          eq?eq.nom:'',
+          q.texte,
+          r.valeur,
+          q.unite||''
+        ]);
+      });
+    }
+
+    // prépare export CSV rondes — détaillé (une ligne par réponse)
+    var rondeExportRows=[];
+    var reIds=rondesEq.map(function(re){return re.id;}).filter(Boolean);
+    if(reIds.length){
+      var rondeMap={};rondes.forEach(function(ro){rondeMap[ro.id]=ro;});
+      var reMap={};rondesEq.forEach(function(re){reMap[re.id]=re;});
+      var repsRondeExp=await supaGet('reponses','ronde_equipement_id=in.('+reIds.join(',')+')'+'&select=ronde_equipement_id,question_id,valeur&order=ronde_equipement_id.asc');
+      repsRondeExp.forEach(function(r){
+        var re=reMap[r.ronde_equipement_id];if(!re)return;
+        var ro=rondeMap[re.ronde_id];if(!ro)return;
+        var q=qMap[r.question_id];if(!q)return;
+        var eq=eqMap[re.equipement_id];
+        rondeExportRows.push([
+          ro.date_ronde,
+          _FREQ_LABELS[ro.frequence]||ro.frequence,
+          eq?eq.nom:'',
+          q.texte,
+          r.valeur,
+          q.unite||'',
+          re.statut||''
+        ]);
+        // historique cuve depuis rondes
+        if(eq&&eq.capacite_litres&&q.texte.toLowerCase().indexOf('niveau')>=0){
+          var niv=parseFloat(r.valeur);
+          if(!isNaN(niv)){
+            var ts=ro.date_ronde+'T06:00:00Z';
+            var eqId=re.equipement_id;
+            if(!cuveHistory[eqId])cuveHistory[eqId]={nom:eq.nom,cap:parseFloat(eq.capacite_litres),points:[]};
+            if(!cuveHistory[eqId].points.some(function(p){return p.t.startsWith(ro.date_ronde);}))
+              cuveHistory[eqId].points.push({t:ts,v:niv});
+          }
+        }
+      });
+      Object.values(cuveHistory).forEach(function(h){h.points.sort(function(a,b){return a.t<b.t?-1:1;});});
+    }
+
+    // Énergie
+    var _now2=new Date();var _anneeR=_now2.getFullYear();var _moisR=_now2.getMonth()+1;
+    var[energieFluides,relevesEnergiePeriode,pleinsPeriode,budgetMensuelArr]=await Promise.all([
+      supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,objectif_mensuel,capacite,devise&order=ordre.asc'),
+      supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+cutoff+'&select=date_releve,valeurs,saisi_par,to_percent,nb_couverts&order=date_releve.asc&limit=100'),
+      supaGet('pleins','site_id=eq.'+sid+'&date=gte.'+cutoff+'&select=date,litres_ajoutes&order=date.asc&limit=50'),
+      supaGet('energie_budget_mensuel','site_id=eq.'+sid+'&annee=eq.'+_anneeR+'&mois=eq.'+_moisR+'&limit=1')
+    ]);
+    var _budgetMensuel=budgetMensuelArr&&budgetMensuelArr.length?budgetMensuelArr[0]:null;
+    var _budgetFluides=[];
+    if(_budgetMensuel&&_budgetMensuel.id){_budgetFluides=await supaGet('energie_budget_fluide','budget_id=eq.'+_budgetMensuel.id+'&select=fluide_id,cout_budget_jour')||[];}
+    var _nbCh=siteRow.length&&siteRow[0].nb_chambres?parseInt(siteRow[0].nb_chambres):null;
+    var html=_buildRapportPro(siteNom,periodeStr,period,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[],_nbCh,_budgetMensuel,_budgetFluides);
+    var w=window.open('','_blank');
+    if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
+    w.document.write(html);w.document.close();
+  }catch(e){console.error(e);alert('Erreur : '+(e.message||e));}
+  finally{if(btn){btn.disabled=false;btn.textContent='📄 Rapport ▾';}}
+}
+
+async function _openRapportHebdoMois(offset){
+  var now=new Date();
+  var tgt=new Date(now.getFullYear(),now.getMonth()+(offset||0),1);
+  var moisDebut=tgt.toISOString().split('T')[0];
+  var moisFin=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).toISOString().split('T')[0];
+  var ml=tgt.toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+  var periodeStr=ml.charAt(0).toUpperCase()+ml.slice(1);
+  var daysInMonth=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).getDate();
+  var m=document.getElementById('rapport-menu');if(m)m.style.display='none';
+  var btn=document.getElementById('rapport-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Chargement...';}
+  try{
+    var sid=_activeSiteId||(_session.site_ids&&_session.site_ids[0]);
+    if(!sid){alert('Aucun site configuré.');return;}
+    var[siteRow,equips,rondes,signalements,maintenances]=await Promise.all([
+      supaGet('sites','id=eq.'+sid+'&select=nom,nb_chambres&limit=1'),
+      supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,capacite_litres,conso_theorique_lh,types_equipements(nom)&order=ordre_ronde.asc'),
+      supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+moisDebut+'&date_ronde=lte.'+moisFin+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=200'),
+      supaGet('signalements','groupe_id=eq.'+sid+'&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'T23:59:59&select=id,type,description,statut,signale_par,equipement_id,equipement_zone_id,cout_intervention,created_at,resolved_at,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=60'),
+      supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+moisDebut+'&date_intervention=lte.'+moisFin+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=40')
+    ]);
+    var siteNom=siteRow.length?siteRow[0].nom:'Mon site';
+    var rIds=rondes.map(function(r){return r.id;});
+    var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=id,ronde_id,equipement_id,statut'):[];
+    var eqIds=equips.map(function(e){return e.id;});
+    var questions=eqIds.length?await supaGet('questions','equipement_id=in.('+eqIds.join(',')+')'+'&actif=eq.true&select=id,equipement_id,texte,unite'):[];
+    var qMap={};questions.forEach(function(q){qMap[q.id]=q;});
+    var eqMap={};equips.forEach(function(e){eqMap[e.id]=e;});
+    // dernières réponses rondes
+    var lastRepsByEq={};
+    if(eqIds.length){
+      var allLastRE=await supaGet('rondes_equipements','equipement_id=in.('+eqIds.join(',')+')'+'&statut=eq.valide&valide_at=not.is.null&select=id,equipement_id,valide_at&order=valide_at.desc&limit='+eqIds.length*5);
+      var seenEq=new Set();var topREIds=[];
+      allLastRE.forEach(function(re){if(!seenEq.has(re.equipement_id)){seenEq.add(re.equipement_id);topREIds.push(re.id);lastRepsByEq[re.equipement_id]={valide_at:re.valide_at,re_id:re.id,vals:[]};}});
+      if(topREIds.length){
+        var repsRonde=await supaGet('reponses','ronde_equipement_id=in.('+topREIds.join(',')+')'+'&select=ronde_equipement_id,question_id,valeur');
+        repsRonde.forEach(function(r){var q=qMap[r.question_id];if(!q)return;var eqId=q.equipement_id;if(!lastRepsByEq[eqId]||lastRepsByEq[eqId].re_id!==r.ronde_equipement_id)return;lastRepsByEq[eqId].vals.push({texte:q.texte,valeur:r.valeur,unite:q.unite||''});});
+      }
+    }
+    var cuveHistory={};var rondeExportRows=[];var releveExportRows=[];
+    var relevesH=await supaGet('releves_horaires','site_id=eq.'+sid+'&created_at=gte.'+moisDebut+'T00:00:00&created_at=lte.'+moisFin+'T23:59:59&select=id,created_at,statut,nb_valeurs,nb_alertes,expires_at&order=created_at.asc&limit=500');
+    if(relevesH.length){
+      var relDateMap={};relevesH.forEach(function(r){relDateMap[r.id]=r.created_at;});
+      var relIds=relevesH.map(function(r){return r.id;});
+      var repsReleve=await supaGet('reponses','releve_id=in.('+relIds.join(',')+')'+'&select=releve_id,question_id,valeur,created_at&order=created_at.asc');
+      var latestRelByEq={};
+      repsReleve.forEach(function(r){var q=qMap[r.question_id];if(!q)return;var eqId=q.equipement_id;if(!eqId)return;var ts=relDateMap[r.releve_id]||r.created_at||'';if(!latestRelByEq[eqId]||ts>(relDateMap[latestRelByEq[eqId]]||'')){latestRelByEq[eqId]=r.releve_id;}});
+      var releveVals={};
+      repsReleve.forEach(function(r){var q=qMap[r.question_id];if(!q)return;var eqId=q.equipement_id;if(!eqId)return;if(r.releve_id!==latestRelByEq[eqId])return;if(!releveVals[eqId])releveVals[eqId]=[];releveVals[eqId].push({texte:q.texte,valeur:r.valeur,unite:q.unite||''});});
+      Object.keys(latestRelByEq).forEach(function(eqId){var ts=relDateMap[latestRelByEq[eqId]]||'';if(!lastRepsByEq[eqId]||(ts&&ts>(lastRepsByEq[eqId].valide_at||''))){lastRepsByEq[eqId]={valide_at:ts,vals:releveVals[eqId]||[]};}});
+    }
+    // rondeExportRows
+    var reIds2=rondesEq.map(function(re){return re.id;}).filter(Boolean);
+    if(reIds2.length){
+      var rondeMap={};rondes.forEach(function(ro){rondeMap[ro.id]=ro;});var reMap={};rondesEq.forEach(function(re){reMap[re.id]=re;});
+      var repsRondeExp=await supaGet('reponses','ronde_equipement_id=in.('+reIds2.join(',')+')'+'&select=ronde_equipement_id,question_id,valeur&order=ronde_equipement_id.asc');
+      repsRondeExp.forEach(function(r){var re=reMap[r.ronde_equipement_id];if(!re)return;var ro=rondeMap[re.ronde_id];if(!ro)return;var q=qMap[r.question_id];if(!q)return;var eq=eqMap[re.equipement_id];rondeExportRows.push([ro.date_ronde,_FREQ_LABELS&&_FREQ_LABELS[ro.frequence]||ro.frequence,eq?eq.nom:'',q.texte,r.valeur,q.unite||'',re.statut||'']);if(eq&&eq.capacite_litres&&q.texte.toLowerCase().indexOf('niveau')>=0){var niv=parseFloat(r.valeur);if(!isNaN(niv)){var eqId2=re.equipement_id;if(!cuveHistory[eqId2])cuveHistory[eqId2]={nom:eq.nom,cap:parseFloat(eq.capacite_litres),points:[]};if(!cuveHistory[eqId2].points.some(function(p){return p.t.startsWith(ro.date_ronde);}))cuveHistory[eqId2].points.push({t:ro.date_ronde+'T06:00:00Z',v:niv});}}});
+      Object.values(cuveHistory).forEach(function(h){h.points.sort(function(a,b){return a.t<b.t?-1:1;});});
+    }
+    // énergie
+    var[energieFluides,relevesEnergiePeriode,pleinsPeriode,budgetMensuelArr]=await Promise.all([
+      supaGet('energie_config','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,unite,type_valeur,tarif,objectif_mensuel,capacite,devise&order=ordre.asc'),
+      supaGet('releves_energie','site_id=eq.'+sid+'&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=date_releve,valeurs,saisi_par,to_percent,nb_couverts&order=date_releve.asc&limit=100'),
+      supaGet('pleins','site_id=eq.'+sid+'&date=gte.'+moisDebut+'&date=lte.'+moisFin+'&select=date,litres_ajoutes&order=date.asc&limit=50'),
+      supaGet('energie_budget_mensuel','site_id=eq.'+sid+'&annee=eq.'+tgt.getFullYear()+'&mois=eq.'+(tgt.getMonth()+1)+'&limit=1')
+    ]);
+    var _budgetMensuel=budgetMensuelArr&&budgetMensuelArr.length?budgetMensuelArr[0]:null;
+    var _budgetFluides=[];
+    if(_budgetMensuel&&_budgetMensuel.id){_budgetFluides=await supaGet('energie_budget_fluide','budget_id=eq.'+_budgetMensuel.id+'&select=fluide_id,cout_budget_jour')||[];}
+    var _nbCh=siteRow.length&&siteRow[0].nb_chambres?parseInt(siteRow[0].nb_chambres):null;
+    // Rondes zones (module résidence)
+    var _relevesZones=[],_zonesRes=[];
+    if(hasModule('residence')){
+      var rzData=await Promise.all([
+        supaGet('releves_zones','site_id=eq.'+sid+'&date=gte.'+moisDebut+'&date=lte.'+moisFin+'&select=zone_id,date,technicien,statut,nb_anomalies&order=date.desc&limit=500'),
+        supaGet('zones','site_id=eq.'+sid+'&type_zone=in.(chambre,commun_etage,special)&actif=eq.true&select=id,nom,batiment,type_zone,frequence_passage&order=batiment.asc,nom.asc')
+      ]);
+      _relevesZones=rzData[0]||[];
+      _zonesRes=rzData[1]||[];
+    }
+    var html=_buildRapportPro(siteNom,periodeStr,daysInMonth,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[],_nbCh,_budgetMensuel,_budgetFluides,_relevesZones,_zonesRes,relevesH||[]);
+    var w=window.open('','_blank');
+    if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
+    w.document.write(html);w.document.close();
+  }catch(e){console.error(e);alert('Erreur : '+(e.message||e));}
+  finally{if(btn){btn.disabled=false;btn.textContent='📄 Rapport ▾';}}
+}
+
+function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,releves,siteRow){
+  var siteNom=siteRow?siteRow.nom:'';
+  var nbChambres=siteRow&&siteRow.nb_chambres?parseInt(siteRow.nb_chambres):null;
+  var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var relevesAsc=releves.slice().sort(function(a,b){return a.date_releve.localeCompare(b.date_releve);});
+  var firstReleve=relevesAsc.length?relevesAsc[0]:null;
+  var lastReleve=relevesAsc.length?relevesAsc[relevesAsc.length-1]:null;
+  var toVals=relevesAsc.map(function(r){return r.to_percent!=null?parseFloat(r.to_percent):null;}).filter(function(v){return v!=null;});
+  var toMoy=toVals.length?toVals.reduce(function(a,b){return a+b;},0)/toVals.length:null;
+  var chambresOcc=nbChambres&&toMoy?Math.round(nbChambres*toMoy/100):null;
+  var lignes=fluides.map(function(f){
+    var conso=null;
+    if(f.type_valeur==='index'){
+      var vF=firstReleve&&firstReleve.valeurs&&firstReleve.valeurs[f.id];
+      var vL=lastReleve&&lastReleve.valeurs&&lastReleve.valeurs[f.id];
+      if(vF!=null&&vL!=null)conso=Math.max(0,parseFloat(vL)-parseFloat(vF));
+    }else{
+      var vL2=lastReleve&&lastReleve.valeurs&&lastReleve.valeurs[f.id];
+      if(vL2!=null)conso=parseFloat(vL2);
+    }
+    var obj=f.objectif_mensuel?parseFloat(f.objectif_mensuel):null;
+    var tarif=f.tarif?parseFloat(f.tarif):null;
+    var bpc=f.budget_par_chambre?parseFloat(f.budget_par_chambre):null;
+    var coutReel=(conso!=null&&tarif&&f.type_valeur==='index')?Math.round(conso*tarif):null;
+    var budgetDyn=bpc&&chambresOcc?Math.round(bpc*chambresOcc*daysInMonth):null;
+    var budget=budgetDyn||(obj&&tarif?Math.round(obj*tarif):null);
+    var ecartCout=(coutReel!=null&&budget)?coutReel-budget:null;
+    var ecartPct=(ecartCout!=null&&budget)?Math.round(ecartCout/budget*100):null;
+    var ecartConso=(conso!=null&&obj)?Math.round((conso-obj)/obj*100):null;
+    return{f:f,conso:conso,obj:obj,tarif:tarif,bpc:bpc,coutReel:coutReel,budget:budget,budgetDyn:budgetDyn,ecartCout:ecartCout,ecartPct:ecartPct,ecartConso:ecartConso};
+  });
+  var coutTotal=0,budgetTotal=0,hasCout=false;
+  lignes.forEach(function(l){if(l.coutReel!=null){coutTotal+=l.coutReel;hasCout=true;}if(l.budget)budgetTotal+=l.budget;});
+  var ecartTotal=hasCout&&budgetTotal?coutTotal-budgetTotal:null;
+  var ecartTotalPct=ecartTotal!=null&&budgetTotal?Math.round(ecartTotal/budgetTotal*100):null;
+  // FCFA/ch.nuitée : coût total / (chambres moy/jour × nb jours du mois) — norme industrie hôtelière
+  var fcfaParCh=hasCout&&chambresOcc&&daysInMonth?Math.round(coutTotal/(chambresOcc*daysInMonth)):null;
+  var fcfaParChBudget=budgetTotal&&chambresOcc&&daysInMonth?Math.round(budgetTotal/(chambresOcc*daysInMonth)):null;
+  function fmtN(n){return n!=null?Math.round(n).toLocaleString('fr-FR'):'—';}
+  function fmtPct(p){if(p==null)return'—';return(p>0?'+':'')+p+'%';}
+  function pctCol(p){if(p==null)return'#888';if(p<=0)return'#2D7A4F';if(p<=10)return'#C49A1C';return'#C0392B';}
+  var h='<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport Énergie — '+escape_html(moisLabel)+'</title><style>';
+  h+='*{box-sizing:border-box;margin:0;padding:0;}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f5f0;color:#1A1411;padding:24px;}';
+  h+='.page{max-width:840px;margin:0 auto;}h2{font-size:11px;font-weight:700;color:#888;margin:24px 0 10px;text-transform:uppercase;letter-spacing:.06em;}';
+  h+='.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}';
+  h+='.kpi{background:white;border:1px solid #e5e0d8;border-radius:10px;padding:14px 16px;}';
+  h+='.kpi-lbl{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;}';
+  h+='.kpi-val{font-size:18px;font-weight:700;line-height:1.2;}';
+  h+='.kpi-sub{font-size:10px;color:#aaa;margin-top:3px;}';
+  h+='table{width:100%;border-collapse:collapse;font-size:12px;background:white;border-radius:10px;overflow:hidden;border:1px solid #e5e0d8;margin-bottom:24px;}';
+  h+='thead tr{background:#1A1411;color:white;}th{padding:10px 12px;text-align:right;font-size:10px;font-weight:600;letter-spacing:.04em;}th:first-child{text-align:left;}';
+  h+='td{padding:9px 12px;text-align:right;border-bottom:1px solid #f0ebe4;}td:first-child{text-align:left;font-weight:500;}tr:last-child td{border-bottom:none;}';
+  h+='.tr-total td{font-weight:700;background:#faf8f5;border-top:2px solid #e5e0d8;}';
+  h+='.print-bar{display:flex;justify-content:flex-end;gap:10px;margin-bottom:20px;}';
+  h+='.btn-print{background:#1A1411;color:white;border:none;border-radius:7px;padding:8px 18px;font-size:12px;font-weight:600;cursor:pointer;}';
+  h+='.btn-close{background:white;color:#1A1411;border:1px solid #e5e0d8;border-radius:7px;padding:8px 14px;font-size:12px;cursor:pointer;}';
+  h+='.note-area{width:100%;min-height:72px;border:1px solid #e5e0d8;border-radius:8px;padding:12px;font-size:12px;font-family:inherit;resize:vertical;background:white;}';
+  h+='@media print{.print-bar{display:none!important;}body{background:white;padding:0;}textarea{border:none!important;resize:none!important;}}';
+  h+='</style></head><body><div class="page">';
+  h+='<div class="print-bar"><button class="btn-print" onclick="window.print()">🖨 Imprimer / PDF</button><button class="btn-close" onclick="window.close()">Fermer</button></div>';
+  h+='<div style="background:#1A1411;border-radius:10px;padding:28px 32px;margin-bottom:24px">';
+  h+='<div style="font-size:11px;font-weight:800;color:#E8C87A;letter-spacing:.12em;text-transform:uppercase;margin-bottom:2px">GenTrack</div>';
+  h+='<div style="font-size:10px;color:rgba(255,255,255,0.45);margin-bottom:14px">Rapport Énergie Mensuel</div>';
+  h+='<div style="font-size:20px;font-weight:700;color:white;margin-bottom:3px">'+escape_html(siteNom)+'</div>';
+  h+='<div style="font-size:14px;color:rgba(255,255,255,0.65);text-transform:capitalize;margin-bottom:2px">'+escape_html(moisLabel)+'</div>';
+  h+='<div style="font-size:10px;color:rgba(255,255,255,0.35)">Généré le '+genDate+'</div>';
+  if(toMoy||chambresOcc){
+    h+='<div style="display:flex;gap:20px;margin-top:14px">';
+    if(toMoy)h+='<div style="font-size:11px;color:rgba(255,255,255,0.6)">TO moyen <strong style="color:white">'+Math.round(toMoy)+'%</strong></div>';
+    if(chambresOcc&&nbChambres)h+='<div style="font-size:11px;color:rgba(255,255,255,0.6)">Chambres occ. (moy.) <strong style="color:white">'+chambresOcc+' / '+nbChambres+'</strong></div>';
+    h+='</div>';
+  }
+  h+='</div>';
+  if(hasCout){
+    h+='<div class="kpi-row">';
+    h+='<div class="kpi"><div class="kpi-lbl">Coût total</div><div class="kpi-val">'+fmtN(coutTotal)+'</div><div class="kpi-sub">XOF HT</div></div>';
+    h+='<div class="kpi"><div class="kpi-lbl">Budget</div><div class="kpi-val">'+fmtN(budgetTotal||null)+'</div><div class="kpi-sub">XOF HT</div></div>';
+    h+='<div class="kpi"><div class="kpi-lbl">Écart</div><div class="kpi-val" style="color:'+pctCol(ecartTotalPct)+'">'+fmtPct(ecartTotalPct)+'</div><div class="kpi-sub">'+(ecartTotal!=null?(ecartTotal>0?'+':'')+fmtN(ecartTotal)+' XOF':'—')+'</div></div>';
+    h+='<div class="kpi"><div class="kpi-lbl">FCFA / ch. nuitée</div><div class="kpi-val">'+fmtN(fcfaParCh)+'</div><div class="kpi-sub">'+(fcfaParChBudget?'Budget : '+fmtN(fcfaParChBudget):'Budget non défini')+'</div></div>';
+    h+='</div>';
+  }
+  h+='<h2>Détail par fluide</h2>';
+  h+='<table><thead><tr><th>Fluide</th><th>Conso réelle</th><th>Objectif</th><th>Écart conso</th><th>Coût FCFA</th><th>Budget FCFA</th><th>Écart coût</th></tr></thead><tbody>';
+  lignes.forEach(function(l){
+    var ecC=l.ecartConso!=null?(l.ecartConso<=0?'#2D7A4F':l.ecartConso<=10?'#C49A1C':'#C0392B'):'#888';
+    h+='<tr>';
+    h+='<td>'+escape_html(l.f.nom)+'</td>';
+    h+='<td>'+(l.conso!=null?Math.round(l.conso).toLocaleString('fr-FR')+' '+escape_html(l.f.unite||''):'—')+'</td>';
+    h+='<td>'+(l.obj?Math.round(l.obj).toLocaleString('fr-FR')+' '+escape_html(l.f.unite||''):'—')+'</td>';
+    h+='<td><span style="color:'+ecC+';font-weight:600">'+fmtPct(l.ecartConso)+'</span></td>';
+    h+='<td>'+(l.coutReel!=null?fmtN(l.coutReel)+' XOF':'—')+'</td>';
+    h+='<td>'+(l.budget?fmtN(l.budget)+' XOF'+(l.budgetDyn?' <span style="font-size:9px;color:#aaa">dyn.</span>':''):'—')+'</td>';
+    h+='<td>'+(l.ecartPct!=null?'<span style="color:'+pctCol(l.ecartPct)+';font-weight:600">'+fmtPct(l.ecartPct)+'</span>':'—')+'</td>';
+    h+='</tr>';
+  });
+  if(hasCout){
+    h+='<tr class="tr-total"><td>Total</td><td>—</td><td>—</td><td>—</td>';
+    h+='<td>'+fmtN(coutTotal)+' XOF</td>';
+    h+='<td>'+(budgetTotal?fmtN(budgetTotal)+' XOF':'—')+'</td>';
+    h+='<td>'+(ecartTotalPct!=null?'<span style="color:'+pctCol(ecartTotalPct)+';font-weight:600">'+fmtPct(ecartTotalPct)+'</span>':'—')+'</td>';
+    h+='</tr>';
+  }
+  h+='</tbody></table>';
+  if(fcfaParCh&&chambresOcc){
+    h+='<h2>Ratio FCFA / chambre</h2>';
+    h+='<div style="background:white;border:1px solid #e5e0d8;border-radius:10px;padding:16px 20px;display:flex;gap:32px;flex-wrap:wrap;margin-bottom:24px">';
+    h+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Réel</div><div style="font-size:22px;font-weight:700">'+fmtN(fcfaParCh)+'</div><div style="font-size:10px;color:#aaa">XOF / ch. nuitée</div></div>';
+    if(fcfaParChBudget){
+      h+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Budget</div><div style="font-size:22px;font-weight:700;color:#aaa">'+fmtN(fcfaParChBudget)+'</div><div style="font-size:10px;color:#aaa">XOF / ch. nuitée</div></div>';
+      var ecFcfa=fcfaParCh-fcfaParChBudget;
+      var ecFcfaPct=Math.round(ecFcfa/fcfaParChBudget*100);
+      h+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Écart</div>';
+      h+='<div style="font-size:22px;font-weight:700;color:'+pctCol(ecFcfaPct)+'">'+(ecFcfa>0?'+':'')+fmtN(ecFcfa)+'</div>';
+      h+='<div style="font-size:10px;color:'+pctCol(ecFcfaPct)+';font-weight:600">'+fmtPct(ecFcfaPct)+'</div></div>';
+    }
+    h+='</div>';
+  }
+  h+='<h2>Commentaire</h2>';
+  h+='<textarea class="note-area" placeholder="Ajoutez un commentaire avant impression..."></textarea>';
+  h+='</div></body></html>';
+  return h;
+}
+
+function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides,relevesEnergie,pleinsSite,nbChambres,budgetMensuel,budgetFluides,relevesZones,zonesRes,relevesHoraires){
+  relevesZones=relevesZones||[];zonesRes=zonesRes||[];relevesHoraires=relevesHoraires||[];
+  var respNom=(session.contact&&session.contact.nom)||'Responsable technique';
+  var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  // ── Calculs ──
+  var reByRonde={};
+  rondesEq.forEach(function(re){if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];reByRonde[re.ronde_id].push(re);});
+  var rondesJ=rondes.filter(function(r){return r.frequence==='journalier';});
+  var rondesH=rondes.filter(function(r){return r.frequence==='hebdo';});
+  var rondesM=rondes.filter(function(r){return r.frequence==='mensuel';});
+  var totalVal=0,totalTot=0;
+  rondes.forEach(function(r){var eq=reByRonde[r.id]||[];totalTot+=eq.length;totalVal+=eq.filter(function(re){return re.statut==='valide';}).length;});
+  var tauxRondes=totalTot>0?Math.round(totalVal/totalTot*100):null;
+  var nbSgOuverts=signalements.filter(function(s){return s.statut!=='resolu';}).length;
+  var nbSgResolus=signalements.filter(function(s){return s.statut==='resolu';}).length;
+  var coutTotal=maintenances.filter(function(m){return m.type!=='ravitaillement';}).reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
+  var nbMaintenances=maintenances.length;
+  var cuves=equips.filter(function(e){return e.capacite_litres!=null;});
+  var ges=equips.filter(function(e){return e.conso_theorique_lh!=null&&e.capacite_litres==null;});
+
+  // ── MTTR & niveaux cuves ──
+  var sgsResolus=signalements.filter(function(s){return s.statut==='resolu'&&s.resolved_at&&s.created_at;});
+  var mttrH=sgsResolus.length?sgsResolus.reduce(function(sum,s){return sum+(new Date(s.resolved_at)-new Date(s.created_at))/3600000;},0)/sgsResolus.length:null;
+  function fmtDur(h){if(h===null||h===undefined)return'—';if(h<1)return Math.round(h*60)+'min';if(h<48)return h.toFixed(1)+'h';return(h/24).toFixed(1)+'j';}
+  var niveauCuveMin=null;
+  cuves.forEach(function(c){var lr=lastRepsByEq[c.id];if(!lr||!lr.vals)return;var niveauEntry=lr.vals.find(function(v){return v.texte.toLowerCase().includes('niveau');});if(!niveauEntry)return;var pct=Math.round(parseFloat(niveauEntry.valeur)/parseFloat(c.capacite_litres)*100);if(niveauCuveMin===null||pct<niveauCuveMin)niveauCuveMin=pct;});
+
+  // ── Narratives auto-générées ──
+  // Résumé global
+  var narResume=(period===7?'Semaine':period===14?'Quinzaine':'Mois')+' du '+periodeStr+'. ';
+  if(tauxRondes!==null)narResume+='Taux de conformité des rondes : '+tauxRondes+'%. ';
+  if(signalements.length===0)narResume+='Aucun signalement enregistré sur la période. ';
+  else narResume+=(signalements.length)+' signalement'+(signalements.length>1?'s':'')+' enregistré'+(signalements.length>1?'s':'')+' dont '+nbSgOuverts+' en cours et '+nbSgResolus+' résolu'+(nbSgResolus>1?'s':'')+'. ';
+  if(coutTotal>0)narResume+='Coût total des interventions : '+coutTotal.toLocaleString('fr-FR')+' FCFA.';
+
+  // Équipements — narrative GE uniquement (niveaux cuves dans section Énergie)
+  var narEquip='';
+  ges.forEach(function(g){
+    var lr=lastRepsByEq[g.id];
+    if(!lr||!lr.vals)return;
+    var cptEntry=lr.vals.find(function(v){return v.texte.toLowerCase().includes('compteur');});
+    if(cptEntry)narEquip+=(g.nom||'Le groupe')+' affiche '+cptEntry.valeur+' heures au compteur. ';
+  });
+  if(cuves.length&&!narEquip)narEquip='';
+  if(!narEquip){
+    if(cuves.length)narEquip='Les niveaux des cuves sont détaillés dans la section Énergie & Fluides ci-dessous.';
+    else narEquip='Aucune donnée de relevé disponible sur la période pour évaluer l\'état des équipements.';
+  }else if(cuves.length){
+    narEquip+='Les niveaux des cuves sont détaillés dans la section Énergie & Fluides ci-dessous.';
+  }
+
+  // Rondes
+  var narRondes='';
+  if(rondes.length===0){narRondes='Aucune ronde enregistrée sur la semaine.';}
+  else{
+    if(rondesJ.length>0){
+      var jVal=0,jTot=0;
+      rondesJ.forEach(function(r){var eq=reByRonde[r.id]||[];jTot+=eq.length;jVal+=eq.filter(function(re){return re.statut==='valide';}).length;});
+      var jPct=jTot>0?Math.round(jVal/jTot*100):null;
+      narRondes+=rondesJ.length+' ronde'+(rondesJ.length>1?'s journalières':' journalière')+' effectuée'+(rondesJ.length>1?'s':'')+' sur 7 jours'+(jPct!==null?' ('+jPct+'% de conformité)':'')+'. ';
+    }
+    if(rondesH.length>0)narRondes+='Ronde hebdomadaire effectuée. ';
+    if(rondesM.length>0)narRondes+='Ronde mensuelle effectuée. ';
+  }
+
+  // Signalements
+  var narSg='';
+  if(signalements.length===0){narSg='Aucun signalement ou incident enregistré sur la semaine.';}
+  else{
+    var pannes=signalements.filter(function(s){return s.type==='panne';});
+    var anomalies=signalements.filter(function(s){return s.type==='anomalie';});
+    if(pannes.length>0)narSg+=pannes.length+' panne'+(pannes.length>1?'s':'')+' signalée'+(pannes.length>1?'s':'')+', dont '+pannes.filter(function(p){return p.statut==='resolu';}).length+' résolue'+(pannes.length>1?'s':'')+'. ';
+    if(anomalies.length>0)narSg+=anomalies.length+' anomalie'+(anomalies.length>1?'s':'')+' détectée'+(anomalies.length>1?'s':'')+' lors des rondes. ';
+    if(nbSgOuverts>0)narSg+=nbSgOuverts+' signalement'+(nbSgOuverts>1?'s':'')+' en attente de traitement.';
+  }
+
+  // Maintenances
+  var narMaint='';
+  if(maintenances.length===0){narMaint='Aucune intervention de maintenance enregistrée sur la semaine.';}
+  else{
+    var realises=maintenances.filter(function(m){return m.statut==='realise';});
+    narMaint+=realises.length+' intervention'+(realises.length>1?'s':'')+(realises.length>1?' réalisées':' réalisée')+' sur la période. ';
+    if(coutTotal>0)narMaint+='Coût total : '+coutTotal.toLocaleString('fr-FR')+' FCFA.';
+  }
+
+  // ── KPI couleurs ──
+  function kpiCol(val,seuil1,seuil2,invert){
+    if(val===null||val===undefined)return 'var(--text3)';
+    if(invert){return val<=seuil1?'var(--vert)':val<=seuil2?'var(--amber)':'var(--rouge)';}
+    return val>=seuil2?'var(--vert)':val>=seuil1?'var(--amber)':'var(--rouge)';
+  }
+
+  // ── SVG cuve chart ──
+  function svgCuveChart(points,cap){
+    if(!points||points.length<2)return '';
+    var W=500,H=90,PL=8,PR=8,PT=8,PB=20;
+    var xMin=new Date(points[0].t).getTime();
+    var xMax=new Date(points[points.length-1].t).getTime();
+    var xR=xMax-xMin||1;
+    function px(t){return PL+(new Date(t).getTime()-xMin)/xR*(W-PL-PR);}
+    function py(v){return PT+(1-v/cap)*(H-PT-PB);}
+    var y20=py(cap*0.2),y40=py(cap*0.4);
+    var pathD=points.map(function(p,i){return (i?'L':'M')+px(p.t).toFixed(1)+','+py(p.v).toFixed(1);}).join(' ');
+    var areaD=pathD+' L'+px(points[points.length-1].t).toFixed(1)+','+(H-PB)+' L'+PL+','+(H-PB)+' Z';
+    return '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-height:110px;margin:6px 0 2px" xmlns="http://www.w3.org/2000/svg">'+
+      '<rect x="'+PL+'" y="'+y20.toFixed(1)+'" width="'+(W-PL-PR)+'" height="'+(H-PB-y20).toFixed(1)+'" fill="#FDECEA" opacity="0.45"/>'+
+      '<rect x="'+PL+'" y="'+y40.toFixed(1)+'" width="'+(W-PL-PR)+'" height="'+(y20-y40).toFixed(1)+'" fill="#FEF3E2" opacity="0.45"/>'+
+      '<rect x="'+PL+'" y="'+PT+'" width="'+(W-PL-PR)+'" height="'+(y40-PT).toFixed(1)+'" fill="#E8F5EE" opacity="0.45"/>'+
+      '<line x1="'+PL+'" y1="'+y20.toFixed(1)+'" x2="'+(W-PR)+'" y2="'+y20.toFixed(1)+'" stroke="#C0392B" stroke-width="0.5" stroke-dasharray="3,2" opacity="0.6"/>'+
+      '<line x1="'+PL+'" y1="'+y40.toFixed(1)+'" x2="'+(W-PR)+'" y2="'+y40.toFixed(1)+'" stroke="#D4761E" stroke-width="0.5" stroke-dasharray="3,2" opacity="0.6"/>'+
+      '<defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#C49A1C" stop-opacity="0.25"/><stop offset="100%" stop-color="#C49A1C" stop-opacity="0.02"/></linearGradient></defs>'+
+      '<path d="'+areaD+'" fill="url(#cg)"/>'+
+      '<path d="'+pathD+'" fill="none" stroke="#C49A1C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'+
+      points.map(function(p){var col=p.v/cap<0.2?'#C0392B':p.v/cap<0.4?'#D4761E':'#2D7A4F';return '<circle cx="'+px(p.t).toFixed(1)+'" cy="'+py(p.v).toFixed(1)+'" r="3" fill="'+col+'" stroke="white" stroke-width="1"/>';}).join('')+
+      '<text x="'+PL+'" y="'+(H-4)+'" font-size="8" fill="#A8957E" font-family="Inter,sans-serif">'+new Date(points[0].t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</text>'+
+      '<text x="'+(W-PR)+'" y="'+(H-4)+'" font-size="8" fill="#A8957E" font-family="Inter,sans-serif" text-anchor="end">'+new Date(points[points.length-1].t).toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</text>'+
+      '<text x="'+(PL+2)+'" y="'+(y20-2).toFixed(1)+'" font-size="7.5" fill="#C0392B" font-family="Inter,sans-serif" opacity="0.8">20%</text>'+
+      '<text x="'+(PL+2)+'" y="'+(y40-2).toFixed(1)+'" font-size="7.5" fill="#D4761E" font-family="Inter,sans-serif" opacity="0.8">40%</text>'+
+    '</svg>';
+  }
+
+  // ── Énergie : calculs ──
+  energieFluides=energieFluides||[];relevesEnergie=relevesEnergie||[];budgetFluides=budgetFluides||[];
+  var energieData=[];
+  pleinsSite=pleinsSite||[];
+  var _toValsP=relevesEnergie.map(function(r){return r.to_percent!=null?parseFloat(r.to_percent):null;}).filter(function(v){return v!=null;});
+  var _toMoyP=_toValsP.length?_toValsP.reduce(function(a,b){return a+b;},0)/_toValsP.length:null;
+  var chambresOccP=nbChambres&&_toMoyP?Math.round(nbChambres*_toMoyP/100):null;
+  var _couvertsVals=relevesEnergie.map(function(r){return r.nb_couverts!=null?parseInt(r.nb_couverts):null;}).filter(function(v){return v!=null;});
+  var _couvertsTotal=_couvertsVals.length?_couvertsVals.reduce(function(a,b){return a+b;},0):null;
+  var _couvertsBudget=budgetMensuel&&budgetMensuel.nb_couverts_budget?Math.round(parseFloat(budgetMensuel.nb_couverts_budget)*period):null;
+  if(energieFluides.length&&relevesEnergie.length){
+    energieFluides.forEach(function(f){
+      var pts=relevesEnergie.map(function(r){
+        var v=r.valeurs&&r.valeurs[f.id]!=null?parseFloat(r.valeurs[f.id]):null;
+        return{date:r.date_releve,val:v};
+      }).filter(function(p){return p.val!=null&&!isNaN(p.val);});
+      var isInstant=f.type_valeur==='instantane';
+      var cap=f.capacite!=null?parseFloat(f.capacite):null;
+      var tarif=f.tarif!=null?parseFloat(f.tarif):null;
+      var obj=f.objectif_mensuel!=null?parseFloat(f.objectif_mensuel):null;
+      var lastVal=pts.length?pts[pts.length-1].val:null;
+      var conso=null,cout=null;
+      if(isInstant&&cap!=null&&pts.length>=2){
+        var drops=0,_prevRaw2=null;
+        pts.forEach(function(p){
+          if(_prevRaw2!=null){
+            var _dL2=p.val>100?p.val:p.val/100*cap;
+            var _pL2=_prevRaw2>100?_prevRaw2:_prevRaw2/100*cap;
+            if(_dL2<_pL2)drops+=(_pL2-_dL2);
+          }
+          _prevRaw2=p.val;
+        });
+        conso=Math.round(drops);
+      }else if(!isInstant&&pts.length>=2){
+        conso=Math.round(pts[pts.length-1].val-pts[0].val);
+      }
+      if(conso!=null&&tarif!=null)cout=Math.round(conso*tarif);
+      var _rLastIsL=lastVal!=null&&lastVal>100;
+      var restants=isInstant&&cap!=null&&lastVal!=null?(_rLastIsL?Math.round(lastVal):Math.round(lastVal/100*cap)):null;
+      var lastValPctR=isInstant&&cap!=null&&lastVal!=null?(_rLastIsL?Math.min(100,Math.round(lastVal/cap*100)):Math.min(100,Math.round(lastVal))):null;
+      var bfEntry=budgetFluides.find(function(b){return b.fluide_id===f.id;});
+      var budget=bfEntry&&bfEntry.cout_budget_jour!=null?Math.round(parseFloat(bfEntry.cout_budget_jour)*period):null;
+      var vs=cout!=null&&budget!=null?cout-budget:null;
+      energieData.push({f:f,pts:pts,isInstant:isInstant,cap:cap,tarif:tarif,obj:obj,lastVal:lastVal,lastValPct:lastValPctR,conso:conso,cout:cout,restants:restants,budget:budget,vs:vs,pleins:isInstant?pleinsSite:[]});
+    });
+  }
+
+  // ── Synthèse Électricité totale K1+K2 ───────────────────────────────────────
+  var _elecDataPdf=energieData.filter(function(d){return d.f.unite==='kWh'&&!d.isInstant;});
+  var elecSynthPdf=null;
+  if(_elecDataPdf.length>=2){
+    var _epCout=_elecDataPdf.reduce(function(s,d){return d.cout!=null?s+d.cout:s;},0);
+    var _epBudget=_elecDataPdf.reduce(function(s,d){return d.budget!=null?s+d.budget:s;},0);
+    var _epConso=_elecDataPdf.reduce(function(s,d){return d.conso!=null?s+d.conso:s;},0);
+    var _epVs=_epCout&&_epBudget?_epCout-_epBudget:null;
+    var _epVsPct=_epVs!=null&&_epBudget?Math.round(_epVs/_epBudget*100):null;
+    elecSynthPdf={cout:_epCout||null,budget:_epBudget||null,conso:Math.round(_epConso)||null,vs:_epVs,vsPct:_epVsPct,noms:_elecDataPdf.map(function(d){return d.f.nom;})};
+  }
+
+  function fmtCout(v,devise){
+    if(v==null||isNaN(v))return'—';
+    var d=devise||'XOF';
+    var abs=Math.abs(v),s=v<0?'-':'';
+    if(abs>=1000000)return s+(abs/1000000).toFixed(1).replace('.',',')+' M '+d;
+    if(abs>=1000)return s+Math.round(abs/1000).toLocaleString('fr-FR')+' k '+d;
+    return s+Math.round(abs).toLocaleString('fr-FR')+' '+d;
+  }
+  function fmtConso(d){
+    if(d.conso==null)return'—';
+    return d.isInstant?d.conso.toLocaleString('fr-FR')+' L':d.conso.toLocaleString('fr-FR')+(d.f.unite?' '+d.f.unite:'');
+  }
+
+  function svgEnergieMultiChart(indexData){
+    if(!indexData.length||!indexData.some(function(d){return d.pts.length>=2;}))return'';
+    var COLORS=['#2D7A4F','#1E6FA0','#C49A1C','#C0392B','#7B4EA6'];
+    var W=640,H=100,PL=10,PR=10,PT=12,PB=22;
+    var allDates=[];
+    indexData.forEach(function(d){d.pts.forEach(function(p){if(allDates.indexOf(p.date)<0)allDates.push(p.date);});});
+    allDates.sort();
+    if(allDates.length<2)return'';
+    var xMin=new Date(allDates[0]+'T12:00:00').getTime();
+    var xMax=new Date(allDates[allDates.length-1]+'T12:00:00').getTime();
+    var xR=xMax-xMin||1;
+    function pxx(date){return PL+(new Date(date+'T12:00:00').getTime()-xMin)/xR*(W-PL-PR);}
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-height:110px;margin:8px 0 4px" xmlns="http://www.w3.org/2000/svg">';
+    var step=Math.max(1,Math.ceil(allDates.length/6));
+    var dLabeledIdx=[];
+    for(var di=0;di<allDates.length;di+=step){dLabeledIdx.push(di);}
+    var dLastIdx=allDates.length-1;
+    if(dLabeledIdx.indexOf(dLastIdx)<0){
+      var dPrevX=pxx(allDates[dLabeledIdx[dLabeledIdx.length-1]]);
+      var dLastX=pxx(allDates[dLastIdx]);
+      if(dLastX-dPrevX>(W-PL-PR)*0.08)dLabeledIdx.push(dLastIdx);
+    }
+    dLabeledIdx.forEach(function(di){
+      var xp=pxx(allDates[di]);
+      svg+='<text x="'+xp.toFixed(1)+'" y="'+(H-5)+'" font-size="8" fill="#A8957E" font-family="Inter,sans-serif" text-anchor="middle">'+new Date(allDates[di]+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</text>';
+    });
+    var lx=PL;
+    indexData.forEach(function(d,ci){
+      if(d.pts.length<2)return;
+      var col=COLORS[ci%COLORS.length];
+      var minV=Math.min.apply(null,d.pts.map(function(p){return p.val;}));
+      var maxV=Math.max.apply(null,d.pts.map(function(p){return p.val;}));
+      var range=maxV-minV||1;
+      var pts2=d.pts.map(function(p){return pxx(p.date).toFixed(1)+','+(PT+(1-(p.val-minV)/range)*(H-PT-PB)).toFixed(1);});
+      svg+='<polyline points="'+pts2.join(' ')+'" fill="none" stroke="'+col+'" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+      svg+='<rect x="'+lx+'" y="'+(PT-2)+'" width="10" height="3" fill="'+col+'" rx="1"/>'+
+           '<text x="'+(lx+13)+'" y="'+PT+'" font-size="8.5" fill="#6B5E4A" font-family="Inter,sans-serif">'+escape_html(d.f.nom)+'</text>';
+      lx+=escape_html(d.f.nom).length*5+28;
+    });
+    return svg+'</svg>';
+  }
+
+  function svgGasoilChart(d){
+    if(!d||!d.pts||d.pts.length<2)return'';
+    var cap=d.cap||null;
+    // Normaliser toutes les valeurs en L via heuristique
+    var ptsL=d.pts.map(function(p){
+      if(p.val==null)return{date:p.date,v:null};
+      var v=cap!=null?(p.val>100?p.val:Math.round(p.val/100*cap)):p.val;
+      return{date:p.date,v:v};
+    }).filter(function(p){return p.v!=null;});
+    if(ptsL.length<2)return'';
+    var maxV=cap!=null?cap:Math.max.apply(null,ptsL.map(function(p){return p.v;}));
+    var seuil=d.f&&d.f.seuil_alerte_bas!=null?d.f.seuil_alerte_bas:(cap?Math.round(cap*0.2):null);
+    var W=640,H=90,PL=10,PR=10,PT=8,PB=22;
+    var xMin=new Date(ptsL[0].date+'T12:00:00').getTime();
+    var xMax=new Date(ptsL[ptsL.length-1].date+'T12:00:00').getTime();
+    var xR=xMax-xMin||1;
+    function pxg(date){return PL+(new Date(date+'T12:00:00').getTime()-xMin)/xR*(W-PL-PR);}
+    function pyg(v){return PT+(1-v/maxV)*(H-PT-PB);}
+    var pathD=ptsL.map(function(p,i){return(i?'L':'M')+pxg(p.date).toFixed(1)+','+pyg(p.v).toFixed(1);}).join(' ');
+    var areaD=pathD+' L'+pxg(ptsL[ptsL.length-1].date).toFixed(1)+','+(H-PB)+' L'+PL+','+(H-PB)+' Z';
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-height:110px;margin:8px 0 4px" xmlns="http://www.w3.org/2000/svg">';
+    if(seuil!=null){
+      var ys=pyg(seuil);
+      svg+='<rect x="'+PL+'" y="'+ys.toFixed(1)+'" width="'+(W-PL-PR)+'" height="'+(H-PB-ys).toFixed(1)+'" fill="#FDECEA" opacity="0.4"/>';
+      svg+='<line x1="'+PL+'" y1="'+ys.toFixed(1)+'" x2="'+(W-PR)+'" y2="'+ys.toFixed(1)+'" stroke="#C0392B" stroke-width="0.8" stroke-dasharray="4,3" opacity="0.7"/>';
+      svg+='<text x="'+(PL+2)+'" y="'+(ys-2).toFixed(1)+'" font-size="8" fill="#C0392B" font-family="Inter,sans-serif" opacity="0.8">alerte &lt; '+seuil.toLocaleString('fr-FR')+' L</text>';
+    }
+    svg+='<defs><linearGradient id="gg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#D4761E" stop-opacity="0.2"/><stop offset="100%" stop-color="#D4761E" stop-opacity="0.02"/></linearGradient></defs>';
+    svg+='<path d="'+areaD+'" fill="url(#gg)"/>';
+    svg+='<path d="'+pathD+'" fill="none" stroke="#D4761E" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    // Points de ravitaillement — utilise les dates réelles de la table pleins
+    var pleinsData=d.pleins||[];
+    if(pleinsData.length){
+      pleinsData.forEach(function(p){
+        if(!p.date||!p.litres_ajoutes)return;
+        var xp=pxg(p.date);
+        if(xp<PL||xp>W-PR)return;
+        // Y positionné sur le relevé le plus proche après le plein
+        var nearPt=null;
+        for(var k=0;k<ptsL.length;k++){if(ptsL[k].date>=p.date){nearPt=ptsL[k];break;}}
+        if(!nearPt)nearPt=ptsL[ptsL.length-1];
+        var yp=pyg(nearPt.v);
+        svg+='<circle cx="'+xp.toFixed(1)+'" cy="'+yp.toFixed(1)+'" r="4" fill="#2D7A4F" stroke="white" stroke-width="1"/>'+
+          '<text x="'+(xp+6).toFixed(1)+'" y="'+(yp+3).toFixed(1)+'" font-size="8" fill="#2D7A4F" font-family="Inter,sans-serif">+'+Math.round(p.litres_ajoutes).toLocaleString('fr-FR')+' L</text>';
+      });
+    }else{
+      // Fallback : détection par hausse significative entre deux relevés
+      for(var i=1;i<ptsL.length;i++){
+        if(ptsL[i].v>ptsL[i-1].v+50){
+          var xp=pxg(ptsL[i].date),yp=pyg(ptsL[i].v);
+          var delta=Math.round(ptsL[i].v-ptsL[i-1].v);
+          svg+='<circle cx="'+xp.toFixed(1)+'" cy="'+yp.toFixed(1)+'" r="4" fill="#2D7A4F" stroke="white" stroke-width="1"/>'+
+            '<text x="'+(xp+6).toFixed(1)+'" y="'+(yp+3).toFixed(1)+'" font-size="8" fill="#2D7A4F" font-family="Inter,sans-serif">+'+delta.toLocaleString('fr-FR')+' L</text>';
+        }
+      }
+    }
+    var step2=Math.max(1,Math.ceil(ptsL.length/5));
+    var labeledIdx=[];
+    for(var j=0;j<ptsL.length;j+=step2){labeledIdx.push(j);}
+    // Toujours afficher le dernier point
+    var lastIdx=ptsL.length-1;
+    if(labeledIdx.indexOf(lastIdx)<0){
+      // N'ajouter que si pas trop proche du précédent label (>3% de la largeur)
+      var prevLabelIdx=labeledIdx[labeledIdx.length-1];
+      var prevX=pxg(ptsL[prevLabelIdx].date);
+      var lastX=pxg(ptsL[lastIdx].date);
+      if(lastX-prevX>(W-PL-PR)*0.08)labeledIdx.push(lastIdx);
+    }
+    labeledIdx.forEach(function(j){
+      var xp2=pxg(ptsL[j].date);
+      svg+='<text x="'+xp2.toFixed(1)+'" y="'+(H-5)+'" font-size="8" fill="#A8957E" font-family="Inter,sans-serif" text-anchor="middle">'+new Date(ptsL[j].date+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'})+'</text>';
+    });
+    return svg+'</svg>';
+  }
+
+  // ── Données export JSON embeddées ──
+  var exportScript='<scr'+'ipt>'+
+    'var _exportRondes='+JSON.stringify(rondeExportRows||[])+';'+
+    'var _exportReleves='+JSON.stringify(releveExportRows||[])+';'+
+    'var _exportSiteNom='+JSON.stringify(siteNom)+';'+
+    'var _exportPeriode='+JSON.stringify(periodeStr)+';'+
+    'function _dlCSV(rows,headers,filename){'+
+      'var csv=[headers.join(",")].concat(rows.map(function(r){return r.map(function(v){return "\\""+String(v).replace(/"/g,"\'\'")+"\\"";}).join(",")})).join("\\n");'+
+      'var a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent("\\uFEFF"+csv);a.download=filename;a.click();'+
+    '}'+
+    'function _exportRondesCSV(){_dlCSV(_exportRondes,["Date","Type de ronde","Equipement","Question","Valeur","Unité","Statut"],_exportSiteNom+"_rondes.csv");}'+
+    'function _exportRelevesCSV(){_dlCSV(_exportReleves,["Date","Equipement","Question","Valeur","Unité"],_exportSiteNom+"_releves.csv");}'+
+  '<\/scr'+'ipt>';
+
+  // ── HTML ──
+  var h='';
 
   // ── Styles additionnels GenTrack ──
   h+='<style>'+
