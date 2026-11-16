@@ -4799,6 +4799,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
     supaGet('missions','equipement_id=eq.'+eqId+'&statut=eq.realisee&select=id,statut,cout,completed_at,created_at,plan_maintenance_id,plan_titre,eq_nom,nom_prestataire,devise&order=completed_at.desc&limit=90').catch(function(){return[];})
   ]);
   var eq=res[0][0]||{nom:eqNom};
+  window._mntCurrentEqNom=eq.nom||null; // fiable: depuis DB, utilisé pour eq_nom sur les missions
   var pannesOuv=res[1]||[];
   var allSigs=res[2]||[];
   var mnts=res[3]||[];
@@ -5466,8 +5467,7 @@ async function _mntCreerMission(eqId,sid){
   if(!checks.length){alert('Sélectionnez au moins une tâche.');return;}
   var planIds=Array.prototype.map.call(checks,function(c){return c.value;});
   var planTitreVal=checks[0]?checks[0].getAttribute('data-titre')||null:null;
-  var eqNomEl=document.querySelector('#mnt-detail-panel [style*="font-size:15px"]');
-  var eqNomVal=eqNomEl?eqNomEl.textContent.trim():null;
+  var eqNomVal=window._mntCurrentEqNom||null;
   var statusEl=document.getElementById('mnt-mission-status');
   if(statusEl){statusEl.style.display='';statusEl.textContent='Création de la mission...';}
   // Créer la mission
@@ -5493,8 +5493,7 @@ async function _mntCreerMission(eqId,sid){
   var baseUrl=window.location.origin+'/mission.html';
   var missionUrl=baseUrl+'?token='+mission.token;
   var nbTaches=planIds.length;
-  var eqNom=document.querySelector('#mnt-detail-panel [style*="font-size:15px"]');
-  var eqNomTxt=eqNom?eqNom.textContent:'Équipement';
+  var eqNomTxt=window._mntCurrentEqNom||'Équipement';
   var msg='🔧 Mission de maintenance\n'+(nom?'Tech: '+nom+'\n':'')+eqNomTxt+' · '+nbTaches+' tâche'+(nbTaches>1?'s':'')+'\n\n'+missionUrl;
   // WhatsApp
   var telClean=(tel||'').replace(/\s+/g,'');
@@ -5516,8 +5515,7 @@ async function _mntCreerMissionPrest(eqId,sid){
   if(!checks.length){alert('Sélectionnez au moins une tâche.');return;}
   var planIds=Array.prototype.map.call(checks,function(c){return c.value;});
   var planTitreVal=checks[0]?checks[0].getAttribute('data-titre')||null:null;
-  var eqNomEl2=document.querySelector('#mnt-detail-panel [style*="font-size:15px"]');
-  var eqNomVal2=eqNomEl2?eqNomEl2.textContent.trim():null;
+  var eqNomVal2=window._mntCurrentEqNom||null;
   var statusEl=document.getElementById('mnt-prest-status');
   if(statusEl){statusEl.style.display='';statusEl.textContent='Création de la mission...';}
   var missionPayload={
@@ -5542,8 +5540,7 @@ async function _mntCreerMissionPrest(eqId,sid){
   var baseUrl=window.location.origin+'/prestataire-mission.html';
   var missionUrl=baseUrl+'?token='+mission.token;
   var nbTaches=planIds.length;
-  var eqEl=document.querySelector('#mnt-detail-panel [style*="font-size:15px"]');
-  var eqNomTxt=eqEl?eqEl.textContent:'Équipement';
+  var eqNomTxt=window._mntCurrentEqNom||'Équipement';
   var msg='🏢 Mission de maintenance — Prestataire\n'+( prestNom?'Société : '+prestNom+'\n':'')+eqNomTxt+' · '+nbTaches+' tâche'+(nbTaches>1?'s':'')+'\n\nAccédez à votre mission :\n'+missionUrl;
   // WhatsApp
   if(prestTel){
