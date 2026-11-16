@@ -12264,11 +12264,11 @@ async function _dtMaintenances(sids){
   var todayStr=new Date().toISOString().slice(0,10);
   var baseSelect='id,groupe_id,type,titre,statut,date_intervention,cout,prestataire,quantite,unite,equipements(nom)';
   var qPast='groupe_id=in.('+sidStr+')&statut=neq.planifie&date_intervention=gte.'+cutoffStr+'&order=date_intervention.desc&limit=300&select='+baseSelect;
-  var qUpcoming='groupe_id=in.('+sidStr+')&statut=eq.planifie&date_intervention=gte.'+todayStr+'&order=date_intervention.asc&limit=100&select='+baseSelect;
+  var qUpcoming='site_id=in.('+sidStr+')&prochaine_date=gte.'+todayStr+'&actif=eq.true&order=prochaine_date.asc&select=id,site_id,titre,prochaine_date,frequence,type_plan&limit=100';
   var qPannes='groupe_id=in.('+sidStr+')&type=eq.panne&statut=not.in.(traite,resolu,annule)&select=id,groupe_id,equipement_id,description,created_at,ref_code,statut,equipements(nom)&order=created_at.asc&limit=20';
   var qMissionsW='site_id=in.('+sidStr+')&created_at=gte.'+cutoffStr+'T00:00:00&select=id,site_id,statut,cout&limit=200';
-  var results=await Promise.all([supaGet('maintenances',qPast),supaGet('maintenances',qUpcoming),supaGet('signalements',qPannes).catch(function(){return[];}),supaGet('missions',qMissionsW).catch(function(){return[];})]);
-  var rows=results[0];var upcoming=results[1];var pannesOuvertes=results[2]||[];var missionsW=results[3]||[];
+  var results=await Promise.all([supaGet('maintenances',qPast),supaGet('plans_maintenance',qUpcoming).catch(function(){return[];}),supaGet('signalements',qPannes).catch(function(){return[];}),supaGet('missions',qMissionsW).catch(function(){return[];})]);
+  var rows=results[0];var upcoming=results[1]||[];var pannesOuvertes=results[2]||[];var missionsW=results[3]||[];
   /* filtered views */
   var displayRows=rows.filter(function(r){
     if(_dtMntFilter!=='tous'&&r.type!==_dtMntFilter)return false;
@@ -12276,7 +12276,7 @@ async function _dtMaintenances(sids){
     return true;
   });
   var displayUpcoming=upcoming.filter(function(r){
-    if(_dtMntSiteFilter!=='tous'&&String(r.groupe_id)!==String(_dtMntSiteFilter))return false;
+    if(_dtMntSiteFilter!=='tous'&&String(r.site_id)!==String(_dtMntSiteFilter))return false;
     return true;
   });
   /* KPIs */
@@ -12334,7 +12334,7 @@ async function _dtMaintenances(sids){
   /* ── planning 2 colonnes : préventif planifié + correctif actif ── */
   var now2=new Date();
   var upcomingBySite={};
-  displayUpcoming.forEach(function(r){if(!upcomingBySite[r.groupe_id])upcomingBySite[r.groupe_id]=[];upcomingBySite[r.groupe_id].push(r);});
+  displayUpcoming.forEach(function(r){if(!upcomingBySite[r.site_id])upcomingBySite[r.site_id]=[];upcomingBySite[r.site_id].push(r);});
   var pannesBySite={};
   pannesOuvertes.forEach(function(p){if(!pannesBySite[p.groupe_id])pannesBySite[p.groupe_id]=[];pannesBySite[p.groupe_id].push(p);});
   var colPrev='';
@@ -12351,13 +12351,13 @@ async function _dtMaintenances(sids){
           '<span style="font-size:10px;color:var(--text3);margin-left:3px">'+items.length+' planifiée'+(items.length>1?'s':'')+'</span>'+
         '</div>';
       items.slice(0,5).forEach(function(r){
-        var t=MNT[r.type]||{label:r.type||'Maintenance',icon:'🔧'};
-        var dStr=r.date_intervention?new Date(r.date_intervention).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
-        var daysFromNow=r.date_intervention?Math.round((new Date(r.date_intervention)-now2)/86400000):999;
+        var ico=r.type_plan==='horaire'?'⏱':'🗓';
+        var dStr=r.prochaine_date?new Date(r.prochaine_date+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
+        var daysFromNow=r.prochaine_date?Math.round((new Date(r.prochaine_date+'T12:00:00')-now2)/86400000):999;
         var urgCol=daysFromNow<=3?'#b91c1c':daysFromNow<=7?'#d97706':'#16a34a';
-        var label=(r.titre||t.label);if(label.length>26)label=label.slice(0,26)+'…';
+        var label=(r.titre||'Maintenance');if(label.length>26)label=label.slice(0,26)+'…';
         colPrev+='<div style="display:flex;align-items:center;gap:5px;padding:4px 7px;background:#f8fafc;border-radius:6px;margin-bottom:3px">'+
-          '<span style="font-size:11px">'+t.icon+'</span>'+
+          '<span style="font-size:11px">'+ico+'</span>'+
           '<span style="flex:1;font-size:11px;color:var(--dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escape_html(label)+'</span>'+
           '<span style="font-size:10px;font-weight:700;color:'+urgCol+';flex-shrink:0">'+dStr+'</span>'+
         '</div>';
