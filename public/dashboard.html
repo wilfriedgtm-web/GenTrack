@@ -12807,7 +12807,7 @@ async function _openRapportDTMois(offset){
     if(!sids.length){alert('Aucun site configuré.');return;}
     var sidStr=sids.join(',');
     var _now2=new Date();
-    var[sites,pleins,maintenances,signalements,rondes,energieFluidesDT,relevesEnergieDT,budgetsMensuels,relevesZonesDT]=await Promise.all([
+    var[sites,pleins,maintenances,signalements,rondes,energieFluidesDT,relevesEnergieDT,budgetsMensuels,relevesZonesDT,missionsDTMois]=await Promise.all([
       supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres'),
       supaGet('pleins','site_id=in.('+sidStr+')&date=gte.'+moisDebut+'&date=lte.'+moisFin+'&select=id,site_id,litres_ajoutes,cout,date&order=date.asc'),
       supaGet('maintenances','groupe_id=in.('+sidStr+')&date_intervention=gte.'+moisDebut+'&date_intervention=lte.'+moisFin+'&select=id,groupe_id,type,titre,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=200'),
@@ -12816,14 +12816,16 @@ async function _openRapportDTMois(offset){
       supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,tarif,capacite,seuil_alerte_bas,devise&order=ordre.asc'),
       supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=site_id,date_releve,valeurs,to_percent,nb_couverts,nb_chambres_occupees&order=date_releve.asc&limit=500'),
       supaGet('energie_budget_mensuel','site_id=in.('+sidStr+')&annee=eq.'+tgt.getFullYear()+'&mois=eq.'+(tgt.getMonth()+1)+'&select=id,site_id,nb_couverts_budget,nb_chambres_budget'),
-      supaGet('releves_zones','site_id=in.('+sidStr+')&date=gte.'+moisDebut+'&date=lte.'+moisFin+'&select=site_id,zone_id,date,statut,nb_anomalies&limit=500')
+      supaGet('releves_zones','site_id=in.('+sidStr+')&date=gte.'+moisDebut+'&date=lte.'+moisFin+'&select=site_id,zone_id,date,statut,nb_anomalies&limit=500'),
+      supaGet('missions','site_id=in.('+sidStr+')&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'T23:59:59&select=id,site_id,statut,cout&limit=200').catch(function(){return[];})
     ]);
+    missionsDTMois=missionsDTMois||[];
     var _bmIdsDT=(budgetsMensuels||[]).map(function(b){return b.id;});
     var budgetsFluidesDT=_bmIdsDT.length?await supaGet('energie_budget_fluide','budget_id=in.('+_bmIdsDT.join(',')+')'+'&select=budget_id,fluide_id,cout_budget_jour')||[]:[];
     var nbChambresMap={};(sites||[]).forEach(function(s){nbChambresMap[s.id]=s.nb_chambres?parseInt(s.nb_chambres):null;});
     var rIds=rondes.map(function(r){return r.id;});
     var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,equipement_id,statut'):[];
-    var html=_buildRapportDirTech(daysInMonthDT,periodeStr,_session,sites,pleins,maintenances,signalements,rondes,rondesEq,energieFluidesDT||[],relevesEnergieDT||[],budgetsMensuels||[],budgetsFluidesDT||[],nbChambresMap,relevesZonesDT||[]);
+    var html=_buildRapportDirTech(daysInMonthDT,periodeStr,_session,sites,pleins,maintenances,signalements,rondes,rondesEq,energieFluidesDT||[],relevesEnergieDT||[],budgetsMensuels||[],budgetsFluidesDT||[],nbChambresMap,relevesZonesDT||[],missionsDTMois);
     var w=window.open('','_blank');
     if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
     w.document.write(html);w.document.close();
