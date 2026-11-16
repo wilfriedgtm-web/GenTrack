@@ -12175,8 +12175,9 @@ async function _dtMaintenances(sids){
   var qPast='groupe_id=in.('+sidStr+')&statut=neq.planifie&date_intervention=gte.'+cutoffStr+'&order=date_intervention.desc&limit=300&select='+baseSelect;
   var qUpcoming='groupe_id=in.('+sidStr+')&statut=eq.planifie&date_intervention=gte.'+todayStr+'&order=date_intervention.asc&limit=100&select='+baseSelect;
   var qPannes='groupe_id=in.('+sidStr+')&type=eq.panne&statut=not.in.(traite,resolu,annule)&select=id,groupe_id,equipement_id,description,created_at,ref_code,statut,equipements(nom)&order=created_at.asc&limit=20';
-  var results=await Promise.all([supaGet('maintenances',qPast),supaGet('maintenances',qUpcoming),supaGet('signalements',qPannes).catch(function(){return[];})]);
-  var rows=results[0];var upcoming=results[1];var pannesOuvertes=results[2]||[];
+  var qMissionsW='site_id=in.('+sidStr+')&created_at=gte.'+cutoffStr+'T00:00:00&select=id,site_id,statut,cout,signalement_id&limit=200';
+  var results=await Promise.all([supaGet('maintenances',qPast),supaGet('maintenances',qUpcoming),supaGet('signalements',qPannes).catch(function(){return[];}),supaGet('missions',qMissionsW).catch(function(){return[];})]);
+  var rows=results[0];var upcoming=results[1];var pannesOuvertes=results[2]||[];var missionsW=results[3]||[];
   /* filtered views */
   var displayRows=rows.filter(function(r){
     if(_dtMntFilter!=='tous'&&r.type!==_dtMntFilter)return false;
@@ -12192,10 +12193,12 @@ async function _dtMaintenances(sids){
   var nbTotal=rows.length;
   var tauxCloture=nbTotal>0?Math.round(nbRealises/nbTotal*100):null;
   var tauxCol=tauxCloture===null?'var(--text3)':tauxCloture>=80?'var(--vert)':tauxCloture>=50?'var(--amber)':'var(--rouge)';
-  var nbPreventif=rows.filter(function(r){return r.type==='preventive';}).length;
-  var nbCorrectif=rows.filter(function(r){return r.type==='panne'||r.type==='corrective';}).length;
-  var coutPreventifW=rows.filter(function(r){return r.type==='preventive';}).reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
-  var coutCorrectifW=rows.filter(function(r){return r.type==='panne'||r.type==='corrective';}).reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0);
+  var missionsWPreventif=missionsW.filter(function(m){return !m.signalement_id;});
+  var missionsWCorrectif=missionsW.filter(function(m){return !!m.signalement_id;});
+  var nbPreventif=rows.filter(function(r){return r.type!=='ravitaillement';}).length+missionsWPreventif.length;
+  var nbCorrectif=missionsWCorrectif.length;
+  var coutPreventifW=rows.filter(function(r){return r.type!=='ravitaillement';}).reduce(function(s,r){return s+(parseFloat(r.cout)||0);},0)+missionsWPreventif.reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
+  var coutCorrectifW=missionsWCorrectif.reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
   function _fmtKW(v){if(!v)return'0';if(v>=1000000)return(v/1000000).toFixed(1)+' M';if(v>=1000)return Math.round(v/1000)+' k';return Math.round(v);}
   var ratioLabel=nbPreventif+' préventif / '+nbCorrectif+' correctif';
   var nbPannesActives=pannesOuvertes.length;
@@ -14345,7 +14348,7 @@ async function _openRapportDT(period){
     var sidStr=sids.join(',');
 
     var _now=new Date();
-    var[sites,pleins,maintenances,signalements,rondes,energieFluidesDT,relevesEnergieDT,budgetsMensuels,relevesZonesDT]=await Promise.all([
+    var[sites,pleins,maintenances,signalements,rondes,energieFluidesDT,relevesEnergieDT,budgetsMensuels,relevesZonesDT,missionsDT]=await Promise.all([
       supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres'),
       supaGet('pleins','site_id=in.('+sidStr+')&date=gte.'+cutoff+'&select=id,site_id,litres_ajoutes,cout,date&order=date.asc'),
       supaGet('maintenances','groupe_id=in.('+sidStr+')&date_intervention=gte.'+cutoff+'&select=id,groupe_id,type,titre,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=200'),
@@ -14354,15 +14357,17 @@ async function _openRapportDT(period){
       supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,tarif,capacite,seuil_alerte_bas,devise&order=ordre.asc'),
       supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+cutoff+'&select=site_id,date_releve,valeurs,to_percent,nb_couverts,nb_chambres_occupees&order=date_releve.asc&limit=500'),
       supaGet('energie_budget_mensuel','site_id=in.('+sidStr+')&annee=eq.'+_now.getFullYear()+'&mois=eq.'+(_now.getMonth()+1)+'&select=id,site_id,nb_couverts_budget,nb_chambres_budget'),
-      supaGet('releves_zones','site_id=in.('+sidStr+')&date=gte.'+cutoff+'&select=site_id,zone_id,date,statut,nb_anomalies&limit=500')
+      supaGet('releves_zones','site_id=in.('+sidStr+')&date=gte.'+cutoff+'&select=site_id,zone_id,date,statut,nb_anomalies&limit=500'),
+      supaGet('missions','site_id=in.('+sidStr+')&created_at=gte.'+cutoff+'T00:00:00&select=id,site_id,statut,cout,signalement_id&limit=200').catch(function(){return[];})
     ]);
+    missionsDT=missionsDT||[];
     var _bmIdsDT=(budgetsMensuels||[]).map(function(b){return b.id;});
     var budgetsFluidesDT=_bmIdsDT.length?await supaGet('energie_budget_fluide','budget_id=in.('+_bmIdsDT.join(',')+')'+'&select=budget_id,fluide_id,cout_budget_jour')||[]:[];
     var nbChambresMap={};(sites||[]).forEach(function(s){nbChambresMap[s.id]=s.nb_chambres?parseInt(s.nb_chambres):null;});
     var rIds=rondes.map(function(r){return r.id;});
     var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=ronde_id,equipement_id,statut'):[];
 
-    var html=_buildRapportDirTech(period,periodeStr,_session,sites,pleins,maintenances,signalements,rondes,rondesEq,energieFluidesDT||[],relevesEnergieDT||[],budgetsMensuels||[],budgetsFluidesDT||[],nbChambresMap,relevesZonesDT||[]);
+    var html=_buildRapportDirTech(period,periodeStr,_session,sites,pleins,maintenances,signalements,rondes,rondesEq,energieFluidesDT||[],relevesEnergieDT||[],budgetsMensuels||[],budgetsFluidesDT||[],nbChambresMap,relevesZonesDT||[],missionsDT);
     var w=window.open('','_blank');
     if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
     w.document.write(html);w.document.close();
@@ -14370,8 +14375,8 @@ async function _openRapportDT(period){
   finally{if(btn){btn.disabled=false;btn.textContent='📊 Rapport ▾';}}
 }
 
-function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenances,signalements,rondes,rondesEq,energieFluidesDT,relevesEnergieDT,budgetsMensuels,budgetsFluidesDT,nbChambresMap,relevesZonesDT){
-  budgetsMensuels=budgetsMensuels||[];budgetsFluidesDT=budgetsFluidesDT||[];nbChambresMap=nbChambresMap||{};
+function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenances,signalements,rondes,rondesEq,energieFluidesDT,relevesEnergieDT,budgetsMensuels,budgetsFluidesDT,nbChambresMap,relevesZonesDT,missions){
+  budgetsMensuels=budgetsMensuels||[];budgetsFluidesDT=budgetsFluidesDT||[];nbChambresMap=nbChambresMap||{};missions=missions||[];
   var HCOLS=['#C49A1C','#2D7A4F','#3498DB','#D4761E','#8E44AD','#E74C3C'];
   var HCOLS_PALE=['#FDF3E3','#E8F5EE','#EBF5FB','#FDF0E6','#F5EEF8','#FDEDEC'];
   var dirNom=(session.contact&&session.contact.nom)||'Directeur technique';
@@ -14382,7 +14387,8 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   var siteData={};
   sites.forEach(function(s){siteData[s.id]={nom:s.nom,litres:0,coutCarb:0,pannes:0,pannesTot:0,panneCout:0,mntCout:0,mntCount:0,mntPreventif:0,mntCoutPreventif:0,mntCorrectif:0,mntCoutCorrectif:0,rondes:0,rondesVal:0,rondesTot:0,mttrH:[],mttr:null,toVals:[],toMoy:null,couvertsTotal:null};});
   pleins.forEach(function(p){if(siteData[p.site_id]){siteData[p.site_id].litres+=Number(p.litres_ajoutes)||0;siteData[p.site_id].coutCarb+=Number(p.cout)||0;}});
-  maintenances.forEach(function(m){if(siteData[m.groupe_id]){if(m.type!=='ravitaillement'){siteData[m.groupe_id].mntCout+=Number(m.cout)||0;}siteData[m.groupe_id].mntCount++;if(m.type==='preventive'){siteData[m.groupe_id].mntPreventif++;siteData[m.groupe_id].mntCoutPreventif+=Number(m.cout)||0;}else if(m.type==='panne'||m.type==='corrective'){siteData[m.groupe_id].mntCorrectif++;siteData[m.groupe_id].mntCoutCorrectif+=Number(m.cout)||0;}}});
+  maintenances.forEach(function(m){if(siteData[m.groupe_id]){if(m.type!=='ravitaillement'){siteData[m.groupe_id].mntCout+=Number(m.cout)||0;siteData[m.groupe_id].mntPreventif++;siteData[m.groupe_id].mntCoutPreventif+=Number(m.cout)||0;}siteData[m.groupe_id].mntCount++;}});
+  missions.forEach(function(m){if(siteData[m.site_id]){siteData[m.site_id].mntCout+=Number(m.cout)||0;if(m.signalement_id){siteData[m.site_id].mntCorrectif++;siteData[m.site_id].mntCoutCorrectif+=Number(m.cout)||0;}else{siteData[m.site_id].mntPreventif++;siteData[m.site_id].mntCoutPreventif+=Number(m.cout)||0;}}});
   signalements.forEach(function(s){if(siteData[s.groupe_id]){siteData[s.groupe_id].pannesTot++;if(s.statut!=='resolu')siteData[s.groupe_id].pannes++;siteData[s.groupe_id].panneCout+=Number(s.cout_intervention)||0;if(s.statut==='resolu'&&s.created_at&&s.resolved_at){var ttr=(new Date(s.resolved_at)-new Date(s.created_at))/3600000;if(ttr>=0)siteData[s.groupe_id].mttrH.push(ttr);}}});
   var reByRonde={};rondesEq.forEach(function(re){if(!reByRonde[re.ronde_id])reByRonde[re.ronde_id]=[];reByRonde[re.ronde_id].push(re);});
   rondes.forEach(function(r){if(siteData[r.site_id]){siteData[r.site_id].rondes++;var eq=reByRonde[r.id]||[];siteData[r.site_id].rondesTot+=eq.length;siteData[r.site_id].rondesVal+=eq.filter(function(re){return re.statut==='valide';}).length;}});
@@ -14809,7 +14815,7 @@ async function _openRapportHebdo(period){
       supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+cutoff+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=200'),
       supaGet('signalements','groupe_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,type,description,statut,signale_par,equipement_id,equipement_zone_id,cout_intervention,created_at,resolved_at,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=60'),
       supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+cutoff+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=40'),
-      supaGet('missions','site_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,statut,cout,devise&order=created_at.desc&limit=100').catch(function(){return[];})
+      supaGet('missions','site_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,statut,cout,devise,signalement_id&order=created_at.desc&limit=100').catch(function(){return[];})
     ]);
     missions=missions||[];
     var siteNom=siteRow.length?siteRow[0].nom:'Mon site';
@@ -14979,7 +14985,7 @@ async function _openRapportHebdoMois(offset){
       supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+moisDebut+'&date_ronde=lte.'+moisFin+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=200'),
       supaGet('signalements','groupe_id=eq.'+sid+'&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'T23:59:59&select=id,type,description,statut,signale_par,equipement_id,equipement_zone_id,cout_intervention,created_at,resolved_at,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=60'),
       supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+moisDebut+'&date_intervention=lte.'+moisFin+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=40'),
-      supaGet('missions','site_id=eq.'+sid+'&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'T23:59:59&select=id,statut,cout,devise&order=created_at.desc&limit=100').catch(function(){return[];})
+      supaGet('missions','site_id=eq.'+sid+'&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'T23:59:59&select=id,statut,cout,devise,signalement_id&order=created_at.desc&limit=100').catch(function(){return[];})
     ]);
     missionsMens=missionsMens||[];
     var siteNom=siteRow.length?siteRow[0].nom:'Mon site';
@@ -15189,10 +15195,12 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   var tauxRondes=totalTot>0?Math.round(totalVal/totalTot*100):null;
   var nbSgOuverts=signalements.filter(function(s){return s.statut!=='resolu';}).length;
   var nbSgResolus=signalements.filter(function(s){return s.statut==='resolu';}).length;
-  var nbPreventif=maintenances.filter(function(m){return m.type==='preventive';}).length;
-  var coutPreventif=maintenances.filter(function(m){return m.type==='preventive';}).reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
-  var nbCorrectif=missions.length;
-  var coutCorrectif=missions.reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
+  var missionsPreventif=missions.filter(function(m){return !m.signalement_id;});
+  var missionsCorrectif=missions.filter(function(m){return !!m.signalement_id;});
+  var nbPreventif=maintenances.filter(function(m){return m.type!=='ravitaillement';}).length+missionsPreventif.length;
+  var coutPreventif=maintenances.filter(function(m){return m.type!=='ravitaillement';}).reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0)+missionsPreventif.reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
+  var nbCorrectif=missionsCorrectif.length;
+  var coutCorrectif=missionsCorrectif.reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
   var coutTotal=coutPreventif+coutCorrectif;
   var nbMaintenances=maintenances.length;
   var cuves=equips.filter(function(e){return e.capacite_litres!=null;});
