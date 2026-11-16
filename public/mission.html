@@ -205,7 +205,7 @@ function renderApp(){
         html+='<label style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f1f5f9;cursor:pointer">';
         html+='<input type="checkbox" '+(checked?'checked':'')+' onchange="_toggleCheck(\''+mp.id+'\','+ci+',this.checked)" '+
           'style="width:16px;height:16px;accent-color:#22c55e;cursor:pointer">';
-        html+='<span style="font-size:13px;color:#374151'+(checked?';text-decoration:line-through;color:#94a3b8':'')+'" id="cl-text-'+mp.id+'-'+ci+'">'+esc(item.text||item)+'</span>';
+        html+='<span style="font-size:13px;color:#374151'+(checked?';text-decoration:line-through;color:#94a3b8':'')+'" id="cl-text-'+mp.id+'-'+ci+'">'+esc(typeof item==='string'?item:(item.label||item.text||item.tache||item.titre||item.nom||''))+'</span>';
         html+='</label>';
       });
       html+='</div>';
@@ -315,7 +315,7 @@ async function _submitMission(){
     // Checklist complétée — [{text, done}]
     if(checklist.length){
       mpPatch.checklist_completee=checklist.map(function(item,ci){
-        return{text:item.text||item,done:!!st.checklistCompletee[ci]};
+        return{text:typeof item==='string'?item:(item.label||item.text||item.tache||item.titre||item.nom||''),done:!!st.checklistCompletee[ci]};
       });
     }
     await sbPatch('mission_plans',mp.id,mpPatch);
@@ -392,8 +392,8 @@ function renderRapport(){
     var isOk=statut==='realise',isKo=statut==='bloque';
     var clDef=Array.isArray(plan.checklist)?plan.checklist:[];
     var clComp=Array.isArray(mp.checklist_completee)?mp.checklist_completee:[];
-    var nbComp=clComp.filter(function(c){return c&&c.done;}).length;
-    var nbTotal=clDef.length;
+    var nbComp=clComp.filter(function(c){return c===true||(c&&c.done===true);}).length;
+    var nbTotal=clDef.length||clComp.length;
 
     html+='<div class="card" id="task-card-'+mp.id+'">';
     html+='<div class="card-head">';
@@ -410,9 +410,18 @@ function renderRapport(){
     if(clComp.length){
       html+='<div style="margin-bottom:10px">';
       html+='<div class="field-label" style="margin-bottom:5px">Points vérifiés ('+nbComp+'/'+nbTotal+')</div>';
-      clComp.forEach(function(c){
-        var txt=c.text||'';
-        var done=!!c.done;
+      clComp.forEach(function(c,ci){
+        var done,txt;
+        if(typeof c==='boolean'){
+          // Format booléen [true,false,...] — texte dans clDef
+          done=c;
+          var di=clDef[ci];
+          txt=!di?('Point '+(ci+1)):typeof di==='string'?di:(di.text||di.label||di.tache||di.titre||di.nom||('Point '+(ci+1)));
+        }else{
+          // Format objet {done,text}
+          done=!!(c&&c.done);
+          txt=(c&&(c.text||c.label||c.tache||c.titre||c.nom))||('Point '+(ci+1));
+        }
         html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9">';
         html+='<span style="font-size:14px">'+(done?'✅':'⬜')+'</span>';
         html+='<span style="font-size:12px;color:'+(done?'#94a3b8':'#374151')+';'+(done?'text-decoration:line-through':'')+'">'+esc(txt)+'</span>';
@@ -426,7 +435,7 @@ function renderRapport(){
       clDef.forEach(function(item){
         html+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f1f5f9">';
         html+='<span style="font-size:14px">⬜</span>';
-        html+='<span style="font-size:12px;color:#374151">'+esc(item.text||item)+'</span>';
+        html+='<span style="font-size:12px;color:#374151">'+esc(typeof item==='string'?item:(item.label||item.text||item.tache||item.titre||item.nom||''))+'</span>';
         html+='</div>';
       });
       html+='</div>';
