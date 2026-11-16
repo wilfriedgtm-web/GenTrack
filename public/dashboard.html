@@ -4349,6 +4349,8 @@ async function _rtMaintenances(sid){
         '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin-bottom:1px">Maintenance</div>'+
         '<div style="font-size:20px;font-weight:800;color:#1e293b">Gestion technique</div>'+
       '</div>'+
+      '<button onclick="_mntCreateEqFromMaint(\''+sid+'\')" style="display:flex;align-items:center;gap:5px;padding:7px 14px;background:#0f172a;color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">'+
+        '<i class="ti ti-plus" style="font-size:12px"></i>Équipement</button>'+
     '</div>'+
     '<div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:14px">'+
       '<button id="mnt-main-tab-eq" onclick="_mntSwitchMainTab(\'eq\',\''+sid+'\')" '+
@@ -4381,6 +4383,64 @@ async function _rtMaintenances(sid){
     '</div>'+
     '</div>'+ // end mnt-main-view-eq
     '<div id="mnt-main-view-prest" style="display:none"></div>';
+}
+
+// ── Création équipement hors-ronde depuis onglet maintenance ────────────────
+
+async function _mntCreateEqFromMaint(sid){
+  var types=await supaGet('types_equipements','order=nom.asc&select=id,nom').catch(function(){return[];});
+  var typeOpts=types.map(function(t){return '<option value="'+t.id+'">'+escape_html(t.nom)+'</option>';}).join('');
+  var modal=document.createElement('div');
+  modal.id='mnt-create-eq-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML=
+    '<div style="background:white;border-radius:16px;padding:24px;width:400px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2)">'+
+      '<div style="font-size:16px;font-weight:800;color:#1e293b;margin-bottom:4px">Nouvel équipement</div>'+
+      '<div style="font-size:11px;color:#94a3b8;margin-bottom:16px">Équipement suivi en maintenance sans ronde automatique</div>'+
+      '<div style="margin-bottom:11px">'+
+        '<label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Nom *</label>'+
+        '<input id="mnt-eq-new-nom" type="text" placeholder="Ex: Split chambre 101, Groupe froid cuisine…" '+
+          'style="width:100%;box-sizing:border-box;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;outline:none">'+
+      '</div>'+
+      '<div style="margin-bottom:14px">'+
+        '<label style="font-size:11px;font-weight:600;color:#64748b;display:block;margin-bottom:4px">Type d\'équipement</label>'+
+        '<select id="mnt-eq-new-type" style="width:100%;border:1.5px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;background:white">'+
+          '<option value="">— Sans type —</option>'+typeOpts+
+        '</select>'+
+      '</div>'+
+      '<div style="background:#f1f5f9;border-radius:8px;padding:9px 11px;font-size:11px;color:#64748b;margin-bottom:16px">'+
+        '⚠ Cet équipement ne sera <strong>pas inclus dans les rondes</strong>. Vous pourrez lui créer des plans de maintenance et enregistrer des interventions depuis sa fiche.'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end">'+
+        '<button onclick="document.getElementById(\'mnt-create-eq-modal\').remove()" '+
+          'style="padding:8px 16px;border-radius:8px;border:1.5px solid #e2e8f0;background:white;font-size:13px;font-weight:600;color:#64748b;cursor:pointer">Annuler</button>'+
+        '<button onclick="_mntCreateEqConfirm(\''+sid+'\')" '+
+          'style="padding:8px 16px;border-radius:8px;border:none;background:#0f172a;font-size:13px;font-weight:600;color:white;cursor:pointer">Créer l\'équipement</button>'+
+      '</div>'+
+      '<div id="mnt-eq-new-status" style="display:none;font-size:11px;text-align:center;margin-top:8px"></div>'+
+    '</div>';
+  document.body.appendChild(modal);
+  setTimeout(function(){var el=document.getElementById('mnt-eq-new-nom');if(el)el.focus();},80);
+}
+
+async function _mntCreateEqConfirm(sid){
+  var nomEl=document.getElementById('mnt-eq-new-nom');
+  var typeEl=document.getElementById('mnt-eq-new-type');
+  var statusEl=document.getElementById('mnt-eq-new-status');
+  var nom=nomEl?nomEl.value.trim():'';
+  if(!nom){if(nomEl){nomEl.style.borderColor='#ef4444';nomEl.focus();}return;}
+  var typeId=typeEl?typeEl.value:'';
+  if(statusEl){statusEl.style.display='';statusEl.style.color='#64748b';statusEl.textContent='⏳ Création...';}
+  var payload={site_id:sid,nom:nom,actif:true,actif_ronde:false,actif_releve:false,ordre_ronde:99};
+  if(typeId)payload.type_id=typeId;
+  var created=await supaPost('equipements',payload).catch(function(){return null;});
+  if(created&&created.id){
+    var modal=document.getElementById('mnt-create-eq-modal');
+    if(modal)modal.remove();
+    _rtMaintenances(sid);
+  }else{
+    if(statusEl){statusEl.style.color='#ef4444';statusEl.textContent='❌ Erreur création.';}
+  }
 }
 
 // ── Maintenance list helpers ────────────────────────────────────────────────
@@ -5588,7 +5648,7 @@ async function _mntDossierPrestataire(prestId,prestNom,sid,months){
         '<span style="font-size:16px">'+ico+'</span>'+
         '<div style="flex:1;min-width:0">'+
           '<div style="font-size:12px;font-weight:500;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+escape_html(d.nom)+'</div>'+
-          '<div style="font-size:10px;color:#94a3b8">'+escape_html(d.type_doc)+' · '+new Date(d.created_at).toLocaleDateString('fr-FR')+'</div>'+
+          '<div style="font-size:10px;color:#94a3b8">'+escape_html(d.type_doc)+' · '+(d.date_document?new Date(d.date_document+'T12:00:00').toLocaleDateString('fr-FR'):new Date(d.created_at).toLocaleDateString('fr-FR'))+'</div>'+
         '</div>'+
         (function(){var dUrl=d.url||(d.storage_path?'https://zbpoxjlkqxnqjzxohasq.supabase.co/storage/v1/object/public/maintenance-photos/'+d.storage_path:'');return dUrl?'<a href="'+dUrl+'" target="_blank" style="font-size:10px;padding:3px 7px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;color:#64748b;text-decoration:none">↗ Ouvrir</a>':'';})()+
       '</div>';
@@ -5600,7 +5660,7 @@ async function _mntDossierPrestataire(prestId,prestNom,sid,months){
   // Import document
   html+='<div style="margin-top:12px;padding-top:12px;border-top:1px solid #e2e8f0">'+
     '<div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:6px">Importer un document</div>'+
-    '<div style="display:flex;gap:6px;margin-bottom:7px">'+
+    '<div style="display:flex;gap:6px;margin-bottom:6px">'+
       '<select id="doc-type-sel" style="flex:1;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px;background:white">'+
         '<option value="facture">Facture</option>'+
         '<option value="contrat">Contrat</option>'+
@@ -5608,7 +5668,9 @@ async function _mntDossierPrestataire(prestId,prestNom,sid,months){
         '<option value="garantie">Garantie</option>'+
         '<option value="autre">Autre</option>'+
       '</select>'+
+      '<input type="date" id="doc-date-sel" style="flex:1;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px;background:white" value="'+new Date().toISOString().slice(0,10)+'">'+
     '</div>'+
+    '<input type="text" id="doc-nom-sel" placeholder="Nom du document (ex: Facture réparation AC)" style="width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:7px;padding:6px 8px;font-size:11px;margin-bottom:6px">'+
     '<label style="display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;background:#f8fafc;border:1.5px dashed #cbd5e1;border-radius:8px;font-size:11px;font-weight:600;color:#64748b;cursor:pointer">'+
       '<input type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display:none" onchange="_mntUploadDocPrest(this,\''+prestId+'\',\''+sid+'\',\''+prestNom.replace(/'/g,'').replace(/\\/g,'')+'\')">'+
       '📎 Sélectionner un fichier'+
@@ -5645,11 +5707,13 @@ async function _mntUploadDocPrest(input,prestId,sid,prestNom){
 
   var typeSel=document.getElementById('doc-type-sel');
   var typeDoc=typeSel?typeSel.value:'autre';
-  var rec=await supaPost('documents_prestataire',{
-    prestataire_id:prestId,site_id:sid,
-    nom:file.name,type_doc:typeDoc,
-    storage_path:path,url:url
-  }).catch(function(){return null;});
+  var nomSel=document.getElementById('doc-nom-sel');
+  var nomDoc=(nomSel&&nomSel.value.trim())?nomSel.value.trim():file.name;
+  var dateSel=document.getElementById('doc-date-sel');
+  var dateDoc=dateSel&&dateSel.value?dateSel.value:null;
+  var payload={prestataire_id:prestId,site_id:sid,nom:nomDoc,type_doc:typeDoc,storage_path:path,url:url};
+  if(dateDoc)payload.date_document=dateDoc;
+  var rec=await supaPost('documents_prestataire',payload).catch(function(){return null;});
 
   if(rec){
     if(status){status.style.color='#16a34a';status.textContent='✅ Document importé !';}
@@ -14739,13 +14803,15 @@ async function _openRapportHebdo(period){
     var dateFin=new Date();
     var periodeStr=dateDebut.toLocaleDateString('fr-FR',{day:'numeric',month:'long'})+' – '+dateFin.toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
 
-    var[siteRow,equips,rondes,signalements,maintenances]=await Promise.all([
+    var[siteRow,equips,rondes,signalements,maintenances,missions]=await Promise.all([
       supaGet('sites','id=eq.'+sid+'&select=nom,nb_chambres&limit=1'),
       supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,capacite_litres,conso_theorique_lh,types_equipements(nom)&order=ordre_ronde.asc'),
       supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+cutoff+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=200'),
       supaGet('signalements','groupe_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,type,description,statut,signale_par,equipement_id,equipement_zone_id,cout_intervention,created_at,resolved_at,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=60'),
-      supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+cutoff+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=40')
+      supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+cutoff+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=40'),
+      supaGet('missions','site_id=eq.'+sid+'&created_at=gte.'+cutoff+'T00:00:00&select=id,statut,cout,devise&order=created_at.desc&limit=100').catch(function(){return[];})
     ]);
+    missions=missions||[];
     var siteNom=siteRow.length?siteRow[0].nom:'Mon site';
     var rIds=rondes.map(function(r){return r.id;});
     var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=id,ronde_id,equipement_id,statut'):[];
@@ -14885,7 +14951,7 @@ async function _openRapportHebdo(period){
     var _budgetFluides=[];
     if(_budgetMensuel&&_budgetMensuel.id){_budgetFluides=await supaGet('energie_budget_fluide','budget_id=eq.'+_budgetMensuel.id+'&select=fluide_id,cout_budget_jour')||[];}
     var _nbCh=siteRow.length&&siteRow[0].nb_chambres?parseInt(siteRow[0].nb_chambres):null;
-    var html=_buildRapportPro(siteNom,periodeStr,period,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[],_nbCh,_budgetMensuel,_budgetFluides);
+    var html=_buildRapportPro(siteNom,periodeStr,period,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[],_nbCh,_budgetMensuel,_budgetFluides,undefined,undefined,undefined,missions);
     var w=window.open('','_blank');
     if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
     w.document.write(html);w.document.close();
@@ -14907,13 +14973,15 @@ async function _openRapportHebdoMois(offset){
   try{
     var sid=_activeSiteId||(_session.site_ids&&_session.site_ids[0]);
     if(!sid){alert('Aucun site configuré.');return;}
-    var[siteRow,equips,rondes,signalements,maintenances]=await Promise.all([
+    var[siteRow,equips,rondes,signalements,maintenances,missionsMens]=await Promise.all([
       supaGet('sites','id=eq.'+sid+'&select=nom,nb_chambres&limit=1'),
       supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom,capacite_litres,conso_theorique_lh,types_equipements(nom)&order=ordre_ronde.asc'),
       supaGet('rondes','site_id=eq.'+sid+'&date_ronde=gte.'+moisDebut+'&date_ronde=lte.'+moisFin+'&select=id,date_ronde,frequence&order=date_ronde.asc&limit=200'),
       supaGet('signalements','groupe_id=eq.'+sid+'&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'T23:59:59&select=id,type,description,statut,signale_par,equipement_id,equipement_zone_id,cout_intervention,created_at,resolved_at,equipements(nom),equipements_zone(nom)&order=created_at.desc&limit=60'),
-      supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+moisDebut+'&date_intervention=lte.'+moisFin+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=40')
+      supaGet('maintenances','groupe_id=eq.'+sid+'&date_intervention=gte.'+moisDebut+'&date_intervention=lte.'+moisFin+'&select=id,titre,type,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=40'),
+      supaGet('missions','site_id=eq.'+sid+'&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'T23:59:59&select=id,statut,cout,devise&order=created_at.desc&limit=100').catch(function(){return[];})
     ]);
+    missionsMens=missionsMens||[];
     var siteNom=siteRow.length?siteRow[0].nom:'Mon site';
     var rIds=rondes.map(function(r){return r.id;});
     var rondesEq=rIds.length?await supaGet('rondes_equipements','ronde_id=in.('+rIds.join(',')+')'+'&select=id,ronde_id,equipement_id,statut'):[];
@@ -14973,7 +15041,7 @@ async function _openRapportHebdoMois(offset){
       _relevesZones=rzData[0]||[];
       _zonesRes=rzData[1]||[];
     }
-    var html=_buildRapportPro(siteNom,periodeStr,daysInMonth,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[],_nbCh,_budgetMensuel,_budgetFluides,_relevesZones,_zonesRes,relevesH||[]);
+    var html=_buildRapportPro(siteNom,periodeStr,daysInMonth,_session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides||[],relevesEnergiePeriode||[],pleinsPeriode||[],_nbCh,_budgetMensuel,_budgetFluides,_relevesZones,_zonesRes,relevesH||[],missionsMens);
     var w=window.open('','_blank');
     if(!w){alert('Autorisez les popups pour générer le rapport.');return;}
     w.document.write(html);w.document.close();
@@ -15104,7 +15172,8 @@ function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,relev
   return h;
 }
 
-function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides,relevesEnergie,pleinsSite,nbChambres,budgetMensuel,budgetFluides,relevesZones,zonesRes,relevesHoraires){
+function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondesEq,signalements,maintenances,lastRepsByEq,cuveHistory,rondeExportRows,releveExportRows,energieFluides,relevesEnergie,pleinsSite,nbChambres,budgetMensuel,budgetFluides,relevesZones,zonesRes,relevesHoraires,missions){
+  missions=missions||[];
   relevesZones=relevesZones||[];zonesRes=zonesRes||[];relevesHoraires=relevesHoraires||[];
   var respNom=(session.contact&&session.contact.nom)||'Responsable technique';
   var genDate=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -15120,12 +15189,12 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   var tauxRondes=totalTot>0?Math.round(totalVal/totalTot*100):null;
   var nbSgOuverts=signalements.filter(function(s){return s.statut!=='resolu';}).length;
   var nbSgResolus=signalements.filter(function(s){return s.statut==='resolu';}).length;
-  var coutTotal=maintenances.filter(function(m){return m.type!=='ravitaillement';}).reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
-  var nbMaintenances=maintenances.length;
   var nbPreventif=maintenances.filter(function(m){return m.type==='preventive';}).length;
   var coutPreventif=maintenances.filter(function(m){return m.type==='preventive';}).reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
-  var nbCorrectif=maintenances.filter(function(m){return m.type==='panne'||m.type==='corrective';}).length;
-  var coutCorrectif=maintenances.filter(function(m){return m.type==='panne'||m.type==='corrective';}).reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
+  var nbCorrectif=missions.length;
+  var coutCorrectif=missions.reduce(function(s,m){return s+(parseFloat(m.cout)||0);},0);
+  var coutTotal=coutPreventif+coutCorrectif;
+  var nbMaintenances=maintenances.length;
   var cuves=equips.filter(function(e){return e.capacite_litres!=null;});
   var ges=equips.filter(function(e){return e.conso_theorique_lh!=null&&e.capacite_litres==null;});
 
@@ -15482,7 +15551,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
     '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+kpiCol(tauxRondes,70,90,false)+'">'+(tauxRondes!==null?tauxRondes+'%':'—')+'</div><div class="kpi-sub">'+rondes.length+' ronde(s)</div></div>'+
     '<div class="kpi"><div class="kpi-label">Signalements actifs</div><div class="kpi-value" style="color:'+kpiCol(nbSgOuverts,1,3,true)+'">'+nbSgOuverts+'</div><div class="kpi-sub">'+nbSgResolus+' résolu(s)</div></div>'+
     '<div class="kpi"><div class="kpi-label">Maint. préventif</div><div class="kpi-value">'+nbPreventif+'</div><div class="kpi-sub">'+(coutPreventif>0?fmtCout(coutPreventif,'XOF'):'aucun coût')+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Maint. correctif</div><div class="kpi-value" style="color:'+(nbCorrectif>0?'var(--rouge)':'var(--vert)')+'">'+nbCorrectif+'</div><div class="kpi-sub">'+(coutCorrectif>0?fmtCout(coutCorrectif,'XOF'):'aucun coût')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Maint. correctif</div><div class="kpi-value" style="color:'+(nbCorrectif>0?'var(--rouge)':'var(--vert)')+'">'+nbCorrectif+'</div><div class="kpi-sub">'+(coutCorrectif>0?fmtCout(coutCorrectif,'XOF'):'aucun coût')+' · missions prest.</div></div>'+
     '<div class="kpi"><div class="kpi-label">Équipements actifs</div><div class="kpi-value">'+equips.length+'</div><div class="kpi-sub">'+ges.length+' groupe(s) · '+cuves.length+' cuve(s)</div></div>'+
     '<div class="kpi"><div class="kpi-label">MTTR moyen</div><div class="kpi-value" style="color:'+(mttrH===null?'var(--text3)':mttrH<24?'var(--vert)':mttrH<72?'var(--amber)':'var(--rouge)')+'">'+fmtDur(mttrH)+'</div><div class="kpi-sub">'+(sgsResolus.length>0?sgsResolus.length+' résolution(s)':'—')+'</div></div>'+
   '</div>';
