@@ -186,6 +186,8 @@ tbody tr:hover { background: #faf9f6; }
         <input class="form-input" type="password" id="login-password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
       </div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px" id="login-btn" onclick="doLogin()">Connexion</button>
+      <button class="btn btn-outline" style="width:100%;justify-content:center;margin-top:8px;font-size:12px" id="magic-btn" onclick="doMagicLink()">✉ Connexion par lien email (sans mot de passe)</button>
+      <div id="magic-sent" class="hidden" style="text-align:center;font-size:12px;color:var(--green);margin-top:10px">✓ Lien envoyé — vérifie ta boîte mail</div>
     </div>
     <div id="reset-form" class="hidden">
       <div class="form-group">
@@ -1753,6 +1755,25 @@ async function doSetPassword() {
   _jwt = data?.session?.access_token || null;
   hideLoginScreen();
   loadAll();
+}
+
+async function doMagicLink() {
+  const btn = document.getElementById('magic-btn');
+  const errEl = document.getElementById('login-error');
+  const email = document.getElementById('login-email').value.trim() || 'wilfried.gtm@gmail.com';
+  btn.textContent = 'Envoi…'; btn.disabled = true;
+  errEl.classList.add('hidden');
+  const { error } = await _sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.href }
+  });
+  btn.textContent = '✉ Connexion par lien email (sans mot de passe)'; btn.disabled = false;
+  if (error) {
+    errEl.textContent = 'Erreur : ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+  document.getElementById('magic-sent').classList.remove('hidden');
 }
 
 async function doLogout() {
