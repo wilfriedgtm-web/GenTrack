@@ -800,7 +800,8 @@ async function demarrerResolu(phone: string, contact: any, site: any): Promise<a
       equipement_id: s.equipement_id || null,
       groupe_id: s.groupe_id,
       type: s.type,
-      description: s.description || s.type
+      description: s.description || s.type,
+      prestataire_id: s.prestataire_id || null,
     }))
   });
   return sendWA(phone, `✅ *Clôturer un signalement*\n*${site?.nom || ''}*\n\nQuel signalement est résolu ?\n\n${liste}\n\nRépondez avec le numéro.`);
@@ -1589,7 +1590,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     if (isNaN(idx) || idx < 0 || idx >= (sd.signalements?.length || 0))
       return sendWA(phone, `Répondez avec un numéro entre 1 et ${sd.signalements?.length}`);
     const sg = sd.signalements[idx];
-    await setSession(phone, 'resolu_note', { ...sd, sg_id: sg.id, sg_equipement: sg.equipement, sg_equipement_id: sg.equipement_id, sg_groupe_id: sg.groupe_id, sg_label: sg.equipement + ' · ' + sg.description });
+    await setSession(phone, 'resolu_note', { ...sd, sg_id: sg.id, sg_equipement: sg.equipement, sg_equipement_id: sg.equipement_id, sg_groupe_id: sg.groupe_id, sg_label: sg.equipement + ' · ' + sg.description, sg_prestataire_id: sg.prestataire_id || null });
     return sendWA(phone, `✅ *${sg.equipement} · ${sg.description}*\n\nComment a été résolu le problème ?\n_(Ex: Démarreur remplacé, ou tapez - pour passer)_`);
   }
 
@@ -1632,6 +1633,8 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       statut: 'realise',
       cout: cout > 0 ? cout : null,
       prestataire: sd.intervenant || contact.nom,
+      prestataire_id: sd.sg_prestataire_id || null,
+      signalement_id: sd.sg_id || null,
       created_by: contact.nom,
     }}).catch(() => {});
     // Notifier resp_tech (multi-site inclus)
