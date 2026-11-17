@@ -3106,20 +3106,6 @@ async function _sgAffecterPrestataireConfirm(sgId){
     pris_en_charge_par:prestNom,
     pris_en_charge_at:new Date().toISOString()
   });
-  // 2. Créer l'entrée maintenances (corrective)
-  await supaPost('maintenances',{
-    groupe_id:sid,
-    equipement_id:r&&r.equipement_id||null,
-    equipement_zone_id:r&&r.equipement_zone_id||null,
-    type:'panne',
-    statut:'planifie',
-    titre:'Intervention · '+(eqNom||typeLabel),
-    description:(r&&r.description||'')+(note?'\n\nNote : '+note:''),
-    signalement_id:sgId,
-    prestataire:prestNom,
-    prestataire_id:prestId,
-    created_by:_session&&(_session.nom||_session.email)||'Resp Tech'
-  });
   _closeCfgModal();
   // 3. Ouvrir WhatsApp si numéro disponible
   if(prestTel&&prestTel.trim()){
@@ -5637,10 +5623,13 @@ async function _mntDossierPrestataire(prestId,prestNom,sid,months){
 
   var monthsFilter='';
   if(months>0){var mfd=new Date();mfd.setMonth(mfd.getMonth()-months);monthsFilter='&created_at=gte.'+mfd.toISOString();}
-  var [missions,docs,_siteEqs]=await Promise.all([
+  var mntMonthsFilter='';
+  if(months>0){var mfd2=new Date();mfd2.setMonth(mfd2.getMonth()-months);mntMonthsFilter='&date_intervention=gte.'+mfd2.toISOString().slice(0,10);}
+  var [missions,docs,_siteEqs,correctives]=await Promise.all([
     supaGet('missions','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+monthsFilter+'&order=created_at.desc&select=id,token,statut,created_at,completed_at,cout,duree_heures,devise,equipements(nom)').catch(function(){return[];}),
     supaGet('documents_prestataire','prestataire_id=eq.'+prestId+'&site_id=eq.'+sid+'&order=created_at.desc&select=*').catch(function(){return[];}),
-    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc').catch(function(){return[];})
+    supaGet('equipements','site_id=eq.'+sid+'&actif=eq.true&select=id,nom&order=ordre_ronde.asc').catch(function(){return[];})  ,
+    supaGet('maintenances','prestataire_id=eq.'+prestId+'&groupe_id=eq.'+sid+'&statut=eq.realise&type=eq.panne'+mntMonthsFilter+'&order=date_intervention.desc&select=id,titre,type,date_intervention,cout,description,photo_url,signalement_id,equipements(nom)').catch(function(){return[];})
   ]);
   window._prestEquipements=_siteEqs||[];
 
@@ -5653,6 +5642,9 @@ async function _mntDossierPrestataire(prestId,prestNom,sid,months){
     if(m.statut==='realisee')nbReal++;
     if(m.cout!=null){hasCoutData=true;totalCout+=parseFloat(m.cout)||0;}
     if(m.duree_heures!=null)totalH+=parseFloat(m.duree_heures)||0;
+  });
+  (correctives||[]).forEach(function(m){
+    if(m.cout!=null){hasCoutData=true;totalCout+=parseFloat(m.cout)||0;}
   });
   var devise=(missions.find(function(m){return m.devise;})||{}).devise||'FCFA';
   var fmtMnt=function(n){return n.toLocaleString('fr-FR')+(n%1!==0?'':'')+' '+devise;};
@@ -5726,6 +5718,29 @@ async function _mntDossierPrestataire(prestId,prestNom,sid,months){
     });
   } else {
     html+='<div style="font-size:12px;color:#94a3b8;padding:8px 0">Aucune mission pour ce prestataire.</div>';
+  }
+
+  // Interventions correctives (signalements résolus)
+  if(correctives&&correctives.length){
+    html+='<div style="font-size:11px;font-weight:700;color:#b45309;text-transform:uppercase;letter-spacing:.6px;margin:14px 0 8px">Interventions correctives</div>';
+    correctives.forEach(function(m){
+      var eqN=(m.equipements&&m.equipements.nom)||'—';
+      var dateStr=m.date_intervention?new Date(m.date_intervention+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'}):'—';
+      var mCout=m.cout!=null?parseFloat(m.cout):null;
+      var rapportUrl='rapport.html?sg='+m.signalement_id;
+      html+='<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f1f5f9;">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:12px;font-weight:600;color:#1e293b">'+escape_html(eqN||m.titre||'—')+'</div>'+
+          '<div style="font-size:10px;color:#94a3b8;display:flex;gap:8px;margin-top:1px">'+
+            '<span>'+dateStr+'</span>'+
+            (m.description?'<span style="color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px">'+escape_html(m.description.substring(0,60))+'</span>':'')+
+            (mCout!=null?'<span style="color:#d97706;font-weight:600">'+mCout.toLocaleString('fr-FR')+' '+devise+'</span>':'')+
+          '</div>'+
+        '</div>'+
+        '<span style="font-size:10px;font-weight:700;color:#16a34a">✅ Réalisé</span>'+
+        (m.signalement_id?'<a href="'+rapportUrl+'" target="_blank" style="font-size:10px;padding:3px 6px;background:#fef3c7;border:1px solid #fcd34d;border-radius:5px;color:#92400e;text-decoration:none;font-weight:600">📋</a>':'')+
+      '</div>';
+    });
   }
 
   // Documents
@@ -6675,7 +6690,7 @@ async function _mntGeneratePDF(mntId){
   doc.text('DATE DE RÉALISATION',ml,y);doc.text('INTERVENANT / PRESTATAIRE',ml+95,y);
   y+=5;
   doc.setTextColor(30,41,59);doc.setFontSize(11);doc.setFont('helvetica','bold');
-  var dateStr=m.date_realisee?new Date(m.date_realisee+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}):'—';
+  var _pdfDate=m.date_realisee||m.date_intervention;var dateStr=_pdfDate?new Date(_pdfDate+'T00:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}):'—';
   doc.text(dateStr,ml,y);
   doc.setFontSize(11);doc.text(m.technicien||m.prestataire||'—',ml+95,y);
   y+=8;
@@ -6688,6 +6703,7 @@ async function _mntGeneratePDF(mntId){
   y+=10;
   doc.setDrawColor(226,232,240);doc.line(ml,y,ml+cw,y);
   // Compte rendu
+  var _pdfTexte=m.rapport_texte||m.description;if(_pdfTexte&&_pdfTexte.trim()){m={...m,rapport_texte:_pdfTexte};}
   if(m.rapport_texte&&m.rapport_texte.trim()){
     y+=8;
     doc.setTextColor(100,116,139);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text('COMPTE RENDU',ml,y);
