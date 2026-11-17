@@ -4159,7 +4159,7 @@ async function _rtMaintenances(sid){
   var res=await Promise.all([
     supaGet('equipements',
       'site_id=eq.'+sid+'&actif=eq.true&order=nom.asc'+
-      '&select=id,nom,marque,modele,type_id,contrat_actif,contrat_type,types_equipements(nom)'
+      '&select=id,nom,marque,modele,type_id,contrat_actif,contrat_type,actif_maintenance,types_equipements(nom)'
     ).catch(function(){return[];}),
     supaGet('signalements',
       'groupe_id=eq.'+sid+'&type=eq.panne&statut=not.in.(traite,resolu,annule)&select=id,equipement_id,statut,description,created_at'
@@ -4211,8 +4211,8 @@ async function _rtMaintenances(sid){
 
   // ─── KPI data ────────────────────────────────────────────────────
   var nbPannes=pannes.length;
-  var nbSansPlan=equips.filter(function(e){return !plansIdx[e.id];}).length;
-  var nbEquips=equips.length;
+  var nbSansPlan=equips.filter(function(e){return !plansIdx[e.id]&&e.actif_maintenance!==false;}).length;
+  var nbEquips=equips.filter(function(e){return e.actif_maintenance!==false;}).length;
   var nbPlansActifs=plans.length;
   // Échéances ce mois
   var moisDebMnt=new Date(today.getFullYear(),today.getMonth(),1);
@@ -4270,9 +4270,11 @@ async function _rtMaintenances(sid){
         (urgDiff<0?'⚠ Retard '+Math.abs(urgDiff)+'j':urgDiff===0?'Aujourd\'hui':urgDiff+'j — '+escape_html((urgPlan.titre||'').slice(0,22)))+
       '</div>';
     }
+    var isMntOff=e.actif_maintenance===false;
+    if(isMntOff){stCol='#cbd5e1';stLbl='🔕 Maint. désactivée';}
     return '<div onclick="_mntSelectEq(\''+e.id+'\',\''+escape_html(e.nom)+'\',\''+sid+'\')" '+
       'style="padding:10px 12px;border-left:3px solid '+stCol+';'+
-      'background:'+(isSel?'#f0f9ff':'white')+';cursor:pointer;border-bottom:1px solid #f1f5f9;transition:background .1s">'+
+      'background:'+(isSel?'#f0f9ff':isMntOff?'#f8fafc':'white')+';cursor:pointer;border-bottom:1px solid #f1f5f9;transition:background .1s;'+(isMntOff?'opacity:.55':'')+'">'+
       '<div style="display:flex;align-items:center;gap:10px">'+
         '<div style="width:32px;height:32px;border-radius:8px;background:'+ti.bg+';display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
           '<i class="ti '+ti.icon+'" style="font-size:16px;color:'+ti.col+'" aria-hidden="true"></i>'+
@@ -4464,8 +4466,11 @@ function _mntBuildList(){
     return {eq:e,urgDiff:urgDiff};
   });
 
-  // Sort: overdue first, then soonest, then no plan
+  // Sort: overdue first, then soonest, then no plan, inactive maintenance last
   withUrg.sort(function(a,b){
+    var aOff=a.eq.actif_maintenance===false,bOff=b.eq.actif_maintenance===false;
+    if(aOff&&!bOff)return 1;
+    if(!aOff&&bOff)return -1;
     if(a.urgDiff===null&&b.urgDiff===null)return 0;
     if(a.urgDiff===null)return 1;
     if(b.urgDiff===null)return -1;
@@ -4780,7 +4785,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
   panel.innerHTML='<div style="padding:32px;text-align:center;color:#94a3b8"><i class="ti ti-loader" style="font-size:24px"></i></div>';
 
   var res=await Promise.all([
-    supaGet('equipements','id=eq.'+eqId+'&select=id,nom,marque,modele,numero_serie,date_mise_en_service,garantie_fin,contrat_type,contrat_actif,notes_tech,types_equipements(nom)').catch(function(){return[];}),
+    supaGet('equipements','id=eq.'+eqId+'&select=id,nom,marque,modele,numero_serie,date_mise_en_service,garantie_fin,contrat_type,contrat_actif,notes_tech,actif_maintenance,types_equipements(nom)').catch(function(){return[];}),
     supaGet('signalements','equipement_id=eq.'+eqId+'&type=eq.panne&statut=not.in.(traite,resolu,annule)&order=created_at.desc&select=id,description,statut,created_at').catch(function(){return[];}),
     supaGet('signalements','equipement_id=eq.'+eqId+'&order=created_at.desc&limit=90&select=id,type,description,statut,created_at,assigne_a').catch(function(){return[];}),
     supaGet('maintenances','equipement_id=eq.'+eqId+'&order=date_realisee.desc&limit=90&select=id,titre,type,statut,created_at,date_realisee,prestataire,prestataire_id,technicien,cout,rapport_texte,plan_maintenance_id').catch(function(){return[];}),
@@ -5234,6 +5239,10 @@ async function _mntSelectEq(eqId,eqNom,sid){
     '<div style="position:relative;background:linear-gradient(160deg,#1a2234 0%,#0f172a 100%);padding:20px 16px 18px;overflow:hidden">'+
       '<div style="position:absolute;top:10px;right:10px;display:flex;gap:6px;align-items:center">'+
         '<button onclick="_mntCompleteFiche(\''+eqId+'\',\''+sid+'\')" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);cursor:pointer;color:#e2e8f0;font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;line-height:1;display:flex;align-items:center;gap:5px"><i class="ti ti-pencil" style="font-size:12px"></i> Modifier</button>'+
+        (eq.actif_maintenance===false?
+          '<button onclick="_mntToggleActifMaintenance(\''+eqId+'\',true,\''+sid+'\')" title="Activer la maintenance" style="background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.35);cursor:pointer;color:#86efac;font-size:11px;font-weight:600;padding:4px 10px;border-radius:7px;line-height:1;display:flex;align-items:center;gap:4px"><i class="ti ti-bell" style="font-size:12px"></i> Activer maint.</button>':
+          '<button onclick="_mntToggleActifMaintenance(\''+eqId+'\',false,\''+sid+'\')" title="Désactiver la maintenance" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);cursor:pointer;color:#94a3b8;font-size:11px;font-weight:500;padding:4px 10px;border-radius:7px;line-height:1;display:flex;align-items:center;gap:4px"><i class="ti ti-bell-off" style="font-size:12px"></i> Désactiver maint.</button>'
+        )+
         '<button onclick="_mntCloseDetail()" title="Fermer" style="background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.25);cursor:pointer;color:white;font-size:14px;padding:5px 8px;border-radius:7px;line-height:1;font-weight:700" aria-label="Fermer"><i class="ti ti-x"></i></button>'+
       '</div>'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
@@ -6007,6 +6016,14 @@ function _mntFreqToDays(freq){
   if(u.startsWith('mois'))return n*30;
   if(u.startsWith('an'))return n*365;
   return 9999; // compteur horaire/km — pas de fenêtre calendaire
+}
+async function _mntToggleActifMaintenance(eqId,newState,sid){
+  try{
+    await supaPatch('equipements',eqId,{actif_maintenance:newState});
+    _mntSelectEq(eqId,sid);
+  }catch(e){
+    alert('Erreur lors de la mise à jour : '+e.message);
+  }
 }
 function _mntToggleFreqType(type){
   var btnT=document.getElementById('ntache-type-temps');
