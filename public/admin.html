@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GenTrack Admin</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -124,6 +125,13 @@ tbody tr:hover { background: #faf9f6; }
 .section-sep { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .site-check-list { border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; max-height: 160px; overflow-y: auto; }
 .site-check-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+/* ── AUTH ── */
+#login-screen { position: fixed; inset: 0; background: var(--sidebar-bg); z-index: 10000; display: flex; align-items: center; justify-content: center; }
+.login-box { background: #fff; border-radius: 14px; padding: 36px; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+.login-logo { font-family: 'Space Grotesk',sans-serif; font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.login-logo span { color: var(--gold); }
+.login-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+.login-error { background: #fff0f0; color: var(--red); border: 1px solid #fecaca; border-radius: 7px; padding: 10px 12px; font-size: 13px; margin-bottom: 14px; }
 </style>
 </head>
 <body>
@@ -142,7 +150,10 @@ tbody tr:hover { background: #faf9f6; }
     <div class="nav-item" data-section="modeles" onclick="showSection('modeles')"><span class="icon">📋</span> Modèles</div>
     <div class="nav-item" data-section="modules" onclick="showSection('modules')"><span class="icon">🧩</span> Modules</div>
   </nav>
-  <div class="sidebar-footer"><small id="sync-status">Chargement…</small></div>
+  <div class="sidebar-footer">
+    <small id="sync-status">Chargement…</small>
+    <div style="margin-top:8px"><button class="btn btn-outline btn-xs" style="color:#888;border-color:#333;width:100%;justify-content:center" onclick="doLogout()">↩ Déconnexion</button></div>
+  </div>
 </aside>
 
 <div id="main">
@@ -159,11 +170,40 @@ tbody tr:hover { background: #faf9f6; }
 <div id="toast"></div>
 <div id="modals"></div>
 
+<!-- ── LOGIN SCREEN ── -->
+<div id="login-screen" style="display:none">
+  <div class="login-box">
+    <div class="login-logo">Gen<span>Track</span></div>
+    <div class="login-sub" id="login-sub">Accès administrateur</div>
+    <div id="login-error" class="login-error hidden"></div>
+    <div id="login-form">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" id="login-email" autocomplete="email" placeholder="votre@email.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Mot de passe</label>
+        <input class="form-input" type="password" id="login-password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px" id="login-btn" onclick="doLogin()">Connexion</button>
+    </div>
+    <div id="reset-form" class="hidden">
+      <div class="form-group">
+        <label class="form-label">Nouveau mot de passe</label>
+        <input class="form-input" type="password" id="new-password" placeholder="Minimum 6 caractères" onkeydown="if(event.key==='Enter')doSetPassword()">
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:6px" id="reset-btn" onclick="doSetPassword()">Enregistrer le mot de passe</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── CONSTANTS ──────────────────────────────────────────────
 const SUPA_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
 const BASE_URL = 'https://gen-track.vercel.app';
+let _jwt = null; // JWT de session — remplace SUPA_KEY dans Authorization après login
+let _sb = null;  // client supabase-js (pour l'auth uniquement)
 const PLANS = { starter: 10000, business: 20000, pro: 50000 };
 
 function typeById(id){const t=S.types_equipements.find(t=>t.id===id);return t||{nom:'Autre',icone:'🔩'};}
@@ -175,7 +215,7 @@ async function api(table, q='', select='*', method='GET', body=null) {
   try {
     const res = await fetch(`${SUPA_URL}/rest/v1/${table}?select=${select}${q}`, {
       method,
-      headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`, 'Content-Type': 'application/json', 'Prefer': (method==='POST'||method==='PATCH')?'return=representation':'' },
+      headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${_jwt || SUPA_KEY}`, 'Content-Type': 'application/json', 'Prefer': (method==='POST'||method==='PATCH')?'return=representation':'' },
       body: body ? JSON.stringify(body) : undefined
     });
     if (res.status===204||res.status===404) return [];
@@ -187,7 +227,7 @@ async function apiPatch(table, id, body) {
   try {
     const res = await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`, {
       method: 'PATCH',
-      headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${_jwt || SUPA_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
       body: JSON.stringify(body)
     });
     if (!res.ok) {
@@ -199,7 +239,7 @@ async function apiPatch(table, id, body) {
   } catch(e) { console.error('[apiPatch]', e); return { ok: false, error: String(e) }; }
 }
 async function apiDelete(table, q) {
-  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?${q}`, { method:'DELETE', headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${SUPA_KEY}`} });
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?${q}`, { method:'DELETE', headers:{'apikey':SUPA_KEY,'Authorization':`Bearer ${_jwt || SUPA_KEY}`} });
   return res.ok;
 }
 
@@ -1650,8 +1690,109 @@ async function _adminMigrateLegacy(siteId) {
   }
 }
 
+// ── AUTH ───────────────────────────────────────────────────
+function showLoginScreen(sub) {
+  document.getElementById('login-sub').textContent = sub || 'Accès administrateur';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-form').classList.remove('hidden');
+  document.getElementById('reset-form').classList.add('hidden');
+  document.getElementById('login-error').classList.add('hidden');
+}
+
+function showResetScreen() {
+  document.getElementById('login-sub').textContent = 'Définir un nouveau mot de passe';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-form').classList.add('hidden');
+  document.getElementById('reset-form').classList.remove('hidden');
+  document.getElementById('login-error').classList.add('hidden');
+}
+
+function hideLoginScreen() {
+  document.getElementById('login-screen').style.display = 'none';
+}
+
+async function doLogin() {
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  btn.textContent = 'Connexion…'; btn.disabled = true;
+  errEl.classList.add('hidden');
+  const { data, error } = await _sb.auth.signInWithPassword({ email, password });
+  btn.textContent = 'Connexion'; btn.disabled = false;
+  if (error) {
+    errEl.textContent = 'Email ou mot de passe incorrect.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  _jwt = data.session.access_token;
+  hideLoginScreen();
+  loadAll();
+}
+
+async function doSetPassword() {
+  const btn = document.getElementById('reset-btn');
+  const errEl = document.getElementById('login-error');
+  const newPwd = document.getElementById('new-password').value;
+  if (newPwd.length < 6) {
+    errEl.textContent = 'Le mot de passe doit faire au moins 6 caractères.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  btn.textContent = 'Enregistrement…'; btn.disabled = true;
+  errEl.classList.add('hidden');
+  const { error } = await _sb.auth.updateUser({ password: newPwd });
+  btn.textContent = 'Enregistrer le mot de passe'; btn.disabled = false;
+  if (error) {
+    errEl.textContent = 'Erreur : ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+  // Mot de passe défini — récupérer la session et afficher l'app
+  const { data } = await _sb.auth.getSession();
+  _jwt = data?.session?.access_token || null;
+  hideLoginScreen();
+  loadAll();
+}
+
+async function doLogout() {
+  await _sb.auth.signOut();
+  _jwt = null;
+  showLoginScreen();
+}
+
 // ── INIT ───────────────────────────────────────────────────
-loadAll();
+async function initAdmin() {
+  _sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+  // Écouter les changements d'auth (gère le lien recovery automatiquement)
+  _sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      // L'utilisateur a cliqué le lien de récupération → afficher le formulaire de nouveau mot de passe
+      showResetScreen();
+    } else if (event === 'SIGNED_IN' && session) {
+      _jwt = session.access_token;
+    } else if (event === 'SIGNED_OUT') {
+      _jwt = null;
+    } else if (event === 'TOKEN_REFRESHED' && session) {
+      _jwt = session.access_token;
+    }
+  });
+
+  // Vérifier s'il y a déjà une session active
+  const { data: { session } } = await _sb.auth.getSession();
+  if (session) {
+    _jwt = session.access_token;
+    // Si c'est un recovery, le onAuthStateChange le gérera
+    if (window.location.hash.includes('type=recovery')) return;
+    hideLoginScreen();
+    loadAll();
+  } else {
+    showLoginScreen();
+  }
+}
+
+initAdmin();
 </script>
 </body>
 </html>
