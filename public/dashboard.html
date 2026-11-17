@@ -2384,7 +2384,7 @@ async function _rtSignalements(sid){
     supaGet('zones','site_id=eq.'+sid+'&actif=eq.true&order=categorie.asc,ordre.asc,nom.asc&select=id,nom,etage,categorie,type'),
     supaGet('signalements',
       'groupe_id=eq.'+sid+'&order=created_at.desc&limit=200'+
-      '&select=id,groupe_id,site_id,type,description,statut,signale_par,lieu,zone_id,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,pris_en_charge_par,pris_en_charge_at,ref_code,created_at,source,photo_url,equipement_id,equipement_zone_id,equipements(nom),equipements_zone(nom),maintenances!signalement_id(photo_url,prestataire)'
+      '&select=id,groupe_id,site_id,type,description,statut,signale_par,lieu,zone_id,cout_intervention,note_resolution,resolved_by,resolved_at,assigne_a,pris_en_charge_par,pris_en_charge_at,ref_code,created_at,source,photo_url,equipement_id,equipement_zone_id,equipements(nom),equipements_zone(nom),maintenances!signalement_id(photo_url,prestataire,statut)'
     )
   ]);
   zones=zones||[]; allRows=allRows||[];
@@ -2604,7 +2604,13 @@ function _sgBuildDetail(r,zones,sid){
   var z=r.zone_id?zones.find(function(z){return z.id===r.zone_id;}):null;
   var lieuLabel=z?z.nom:(r.lieu||'');
   var statut=_SG_STATUTS[r.statut]||{label:r.statut,color:'var(--text3)',bg:'var(--bg)'};
-  var mnt=r.maintenances&&r.maintenances[0]?r.maintenances[0]:null;
+  var mnt=null;
+  if(r.maintenances&&r.maintenances.length){
+    // Prendre en priorité celle avec photo_url, sinon celle en statut realise, sinon la première
+    mnt=r.maintenances.find(function(m){return m.photo_url;})||
+        r.maintenances.find(function(m){return m.statut==='realise';})||
+        r.maintenances[0];
+  }
   var photoApres=mnt&&mnt.photo_url?mnt.photo_url:null;
   var tech=r.resolved_by||(mnt&&mnt.prestataire)||null;
   var dateStr=r.created_at?new Date(r.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
