@@ -1407,7 +1407,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     const panneTypes = e.type_id ? await db('panne_types', { query: `&type_equipement_id=eq.${e.type_id}&order=ordre.asc` }) : [];
     if (!Array.isArray(panneTypes) || !panneTypes.length) {
       await setSession(phone, 'panne_description', { ...sd, equipement_id: e.id, equip_nom: e.nom, panne_type_label: 'Panne', panne_type_slug: 'panne' });
-      return sendWA(phone, `🚨 *${e.nom}*\n\nDécrivez le problème en détail :\n_(minimum 10 caractères)_`);
+      return sendWA(phone, `🚨 *${e.nom}*\n\nDécrivez le problème en détail :\n_(minimum 10 caractères — ou envoyez directement une photo 📷)_`);
     }
     const liste = panneTypes.map((pt: any, i: number) => `*${i + 1}* — ${pt.label}`).join('\n');
     await setSession(phone, 'panne_type', { ...sd, equipement_id: e.id, equip_nom: e.nom, panne_types: panneTypes });
@@ -1421,7 +1421,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       return sendWA(phone, `Répondez avec un numéro entre 1 et ${panneTypes.length}.`);
     const pt = panneTypes[idx];
     await setSession(phone, 'panne_description', { ...sd, panne_type_label: pt.label, panne_type_slug: pt.slug });
-    return sendWA(phone, `✅ *${pt.label}*\n\nDécrivez le problème en détail :`);
+    return sendWA(phone, `✅ *${pt.label}*\n\nDécrivez le problème en détail :\n_(Vous pouvez aussi joindre une photo 📷)_`);
   }
 
   if (state === 'panne_description') {

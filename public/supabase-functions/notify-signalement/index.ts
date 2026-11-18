@@ -125,7 +125,7 @@ async function sendNotifications(payload: any) {
     `${signale_par ? '\n👤 ' + signale_par : ''}` +
     `${signaleur_whatsapp && isExternal ? '\n📞 ' + signaleur_whatsapp : ''}` +
     `\n\n📝 ${description}` +
-    `${photo_url ? '\n📷 Photo : ' + photo_url : ''}` +
+    `${photo_url ? '\n📷 Photo disponible dans la fiche' : ''}` +
     `${ref_code ? '\n\n_Réf : ' + ref_code + '_\n_Répondre *OK ' + ref_code + '* pour PEC · ou *AFFECTER ' + ref_code + ' NomTech* pour assigner._' : ''}` +
     `\n_${heure}_`;
 
