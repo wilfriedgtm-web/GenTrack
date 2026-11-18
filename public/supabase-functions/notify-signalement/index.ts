@@ -59,7 +59,7 @@ async function sendWA(to: string, body: string, mediaUrl?: string) {
   await twilioPost({ From: TWILIO_FROM, To: toFmt, Body: body });
   // Photo en message séparé si présente (plus fiable qu'un caption sur WhatsApp)
   if (mediaUrl) {
-    await twilioPost({ From: TWILIO_FROM, To: toFmt, MediaUrl0: mediaUrl });
+    await twilioPost({ From: TWILIO_FROM, To: toFmt, MediaUrl: mediaUrl });
   }
 }
 
