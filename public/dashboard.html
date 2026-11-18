@@ -13058,7 +13058,7 @@ async function _openRapportDTMois(offset){
       supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres'),
       supaGet('pleins','site_id=in.('+sidStr+')&date=gte.'+moisDebut+'&date=lte.'+moisFin+'&select=id,site_id,litres_ajoutes,cout,date&order=date.asc'),
       supaGet('maintenances','groupe_id=in.('+sidStr+')&date_intervention=gte.'+moisDebut+'&date_intervention=lte.'+moisFin+'&select=id,groupe_id,type,titre,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=200'),
-      supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'&select=id,groupe_id,type,description,statut,signale_par,cout_intervention,created_at,resolved_at,equipement_id,equipement_zone_id,lieu,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=200'),
+      supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'&select=id,groupe_id,type,description,statut,signale_par,assigne_a,pris_en_charge_par,cout_intervention,created_at,resolved_at,equipement_id,equipement_zone_id,lieu,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=200'),
       supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+moisDebut+'&date_ronde=lte.'+moisFin+'&select=id,site_id,date_ronde,frequence&order=date_ronde.asc&limit=500'),
       supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,tarif,capacite,seuil_alerte_bas,devise&order=ordre.asc'),
       supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=site_id,date_releve,valeurs,to_percent,nb_couverts,nb_chambres_occupees&order=date_releve.asc&limit=500'),
@@ -14821,7 +14821,7 @@ async function _openRapportDT(period){
       supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres'),
       supaGet('pleins','site_id=in.('+sidStr+')&date=gte.'+cutoff+'&select=id,site_id,litres_ajoutes,cout,date&order=date.asc'),
       supaGet('maintenances','groupe_id=in.('+sidStr+')&date_intervention=gte.'+cutoff+'&select=id,groupe_id,type,titre,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=200'),
-      supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+cutoff+'T00:00:00&select=id,groupe_id,type,description,statut,signale_par,cout_intervention,created_at,resolved_at,equipement_id,equipement_zone_id,lieu,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=200'),
+      supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+cutoff+'T00:00:00&select=id,groupe_id,type,description,statut,signale_par,assigne_a,pris_en_charge_par,cout_intervention,created_at,resolved_at,equipement_id,equipement_zone_id,lieu,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=200'),
       supaGet('rondes','site_id=in.('+sidStr+')&date_ronde=gte.'+cutoff+'&select=id,site_id,date_ronde,frequence&order=date_ronde.asc&limit=500'),
       supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,tarif,capacite,seuil_alerte_bas,devise&order=ordre.asc'),
       supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+cutoff+'&select=site_id,date_releve,valeurs,to_percent,nb_couverts,nb_chambres_occupees&order=date_releve.asc&limit=500'),
@@ -15185,24 +15185,43 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
         '</div>'+
         '<div class="edit-hint">Observations (modifiable)</div>'+
         '<div class="obs-zone" contenteditable="true" data-placeholder="Observations pour '+escape_html(site.nom)+' : constats, recommandations, actions..."></div>'+
-        (siteSignalements.length>0?
-          '<div style="margin-top:14px"><div style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Signalements</div>'+
-          '<table><thead><tr><th>Équipement / Zone / Lieu</th><th>Description</th><th>Date</th><th>Statut</th><th>Coût</th></tr></thead><tbody>'+
-          siteSignalements.slice(0,15).map(function(s){
-            var ts=new Date(s.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
-            var resolu=s.statut==='resolu';
-            var eqNom=s.equipements&&s.equipements.nom?s.equipements.nom
-              :s.equipements_zone&&s.equipements_zone.nom?(s.equipements_zone.nom+(s.equipements_zone.zones&&s.equipements_zone.zones.nom?' · '+s.equipements_zone.zones.nom:''))
-              :s.lieu||'—';
-            return '<tr>'+
-              '<td style="font-weight:500">'+escape_html(eqNom)+'</td>'+
-              '<td style="max-width:220px;color:var(--text2)">'+escape_html((s.description||'').substring(0,70))+'</td>'+
-              '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
-              '<td>'+(resolu?'<span class="badge badge-ok">Résolu</span>':'<span class="badge badge-ko">En cours</span>')+'</td>'+
-              '<td style="font-size:11px">'+(s.cout_intervention?Number(s.cout_intervention).toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
-            '</tr>';
-          }).join('')+
-          '</tbody></table></div>':'')+
+        (function(){
+          var sgsOuv=siteSignalements.filter(function(s){return s.statut!=='resolu';});
+          var sgsRes=siteSignalements.filter(function(s){return s.statut==='resolu';});
+          if(!siteSignalements.length)return '';
+          var out='<div style="margin-top:14px"><div style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Signalements</div>';
+          if(sgsOuv.length>0){
+            out+='<table><thead><tr><th>Équipement / Zone</th><th>Description</th><th>Date</th><th>Statut</th><th>Assigné à</th></tr></thead><tbody>'+
+            sgsOuv.slice(0,10).map(function(s){
+              var ts=new Date(s.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+              var eqNom=s.equipements&&s.equipements.nom?s.equipements.nom
+                :s.equipements_zone&&s.equipements_zone.nom?(s.equipements_zone.nom+(s.equipements_zone.zones&&s.equipements_zone.zones.nom?' · '+s.equipements_zone.zones.nom:''))
+                :s.lieu||'—';
+              var assigneNom=s.assigne_a||s.pris_en_charge_par||null;
+              var statutBadge=s.statut==='en_cours'?'<span class="badge badge-warn">En cours</span>':'<span class="badge badge-ko">Ouvert</span>';
+              return '<tr>'+
+                '<td style="font-weight:500">'+escape_html(eqNom)+'</td>'+
+                '<td style="max-width:200px;color:var(--text2)">'+escape_html((s.description||'').substring(0,60))+'</td>'+
+                '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
+                '<td>'+statutBadge+'</td>'+
+                '<td style="font-size:11px">'+(assigneNom?escape_html(assigneNom):'<span style="color:var(--text3)">—</span>')+'</td>'+
+              '</tr>';
+            }).join('')+
+            '</tbody></table>';
+          }else{
+            out+='<div style="font-size:11px;color:#2D7A4F;padding:4px 0">✅ Aucun signalement en cours</div>';
+          }
+          if(sgsRes.length){
+            var mttrArr=sgsRes.filter(function(s){return s.created_at&&s.resolved_at;}).map(function(s){return(new Date(s.resolved_at)-new Date(s.created_at))/3600000;});
+            var mttrAvg=mttrArr.length?mttrArr.reduce(function(a,b){return a+b;},0)/mttrArr.length:null;
+            out+='<div style="font-size:11px;color:var(--text3);margin-top:6px">'+
+              sgsRes.length+' résolu'+(sgsRes.length>1?'s':'')+' sur la période'+
+              (mttrAvg!==null?' · MTTR : '+fmtDur(mttrAvg):'')+
+            '</div>';
+          }
+          out+='</div>';
+          return out;
+        })()+
         (function(){
           var siteMissF=missions.filter(function(m){return m.site_id===site.id;});
           var mntPrevRows=siteMaintenances.filter(function(m){return m.type!=='panne'&&m.type!=='ravitaillement';});
@@ -15220,7 +15239,11 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
                 var isMiss=!m.groupe_id;
                 var titre=isMiss?(m.plan_titre||'Mission prestataire'):(m.titre||'Intervention');
                 var eqDisp=isMiss?(m.eq_nom||''):(m.equipements&&m.equipements.nom?m.equipements.nom:'');
-                var inter=isMiss?('<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:3px;background:#E6F4FF;color:#185FA5">'+(m.nom_prestataire||'Prestataire')+'</span>'):(escape_html(m.prestataire||'—'));
+                var inter=isMiss
+                  ?'<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:3px;background:#EEF4FF;color:#3B6FD4;border:1px solid #BFCFF8">🔧 '+(m.nom_prestataire||'Prestataire')+'</span>'
+                  :(m.prestataire&&m.prestataire.trim()
+                    ?'<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:3px;background:#EEF4FF;color:#3B6FD4;border:1px solid #BFCFF8">🔧 '+escape_html(m.prestataire)+'</span>'
+                    :'<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:3px;background:#F4F5FA;color:#5A5F78;border:1px solid #E4E6EF">Interne</span>');
                 var typeLabel=isMiss?'préventive':(m.type||'—');
                 var typeCol=typeLabel==='panne'?'#C0392B':'#0F6E56';
                 var ts=isMiss?(m.completed_at?new Date(m.completed_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—'):(m.date_intervention?new Date(m.date_intervention).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—');
@@ -15234,13 +15257,27 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
               }).join('')+
             '</tbody></table>';
           }
+          var mntPills=
+            '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">'+
+            (d.mntCorrectif>0
+              ?'<div style="background:#FEF0F0;border:1px solid #F5C0B8;border-radius:5px;padding:5px 10px;font-size:11px">'+
+                '<span style="font-weight:700;color:#C0392B">⚡ Correctif</span> · '+d.mntCorrectif+' interv.'+
+                (d.mntCoutCorrectif>0?' · <strong style="color:#C0392B">'+fmtCout(d.mntCoutCorrectif,'XOF')+'</strong>':'')+
+              '</div>'
+              :'<div style="background:#F4F5FA;border:1px solid #E4E6EF;border-radius:5px;padding:5px 10px;font-size:11px;color:var(--text3)">⚡ Pas de correctif ✓</div>')+
+            (d.mntPreventif>0
+              ?'<div style="background:#EEF9F3;border:1px solid #A8DEC0;border-radius:5px;padding:5px 10px;font-size:11px">'+
+                '<span style="font-weight:700;color:#2D7A4F">🗓 Préventif</span> · '+d.mntPreventif+' interv.'+
+                (d.mntCoutPreventif>0?' · <strong style="color:#2D7A4F">'+fmtCout(d.mntCoutPreventif,'XOF')+'</strong>':'')+
+              '</div>'
+              :'')+
+            (d.mntCout>0
+              ?'<div style="background:var(--creme);border:1px solid var(--border);border-radius:5px;padding:5px 10px;font-size:11px"><strong>Total</strong> · '+fmtCout(d.mntCout,'XOF')+'</div>'
+              :'')+
+            '</div>';
           return '<div style="margin-top:14px">'+
             '<div style="font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">Maintenance</div>'+
-            '<table><thead><tr><th>Résumé</th><th style="text-align:right">Nb</th><th style="text-align:right">Coût</th></tr></thead><tbody>'+
-            '<tr><td style="font-weight:500;color:#0F6E56">Préventif (prestataire + interne)</td><td style="text-align:right;font-size:11px">'+d.mntPreventif+'</td><td style="text-align:right;font-weight:600;color:#0F6E56">'+(d.mntCoutPreventif>0?d.mntCoutPreventif.toLocaleString('fr-FR')+' FCFA':'—')+'</td></tr>'+
-            '<tr><td style="font-weight:500;color:'+(d.mntCorrectif>0?'#C0392B':'var(--text2)')+'">Correctif (pannes)</td><td style="text-align:right;font-size:11px">'+d.mntCorrectif+'</td><td style="text-align:right;font-weight:600;color:'+(d.mntCoutCorrectif>0?'#C0392B':'var(--text2)')+'">'+(d.mntCoutCorrectif>0?d.mntCoutCorrectif.toLocaleString('fr-FR')+' FCFA':'—')+'</td></tr>'+
-            (d.mntCout>0?'<tr style="background:#F9F6F0;border-top:1px solid var(--border)"><td style="font-weight:600">Total maintenance</td><td></td><td style="text-align:right;font-weight:700">'+d.mntCout.toLocaleString('fr-FR')+' FCFA</td></tr>':'')+
-            '</tbody></table>'+
+            mntPills+
             detailRows+
           '</div>';
         })()+
@@ -15277,13 +15314,19 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
         }).join('')+
         siteMainAll.map(function(m){
           var ts=m.date_intervention?new Date(m.date_intervention).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
-          var eqNom=m.equipements&&m.equipements.nom?' · '+m.equipements.nom:'';
-          var typeCol=m.type==='panne'?'#C0392B':'#0F6E56';
+          var eqNom=m.equipements&&m.equipements.nom?' · '+escape_html(m.equipements.nom):'';
+          var isCorr=m.type==='panne';
+          var typeTag=isCorr
+            ?'<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:#FEF0F0;color:#C0392B;border:1px solid #F5C0B8;font-weight:600">⚡ Correctif</span>'
+            :'<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:#EEF9F3;color:#2D7A4F;border:1px solid #A8DEC0;font-weight:600">🗓 Préventif</span>';
+          var prestTag=m.prestataire&&m.prestataire.trim()
+            ?'<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:#EEF4FF;color:#3B6FD4;border:1px solid #BFCFF8">🔧 '+escape_html(m.prestataire)+'</span>'
+            :'<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:#F4F5FA;color:#5A5F78;border:1px solid #E4E6EF">Interne</span>';
           var coutStr=(Number(m.cout)||0)>0?(Number(m.cout)).toLocaleString('fr-FR')+' FCFA':'—';
           return '<tr>'+
-            '<td><strong>'+escape_html(m.titre||'Intervention')+'</strong>'+escape_html(eqNom)+'</td>'+
-            '<td style="color:'+typeCol+'">'+escape_html(m.type||'—')+'</td>'+
-            '<td>'+escape_html(m.prestataire||'—')+'</td>'+
+            '<td><strong>'+escape_html(m.titre||'Intervention')+'</strong>'+eqNom+'</td>'+
+            '<td>'+typeTag+'</td>'+
+            '<td>'+prestTag+'</td>'+
             '<td style="white-space:nowrap">'+ts+'</td>'+
             '<td>'+coutStr+'</td>'+
           '</tr>';
