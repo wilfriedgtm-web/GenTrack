@@ -222,7 +222,7 @@ async function init(){
   // Fetch signalement + site
   var rows=await supa('signalements',
     'id=eq.'+sgId+
-    '&select=id,type,description,lieu,statut,assigne_a,groupe_id,equipement_id,created_at,photo_url,equipements(nom)'
+    '&select=id,type,description,lieu,statut,assigne_a,groupe_id,equipement_id,created_at,photo_url,prestataire_id,equipements(nom)'
   );
   if(!rows||!rows[0]){_showInvalid();return;}
   _sg=rows[0];
@@ -358,6 +358,7 @@ async function _submit(){
       created_by:tech,
       photo_url:photoUrl||null,
       signalement_id:_sg.id,
+      prestataire_id:_sg.prestataire_id||null,
       duree_valeur:duree||null,
       duree_unite:duree?dureeUnite:null
     });
