@@ -25,14 +25,11 @@ async function db(table: string, opts: { query?: string; select?: string } = {})
 }
 
 // ── WhatsApp — timeout 8s via Promise.race (AbortController non fiable sur Supabase) ──
-async function sendWA(to: string, body: string, mediaUrl?: string) {
+async function twilioPost(params: Record<string, string>): Promise<void> {
   if (!TWILIO_SID || !TWILIO_TOK) {
-    console.error('sendWA: credentials manquants');
+    console.error('twilioPost: credentials manquants');
     return;
   }
-  const toFmt = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
-  const params: Record<string, string> = { From: TWILIO_FROM, To: toFmt, Body: body };
-  if (mediaUrl) params['MediaUrl0'] = mediaUrl;
   const fetchPromise = fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`,
     {
@@ -45,14 +42,24 @@ async function sendWA(to: string, body: string, mediaUrl?: string) {
     }
   );
   const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error('sendWA timeout 8s')), 8000)
+    setTimeout(() => reject(new Error('twilioPost timeout 8s')), 8000)
   );
   try {
     const res = await Promise.race([fetchPromise, timeoutPromise]);
     if (!res.ok) console.error('Twilio error:', await res.text());
-    else console.log(`sendWA OK → ${toFmt.slice(0, 16)}...`);
+    else console.log(`sendWA OK → ${params['To']?.slice(0, 16)}...`);
   } catch (e: any) {
     console.error('sendWA error:', e?.name, e?.message);
+  }
+}
+
+async function sendWA(to: string, body: string, mediaUrl?: string) {
+  const toFmt = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
+  // Message texte
+  await twilioPost({ From: TWILIO_FROM, To: toFmt, Body: body });
+  // Photo en message séparé si présente (plus fiable qu'un caption sur WhatsApp)
+  if (mediaUrl) {
+    await twilioPost({ From: TWILIO_FROM, To: toFmt, MediaUrl0: mediaUrl });
   }
 }
 
