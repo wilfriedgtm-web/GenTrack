@@ -2954,9 +2954,8 @@ function _sgAffecterMsg(r,instr,rapportUrl){
     '📍 *'+typeLabel+(eqNom?' · '+eqNom:'')+'*\n'+
     (r.lieu?'📍 Lieu : '+r.lieu+'\n':'')+
     '📝 '+r.description+
-    (r.photo_url?'\n\n📸 Photo : '+r.photo_url:'')+
     (instr?'\n\n📋 *Instructions :*\n'+instr:'')+
-    '\n\n✅ Rapport d\'intervention :\n'+rapportUrl;
+    '\n\n✅ Rapport d\'intervention'+(r.photo_url?' (photo incluse)':'')+' :\n'+rapportUrl;
 }
 
 function _sgAffecterUpdatePreview(id){
@@ -3073,8 +3072,7 @@ function _sgAffecterPrestatairePreview(sgId,prestId,prestNom,prestTel){
     '📍 *'+typeLabel+(eqNom?' · '+eqNom:'')+'*\n'+
     (r&&r.lieu?'📍 Lieu : '+r.lieu+'\n':'')+
     (r?'📝 '+(r.description||''):'')+
-    (r&&r.photo_url?'\n\n📸 Photo : '+r.photo_url:'')+
-    '\n\n✅ Fiche intervention :\n'+rapportUrl;
+    '\n\n✅ Fiche intervention'+(r&&r.photo_url?' (photo incluse)':'')+' :\n'+rapportUrl;
   var hasWa=!!(prestTel&&prestTel.trim());
   _showCfgModal(
     '<div style="font-size:15px;font-weight:700;color:var(--dark);margin-bottom:4px">🏢 Envoyer au prestataire</div>'+
@@ -3114,9 +3112,8 @@ async function _sgAffecterPrestataireConfirm(sgId){
       '📍 *'+typeLabel+(eqNom?' · '+eqNom:'')+'*\n'+
       (r&&r.lieu?'📍 Lieu : '+r.lieu+'\n':'')+
       (r?'📝 '+(r.description||''):'')+
-      (r&&r.photo_url?'\n\n📸 Photo : '+r.photo_url:'')+
       (note?'\n\n📋 Note : '+note:'')+
-      '\n\n✅ Fiche intervention :\n'+rapportUrl;
+      '\n\n✅ Fiche intervention'+(r&&r.photo_url?' (photo incluse)':'')+' :\n'+rapportUrl;
     var waNum=prestTel.replace(/\D/g,'');
     window.open('https://wa.me/'+waNum+'?text='+encodeURIComponent(msg),'_blank');
   }

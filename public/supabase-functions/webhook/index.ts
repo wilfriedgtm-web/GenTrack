@@ -33,7 +33,7 @@ async function getSignedUrl(path: string, expiresIn = 31536000): Promise<string 
     });
     if (!res.ok) { console.error('getSignedUrl failed', res.status, await res.text()); return null; }
     const data = await res.json();
-    return data.signedURL ? `${SUPA_URL}${data.signedURL}` : null;
+    return data.signedURL ? `${SUPA_URL}/storage/v1${data.signedURL}` : null;
   } catch (e) {
     console.error('getSignedUrl error:', e);
     return null;
@@ -2018,7 +2018,7 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
         sd.sg_lieu ? `📍 Lieu : ${sd.sg_lieu}` : null,
         `📝 ${sd.sg_desc}`,
         sd.sg_signale_par ? `👤 Signalé par : ${sd.sg_signale_par}` : null,
-        sd.sg_photo ? `📷 Photo : ${sd.sg_photo}` : null,
+        sd.sg_photo ? `📷 Photo disponible dans la fiche` : null,
         ``,
         `👤 Assigné par : ${assigneNom}`,
         `🕐 ${getHeure()}`,
@@ -2200,11 +2200,11 @@ async function handleMessage(from: string, bodyText: string, mediaUrl: string = 
         await setSession(phone, 'idle', { active_site_id: sd.active_site_id || siteIdSig });
       }
       const siteInfo = siteNomSig ? `\n📍 *${siteNomSig}*` : '';
-      const photoLine = sig.photo_url ? `\n📷 Photo : ${sig.photo_url}` : '';
       const appUrlPec = Deno.env.get('APP_URL') || 'https://gen-track.vercel.app';
       const rapportUrlPec = `${appUrlPec}/rapport.html?sg=${sig.id}`;
       const rondeNote = rondeStates.includes(state) ? `\n_Votre ronde continue._\n\n` : `\n\n`;
-      return sendWA(phone, `✅ *Pris en charge !*${siteInfo}\n📋 ${refCode}${photoLine}${rondeNote}📝 Rapport d'intervention :\n${rapportUrlPec}`);
+      const photoMention = sig.photo_url ? ` (photo incluse)` : '';
+      return sendWA(phone, `✅ *Pris en charge !*${siteInfo}\n📋 ${refCode}${rondeNote}📝 Rapport d'intervention${photoMention} :\n${rapportUrlPec}`);
     }
 
     // ── Affectation interactive : "AFFECTER REF-XXXX" (sans nom → menu) ─────
