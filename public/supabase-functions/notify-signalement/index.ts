@@ -25,12 +25,14 @@ async function db(table: string, opts: { query?: string; select?: string } = {})
 }
 
 // ── WhatsApp — timeout 8s via Promise.race (AbortController non fiable sur Supabase) ──
-async function sendWA(to: string, body: string) {
+async function sendWA(to: string, body: string, mediaUrl?: string) {
   if (!TWILIO_SID || !TWILIO_TOK) {
     console.error('sendWA: credentials manquants');
     return;
   }
   const toFmt = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
+  const params: Record<string, string> = { From: TWILIO_FROM, To: toFmt, Body: body };
+  if (mediaUrl) params['MediaUrl0'] = mediaUrl;
   const fetchPromise = fetch(
     `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`,
     {
@@ -39,7 +41,7 @@ async function sendWA(to: string, body: string) {
         'Authorization': `Basic ${btoa(`${TWILIO_SID}:${TWILIO_TOK}`)}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({ From: TWILIO_FROM, To: toFmt, Body: body }).toString(),
+      body: new URLSearchParams(params).toString(),
     }
   );
   const timeoutPromise = new Promise<never>((_, reject) =>
@@ -125,7 +127,6 @@ async function sendNotifications(payload: any) {
     `${signale_par ? '\n👤 ' + signale_par : ''}` +
     `${signaleur_whatsapp && isExternal ? '\n📞 ' + signaleur_whatsapp : ''}` +
     `\n\n📝 ${description}` +
-    `${photo_url ? '\n📷 Photo disponible dans la fiche' : ''}` +
     `${ref_code ? '\n\n_Réf : ' + ref_code + '_\n_Répondre *OK ' + ref_code + '* pour PEC · ou *AFFECTER ' + ref_code + ' NomTech* pour assigner._' : ''}` +
     `\n_${heure}_`;
 
@@ -133,7 +134,7 @@ async function sendNotifications(payload: any) {
     for (const r of destinataires) {
       if (r.whatsapp && !dejaEnvoyes.has(r.whatsapp)) {
         dejaEnvoyes.add(r.whatsapp);
-        await sendWA(r.whatsapp, msgResp);
+        await sendWA(r.whatsapp, msgResp, photo_url || undefined);
       }
     }
   }
