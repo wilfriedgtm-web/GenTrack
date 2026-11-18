@@ -1,0 +1,1438 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack — Configuration de votre hôtel</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;min-height:100vh;padding:28px 16px}
+.container{max-width:660px;margin:0 auto}
+
+/* Brand */
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:24px}
+.brand-logo{width:32px;height:32px;background:#1a1a1a;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#C9A84C;font-size:13px;font-weight:700;flex-shrink:0}
+.brand-hotel{font-size:15px;font-weight:600;color:#1a1a1a}
+.brand-sub{font-size:12px;color:#888}
+
+/* Progress */
+.progress{display:flex;gap:4px;margin-bottom:7px}
+.pseg{flex:1;height:3px;border-radius:2px;background:#e0e0e0;transition:background .2s}
+.pseg.done{background:#1a1a1a}
+.pseg.active{background:#888}
+.plabels{display:flex;margin-bottom:22px}
+.plbl{flex:1;font-size:10px;color:#bbb;text-align:center;line-height:1.2}
+.plbl.active{color:#1a1a1a;font-weight:600}
+.plbl.done{color:#888}
+
+/* Steps */
+.step{display:none}
+.step.active{display:block}
+.shdr{margin-bottom:20px}
+.sn{font-size:11px;color:#aaa;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.stitle{font-size:20px;font-weight:700}
+.sdesc{font-size:13px;color:#666;margin-top:4px;line-height:1.5}
+
+/* Cards */
+.card{background:#fff;border-radius:12px;border:1px solid #e8e8e6;padding:18px 20px;margin-bottom:12px}
+.ctitle{font-size:12px;font-weight:600;color:#555;margin-bottom:14px;letter-spacing:.2px}
+
+/* Fields */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field:last-child,.field.last{margin-bottom:0}
+label{font-size:12px;color:#666;font-weight:500}
+input,select,textarea{border:1px solid #ddd;border-radius:8px;padding:9px 11px;font-size:14px;color:#1a1a1a;background:#fff;width:100%;font-family:inherit;transition:border .15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#1a1a1a}
+textarea{resize:vertical;min-height:72px}
+.hint{font-size:11px;color:#aaa;margin-top:4px}
+.errmsg{font-size:12px;color:#c0392b;margin-top:4px;display:none}
+
+/* Nb count selector */
+.cnt-row{display:flex;gap:8px;flex-wrap:wrap}
+.copt{width:44px;height:44px;border:1px solid #ddd;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600;color:#666;cursor:pointer;transition:all .15s;background:#fff;user-select:none}
+.copt:hover{border-color:#888;color:#1a1a1a}
+.copt.sel{border-color:#1a1a1a;background:#1a1a1a;color:#fff}
+
+/* Building cards */
+.bat-card{background:#fafaf8;border:1px solid #e8e8e6;border-radius:10px;padding:13px 15px;margin-bottom:9px}
+.bat-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}
+.bat-lbl{font-size:13px;font-weight:600;color:#1a1a1a}
+.btn-del{background:none;border:none;color:#ccc;font-size:18px;cursor:pointer;padding:0 2px;line-height:1;font-family:inherit}
+.btn-del:hover{color:#e55}
+
+/* Zone tabs (step 3) */
+.ztabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.ztab{padding:7px 14px;border:1px solid #ddd;border-radius:20px;font-size:12px;color:#666;cursor:pointer;background:#fff;transition:all .15s;white-space:nowrap}
+.ztab:hover{border-color:#888;color:#1a1a1a}
+.ztab.active{border-color:#1a1a1a;background:#1a1a1a;color:#fff}
+.ztab.filled{border-color:#555;color:#1a1a1a;background:#fafaf8}
+.zone-panel{display:none}
+.zone-panel.active{display:block}
+.zone-lbl{font-size:12px;font-weight:600;color:#555;margin-bottom:8px}
+
+/* Tag input */
+.tag-area{border:1px solid #ddd;border-radius:8px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;cursor:text;min-height:46px;background:#fff;transition:border .15s}
+.tag-area:focus-within{border-color:#1a1a1a}
+.chip{background:#f0f0ee;border:1px solid #e0e0e0;border-radius:4px;padding:3px 8px 3px 9px;font-size:12px;color:#1a1a1a;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.chip-x{background:none;border:none;color:#aaa;cursor:pointer;font-size:14px;line-height:1;padding:0;font-family:inherit}
+.chip-x:hover{color:#e55}
+.tag-inp{background:none;border:none;outline:none;font-size:13px;color:#1a1a1a;font-family:inherit;min-width:130px;flex:1}
+.tag-inp::placeholder{color:#bbb}
+.suggestions{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.sug{background:none;border:1px dashed #ddd;border-radius:4px;padding:3px 9px;font-size:11px;color:#888;cursor:pointer;font-family:inherit;transition:all .15s}
+.sug:hover{border-color:#888;color:#1a1a1a;background:#fafaf8}
+
+/* Equipment list */
+.eq-list{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.eq-row{background:#fafaf8;border:1px solid #e8e8e6;border-radius:9px;overflow:hidden}
+.eq-row.custom-eq{border-color:#C9A84C}
+.eq-main{padding:9px 12px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.eq-main:hover{background:#f0f0ee}
+.eq-chevron{font-size:11px;color:#aaa;transition:transform .2s;flex-shrink:0}
+.eq-chevron.open{transform:rotate(90deg)}
+.eq-nom{font-size:13px;font-weight:500;flex:1}
+.eq-badges{display:flex;gap:5px;align-items:center}
+.freq-sel{font-size:11px;background:#f0f0ee;border:1px solid #ddd;border-radius:4px;padding:3px 7px;color:#555;cursor:pointer;font-family:inherit;white-space:nowrap}
+.zone-sel{font-size:11px;background:#f0f0ee;border:1px solid #ddd;border-radius:4px;padding:3px 7px;color:#555;cursor:pointer;font-family:inherit;max-width:120px}
+.qty-badge{font-size:11px;background:#1a1a1a;color:#fff;border-radius:10px;padding:2px 8px;white-space:nowrap;flex-shrink:0}
+/* Equipment detail panel */
+.eq-detail{display:none;background:#fff;border-top:1px solid #e8e8e6;padding:12px 14px}
+.eq-detail.open{display:block}
+.eq-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.eq-detail-grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px}
+.eq-field{display:flex;flex-direction:column;gap:4px}
+.eq-field label{font-size:11px;color:#888;font-weight:500}
+.eq-field input,.eq-field select{border:1px solid #e0e0e0;border-radius:6px;padding:6px 9px;font-size:12px;font-family:inherit;background:#fff}
+.eq-field input:focus,.eq-field select:focus{outline:none;border-color:#1a1a1a}
+.cap-row{display:flex;gap:6px}
+.cap-row input{flex:1}
+.cap-row select{width:80px;flex-shrink:0}
+.mesure-opts{display:flex;gap:6px;flex-wrap:wrap}
+.mopt{padding:5px 11px;border:1px solid #ddd;border-radius:6px;font-size:11px;color:#666;cursor:pointer;background:#fff;transition:all .15s;font-family:inherit}
+.mopt:hover{border-color:#888}
+.mopt.sel{border-color:#1a1a1a;background:#1a1a1a;color:#fff}
+
+/* Fluides (step 5) */
+.fluide-toggle{background:#fafaf8;border:1px solid #e8e8e6;border-radius:9px;padding:13px 15px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;margin-bottom:10px;user-select:none}
+.fluide-toggle:hover{border-color:#aaa}
+.ft-label{font-size:13px;font-weight:500}
+.ft-sub{font-size:11px;color:#888;margin-top:1px}
+.toggle-sw{width:36px;height:20px;background:#ddd;border-radius:10px;position:relative;transition:background .2s;flex-shrink:0}
+.toggle-sw.on{background:#1a1a1a}
+.toggle-sw::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:2px;left:2px;transition:left .2s}
+.toggle-sw.on::after{left:18px}
+.country-hint{background:#f0faf4;border:1px solid #a8e6c0;border-radius:7px;padding:9px 12px;font-size:12px;color:#1a7a45;margin-bottom:12px;display:none}
+.fluide-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f0f0f0}
+.fluide-row:last-child{border-bottom:none}
+.fl-name{font-size:13px;flex:1}
+.fl-unit{font-size:11px;color:#aaa;margin-left:4px}
+.fl-tarif{width:90px;text-align:right;font-size:13px;border:1px solid #e0e0e0;border-radius:5px;padding:6px 8px}
+.fl-tarif:focus{outline:none;border-color:#1a1a1a}
+.fl-devise{font-size:11px;color:#888;min-width:30px}
+.btn-del-fl{background:none;border:none;color:#ccc;font-size:18px;cursor:pointer;padding:0 2px;line-height:1}
+.btn-del-fl:hover{color:#e55}
+
+/* Team (step 6) */
+.member-card{background:#fafaf8;border:1px solid #e8e8e6;border-radius:8px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.av{width:32px;height:32px;border-radius:50%;background:#e0e0e0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#555;flex-shrink:0}
+.m-info{margin-left:10px;flex:1}
+.m-nom{font-size:13px;font-weight:500}
+.m-role{font-size:11px;color:#888}
+.m-del{background:none;border:none;color:#ccc;font-size:18px;cursor:pointer;padding:0 2px;line-height:1}
+.m-del:hover{color:#e55}
+
+/* Add form */
+.add-form{background:#f0f0f0;border-radius:9px;padding:14px;margin-top:8px;display:none}
+.add-form.open{display:block}
+.af-title{font-size:12px;font-weight:600;color:#555;margin-bottom:12px}
+
+/* Buttons */
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:4px}
+.btn-prev{font-size:14px;color:#666;background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px 18px;cursor:pointer;font-family:inherit}
+.btn-prev:hover{border-color:#aaa;color:#1a1a1a}
+.btn-next{font-size:14px;color:#fff;background:#1a1a1a;border:none;border-radius:8px;padding:10px 22px;cursor:pointer;font-family:inherit;transition:background .15s}
+.btn-next:hover{background:#333}
+.btn-next:disabled{background:#ccc;cursor:not-allowed}
+.btn-add{font-size:12px;color:#666;border:1px dashed #ccc;border-radius:7px;padding:9px;background:none;cursor:pointer;width:100%;text-align:center;font-family:inherit;margin-top:6px}
+.btn-add:hover{border-color:#888;color:#1a1a1a;background:#fafaf8}
+.btn-add-gold{border-color:#C9A84C;color:#8A6A28;background:#fffcf0}
+.btn-add-gold:hover{background:#fff8e0;border-color:#b08b38}
+.btn-sm{font-size:12px;padding:7px 14px;border-radius:6px;cursor:pointer;font-family:inherit}
+.btn-outline-sm{background:#fff;border:1px solid #ddd;color:#666}
+.btn-outline-sm:hover{border-color:#888;color:#1a1a1a}
+.btn-primary-sm{background:#1a1a1a;border:none;color:#fff}
+.btn-primary-sm:hover{background:#333}
+.badgeopt{font-size:10px;background:#f0f0ee;color:#888;border-radius:10px;padding:2px 7px;margin-left:6px;font-weight:400}
+
+/* Success */
+.success-box{background:#f0faf4;border:1px solid #a8e6c0;border-radius:12px;padding:28px;text-align:center}
+.success-ico{font-size:42px;margin-bottom:12px}
+.success-title{font-size:20px;font-weight:700;color:#1a7a45;margin-bottom:6px}
+.success-sub{font-size:14px;color:#555;line-height:1.6;margin-bottom:16px}
+.recap{background:#fff;border:1px solid #e8e8e6;border-radius:10px;padding:16px;text-align:left}
+.rc-row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:1px solid #f0f0f0}
+.rc-row:last-child{border-bottom:none}
+.rc-lbl{color:#888}
+.rc-val{color:#1a1a1a;font-weight:500}
+
+/* Overlay */
+.overlay{display:none;position:fixed;inset:0;background:rgba(255,255,255,.7);backdrop-filter:blur(2px);z-index:100;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+.overlay.show{display:flex}
+.spin{width:32px;height:32px;border:3px solid #e0e0e0;border-top-color:#1a1a1a;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.overlay-msg{font-size:14px;color:#555}
+
+@media(max-width:480px){.g2,.g3,.packs-grid{grid-template-columns:1fr}.ztabs{gap:5px}.ztab{font-size:11px;padding:6px 11px}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- Brand -->
+<div class="brand">
+  <div class="brand-logo">GT</div>
+  <div>
+    <div class="brand-hotel" id="brand-name">Configurer votre hôtel</div>
+    <div class="brand-sub">GenTrack — Onboarding</div>
+  </div>
+</div>
+
+<!-- Progress -->
+<div class="progress">
+  <div class="pseg active" id="ps1"></div>
+  <div class="pseg" id="ps2"></div>
+  <div class="pseg" id="ps3"></div>
+  <div class="pseg" id="ps4"></div>
+  <div class="pseg" id="ps5"></div>
+  <div class="pseg" id="ps6"></div>
+</div>
+<div class="plabels">
+  <div class="plbl active" id="pl1">Infos</div>
+  <div class="plbl" id="pl2">Bâtiments</div>
+  <div class="plbl" id="pl3">Espaces</div>
+  <div class="plbl" id="pl4">Rondes</div>
+  <div class="plbl" id="pl5">Fluides</div>
+  <div class="plbl" id="pl6">Équipe</div>
+</div>
+
+<!-- ───────────────────────── STEP 1 ───────────────────────── -->
+<div class="step active" id="step1">
+  <div class="shdr">
+    <div class="sn">Étape 1 sur 6</div>
+    <div class="stitle">Infos de l'établissement</div>
+    <div class="sdesc">Les informations de base de votre hôtel.</div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">🏨 Établissement</div>
+    <div class="field"><label>Nom de l'hôtel *</label><input id="s1-nom" type="text" placeholder="Ex : Hôtel Terrou-Bi"></div>
+    <div class="g2">
+      <div class="field last"><label>Ville *</label><input id="s1-ville" type="text" placeholder="Dakar"></div>
+      <div class="field last"><label>Pays *</label><input id="s1-pays" type="text" placeholder="Sénégal" oninput="detectPays(this.value)"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">📋 Caractéristiques</div>
+    <div class="g2">
+      <div class="field">
+        <label>Classement</label>
+        <select id="s1-classe">
+          <option value="1 étoile">1 étoile</option>
+          <option value="2 étoiles">2 étoiles</option>
+          <option value="3 étoiles">3 étoiles</option>
+          <option value="4 étoiles" selected>4 étoiles</option>
+          <option value="5 étoiles">5 étoiles</option>
+          <option value="Non classé">Non classé</option>
+          <option value="Apart-hôtel">Apart-hôtel</option>
+          <option value="Résidence">Résidence</option>
+          <option value="Lodge / Resort">Lodge / Resort</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Nombre de chambres *</label>
+        <input id="s1-chambres" type="number" min="1" placeholder="80">
+      </div>
+    </div>
+    <div class="field last">
+      <label>Timezone</label>
+      <select id="s1-tz">
+        <option value="Africa/Dakar">Africa/Dakar (GMT+0)</option>
+        <option value="Africa/Abidjan">Africa/Abidjan (GMT+0)</option>
+        <option value="Africa/Bamako">Africa/Bamako (GMT+0)</option>
+        <option value="Africa/Conakry">Africa/Conakry (GMT+0)</option>
+        <option value="Africa/Douala">Africa/Douala (GMT+1)</option>
+        <option value="Africa/Lagos">Africa/Lagos (GMT+1)</option>
+        <option value="Africa/Casablanca">Africa/Casablanca (GMT+1)</option>
+        <option value="Africa/Tunis">Africa/Tunis (GMT+1)</option>
+        <option value="Africa/Johannesburg">Africa/Johannesburg (GMT+2)</option>
+        <option value="Africa/Nairobi">Africa/Nairobi (GMT+3)</option>
+        <option value="Europe/Paris">Europe/Paris (GMT+1/+2)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">👤 Contact principal (Responsable technique)</div>
+    <div class="g2">
+      <div class="field"><label>Nom complet *</label><input id="s1-cnom" type="text" placeholder="Modeste Diop"></div>
+      <div class="field"><label>Rôle</label>
+        <select id="s1-crole">
+          <option value="Responsable technique">Responsable technique</option>
+          <option value="Technicien">Technicien</option>
+          <option value="Directeur technique">Directeur technique</option>
+          <option value="Chef de maintenance">Chef de maintenance</option>
+          <option value="Agent de maintenance">Agent de maintenance</option>
+          <option value="Plombier">Plombier</option>
+          <option value="Électricien">Électricien</option>
+          <option value="Climaticien">Climaticien</option>
+          <option value="Directeur général">Directeur général</option>
+          <option value="Gérant">Gérant</option>
+          <option value="Autre">Autre</option>
+        </select>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="field last"><label>WhatsApp *</label><input id="s1-ctel" type="tel" placeholder="+221 77 000 0000"></div>
+      <div class="field last"><label>Email <span class="badgeopt">optionnel</span></label><input id="s1-cemail" type="email" placeholder="modeste@hotel.com"></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span></span>
+    <button class="btn-next" onclick="goStep(2)">Continuer →</button>
+  </div>
+</div>
+
+<!-- ───────────────────────── STEP 2 ───────────────────────── -->
+<div class="step" id="step2">
+  <div class="shdr">
+    <div class="sn">Étape 2 sur 6</div>
+    <div class="stitle">Structure de l'établissement</div>
+    <div class="sdesc">Définissez vos bâtiments et la répartition des chambres par étage.</div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">🏗 Nombre de bâtiments</div>
+    <div class="cnt-row" id="bat-cnt-row">
+      <div class="copt sel" onclick="setBatCnt(1)">1</div>
+      <div class="copt" onclick="setBatCnt(2)">2</div>
+      <div class="copt" onclick="setBatCnt(3)">3</div>
+      <div class="copt" onclick="setBatCnt(4)">4</div>
+      <div class="copt" onclick="setBatCnt(5)">5</div>
+    </div>
+  </div>
+
+  <div id="bat-list"></div>
+
+  <div class="foot">
+    <button class="btn-prev" onclick="goStep(1)">← Retour</button>
+    <button class="btn-next" onclick="goStep(3)">Continuer →</button>
+  </div>
+</div>
+
+<!-- ───────────────────────── STEP 3 ───────────────────────── -->
+<div class="step" id="step3">
+  <div class="shdr">
+    <div class="sn">Étape 3 sur 6</div>
+    <div class="stitle">Espaces &amp; inventaire</div>
+    <div class="sdesc">Pour chaque zone, définissez ce qui s'y trouve. Tapez un élément et appuyez sur <strong>Entrée</strong> pour l'ajouter.</div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">Zones de l'établissement</div>
+    <div class="ztabs" id="zone-tabs"></div>
+    <div id="zone-panels"></div>
+  </div>
+
+  <div class="card" style="border-style:dashed" id="extra-zones-card">
+    <div class="ctitle" style="margin-bottom:10px">➕ Ajouter une zone commune <span class="badgeopt">optionnel</span></div>
+    <div class="cnt-row" style="flex-wrap:wrap;gap:7px" id="extra-zone-btns">
+      <button class="sug" onclick="addExtraZone('Hall / Lobby','hall')">Hall / Lobby</button>
+      <button class="sug" onclick="addExtraZone('Restaurant','restaurant')">Restaurant</button>
+      <button class="sug" onclick="addExtraZone('Bar','bar')">Bar</button>
+      <button class="sug" onclick="addExtraZone('Cuisine','cuisine')">Cuisine</button>
+      <button class="sug" onclick="addExtraZone('Piscine','piscine')">Piscine</button>
+      <button class="sug" onclick="addExtraZone('SPA / Wellness','spa')">SPA / Wellness</button>
+      <button class="sug" onclick="addExtraZone('Salle de conférence','salle_conf')">Salle de conf.</button>
+      <button class="sug" onclick="addExtraZone('Fitness','fitness')">Fitness</button>
+      <button class="sug" onclick="addExtraZone('Parking','parking')">Parking</button>
+      <button class="sug" onclick="addExtraZone('Local technique','lt')">Local technique</button>
+      <button class="sug" onclick="addExtraZone('Toiture','toiture')">Toiture</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+      <input id="custom-zone-inp" type="text" placeholder="Autre zone (ex : Terrasse, Cave, Salle de sport…)" style="flex:1">
+      <button class="btn-sm btn-primary-sm" onclick="addCustomZone()" style="white-space:nowrap">+ Ajouter</button>
+    </div>
+  </div>
+
+  <!-- Panel résidence -->
+  <div id="residence-panel" style="display:none">
+    <div class="card" style="border-left:3px solid #C9A84C;border-radius:0 12px 12px 0">
+      <div class="ctitle">🏢 Résidence — modèle d'appartement</div>
+      <div style="font-size:12px;color:#888;margin-bottom:12px;line-height:1.6">
+        Les zones seront créées <strong>automatiquement par étage</strong> à partir de la structure de votre bâtiment.<br>
+        Définissez les équipements présents dans <strong>chaque appartement</strong> (modèle appliqué à toutes les unités).
+      </div>
+      <div class="zone-lbl">Équipements par appartement</div>
+      <div class="tag-area" id="tags-appart" onclick="focusInp('tinp-appart')">
+        <input class="tag-inp" id="tinp-appart" placeholder="Ex : Compteur eau, Compteur élec, Clim split…" onkeydown="tagKeyAppart(event)">
+      </div>
+      <div class="suggestions" id="sug-appart" style="margin-top:8px">
+        <button class="sug" onclick="addAppartChip('Compteur eau')">Compteur eau</button>
+        <button class="sug" onclick="addAppartChip('Compteur électricité')">Compteur électricité</button>
+        <button class="sug" onclick="addAppartChip('Climatiseur split')">Climatiseur split</button>
+        <button class="sug" onclick="addAppartChip('Chauffe-eau')">Chauffe-eau</button>
+        <button class="sug" onclick="addAppartChip('Détecteur fumée')">Détecteur fumée</button>
+        <button class="sug" onclick="addAppartChip('Tableau électrique')">Tableau électrique</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <button class="btn-prev" onclick="goStep(2)">← Retour</button>
+    <button class="btn-next" onclick="goStep(4)">Continuer →</button>
+  </div>
+</div>
+
+<!-- ───────────────────────── STEP 4 ───────────────────────── -->
+<div class="step" id="step4">
+  <div class="shdr">
+    <div class="sn">Étape 4 sur 6</div>
+    <div class="stitle">Équipements critiques</div>
+    <div class="sdesc">Uniquement les équipements dont une <strong>panne affecte l'exploitation ou la sécurité</strong>. Ajout rapide ci-dessous, ou saisissez librement — cliquez sur une ligne pour la configurer.</div>
+  </div>
+
+  <!-- Quick add buttons by category -->
+  <div class="card">
+    <div class="ctitle">⚡ Ajout rapide</div>
+    <div id="qa-sections"></div>
+  </div>
+
+  <!-- Equipment table -->
+  <div class="card">
+    <div class="ctitle" id="eq-count-lbl">Liste des équipements</div>
+    <div class="eq-list" id="eq-list"></div>
+    <div id="eq-empty" style="font-size:13px;color:#aaa;text-align:center;padding:18px 0;display:none">
+      Aucun équipement ajouté.<br>Utilisez l'ajout rapide ou le bouton ci-dessous.
+    </div>
+    <button class="btn-add" onclick="quickAddEquip('')" style="margin-top:8px">+ Ajouter un équipement vide</button>
+  </div>
+
+  <div class="foot">
+    <button class="btn-prev" onclick="goStep(3)">← Retour</button>
+    <button class="btn-next" onclick="goStep(5)">Continuer →</button>
+  </div>
+</div>
+
+<!-- ───────────────────────── STEP 5 ───────────────────────── -->
+<div class="step" id="step5">
+  <div class="shdr">
+    <div class="sn">Étape 5 sur 6</div>
+    <div class="stitle">Fluides &amp; énergie <span class="badgeopt" style="font-size:12px">optionnel</span></div>
+    <div class="sdesc">Configurez vos compteurs pour le suivi des consommations. Vous pourrez modifier les tarifs plus tard.</div>
+  </div>
+
+  <div class="fluide-toggle" onclick="toggleFluides()" id="fluide-toggle">
+    <div>
+      <div class="ft-label">⚡ Activer le suivi des fluides</div>
+      <div class="ft-sub" id="fluide-toggle-sub">Non configuré</div>
+    </div>
+    <div class="toggle-sw" id="fluide-sw"></div>
+  </div>
+
+  <div id="fluide-section" style="display:none">
+    <div class="country-hint" id="country-hint"></div>
+    <div class="card" id="fluide-card">
+      <div class="ctitle">Compteurs / points de mesure</div>
+      <div id="fluide-rows"></div>
+      <button class="btn-add" onclick="addFluideRow()">+ Ajouter un fluide</button>
+    </div>
+  </div>
+
+  <div class="foot">
+    <button class="btn-prev" onclick="goStep(4)">← Retour</button>
+    <button class="btn-next" onclick="goStep(6)">Continuer →</button>
+  </div>
+</div>
+
+<!-- ───────────────────────── STEP 6 ───────────────────────── -->
+<div class="step" id="step6">
+  <div class="shdr">
+    <div class="sn">Étape 6 sur 6</div>
+    <div class="stitle">Équipe</div>
+    <div class="sdesc">Ajoutez les membres de l'équipe qui auront accès à GenTrack.</div>
+  </div>
+
+  <div class="card">
+    <div class="ctitle">Membres de l'équipe</div>
+    <div id="team-list"></div>
+    <button class="btn-add" onclick="toggleAddMember()">+ Ajouter un membre</button>
+    <div class="add-form" id="add-member-form">
+      <div class="af-title">Nouveau membre</div>
+      <div class="g2">
+        <div class="field"><label>Nom complet *</label><input id="m-nom" type="text" placeholder="Jean Dupont"></div>
+        <div class="field"><label>Rôle</label>
+          <select id="m-role">
+            <option value="Technicien">Technicien</option>
+            <option value="Responsable technique">Resp. technique</option>
+            <option value="Agent de maintenance">Agent maintenance</option>
+            <option value="Plombier">Plombier</option>
+            <option value="Électricien">Électricien</option>
+            <option value="Climaticien">Climaticien</option>
+            <option value="Chef de maintenance">Chef maintenance</option>
+            <option value="Directeur technique">Directeur technique</option>
+            <option value="Directeur général">Directeur général</option>
+            <option value="Réceptionniste">Réceptionniste</option>
+            <option value="Gouvernante">Gouvernante</option>
+            <option value="Autre">Autre</option>
+          </select>
+        </div>
+      </div>
+      <div class="g2">
+        <div class="field last"><label>WhatsApp *</label><input id="m-tel" type="tel" placeholder="+221 77 000 0000"></div>
+        <div class="field last"><label>Email <span class="badgeopt">optionnel</span></label><input id="m-email" type="email" placeholder="jean@hotel.com"></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button class="btn-sm btn-outline-sm" onclick="toggleAddMember()">Annuler</button>
+        <button class="btn-sm btn-primary-sm" onclick="addMember()">Ajouter</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <button class="btn-prev" onclick="goStep(5)">← Retour</button>
+    <button class="btn-next" onclick="submit()">🚀 Créer l'établissement</button>
+  </div>
+</div>
+
+<!-- ───────────────────────── STEP 7 (success) ───────────────────────── -->
+<div class="step" id="step7">
+  <div class="success-box">
+    <div class="success-ico">🎉</div>
+    <div class="success-title" id="succ-title">Bienvenue sur GenTrack !</div>
+    <div class="success-sub" id="succ-sub">Votre établissement a été configuré. L'équipe GenTrack prend le relais pour la mise en service.</div>
+    <div class="recap" id="succ-recap"></div>
+  </div>
+</div>
+
+<!-- Overlay loading -->
+<div class="overlay" id="overlay">
+  <div class="spin"></div>
+  <div class="overlay-msg" id="overlay-msg">Création en cours…</div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+// ── Constants ──
+const SB_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+const SB_HEADERS = {'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Prefer':'return=representation'};
+
+const PAYS_MAP = {
+  'sénégal':'SN','senegal':'SN','côte d\'ivoire':'CI','cote d\'ivoire':'CI','mali':'ML',
+  'guinée':'GN','guinee':'GN','cameroun':'CM','bénin':'BJ','benin':'BJ','burkina faso':'BF',
+  'togo':'TG','niger':'NE','gabon':'GA','madagascar':'MG','mauritanie':'MR',
+  'maroc':'MA','tunisie':'TN','algérie':'DZ','algerie':'DZ','ghana':'GH','kenya':'KE','france':'FR'
+};
+
+const TARIFS_PAYS = {
+  SN:{devise:'XOF',label:'SENELEC / SDE',fluides:[
+    {nom:'Électricité (SENELEC)',unite:'kWh',tarif:120,type_valeur:'index'},
+    {nom:'Eau (SDE/SONES)',unite:'m³',tarif:690,type_valeur:'index'}
+  ]},
+  CI:{devise:'XOF',label:'CIE / SODECI',fluides:[
+    {nom:'Électricité (CIE)',unite:'kWh',tarif:98,type_valeur:'index'},
+    {nom:'Eau (SODECI)',unite:'m³',tarif:630,type_valeur:'index'}
+  ]},
+  ML:{devise:'XOF',label:'EDM / SOMAGEP',fluides:[
+    {nom:'Électricité (EDM)',unite:'kWh',tarif:145,type_valeur:'index'},
+    {nom:'Eau (SOMAGEP)',unite:'m³',tarif:580,type_valeur:'index'}
+  ]},
+  GN:{devise:'GNF',label:'EDG',fluides:[
+    {nom:'Électricité (EDG)',unite:'kWh',tarif:800,type_valeur:'index'}
+  ]},
+  CM:{devise:'XAF',label:'ENEO / CDE',fluides:[
+    {nom:'Électricité (ENEO)',unite:'kWh',tarif:95,type_valeur:'index'},
+    {nom:'Eau (CDE/CAMWATER)',unite:'m³',tarif:450,type_valeur:'index'}
+  ]},
+  BJ:{devise:'XOF',label:'SBEE / SONEB',fluides:[
+    {nom:'Électricité (SBEE)',unite:'kWh',tarif:130,type_valeur:'index'},
+    {nom:'Eau (SONEB)',unite:'m³',tarif:520,type_valeur:'index'}
+  ]},
+  BF:{devise:'XOF',label:'SONABEL / ONEA',fluides:[
+    {nom:'Électricité (SONABEL)',unite:'kWh',tarif:115,type_valeur:'index'},
+    {nom:'Eau (ONEA)',unite:'m³',tarif:500,type_valeur:'index'}
+  ]},
+  TG:{devise:'XOF',label:'CEET',fluides:[
+    {nom:'Électricité (CEET)',unite:'kWh',tarif:110,type_valeur:'index'}
+  ]},
+  MA:{devise:'MAD',label:'ONEE / AMENDIS',fluides:[
+    {nom:'Électricité (ONEE)',unite:'kWh',tarif:1.4,type_valeur:'index'},
+    {nom:'Eau (ONEE/REDAL)',unite:'m³',tarif:7.5,type_valeur:'index'}
+  ]},
+  TN:{devise:'TND',label:'STEG',fluides:[
+    {nom:'Électricité (STEG)',unite:'kWh',tarif:0.18,type_valeur:'index'}
+  ]}
+};
+
+const QUICK_ADD = [
+  {cat:'⚡ Électromécanique', items:[
+    {nom:'Groupe électrogène',freq:'journalier'},
+    {nom:'Cuve gazoil',freq:'journalier'},
+    {nom:'Pompe relevage',freq:'journalier'},
+    {nom:'Surpresseur eau',freq:'journalier'},
+    {nom:'Compresseur air',freq:'hebdo'},
+    {nom:'Pompe incendie',freq:'hebdo'}
+  ]},
+  {cat:'❄️ Climatisation', items:[
+    {nom:'Centrale de traitement d\'air',freq:'journalier'},
+    {nom:'Tour de refroidissement',freq:'hebdo'},
+    {nom:'VRV / Groupe froid',freq:'hebdo'},
+    {nom:'Split système principal',freq:'hebdo'}
+  ]},
+  {cat:'🛗 Vertical', items:[
+    {nom:'Ascenseur',freq:'journalier'},
+    {nom:'Monte-charge',freq:'hebdo'},
+    {nom:'Escalier mécanique',freq:'hebdo'}
+  ]},
+  {cat:'⚙️ Électrique & réseau', items:[
+    {nom:'TGBT principal',freq:'hebdo'},
+    {nom:'Transformateur HTA',freq:'mensuel'},
+    {nom:'Onduleur / UPS',freq:'hebdo'},
+    {nom:'Batterie secours',freq:'mensuel'}
+  ]},
+  {cat:'🧊 Froid alimentaire', items:[
+    {nom:'Chambre froide positive',freq:'journalier'},
+    {nom:'Chambre froide négative',freq:'journalier'},
+    {nom:'Cellule de refroidissement',freq:'journalier'},
+    {nom:'Vitrine réfrigérée',freq:'journalier'},
+    {nom:'Groupe froid cuisine',freq:'hebdo'}
+  ]},
+  {cat:'🍳 Cuisine & restauration', items:[
+    {nom:'Hotte extraction cuisine',freq:'hebdo'},
+    {nom:'Four combiné',freq:'hebdo'},
+    {nom:'Piano cuisson',freq:'hebdo'},
+    {nom:'Lave-vaisselle industriel',freq:'hebdo'}
+  ]},
+  {cat:'💧 Eau & traitement', items:[
+    {nom:'Station de traitement eau',freq:'hebdo'},
+    {nom:'Cuve eau potable',freq:'hebdo'},
+    {nom:'Chauffe-eau solaire',freq:'mensuel'},
+    {nom:'Station épuration',freq:'hebdo'},
+    {nom:'Pompe piscine / filtration',freq:'journalier'}
+  ]}
+];
+
+const SUGG = {
+  chambre:['TV','Climatiseur split','Safe','WC','Douche','Baignoire','Minibar','Téléphone','Bureau','Miroir','Lit double','Lit king','Stores','Coffre mural','Peinture plafond'],
+  hall:['Comptoir réception','Canapés','Clim centrale','Lustre','Caméras','Plantes décoratives','Tableaux','Enseigne'],
+  restaurant:['Tables','Chaises','Buffet froid','Sono','Bar comptoir','Éclairage ambiance','Nappe'],
+  bar:['Comptoir bar','Tabourets','Réfrigérateur bar','Présentoir bouteilles','Sono','Éclairage LED'],
+  cuisine:['Piano cuisson','Four combiné','Hotte aspirante','Réfrigérateur','Cellule refroidissement','Plonge inox','Bain-marie'],
+  piscine:['Transats','Parasols','Bar piscine','Douches extérieures','Pompe filtration','Éclairage subaquatique'],
+  spa:['Bains à remous','Hammam','Sauna','Table massage','Vestiaires','Douche chromothérapie'],
+  salle_conf:['Tables réunion','Chaises','Vidéoprojecteur','Écran','Sono','Tableau blanc','Clim'],
+  fitness:['Tapis course','Vélo elliptique','Poids libres','Miroir mural','Climatiseur'],
+  lt:['Tableau électrique principal','Onduleur','Batterie secours','Pompe hydraulique','Canalisation principale'],
+  toiture:['Antenne TV','Paratonnerre','Caméra extérieure','Panneau solaire','Évacuation eau'],
+  parking:['Barrière automatique','Caméra surveillance','Éclairage','Borne recharge'],
+  default:[]
+};
+
+// ── State ──
+var S = {
+  step:1,
+  site:{nom:'',ville:'',pays:'',pays_code:'',nb_chambres:0,classement:'4 étoiles',timezone:'Africa/Dakar'},
+  contact:{nom:'',email:'',tel:'',role:'Responsable technique'},
+  batiments:[{nom:'Bâtiment Principal',nb_etages:5,app_debut:1,app_fin:80}],
+  nbBat:1,
+  zones:[],   // {key, label, cat, batiment, etage, app_debut, app_fin, inventaire:[]}
+  appart_inventaire:[], // modèle équipements par appartement (résidences)
+  equips:[],
+  fluides_actif:false,
+  fluides:[],
+  equipe:[],
+  pays_code:''
+};
+
+function isResidence(){
+  return S.site.classement==='Résidence'||S.site.classement==='Apart-hôtel';
+}
+
+// ── Navigation ──
+function goStep(n){
+  if(n===2 && !validateStep1()) return;
+  if(n===3){
+    buildZones();
+    renderZoneTabs();
+  }
+  if(n===4) initEquipStep();
+  if(n===5) initFluides();
+  if(n===6) renderTeam();
+
+  document.getElementById('step'+S.step).classList.remove('active');
+  document.getElementById('step'+n).classList.add('active');
+  S.step=n;
+  updateProgress(n);
+  window.scrollTo(0,0);
+}
+
+function updateProgress(n){
+  for(var i=1;i<=6;i++){
+    var s=document.getElementById('ps'+i);
+    var l=document.getElementById('pl'+i);
+    s.className='pseg'+(i<n?' done':i===n?' active':'');
+    l.className='plbl'+(i<n?' done':i===n?' active':'');
+  }
+}
+
+// ── Step 1 ──
+function validateStep1(){
+  var nom=v('s1-nom'),ville=v('s1-ville'),pays=v('s1-pays'),ch=v('s1-chambres'),cnom=v('s1-cnom'),ctel=v('s1-ctel');
+  if(!nom) {alert('Le nom de l\'hôtel est obligatoire.');return false;}
+  if(!ville) {alert('La ville est obligatoire.');return false;}
+  if(!pays) {alert('Le pays est obligatoire.');return false;}
+  if(!ch) {alert('Le nombre de chambres est obligatoire.');return false;}
+  if(!cnom) {alert('Le nom du contact principal est obligatoire.');return false;}
+  if(!ctel) {alert('Le WhatsApp du contact principal est obligatoire.');return false;}
+  S.site.nom=nom; S.site.ville=ville; S.site.pays=pays;
+  S.site.nb_chambres=parseInt(ch)||0;
+  S.site.classement=v('s1-classe');
+  S.site.timezone=v('s1-tz');
+  S.contact.nom=cnom; S.contact.email=v('s1-cemail'); S.contact.tel=v('s1-ctel');
+  S.contact.role=v('s1-crole');
+  document.getElementById('brand-name').textContent=nom;
+  return true;
+}
+
+function detectPays(val){
+  var k=val.toLowerCase().trim();
+  var code=PAYS_MAP[k]||'';
+  S.pays_code=code; S.site.pays_code=code;
+}
+
+// ── Step 2 ──
+function setBatCnt(n){
+  S.nbBat=n;
+  while(S.batiments.length<n) S.batiments.push({nom:'Bâtiment '+(S.batiments.length+1),nb_etages:4,app_debut:1,app_fin:40});
+  while(S.batiments.length>n) S.batiments.pop();
+  document.querySelectorAll('.copt').forEach(function(el,i){el.classList.toggle('sel',i+1===n);});
+  renderBatiments();
+}
+
+function renderBatiments(){
+  var el=document.getElementById('bat-list');
+  el.innerHTML='';
+  S.batiments.forEach(function(b,i){
+    var d=document.createElement('div');
+    d.className='bat-card';
+    d.innerHTML='<div class="bat-hdr"><div class="bat-lbl">Bâtiment '+(i+1)+'</div></div>'
+      +'<div class="g2" style="margin-bottom:10px">'
+        +'<div class="field last"><label>Nom du bâtiment</label><input type="text" value="'+esc(b.nom)+'" oninput="S.batiments['+i+'].nom=this.value" placeholder="Ex : Bâtiment A"></div>'
+        +'<div class="field last"><label>Nombre d\'étages</label><input type="number" min="1" max="30" value="'+b.nb_etages+'" oninput="S.batiments['+i+'].nb_etages=parseInt(this.value)||1"></div>'
+      +'</div>'
+      +'<div class="ctitle" style="margin-bottom:8px;margin-top:4px">Plage des chambres</div>'
+      +'<div class="g2">'
+        +'<div class="field last"><label>Numéro de début</label><input type="number" min="1" value="'+b.app_debut+'" oninput="S.batiments['+i+'].app_debut=parseInt(this.value)||1"></div>'
+        +'<div class="field last"><label>Numéro de fin</label><input type="number" min="1" value="'+b.app_fin+'" oninput="S.batiments['+i+'].app_fin=parseInt(this.value)||1"></div>'
+      +'</div>';
+    el.appendChild(d);
+  });
+}
+
+// ── Step 3 ──
+function buildZones(){
+  if(isResidence()){
+    // Résidence : pas de zones manuelles — auto-générées par étage à la soumission
+    // On garde juste les extras éventuelles (locaux communs, etc.)
+    var extras=S.zones.filter(function(z){return z.type==='extra';});
+    S.zones=extras;
+    return;
+  }
+  // Hôtel classique
+  var extras=S.zones.filter(function(z){return z.type==='extra';});
+  S.zones=[];
+  S.batiments.forEach(function(b,bi){
+    S.zones.push({
+      key:'bat'+bi+'_ch',
+      label:(S.batiments.length>1?b.nom+' — ':'')+'Chambres',
+      cat:'chambre',type:'chambre',
+      batiment:b.nom,
+      app_debut:b.app_debut,app_fin:b.app_fin,
+      inventaire:S.zones.find(function(z){return z.key==='bat'+bi+'_ch';})?.inventaire||[]
+    });
+  });
+  extras.forEach(function(e){S.zones.push(e);});
+}
+
+function renderZoneTabs(){
+  var res=isResidence();
+  document.getElementById('residence-panel').style.display=res?'block':'none';
+  document.getElementById('extra-zones-card').style.display='block';
+  // Pour les résidences, masquer le bloc zones-tabs (pas de zone chambre)
+  document.querySelector('#step3 .card:first-of-type').style.display=res&&!S.zones.length?'none':'block';
+  if(res) renderAppartChips();
+
+  var tabs=document.getElementById('zone-tabs');
+  var panels=document.getElementById('zone-panels');
+  tabs.innerHTML=''; panels.innerHTML='';
+
+  S.zones.forEach(function(z,i){
+    var tab=document.createElement('div');
+    tab.className='ztab'+(i===0?' active':'')+(z.inventaire.length?' filled':'');
+    tab.id='ztab-'+z.key;
+    tab.textContent=z.label+(z.inventaire.length?' ('+z.inventaire.length+')':'');
+    tab.onclick=function(){selectZone(z.key);};
+    tabs.appendChild(tab);
+
+    var panel=document.createElement('div');
+    panel.className='zone-panel'+(i===0?' active':'');
+    panel.id='zpanel-'+z.key;
+
+    var hint='';
+    if(z.type==='chambre') hint='<div class="hint" style="margin-bottom:8px">Modèle appliqué à toutes les chambres ('+z.app_debut+'→'+z.app_fin+'). Les articles ajoutés ici seront l\'inventaire standard de chaque chambre.</div>';
+
+    panel.innerHTML=hint
+      +'<div class="zone-lbl">Inventaire — '+z.label+'</div>'
+      +'<div class="tag-area" id="tags-'+z.key+'" onclick="focusInp(\'tinp-'+z.key+'\')">'
+        +renderChips(z.key)
+        +'<input class="tag-inp" id="tinp-'+z.key+'" placeholder="Ex : TV, Clim, WC…" onkeydown="tagKey(event,\''+z.key+'\')">'
+      +'</div>'
+      +'<div class="suggestions" id="sug-'+z.key+'">'+renderSuggestions(z)+'</div>';
+    panels.appendChild(panel);
+  });
+}
+
+function selectZone(key){
+  document.querySelectorAll('.ztab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.zone-panel').forEach(function(p){p.classList.remove('active');});
+  var tab=document.getElementById('ztab-'+key);
+  var panel=document.getElementById('zpanel-'+key);
+  if(tab) tab.classList.add('active');
+  if(panel) panel.classList.add('active');
+}
+
+function renderChips(zkey){
+  var z=S.zones.find(function(z){return z.key===zkey;});
+  if(!z) return '';
+  return z.inventaire.map(function(item){
+    return '<div class="chip">'+esc(item)+'<button class="chip-x" onclick="removeChip(\''+zkey+'\',\''+esc(item)+'\')">×</button></div>';
+  }).join('');
+}
+
+function renderSuggestions(z){
+  var list=SUGG[z.cat]||SUGG.default;
+  if(!list.length) return '';
+  return list.filter(function(s){return !z.inventaire.includes(s);}).slice(0,8).map(function(s){
+    return '<button class="sug" onclick="addChipFromSug(\''+z.key+'\',\''+esc(s)+'\')">'+esc(s)+'</button>';
+  }).join('');
+}
+
+function tagKey(e,zkey){
+  if(e.key==='Enter'||e.key===','){
+    e.preventDefault();
+    var val=e.target.value.trim();
+    if(val) addChip(zkey,val);
+    e.target.value='';
+  }
+  if(e.key==='Backspace'&&!e.target.value){
+    var z=S.zones.find(function(z){return z.key===zkey;});
+    if(z&&z.inventaire.length){z.inventaire.pop();refreshZone(zkey);}
+  }
+}
+
+function addChip(zkey,val){
+  var z=S.zones.find(function(z){return z.key===zkey;});
+  if(!z||z.inventaire.includes(val)) return;
+  z.inventaire.push(val);
+  refreshZone(zkey);
+}
+
+function addChipFromSug(zkey,val){
+  addChip(zkey,val);
+}
+
+function removeChip(zkey,val){
+  var z=S.zones.find(function(z){return z.key===zkey;});
+  if(!z) return;
+  z.inventaire=z.inventaire.filter(function(i){return i!==val;});
+  refreshZone(zkey);
+}
+
+function refreshZone(zkey){
+  var z=S.zones.find(function(z){return z.key===zkey;});
+  var tagsEl=document.getElementById('tags-'+zkey);
+  var sugEl=document.getElementById('sug-'+zkey);
+  var tabEl=document.getElementById('ztab-'+zkey);
+  if(!z||!tagsEl) return;
+
+  // Rebuild chips
+  var inp=tagsEl.querySelector('.tag-inp');
+  tagsEl.innerHTML=renderChips(zkey);
+  tagsEl.appendChild(inp);
+
+  if(sugEl) sugEl.innerHTML=renderSuggestions(z);
+
+  if(tabEl){
+    tabEl.textContent=z.label+(z.inventaire.length?' ('+z.inventaire.length+')':'');
+    tabEl.classList.toggle('filled',z.inventaire.length>0);
+  }
+}
+
+function focusInp(id){
+  var el=document.getElementById(id);
+  if(el) el.focus();
+}
+
+function addCustomZone(){
+  var inp=document.getElementById('custom-zone-inp');
+  var label=(inp.value||'').trim();
+  if(!label){inp.focus();return;}
+  addExtraZone(label,'default');
+  inp.value='';
+}
+
+// ── Appartement template (résidences) ──
+function renderAppartChips(){
+  var area=document.getElementById('tags-appart');
+  if(!area) return;
+  var inp=area.querySelector('.tag-inp');
+  area.innerHTML='';
+  S.appart_inventaire.forEach(function(item){
+    var chip=document.createElement('div');chip.className='chip';
+    chip.innerHTML=esc(item)+'<button class="chip-x" onclick="removeAppartChip(\''+esc(item)+'\')">×</button>';
+    area.appendChild(chip);
+  });
+  area.appendChild(inp);
+  // Masquer suggestions déjà ajoutées
+  document.querySelectorAll('#sug-appart .sug').forEach(function(b){
+    b.style.display=S.appart_inventaire.includes(b.textContent.trim())?'none':'';
+  });
+}
+
+function addAppartChip(val){
+  if(!S.appart_inventaire.includes(val)) S.appart_inventaire.push(val);
+  renderAppartChips();
+}
+
+function removeAppartChip(val){
+  S.appart_inventaire=S.appart_inventaire.filter(function(i){return i!==val;});
+  renderAppartChips();
+}
+
+function tagKeyAppart(e){
+  if(e.key==='Enter'||e.key===','){
+    e.preventDefault();
+    var val=e.target.value.trim();
+    if(val){addAppartChip(val);e.target.value='';}
+  }
+}
+
+function addExtraZone(label,cat){
+  var key='extra_'+cat+'_'+Date.now();
+  S.zones.push({key:key,label:label,cat:cat,type:'extra',batiment:'',app_debut:0,app_fin:0,inventaire:[]});
+  renderZoneTabs();
+  selectZone(key);
+  // Remove the button for this cat
+  document.querySelectorAll('#extra-zone-btns .sug').forEach(function(b){
+    if(b.textContent.trim()===label) b.style.display='none';
+  });
+}
+
+// ── Step 4 ──
+function initEquipStep(){
+  // Build quick-add buttons once
+  var sec=document.getElementById('qa-sections');
+  if(!sec.children.length){
+    QUICK_ADD.forEach(function(cat){
+      var div=document.createElement('div');
+      div.style.cssText='margin-bottom:12px';
+      div.innerHTML='<div style="font-size:11px;color:#888;font-weight:600;margin-bottom:6px">'+cat.cat+'</div>'
+        +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+        +cat.items.map(function(item){
+          return '<button class="sug" onclick="quickAddEquip(\''+esc(item.nom)+'\',\''+item.freq+'\')">'+esc(item.nom)+'</button>';
+        }).join('')
+        +'</div>';
+      sec.appendChild(div);
+    });
+  }
+  renderEquips();
+}
+
+function quickAddEquip(nom,freq){
+  var eq=mkEquip(nom||'',freq||'journalier','','',false);
+  // Apply smart defaults based on equipment name
+  if(nom){
+    var def=getEqDefaults(nom);
+    if(def){
+      if(def.type_mesure) eq.type_mesure=def.type_mesure;
+      if(def.seuil_unite) eq.seuil_unite=def.seuil_unite;
+      if(def.seuil_min!==undefined) eq.seuil_min=def.seuil_min;
+      if(def.seuil_max!==undefined) eq.seuil_max=def.seuil_max;
+      if(def.seuil!==undefined) eq.seuil=def.seuil;
+      if(def.seuil_intervalle!==undefined) eq.seuil_intervalle=def.seuil_intervalle;
+      if(def.capacite_L) eq.capacite_L=def.capacite_L;
+      if(def.unite_puissance) eq.unite_puissance=def.unite_puissance;
+      if(def.freq_hint) eq.freq=def.freq_hint;
+    }
+  }
+  S.equips.push(eq);
+  renderEquips();
+  // Auto-open detail (always, to let user see/verify the pre-filled values)
+  var i=S.equips.length-1;
+  var det=document.getElementById('eqdet-'+i);
+  var chev=document.getElementById('eqchev-'+i);
+  if(det){det.classList.add('open');if(chev)chev.classList.add('open');}
+  if(!nom){
+    var inp=document.querySelector('#eqdet-'+i+' input[type="text"]');
+    if(inp) setTimeout(function(){inp.focus();},50);
+  }
+}
+
+function duplicateEquip(i){
+  var orig=S.equips[i];
+  var copy=JSON.parse(JSON.stringify(orig));
+  // Try to increment a trailing number in the name, else append " 2"
+  copy.nom=copy.nom.replace(/(\s+\d+)$/,function(m){return ' '+(parseInt(m)+1);});
+  if(copy.nom===orig.nom) copy.nom=orig.nom+' 2';
+  S.equips.splice(i+1,0,copy);
+  renderEquips();
+}
+
+// Smart defaults per equipment type (matched on name substring, lowercase)
+const EQ_DEFAULTS = [
+  // Froid alimentaire
+  {k:'chambre froide négative', d:{type_mesure:'instantane',seuil_unite:'°C',seuil_min:'-22',seuil_max:'-18',freq_hint:'journalier'}},
+  {k:'chambre froide positive', d:{type_mesure:'instantane',seuil_unite:'°C',seuil_min:'0',seuil_max:'5',freq_hint:'journalier'}},
+  {k:'chambre froide',          d:{type_mesure:'instantane',seuil_unite:'°C',seuil_min:'0',seuil_max:'5',freq_hint:'journalier'}},
+  {k:'cellule de refroidissement',d:{type_mesure:'instantane',seuil_unite:'°C',seuil_min:'-3',seuil_max:'3',freq_hint:'journalier'}},
+  {k:'vitrine réfrigérée',      d:{type_mesure:'instantane',seuil_unite:'°C',seuil_min:'2',seuil_max:'8',freq_hint:'journalier'}},
+  // GE & moteurs
+  {k:'groupe électrogène',      d:{type_mesure:'index',seuil_unite:'h',seuil:'490',seuil_intervalle:'500',unite_puissance:'kVA',freq_hint:'journalier'}},
+  {k:'compresseur',             d:{type_mesure:'instantane',seuil_unite:'bar',seuil_min:'6',seuil_max:'12',freq_hint:'hebdo'}},
+  // Cuves
+  {k:'cuve gazoil',             d:{type_mesure:'instantane',seuil_unite:'%',seuil_min:'20',seuil_max:'',freq_hint:'journalier',capacite_L:'5000'}},
+  {k:'cuve eau',                d:{type_mesure:'instantane',seuil_unite:'%',seuil_min:'30',seuil_max:'',freq_hint:'hebdo'}},
+  // Hydraulique
+  {k:'surpresseur',             d:{type_mesure:'instantane',seuil_unite:'bar',seuil_min:'2',seuil_max:'7',freq_hint:'journalier'}},
+  {k:'pompe',                   d:{type_mesure:'etat',freq_hint:'journalier'}},
+  // Climatisation
+  {k:'tour de refroidissement', d:{type_mesure:'instantane',seuil_unite:'°C',seuil_min:'',seuil_max:'35',freq_hint:'hebdo'}},
+  {k:'centrale de traitement',  d:{type_mesure:'instantane',seuil_unite:'°C',seuil_min:'16',seuil_max:'28',freq_hint:'journalier'}},
+  {k:'groupe froid',            d:{type_mesure:'instantane',seuil_unite:'°C',seuil_min:'',seuil_max:'8',freq_hint:'hebdo'}},
+  // Ascenseurs
+  {k:'ascenseur',               d:{type_mesure:'etat',freq_hint:'journalier'}},
+  {k:'monte-charge',            d:{type_mesure:'etat',freq_hint:'journalier'}},
+];
+
+function getEqDefaults(nom){
+  var low=nom.toLowerCase();
+  for(var i=0;i<EQ_DEFAULTS.length;i++){
+    if(low.indexOf(EQ_DEFAULTS[i].k)>=0) return EQ_DEFAULTS[i].d;
+  }
+  return null;
+}
+
+function mkEquip(nom,freq,desc,pack_id,custom){
+  return {nom:nom,freq:freq||'journalier',desc:desc||'',pack_id:pack_id||'',zone_key:'',
+    qty:1,marque:'',reference:'',
+    puissance:'',unite_puissance:'kVA',
+    capacite_L:'',
+    type_mesure:'etat',
+    seuil_unite:'',
+    // instantané
+    seuil_min:'',seuil_max:'',
+    // index cumulatif
+    seuil:'',seuil_intervalle:''
+  };
+}
+
+function renderEquips(){
+  var list=document.getElementById('eq-list');
+  list.innerHTML='';
+  var emptyEl=document.getElementById('eq-empty');
+  var countLbl=document.getElementById('eq-count-lbl');
+  if(emptyEl) emptyEl.style.display=S.equips.length?'none':'block';
+  if(countLbl) countLbl.textContent='Équipements à surveiller'+(S.equips.length?' ('+S.equips.length+')':'');
+  if(!S.equips.length) return;
+
+  var zoneOpts='<option value="">— Zone —</option>'+S.zones.map(function(z){return '<option value="'+z.key+'">'+esc(z.label)+'</option>';}).join('');
+
+  S.equips.forEach(function(eq,i){
+    var row=document.createElement('div');
+    row.className='eq-row'+(eq.custom?' custom-eq':'');
+    row.id='eqrow-'+i;
+
+    var mesures=[
+      {v:'etat',    l:'État ON/OFF',         hint:'Vérification visuelle — marche/arrêt, voyants, fuites'},
+      {v:'index',   l:'Index cumulatif',      hint:'Compteur montant — heures moteur, kWh, m³ (ne repart pas à 0)'},
+      {v:'instantane',l:'Valeur instantanée', hint:'Mesure ponctuelle — pression, température, niveau, %'}
+    ];
+    var mesureHtml=mesures.map(function(m){
+      return '<button class="mopt'+(eq.type_mesure===m.v?' sel':'')+'" onclick="setMesure('+i+',\''+m.v+'\')" title="'+m.hint+'">'+m.l+'</button>';
+    }).join('');
+
+    // Seuil section is built separately per type — see seuilHtml below
+    var seuilHtml='';
+
+    // Generated names preview for qty > 1
+    var namesPreview='';
+    if(eq.qty>1){
+      var names=[];
+      for(var q=1;q<=Math.min(eq.qty,4);q++) names.push(eq.nom+' '+q);
+      if(eq.qty>4) names.push('…');
+      namesPreview='<div style="font-size:10px;color:#888;margin-top:3px;line-height:1.6">→ Créera : '+names.map(function(n){return '<em>'+esc(n)+'</em>';}).join(', ')+'</div>';
+    }
+
+    row.innerHTML=
+      // ── Main clickable row ──
+      '<div class="eq-main" onclick="toggleEqDetail('+i+')">'
+        +'<span class="eq-chevron" id="eqchev-'+i+'">▶</span>'
+        +'<span class="eq-nom" id="eqnom-lbl-'+i+'">'+esc(eq.nom)+'</span>'
+        +'<div class="eq-badges">'
+          +(eq.qty>1?'<span class="qty-badge">×'+eq.qty+'</span>':'')
+          +'<select class="freq-sel" onclick="event.stopPropagation()" onchange="S.equips['+i+'].freq=this.value">'
+            +'<option value="journalier"'+(eq.freq==='journalier'?' selected':'')+'>Journalier</option>'
+            +'<option value="hebdo"'+(eq.freq==='hebdo'?' selected':'')+'>Hebdo</option>'
+            +'<option value="mensuel"'+(eq.freq==='mensuel'?' selected':'')+'>Mensuel</option>'
+          +'</select>'
+          +'<select class="zone-sel" id="eqzone-'+i+'" onclick="event.stopPropagation()" onchange="S.equips['+i+'].zone_key=this.value">'+zoneOpts+'</select>'
+          +'<button class="btn-dup" title="Dupliquer" onclick="event.stopPropagation();duplicateEquip('+i+')" style="background:none;border:1px solid #ddd;border-radius:5px;color:#888;font-size:11px;padding:3px 8px;cursor:pointer;font-family:inherit">⎘</button>'
+          +'<button class="btn-del" onclick="event.stopPropagation();removeEquip('+i+')">×</button>'
+        +'</div>'
+      +'</div>'
+
+      // ── Detail panel ──
+      +'<div class="eq-detail" id="eqdet-'+i+'">'
+
+        // 1. Nom (éditable, met à jour la ligne principale)
+        +'<div class="eq-field" style="margin-bottom:12px">'
+          +'<label>📝 Nom de l\'équipement</label>'
+          +'<input type="text" value="'+esc(eq.nom)+'" oninput="S.equips['+i+'].nom=this.value;var lbl=document.getElementById(\'eqnom-lbl-'+i+'\');if(lbl)lbl.textContent=this.value" placeholder="Ex: GE Caterpillar 500kVA — Bâtiment A">'
+          +'<span style="font-size:10px;color:#aaa;margin-top:3px">Personnalisez le nom — il apparaîtra dans les rondes</span>'
+        +'</div>'
+
+        // 2. Quantité + Marque
+        +'<div class="eq-detail-grid">'
+          +'<div class="eq-field"><label>Nombre d\'unités identiques</label>'
+            +'<input type="number" min="1" max="20" value="'+eq.qty+'" oninput="S.equips['+i+'].qty=parseInt(this.value)||1;refreshEqRow('+i+')" placeholder="1">'
+            +namesPreview
+          +'</div>'
+          +'<div class="eq-field"><label>Marque / Fabricant</label>'
+            +'<input type="text" value="'+esc(eq.marque)+'" oninput="S.equips['+i+'].marque=this.value" placeholder="Caterpillar, Carrier, Otis…">'
+          +'</div>'
+        +'</div>'
+
+        // 3. Puissance + Cuve/Réservoir
+        +'<div class="eq-detail-grid">'
+          +'<div class="eq-field"><label>Puissance nominale</label>'
+            +'<div class="cap-row">'
+              +'<input type="text" value="'+esc(eq.puissance)+'" oninput="S.equips['+i+'].puissance=this.value" placeholder="500">'
+              +'<select onchange="S.equips['+i+'].unite_puissance=this.value">'
+                +'<option value="kVA"'+(eq.unite_puissance==='kVA'?' selected':'')+'>kVA</option>'
+                +'<option value="kW"'+(eq.unite_puissance==='kW'?' selected':'')+'>kW</option>'
+                +'<option value="TR"'+(eq.unite_puissance==='TR'?' selected':'')+'>TR</option>'
+                +'<option value="CV"'+(eq.unite_puissance==='CV'?' selected':'')+'>CV</option>'
+              +'</select>'
+            +'</div>'
+          +'</div>'
+          +'<div class="eq-field"><label>🛢 Cuve / Réservoir associé</label>'
+            +'<div class="cap-row">'
+              +'<input type="text" value="'+esc(eq.capacite_L)+'" oninput="S.equips['+i+'].capacite_L=this.value" placeholder="5000">'
+              +'<select style="width:56px" disabled><option>L</option></select>'
+            +'</div>'
+            +'<span style="font-size:10px;color:#aaa;margin-top:3px">Cuve fuel, bac eau, etc. — laissez vide si sans réservoir</span>'
+          +'</div>'
+        +'</div>'
+
+        // 4. Référence
+        +'<div class="eq-field">'
+          +'<label>Référence / N° série <span class="badgeopt">optionnel</span></label>'
+          +'<input type="text" value="'+esc(eq.reference)+'" oninput="S.equips['+i+'].reference=this.value" placeholder="CAT-3406E · SN-4521">'
+        +'</div>'
+
+        // 5. Type de mesure
+        +'<div class="eq-field" style="margin:10px 0 8px">'
+          +'<label>Type de relevé lors de la ronde</label>'
+          +'<div class="mesure-opts">'+mesureHtml+'</div>'
+        +'</div>'
+
+        // 6. Seuil — adapté au type de mesure
+        +(eq.type_mesure==='instantane'
+          ?'<div style="background:#f5f9ff;border:1px solid #d0e4ff;border-radius:7px;padding:10px 12px;margin-top:4px">'
+            +'<div style="font-size:11px;color:#3a6fc4;font-weight:600;margin-bottom:10px">🌡 Plage de valeurs normale</div>'
+            +'<div style="display:grid;grid-template-columns:1fr 1fr 80px;gap:8px">'
+              +'<div class="eq-field"><label>Valeur mini (alerte si en dessous)</label>'
+                +'<input type="text" value="'+esc(eq.seuil_min)+'" oninput="S.equips['+i+'].seuil_min=this.value" placeholder="Ex: 0 · 2 · 20">'
+              +'</div>'
+              +'<div class="eq-field"><label>Valeur maxi (alerte si au-dessus)</label>'
+                +'<input type="text" value="'+esc(eq.seuil_max)+'" oninput="S.equips['+i+'].seuil_max=this.value" placeholder="Ex: 5 · 8 · 90">'
+              +'</div>'
+              +'<div class="eq-field"><label>Unité</label>'
+                +'<input type="text" value="'+esc(eq.seuil_unite)+'" oninput="S.equips['+i+'].seuil_unite=this.value" placeholder="°C · bar · %">'
+              +'</div>'
+            +'</div>'
+          +'</div>'
+          :eq.type_mesure==='index'
+          ?'<div style="background:#fffaf0;border:1px solid #fde2a0;border-radius:7px;padding:10px 12px;margin-top:4px">'
+            +'<div style="font-size:11px;color:#a06c00;font-weight:600;margin-bottom:10px">⏱ Seuils de maintenance</div>'
+            +'<div style="display:grid;grid-template-columns:1fr 1fr 80px;gap:8px">'
+              +'<div class="eq-field"><label>Alerte avant entretien (seuil)</label>'
+                +'<input type="text" value="'+esc(eq.seuil)+'" oninput="S.equips['+i+'].seuil=this.value" placeholder="Ex: 490">'
+                +'<span style="font-size:10px;color:#aaa;margin-top:2px">Alerte quand le compteur atteint cette valeur</span>'
+              +'</div>'
+              +'<div class="eq-field"><label>Intervalle d\'entretien</label>'
+                +'<input type="text" value="'+esc(eq.seuil_intervalle)+'" oninput="S.equips['+i+'].seuil_intervalle=this.value" placeholder="Ex: 500">'
+                +'<span style="font-size:10px;color:#aaa;margin-top:2px">Vidange / service tous les X</span>'
+              +'</div>'
+              +'<div class="eq-field"><label>Unité</label>'
+                +'<input type="text" value="'+esc(eq.seuil_unite)+'" oninput="S.equips['+i+'].seuil_unite=this.value" placeholder="h · kWh · m³">'
+              +'</div>'
+            +'</div>'
+          +'</div>'
+          :'')
+
+      +'</div>';
+
+    list.appendChild(row);
+    document.getElementById('eqzone-'+i).value=eq.zone_key||'';
+  });
+}
+
+function toggleEqDetail(i){
+  var det=document.getElementById('eqdet-'+i);
+  var chev=document.getElementById('eqchev-'+i);
+  var open=det.classList.toggle('open');
+  chev.classList.toggle('open',open);
+}
+
+function setMesure(i,val){
+  S.equips[i].type_mesure=val;
+  renderEquips();
+  // Re-open the detail
+  var det=document.getElementById('eqdet-'+i);
+  var chev=document.getElementById('eqchev-'+i);
+  if(det){det.classList.add('open');chev.classList.add('open');}
+}
+
+function refreshEqRow(i){
+  // Update qty badge in main row
+  var eq=S.equips[i];
+  var badges=document.querySelector('#eqrow-'+i+' .eq-badges');
+  var badge=document.querySelector('#eqrow-'+i+' .qty-badge');
+  if(eq.qty>1){
+    if(badge) badge.textContent='×'+eq.qty;
+    else if(badges){
+      var b=document.createElement('span');
+      b.className='qty-badge'; b.textContent='×'+eq.qty;
+      badges.insertBefore(b,badges.firstChild);
+    }
+  } else {
+    if(badge) badge.remove();
+  }
+  // Update names preview in detail panel
+  var inp=document.querySelector('#eqdet-'+i+' input[type="number"]');
+  if(inp){
+    var preview=inp.parentElement.querySelector('div');
+    if(eq.qty>1){
+      var names=[];
+      for(var q=1;q<=Math.min(eq.qty,4);q++) names.push(eq.nom+' '+q);
+      if(eq.qty>4) names.push('…');
+      var html='<div style="font-size:10px;color:#888;margin-top:3px;line-height:1.6">→ Créera : '+names.map(function(n){return '<em>'+esc(n)+'</em>';}).join(', ')+'</div>';
+      if(preview) preview.outerHTML=html;
+      else inp.parentElement.insertAdjacentHTML('beforeend',html);
+    } else if(preview) preview.remove();
+  }
+}
+
+function removeEquip(i){
+  S.equips.splice(i,1);
+  renderEquips();
+}
+
+// ── Step 5 ──
+function initFluides(){
+  if(S.fluides_actif) return; // already set up
+  var code=S.pays_code||S.site.pays_code;
+  var preset=TARIFS_PAYS[code];
+  if(preset&&!S.fluides.length){
+    S.fluides=preset.fluides.map(function(f){return Object.assign({},f,{devise:preset.devise});});
+    document.getElementById('country-hint').style.display='block';
+    document.getElementById('country-hint').textContent='✅ Tarifs pré-remplis pour votre pays ('+preset.label+'). Vérifiez et ajustez si nécessaire.';
+  }
+}
+
+function toggleFluides(){
+  S.fluides_actif=!S.fluides_actif;
+  document.getElementById('fluide-sw').classList.toggle('on',S.fluides_actif);
+  document.getElementById('fluide-section').style.display=S.fluides_actif?'block':'none';
+  document.getElementById('fluide-toggle-sub').textContent=S.fluides_actif?'Actif — configurez vos compteurs ci-dessous':'Non configuré';
+  if(S.fluides_actif){
+    initFluides();
+    renderFluides();
+  }
+}
+
+function renderFluides(){
+  var el=document.getElementById('fluide-rows');
+  el.innerHTML='';
+  S.fluides.forEach(function(f,i){
+    var row=document.createElement('div');
+    row.className='fluide-row';
+    row.innerHTML='<div style="flex:1"><div class="fl-name"><input type="text" value="'+esc(f.nom)+'" oninput="S.fluides['+i+'].nom=this.value" style="border:none;background:none;padding:4px 0;font-size:13px;font-weight:500;width:100%" placeholder="Ex : Électricité"></div>'
+        +'<div style="display:flex;gap:8px;margin-top:4px">'
+          +'<input type="text" value="'+esc(f.unite)+'" oninput="S.fluides['+i+'].unite=this.value" style="width:60px;font-size:11px;padding:4px 6px" placeholder="unité">'
+          +'<select onchange="S.fluides['+i+'].type_valeur=this.value" style="font-size:11px;padding:4px 6px">'
+            +'<option value="index"'+(f.type_valeur==='index'?' selected':'')+'>Index</option>'
+            +'<option value="consommation"'+(f.type_valeur==='consommation'?' selected':'')+'>Consommation</option>'
+          +'</select>'
+        +'</div>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:6px">'
+        +'<input class="fl-tarif" type="number" step="0.01" value="'+f.tarif+'" oninput="S.fluides['+i+'].tarif=parseFloat(this.value)||0" placeholder="Tarif">'
+        +'<span class="fl-devise">'+esc(f.devise||'XOF')+'</span>'
+        +'<button class="btn-del-fl" onclick="removeFluide('+i+')">×</button>'
+      +'</div>';
+    el.appendChild(row);
+  });
+}
+
+function removeFluide(i){
+  S.fluides.splice(i,1);
+  renderFluides();
+}
+
+function addFluideRow(){
+  var code=S.pays_code||S.site.pays_code;
+  var devise=(TARIFS_PAYS[code]||{}).devise||'XOF';
+  S.fluides.push({nom:'',unite:'kWh',tarif:0,type_valeur:'index',devise:devise});
+  renderFluides();
+}
+
+// ── Step 6 ──
+function renderTeam(){
+  var el=document.getElementById('team-list');
+  el.innerHTML='';
+  // Main contact first
+  var all=[{nom:S.contact.nom,role:S.contact.role,email:S.contact.email,tel:S.contact.tel,main:true}].concat(S.equipe);
+  all.forEach(function(m,i){
+    var initials=m.nom.split(' ').map(function(w){return w[0]||'';}).slice(0,2).join('').toUpperCase();
+    var card=document.createElement('div');
+    card.className='member-card';
+    card.innerHTML='<div class="av">'+initials+'</div>'
+      +'<div class="m-info"><div class="m-nom">'+esc(m.nom)+(m.main?' <span style="font-size:10px;color:#888">(contact principal)</span>':'')+'</div><div class="m-role">'+esc(m.role)+'</div></div>'
+      +(m.main?'':'<button class="m-del" onclick="removeMember('+(i-1)+')">×</button>');
+    el.appendChild(card);
+  });
+}
+
+function toggleAddMember(){
+  document.getElementById('add-member-form').classList.toggle('open');
+}
+
+function addMember(){
+  var nom=v('m-nom'),tel=v('m-tel');
+  if(!nom||!tel){alert('Le nom et le numéro WhatsApp sont obligatoires.');return;}
+  S.equipe.push({nom:nom,role:v('m-role'),email:v('m-email'),tel:tel});
+  document.getElementById('m-nom').value='';
+  document.getElementById('m-email').value='';
+  document.getElementById('m-tel').value='';
+  document.getElementById('add-member-form').classList.remove('open');
+  renderTeam();
+}
+
+function removeMember(i){
+  S.equipe.splice(i,1);
+  renderTeam();
+}
+
+// ── Submission ──
+async function submit(){
+  showOverlay('Envoi de la demande…');
+
+  try {
+    // Appel unique à l'Edge Function — insère en pending + envoie email
+    var r=await fetch(SB_URL+'/functions/v1/notify-onboarding',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},
+      body:JSON.stringify(S)
+    });
+    var data=await r.json();
+    if(!r.ok) throw new Error(data.error||'Erreur serveur');
+
+    hideOverlay();
+    showSuccess(data.id);
+  } catch(e){
+    hideOverlay();
+    alert('Erreur lors de l\'envoi : '+e.message+'\n\nVérifiez votre connexion et réessayez.');
+    console.error(e);
+  }
+}
+
+function mapRole(label){
+  var m={
+    'Responsable technique':'resp_tech',
+    'Technicien':'technicien',
+    'Agent de maintenance':'technicien',
+    'Plombier':'technicien',
+    'Électricien':'technicien',
+    'Climaticien':'technicien',
+    'Chef de maintenance':'resp_tech',
+    'Directeur technique':'dir_tech',
+    'Directeur général':'dir_ops',
+    'Gérant':'dir_ops',
+    'Réceptionniste':'reception',
+    'Gouvernante':'gouvernant'
+  };
+  return m[label]||'autre';
+}
+
+async function sbInsert(table,payload){
+  var r=await fetch(SB_URL+'/rest/v1/'+table,{method:'POST',headers:SB_HEADERS,body:JSON.stringify(payload)});
+  if(!r.ok){var t=await r.text();throw new Error('Supabase '+table+': '+r.status+' '+t);}
+  return await r.json();
+}
+
+function showSuccess(siteId){
+  document.getElementById('step6').classList.remove('active');
+  document.getElementById('step7').classList.add('active');
+  updateProgress(7);
+
+  var nbZones=S.zones.length;
+  var nbInv=S.zones.reduce(function(a,z){return a+z.inventaire.length;},0);
+  var nbEq=S.equips.length;
+
+  document.getElementById('succ-title').textContent='🎉 '+S.site.nom+' est configuré !';
+  document.getElementById('succ-recap').innerHTML=[
+    {l:'Établissement',v:S.site.nom+' — '+S.site.ville},
+    {l:'Classement',v:S.site.classement+' · '+S.site.nb_chambres+' chambres'},
+    {l:'Zones créées',v:nbZones+' zone'+(nbZones>1?'s':'')},
+    {l:'Inventaire',v:nbInv+' article'+(nbInv>1?'s':'')},
+    {l:'Équipements critiques',v:nbEq+' équipement'+(nbEq>1?'s':'')+(S.fluides_actif?' · '+S.fluides.length+' fluide'+(S.fluides.length>1?'s':''):'')},
+    {l:'Équipe',v:(1+S.equipe.length)+' membre'+(S.equipe.length?'s':'')},
+    {l:'ID Supabase',v:siteId}
+  ].map(function(r){return '<div class="rc-row"><span class="rc-lbl">'+r.l+'</span><span class="rc-val">'+r.v+'</span></div>';}).join('');
+}
+
+function showOverlay(msg){
+  document.getElementById('overlay-msg').textContent=msg||'…';
+  document.getElementById('overlay').classList.add('show');
+}
+function hideOverlay(){
+  document.getElementById('overlay').classList.remove('show');
+}
+
+// ── Utils ──
+function v(id){return (document.getElementById(id)||{}).value||'';}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+// ── Init ──
+setBatCnt(1);
+renderBatiments();
+</script>
+</body>
+</html>

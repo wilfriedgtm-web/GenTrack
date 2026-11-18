@@ -15,8 +15,13 @@ ALTER TABLE plans_maintenance
 -- ─────────────────────────────────────────────────────────────
 -- 2. RLS policy manquante sur templates_maintenance
 -- ─────────────────────────────────────────────────────────────
-CREATE POLICY "allow_all" ON templates_maintenance
-  FOR ALL USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename='templates_maintenance' AND policyname='allow_all'
+  ) THEN
+    EXECUTE 'CREATE POLICY "allow_all" ON templates_maintenance FOR ALL USING (true) WITH CHECK (true)';
+  END IF;
+END $$;
 
 -- ─────────────────────────────────────────────────────────────
 -- 3. Colonne email sur prestataires

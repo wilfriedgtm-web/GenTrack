@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack × Groupe Azalaï — 18 novembre 2026</title>
+<style>
+:root{
+  --bg:#EDE8DF;--surface:#FDFAF6;--surface2:#F5F0E6;
+  --border:#D9D3C8;--text:#1A1917;--muted:#7A746A;
+  --gold:#C49830;--gold-bg:#F7EED6;--gold-border:#DEC97A;
+  --green:#2A7D55;--green-bg:#E6F4ED;--green-border:#A8D5BC;
+  --red:#C0392B;--amber:#B07D1A;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh;width:100vw}
+.deck{width:100vw;height:100vh;position:relative}
+.slide{position:absolute;inset:0;display:none;flex-direction:column;padding:28px 44px 24px;background:var(--bg)}
+.slide.active{display:flex}
+
+/* TOP BAR */
+.top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.logo-text{font-size:15px;font-weight:700;color:var(--text)}
+.logo-text em{font-style:normal;color:var(--gold)}
+.slide-label{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:2px}
+.meet-info{font-size:10px;color:var(--muted);text-align:right;line-height:1.6}
+
+/* TITLE */
+.hero h1{font-size:24px;font-weight:300;line-height:1.2;margin-bottom:3px}
+.hero h1 strong{font-weight:700}
+.hero .sub{font-size:12px;color:var(--muted);margin-bottom:12px}
+
+/* LAYOUTS */
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:14px 16px}
+.kpi{font-size:32px;font-weight:700;line-height:1;margin-bottom:4px}
+.kpi.gold{color:var(--gold)}.kpi.green{color:var(--green)}.kpi.dark{color:var(--text)}
+.kpi-lbl{font-size:11px;color:var(--muted);line-height:1.4}
+
+/* INCIDENT */
+.inc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px;border-left:3px solid var(--border)}
+.inc.g{border-left-color:var(--green)}.inc.a{border-left-color:var(--gold)}
+.itag{font-size:9px;text-transform:uppercase;letter-spacing:.09em;font-weight:600;margin-bottom:4px;color:var(--muted)}
+.itag.g{color:var(--green)}.itag.a{color:var(--amber)}
+.ititle{font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px}
+.idesc{font-size:11px;color:var(--muted);line-height:1.4}
+
+/* QUOTE */
+.quote{background:var(--gold-bg);border:1px solid var(--gold-border);border-radius:9px;padding:14px 18px}
+.qmark{font-size:22px;color:var(--gold);line-height:.5;margin-bottom:6px;font-family:Georgia,serif}
+.qtext{font-size:12px;color:var(--text);font-style:italic;line-height:1.6;margin-bottom:6px}
+.qattr{font-size:10px;font-weight:600;color:var(--gold)}
+
+/* ===================== SLIDE 2 — BROWSER FRAMES ===================== */
+.frames-row{display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:12px;flex:1;min-height:0}
+.browser{background:var(--surface);border-radius:8px;overflow:hidden;border:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+.bbar{background:var(--surface2);padding:5px 9px;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--border);flex-shrink:0}
+.bd{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.burl{font-size:8.5px;color:var(--muted);margin-left:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bscreen{padding:12px 14px;overflow:hidden;flex:1;min-height:0}
+.frame-label{font-size:9px;font-weight:600;color:var(--text);margin-top:5px;text-align:center}
+.frame-sub{font-size:8px;color:var(--muted);text-align:center;margin-top:1px}
+
+/* Frame 1 — Accueil */
+.f1-title{font-size:11px;font-weight:600;color:var(--text);margin-bottom:6px}
+.f1-kpis{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:9px}
+.f1k{background:#fff;border-radius:5px;padding:7px 8px;border:0.5px solid var(--border);text-align:center}
+.f1k-n{font-size:16px;font-weight:700;line-height:1}
+.f1k-n.gn{color:var(--green)}.f1k-n.rd{color:var(--red)}
+.f1k-l{font-size:9px;color:var(--muted);margin-top:2px}
+.section-lbl{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;margin:8px 0 4px}
+.eq-row{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-radius:4px;margin-bottom:3px;background:var(--surface2)}
+.eq-name{font-size:9.5px;font-weight:500;color:var(--text);flex:1}
+.eq-val{font-size:9px;color:var(--muted);margin-right:6px}
+.eq-st{font-size:9.5px;font-weight:600}
+.eq-st.gn{color:var(--green)}.eq-st.rd{color:var(--red)}.eq-st.go{color:var(--gold)}
+.maint-row{background:var(--gold-bg);border:0.5px solid var(--gold-border);border-radius:4px;padding:5px 8px;margin-bottom:3px}
+.maint-name{font-size:9.5px;font-weight:600;color:var(--text)}
+.maint-val{font-size:8.5px;color:var(--amber)}
+.prog-wrap{height:5px;background:var(--surface2);border-radius:3px;margin-top:3px;overflow:hidden}
+.prog{height:5px;border-radius:3px}
+
+/* Frame 2 — Signalements kanban */
+.sig-kpis{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;margin-bottom:8px}
+.sgk{background:#fff;border-radius:5px;padding:6px 7px;border:0.5px solid var(--border);text-align:center}
+.sgk-n{font-size:14px;font-weight:700;line-height:1}
+.sgk-n.rd{color:var(--red)}.sgk-n.go{color:var(--gold)}.sgk-n.gn{color:var(--green)}
+.sgk-l{font-size:8.5px;color:var(--muted);margin-top:2px}
+.kanban{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.kb-col{background:var(--surface2);border-radius:6px;padding:6px}
+.kb-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.kb-title{font-size:9.5px;font-weight:600;color:var(--text)}
+.kb-cnt{font-size:8px;font-weight:700;padding:2px 6px;border-radius:8px;color:#fff}
+.kb-cnt.rd{background:var(--red)}.kb-cnt.go{background:var(--gold)}.kb-cnt.gn{background:var(--green)}
+.card-k{background:var(--surface);border-radius:4px;padding:6px 7px;margin-bottom:4px;border:0.5px solid var(--border);border-left:2.5px solid var(--red)}
+.card-k.go{border-left-color:var(--gold)}
+.card-k.gn{border-left-color:var(--green)}
+.ck-eq{font-size:9.5px;font-weight:600;color:var(--text);margin-bottom:2px}
+.ck-desc{font-size:8.5px;color:var(--muted);line-height:1.3;margin-bottom:2px}
+.ck-agent{font-size:8.5px;font-weight:600;color:var(--gold)}
+.ck-date{font-size:8.5px;color:var(--green)}
+
+/* Frame 3 — Énergie */
+.en-kpis{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px}
+.enk{background:#fff;border-radius:5px;padding:7px 9px;border:0.5px solid var(--border)}
+.enk-n{font-size:12px;font-weight:700;line-height:1}
+.enk-n.gn{color:var(--green)}.enk-n.go{color:var(--gold)}
+.enk-l{font-size:8.5px;color:var(--muted);margin-top:2px}
+.fluide-row{display:flex;justify-content:space-between;align-items:center;padding:5px 7px;border-radius:4px;margin-bottom:3px;background:var(--surface2)}
+.fl-name{font-size:9.5px;color:var(--text);flex:1}
+.fl-bar{flex:1;height:5px;background:var(--border);border-radius:3px;margin:0 7px;overflow:hidden;max-width:60px}
+.fl-fill{height:5px;border-radius:3px}
+.fl-pct{font-size:9px;font-weight:600;text-align:right;min-width:26px}
+.fl-pct.gn{color:var(--green)}.fl-pct.go{color:var(--gold)}
+.budget-box{background:var(--green-bg);border:0.5px solid var(--green-border);border-radius:5px;padding:8px 10px;margin-top:7px}
+.bb-row{display:flex;justify-content:space-between;align-items:center}
+.bb-label{font-size:9px;font-weight:600;color:var(--green)}
+.bb-val{font-size:14px;font-weight:700;color:var(--green)}
+.bb-sub{font-size:8.5px;color:var(--green);margin-top:2px}
+
+/* ===================== SLIDE 3 — SCÉNARIOS ===================== */
+.sc-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px}
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:18px 20px;display:flex;flex-direction:column}
+.sc.pref{border-color:var(--gold);background:var(--gold-bg)}
+.sc-badge{display:inline-block;font-size:9px;text-transform:uppercase;letter-spacing:.1em;font-weight:600;padding:2px 9px;border-radius:16px;margin-bottom:10px}
+.sc-badge.a{background:var(--gold);color:#fff}
+.sc-badge.b{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.sc-title{font-size:16px;font-weight:700;margin-bottom:4px}
+.sc-sub{font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5}
+.sc-items{display:flex;flex-direction:column;gap:5px}
+.si{display:flex;gap:8px;align-items:flex-start}
+.si-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.si-dot.gold{background:var(--gold)}.si-dot.grey{background:var(--border)}
+.si-text{font-size:11.5px;color:var(--text);line-height:1.4}
+.sc-divider{height:1px;background:var(--border);margin:10px 0}
+.split-row{display:flex;gap:8px;margin-top:4px}
+.split-pill{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:9px 10px;text-align:center}
+.split-pill.gold-pill{background:var(--gold-bg);border-color:var(--gold-border)}
+.split-pill-label{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:5px;font-weight:600}
+.split-pill-label.gold{color:var(--gold)}
+.split-pill-items{font-size:10.5px;color:var(--text);line-height:1.6}
+.nuance{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:10px 14px}
+.nuance-text{font-size:11.5px;color:var(--text);line-height:1.5}
+.nuance-text strong{color:var(--gold)}
+
+/* ===================== SLIDES RT & DT — COMPACT HERO ===================== */
+#s2,#s3{padding:18px 44px 16px}
+#s2 .hero h1,#s3 .hero h1{font-size:19px}
+#s2 .hero .sub,#s3 .hero .sub{font-size:11px;margin-bottom:8px}
+#s2 .frames-row,#s3 .frames5{flex:1;min-height:0}
+#s2 .frames-row > div,#s3 .frames5 > div{height:100%}
+
+/* ===================== SLIDE 4 — DÉPLOIEMENT ===================== */
+.dep-layout{display:grid;grid-template-columns:1fr 1fr;gap:20px;flex:1;min-height:0}
+.steps{display:flex;flex-direction:column;gap:9px}
+.step{display:flex;gap:12px;align-items:flex-start}
+.step-num{width:26px;height:26px;border-radius:50%;background:var(--gold);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step-num.done{background:var(--green)}
+.step-date{font-size:10px;font-weight:600;color:var(--gold);margin-bottom:1px}
+.step-date.done{color:var(--green)}
+.step-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:1px}
+.step-sub{font-size:10.5px;color:var(--muted)}
+.hotels-g{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px}
+.hotel{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:7px 9px;display:flex;align-items:center;gap:6px}
+.hotel.on{border-color:var(--green-border);background:var(--green-bg)}
+.hdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.hdot.on{background:var(--green)}.hdot.off{background:var(--border)}
+.hname{font-size:10.5px;font-weight:500}
+.hname.off{color:var(--muted)}
+.hcity{font-size:8.5px;color:var(--green)}
+.hcity.off{color:var(--border)}
+
+/* PRICING */
+.price-box{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:14px 16px}
+.price-tbl{width:100%;border-collapse:collapse;margin-bottom:10px}
+.price-tbl thead th{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;padding:4px 8px;background:var(--surface2);border-radius:4px}
+.price-tbl thead th:last-child{color:var(--green)}
+.price-tbl tbody tr{border-bottom:1px solid var(--border)}
+.price-tbl tbody tr.hl{background:var(--gold-bg)}
+.price-tbl td{padding:8px 8px;font-size:11px;color:var(--text)}
+.price-tbl td:first-child{color:var(--muted)}
+.price-tbl tr.hl td:first-child{color:var(--text);font-weight:600}
+.price-tbl td.val{font-size:12px;font-weight:700;color:var(--text);text-align:right}
+.price-tbl tr.hl td.val{color:var(--gold);font-size:14px}
+.price-tbl td.ann{font-size:10.5px;color:var(--muted);text-align:right}
+.price-tbl tr.hl td.ann{color:var(--green);font-weight:600;font-size:11px}
+.price-incl{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.pill{background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:3px 9px;font-size:10px;color:var(--muted)}
+.cta{background:var(--gold);border-radius:7px;padding:10px 14px;text-align:center}
+.cta-t{font-size:12px;font-weight:700;color:#fff;margin-bottom:2px}
+.cta-s{font-size:9.5px;color:rgba(255,255,255,.75)}
+.col-title{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px}
+
+/* ===================== SLIDE 5 — VISION DT ===================== */
+.frames5{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;flex:1;min-height:0}
+.note-banner{background:var(--green-bg);border:0.5px solid var(--green-border);border-radius:5px;padding:4px 12px;margin-bottom:10px;font-size:9.5px;color:var(--green);text-align:center}
+
+/* Frame DT 1 — Accueil groupe */
+.dt-title{font-size:11px;font-weight:600;color:var(--text);margin-bottom:5px}
+.dt-ab{background:#FEF0EE;border:0.5px solid #F5C6BE;border-radius:4px;padding:4px 8px;margin-bottom:7px;font-size:9.5px;color:var(--red);font-weight:600}
+.dt-kpis{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:7px}
+.dtk{background:#fff;border-radius:5px;padding:6px 7px;border:0.5px solid var(--border);text-align:center}
+.dtk-n{font-size:15px;font-weight:700;line-height:1}
+.dtk-n.gn{color:var(--green)}.dtk-n.rd{color:var(--red)}
+.dtk-l{font-size:8px;color:var(--muted);margin-top:2px}
+.hotel-row{display:flex;justify-content:space-between;align-items:center;padding:4px 7px;border-radius:4px;margin-bottom:2px}
+.hotel-row:nth-child(odd){background:var(--surface2)}
+.h-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-right:5px}
+.h-name5{font-size:9.5px;color:var(--text);flex:1}
+.h-eq5{font-size:8.5px;color:var(--muted);margin-right:5px}
+.h-al5{font-size:9.5px;font-weight:600}
+.h-al5.gn{color:var(--green)}.h-al5.rd{color:var(--red)}.h-al5.go{color:var(--gold)}
+
+/* Frame DT 2 — Fiabilité */
+.dt2-kpis{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:7px}
+.dt2k{background:#fff;border-radius:5px;padding:6px 8px;border:0.5px solid var(--border);text-align:center}
+.dt2k-n{font-size:15px;font-weight:700;line-height:1}
+.dt2k-n.gn{color:var(--green)}.dt2k-n.go{color:var(--gold)}
+.dt2k-l{font-size:8px;color:var(--muted);margin-top:2px}
+.dt2-tbl-h{display:grid;grid-template-columns:1.4fr .6fr .6fr .5fr;gap:2px;padding:4px 6px;background:var(--surface2);border-radius:4px;margin-bottom:3px}
+.dt2-th{font-size:8.5px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.dt2-row{display:grid;grid-template-columns:1.4fr .6fr .6fr .5fr;gap:2px;padding:3px 6px}
+.dt2-row:nth-child(even){background:var(--surface2);border-radius:3px}
+.dt2-td{font-size:9px;color:var(--text)}
+.dt2-td.go{color:var(--gold)}.dt2-td.gn{color:var(--green)}
+
+/* Frame DT 3 — Énergie groupe */
+.dt3-kpis{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:7px}
+.dt3k{background:#fff;border-radius:5px;padding:6px 8px;border:0.5px solid var(--border)}
+.dt3k-n{font-size:14px;font-weight:700;line-height:1}
+.dt3k-n.gn{color:var(--green)}.dt3k-n.go{color:var(--gold)}
+.dt3k-l{font-size:8.5px;color:var(--muted);margin-top:2px}
+.dt3-cmp{background:#fff;border-radius:5px;padding:7px 9px;border:0.5px solid var(--border)}
+.dt3-cmp-h{font-size:9.5px;font-weight:600;color:var(--text);margin-bottom:4px}
+.dt3-site-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+.dt3-site-name{font-size:9px;color:var(--text);flex:1}
+.dt3-bar-wrap{width:52px;height:6px;background:var(--surface2);border-radius:3px;margin:0 5px;overflow:hidden;flex-shrink:0}
+.dt3-bar{height:6px;border-radius:3px}
+.dt3-val{font-size:9px;color:var(--text);font-weight:600;text-align:right;min-width:30px}
+
+/* Maintenance & Prestataires frame */
+.hist-row{display:flex;align-items:center;padding:4px 7px;border-radius:4px;margin-bottom:2px;background:var(--surface2);gap:4px}
+.hist-date{font-size:8px;color:var(--green);font-weight:600;flex-shrink:0;min-width:38px}
+.hist-nm{font-size:9px;color:var(--text);flex:1;font-weight:500}
+.hist-prest{font-size:8.5px;color:var(--muted);flex:1}
+.hist-cost{font-size:9px;color:var(--text);font-weight:600;text-align:right;flex-shrink:0}
+.prest-sum{background:var(--gold-bg);border:0.5px solid var(--gold-border);border-radius:5px;padding:6px 8px;margin-top:5px}
+.prest-sum-h{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:var(--amber);font-weight:600;margin-bottom:4px}
+.prest-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+.prest-nm{font-size:9.5px;font-weight:600;color:var(--text);flex:1}
+.prest-int{font-size:8.5px;color:var(--muted);margin-right:8px}
+.prest-cst{font-size:9.5px;font-weight:600;color:var(--gold)}
+
+/* Slide 5 — 2 volets */
+.volets{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.volet{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:14px 16px;display:flex;flex-direction:column}
+.volet.va{border-top:3px solid var(--gold)}
+.volet.vb{border-top:3px solid var(--green)}
+.vl-badge{font-size:9px;text-transform:uppercase;letter-spacing:.09em;font-weight:600;margin-bottom:5px}
+.vl-badge.a{color:var(--amber)}.vl-badge.b{color:var(--green)}
+.vl-title{font-size:13.5px;font-weight:700;color:var(--text);margin-bottom:3px}
+.vl-desc{font-size:10.5px;color:var(--muted);margin-bottom:10px;line-height:1.4}
+.vl-price{font-size:26px;font-weight:700;color:var(--text);line-height:1}
+.vl-price-unit{font-size:10px;color:var(--muted);margin-top:2px}
+.vl-total{font-size:12px;font-weight:700;color:var(--text);margin-top:5px}
+.vl-pills{margin-top:8px;display:flex;flex-wrap:wrap;gap:4px}
+.vl-pill{font-size:9px;background:var(--surface2);border:0.5px solid var(--border);border-radius:4px;padding:2px 7px;color:var(--muted)}
+.vl-modal{font-size:9.5px;color:var(--muted);margin-top:8px;line-height:1.4;border-top:1px solid var(--border);padding-top:8px}
+.synth-box{background:var(--gold-bg);border:1px solid var(--gold-border);border-radius:9px;padding:12px 18px}
+.synth-line{display:flex;justify-content:space-between;margin-bottom:4px}
+.synth-lbl{font-size:10.5px;color:var(--muted)}
+.synth-val{font-size:10.5px;font-weight:600;color:var(--text)}
+.synth-total{display:flex;justify-content:space-between;border-top:1px solid var(--gold-border);padding-top:7px;margin-top:3px;align-items:baseline}
+.synth-tl{font-size:12px;font-weight:700;color:var(--text)}
+.synth-tv{font-size:18px;font-weight:700;color:var(--gold)}
+
+/* Plan préventif mockup */
+.pp-title{font-size:10px;font-weight:700;color:var(--text);margin-bottom:5px}
+.pp-row{display:flex;align-items:flex-start;gap:6px;padding:6px 0;border-bottom:1px solid var(--border)}
+.pp-row:last-child{border-bottom:none}
+.pp-check{width:13px;height:13px;border:1.5px solid #94a3b8;border-radius:3px;flex-shrink:0;margin-top:1px}
+.pp-body{flex:1;min-width:0}
+.pp-name{font-size:10px;font-weight:700;color:var(--text);display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+.pp-due{font-size:9px;color:var(--green);font-weight:600}
+.pp-due.warn{color:var(--amber)}
+.pp-tags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px}
+.pp-tag{font-size:8px;padding:1px 5px;border-radius:3px;font-weight:500}
+.pp-tag.freq{background:rgba(148,163,184,.15);color:#94a3b8}
+.pp-tag.prest{background:rgba(99,102,241,.12);color:#818cf8}
+.pp-tag.todo{background:rgba(251,146,60,.15);color:#fb923c;display:flex;align-items:center;gap:2px}
+.pp-dateline{display:flex;align-items:center;gap:5px}
+.pp-date{font-size:9px;border:1px solid var(--green);border-radius:4px;padding:2px 7px;color:var(--text);background:transparent;font-weight:500}
+.pp-actions{display:flex;gap:3px;margin-left:auto}
+.pp-btn{width:17px;height:17px;border-radius:4px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:8px;cursor:pointer}
+.pp-btn.ok{color:var(--green);border-color:rgba(34,197,94,.3)}
+.pp-btn.edit{color:#94a3b8}
+.pp-btn.del{color:#ef4444;border-color:rgba(239,68,68,.3)}
+/* Dossier prestataire mockup */
+.dp-header{background:#1a2744;border-radius:6px;padding:7px 10px;margin-top:7px;display:flex;gap:12px;align-items:center}
+.dp-kpi{text-align:center}
+.dp-kpi-val{font-size:11px;font-weight:700;color:var(--gold)}
+.dp-kpi-lbl{font-size:7.5px;color:#94a3b8;margin-top:1px}
+.dp-sep{width:1px;background:rgba(255,255,255,.1);align-self:stretch}
+.dp-title{font-size:8px;font-weight:700;color:#94a3b8;letter-spacing:.05em;text-transform:uppercase;margin:7px 0 4px}
+.dp-row{display:flex;align-items:center;gap:5px;padding:4px 0;border-bottom:1px solid var(--border);font-size:8.5px}
+.dp-row:last-child{border-bottom:none}
+.dp-eq{flex:1;font-weight:600;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dp-meta{color:#94a3b8;white-space:nowrap}
+.dp-cost{color:var(--gold);font-weight:700;white-space:nowrap}
+.dp-badge{font-size:7px;background:rgba(34,197,94,.12);color:var(--green);border-radius:3px;padding:1px 4px;font-weight:600;white-space:nowrap}
+
+/* NAV */
+.nav{position:fixed;bottom:18px;right:24px;display:flex;gap:7px;z-index:100}
+.nav button{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:7px 15px;border-radius:6px;cursor:pointer;font-size:12px;transition:all .15s;font-family:inherit}
+.nav button:hover{background:var(--gold);color:#fff;border-color:var(--gold)}
+.nav button:disabled{opacity:.3;cursor:default}
+.nav button:disabled:hover{background:var(--surface);color:var(--text);border-color:var(--border)}
+.counter{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted);letter-spacing:.06em;z-index:100}
+.dots{position:fixed;bottom:24px;left:24px;display:flex;gap:6px;z-index:100}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--border)}
+.dot.on{background:var(--gold)}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 1 — RÉSULTATS PILOTE
+══════════════════════════════════════════════════════ -->
+<div class="slide active" id="s1">
+  <div class="top">
+    <div><div class="logo-text">Gen<em>Track</em></div><div class="slide-label">Résultats pilote · Azalaï Hôtel Dakar</div></div>
+    <div class="meet-info">18 novembre 2026<br>Groupe Azalaï · Confidentiel</div>
+  </div>
+  <div class="hero">
+    <h1><strong>5 mois sur le terrain.</strong> Des données réelles.</h1>
+    <div class="sub">0 jours manqués — données en production depuis juin 2026 — aucune démonstration</div>
+  </div>
+  <div class="g3">
+    <div class="card"><div class="kpi dark">0</div><div class="kpi-lbl">Jours de ronde manqués<br>sur 5 mois</div></div>
+    <div class="card"><div class="kpi green">14/14</div><div class="kpi-lbl">Équipements validés<br>ce matin, en temps réel</div></div>
+    <div class="card"><div class="kpi gold">6</div><div class="kpi-lbl">Alertes actives détectées<br>et tracées automatiquement</div></div>
+  </div>
+  <div class="g2">
+    <div class="inc g">
+      <div class="itag g">Anomalie détectée &amp; résolue</div>
+      <div class="ititle">CF Négative — dérive de température</div>
+      <div class="idesc">Passage de −8°C → −20°C suivi sur 9 relevés. Alerte déclenchée. Intervention. Perte produit évitée.</div>
+    </div>
+    <div class="inc a">
+      <div class="itag a">Maintenance anticipée</div>
+      <div class="ititle">G1 &amp; G2 CAT 1100 kVA — vidange GE</div>
+      <div class="idesc">Compteur G1 73h, G2 99h (seuil 250h). Alerte automatique. Prestataire relancé à temps.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 2 — VUE RT : 3 BROWSER FRAMES
+══════════════════════════════════════════════════════ -->
+<div class="slide" id="s2">
+  <div class="top">
+    <div><div class="logo-text">Gen<em>Track</em></div><div class="slide-label">Ce que GenTrack apporte concrètement · Vue Responsable Technique</div></div>
+    <div class="meet-info">18 novembre 2026<br>Groupe Azalaï · Confidentiel</div>
+  </div>
+  <div class="hero">
+    <h1><strong>Équipements, maintenance &amp; prestataires.</strong> En temps réel.</h1>
+    <div class="sub">Dashboard Azalaï Dakar · Responsable Technique · Données Octobre–Novembre 2026</div>
+  </div>
+
+  <div class="frames-row">
+
+    <!-- FRAME 1 — Accueil + Équipements -->
+    <div style="display:flex;flex-direction:column">
+      <div class="browser" style="flex:1">
+        <div class="bbar">
+          <div class="bd" style="background:#E24B4A"></div>
+          <div class="bd" style="background:#C49830"></div>
+          <div class="bd" style="background:#2A7D55"></div>
+          <span class="burl">dashboard.gentrack.app · Accueil</span>
+        </div>
+        <div class="bscreen">
+          <div class="f1-title">Accueil · Azalaï Hôtel Dakar</div>
+          <div class="f1-kpis">
+            <div class="f1k"><div class="f1k-n">14</div><div class="f1k-l">Équipements</div></div>
+            <div class="f1k"><div class="f1k-n gn">14/14</div><div class="f1k-l">Ronde validée</div></div>
+            <div class="f1k"><div class="f1k-n rd">6</div><div class="f1k-l">Alertes</div></div>
+          </div>
+          <div class="section-lbl">Statut équipements</div>
+          <div class="eq-row">
+            <span class="eq-name">CF Cuisine 1</span><span class="eq-val">7°C</span><span class="eq-st go">⚠ Dérive</span>
+          </div>
+          <div class="eq-row" style="background:#FEF0EE">
+            <span class="eq-name">G1 – CAT 1100 kVA</span><span class="eq-val">73h</span><span class="eq-st rd">● Signalement</span>
+          </div>
+          <div class="eq-row">
+            <span class="eq-name">CF Cuisine 2</span><span class="eq-val">5°C</span><span class="eq-st gn">OK</span>
+          </div>
+          <div class="eq-row">
+            <span class="eq-name">G2 – CAT 1100 kVA</span><span class="eq-val">99h</span><span class="eq-st gn">OK</span>
+          </div>
+          <div class="eq-row">
+            <span class="eq-name">CF Pâtisserie</span><span class="eq-val">3°C</span><span class="eq-st gn">OK</span>
+          </div>
+          <div class="section-lbl">Maintenance préventive</div>
+          <div class="maint-row">
+            <div class="maint-name">G1 – CAT 1100 kVA</div>
+            <div class="maint-val">73h depuis vidange · 177h restantes / 250h</div>
+            <div class="prog-wrap"><div class="prog" style="width:29%;background:var(--gold)"></div></div>
+          </div>
+          <div class="maint-row">
+            <div class="maint-name">G2 – CAT 1100 kVA</div>
+            <div class="maint-val">99h depuis vidange · 151h restantes / 250h</div>
+            <div class="prog-wrap"><div class="prog" style="width:40%;background:var(--gold)"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="frame-label">Tableau de bord RT</div>
+      <div class="frame-sub">14 équipements · Ronde quotidienne · Alertes</div>
+    </div>
+
+    <!-- FRAME 2 — Signalements kanban -->
+    <div style="display:flex;flex-direction:column">
+      <div class="browser" style="flex:1">
+        <div class="bbar">
+          <div class="bd" style="background:#E24B4A"></div>
+          <div class="bd" style="background:#C49830"></div>
+          <div class="bd" style="background:#2A7D55"></div>
+          <span class="burl">dashboard.gentrack.app · Signalements</span>
+        </div>
+        <div class="bscreen">
+          <div class="f1-title" style="margin-bottom:4px">Signalements · Azalaï Dakar</div>
+          <div class="sig-kpis">
+            <div class="sgk"><div class="sgk-n rd">3</div><div class="sgk-l">Ouverts</div></div>
+            <div class="sgk"><div class="sgk-n go">2</div><div class="sgk-l">En cours</div></div>
+            <div class="sgk"><div class="sgk-n gn">7</div><div class="sgk-l">Résolus</div></div>
+            <div class="sgk"><div class="sgk-n">0k</div><div class="sgk-l">FCFA</div></div>
+          </div>
+          <div class="kanban">
+            <div class="kb-col">
+              <div class="kb-head"><span class="kb-title">Ouvert</span><span class="kb-cnt rd">3</span></div>
+              <div class="card-k">
+                <div class="ck-eq">G1 – CAT 1100 kVA</div>
+                <div class="ck-desc">Anomalie — à affecter</div>
+                <div class="ck-desc" style="color:var(--muted)">il y a 9h</div>
+              </div>
+              <div class="card-k">
+                <div class="ck-eq">Bâche eau incendie</div>
+                <div class="ck-desc">Niveau faible · suppresseur</div>
+                <div class="ck-desc" style="color:var(--muted)">il y a 6j</div>
+              </div>
+              <div class="card-k">
+                <div class="ck-eq">Bâche eau potable</div>
+                <div class="ck-desc">Niveau faible · suppresseur</div>
+                <div class="ck-desc" style="color:var(--muted)">il y a 6j</div>
+              </div>
+            </div>
+            <div class="kb-col">
+              <div class="kb-head"><span class="kb-title">En cours</span><span class="kb-cnt go">2</span></div>
+              <div class="card-k go">
+                <div class="ck-eq">CF Négative</div>
+                <div class="ck-desc">Disjonction récurrente</div>
+                <div class="ck-agent">→ Modeste</div>
+                <div class="ck-desc" style="color:var(--muted)">30 sept.</div>
+              </div>
+              <div class="card-k go">
+                <div class="ck-eq">CF Cuisine 1</div>
+                <div class="ck-desc">Dérive +3.7°C / 9 relevés</div>
+                <div class="ck-agent">→ Ahmad</div>
+                <div class="ck-desc" style="color:var(--muted)">il y a 2j</div>
+              </div>
+            </div>
+            <div class="kb-col">
+              <div class="kb-head"><span class="kb-title">Résolu</span><span class="kb-cnt gn">7</span></div>
+              <div class="card-k gn">
+                <div class="ck-eq">G2 – CAT 1100 kVA</div>
+                <div class="ck-date">✓ 15 oct.</div>
+              </div>
+              <div class="card-k gn">
+                <div class="ck-eq">CF Mise en place</div>
+                <div class="ck-date">✓ 10 oct.</div>
+              </div>
+              <div class="card-k gn">
+                <div class="ck-eq">Cuve carburant</div>
+                <div class="ck-date">✓ 10 oct.</div>
+              </div>
+              <div class="card-k gn">
+                <div class="ck-eq">Groupe Eau Glacée</div>
+                <div class="ck-date">✓ 30 sept.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="frame-label">Signalements · Vue kanban</div>
+      <div class="frame-sub">Ouvert → En cours → Résolu · Traçabilité complète</div>
+    </div>
+
+    <!-- FRAME 3 — Plan préventif + Dossier prestataire -->
+    <div style="display:flex;flex-direction:column">
+      <div class="browser" style="flex:1">
+        <div class="bbar">
+          <div class="bd" style="background:#E24B4A"></div>
+          <div class="bd" style="background:#C49830"></div>
+          <div class="bd" style="background:#2A7D55"></div>
+          <span class="burl">dashboard.gentrack.app · Maintenance</span>
+        </div>
+        <div class="bscreen" style="padding:8px 10px">
+          <!-- En-tête équipement -->
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+            <div style="width:20px;height:20px;background:#1e293b;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0">⚡</div>
+            <div style="flex:1">
+              <div style="font-size:9.5px;font-weight:700;color:var(--text)">GE1 — CAT 800 kVA</div>
+              <div style="font-size:7.5px;color:#94a3b8">Groupe électrogène · Azalaï Dakar</div>
+            </div>
+          </div>
+          <!-- Tabs -->
+          <div style="display:flex;gap:0;border-bottom:1.5px solid var(--border);margin-bottom:6px">
+            <div style="font-size:8px;padding:2px 7px;color:#94a3b8">Fiche</div>
+            <div style="font-size:8px;padding:2px 7px;color:var(--gold);border-bottom:2px solid var(--gold);margin-bottom:-1.5px;font-weight:600">Plan préventif</div>
+            <div style="font-size:8px;padding:2px 7px;color:#94a3b8">📋 Prestataire</div>
+            <div style="font-size:8px;padding:2px 7px;color:#94a3b8">Historique</div>
+          </div>
+          <!-- Plans -->
+          <div style="font-size:7.5px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Plans actifs</div>
+          <div class="pp-row">
+            <div class="pp-check"></div>
+            <div class="pp-body">
+              <div class="pp-name">Vidange huile moteur <span class="pp-due warn">Dans 177h</span></div>
+              <div class="pp-tags">
+                <span class="pp-tag freq">Tous les 250h</span>
+                <span class="pp-tag prest" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px">📋 Froid service →</span>
+                <span class="pp-tag todo">⏰ À faire</span>
+              </div>
+              <div class="pp-dateline">
+                <span class="pp-date">13/12/2026</span>
+                <div class="pp-actions"><div class="pp-btn ok">✓</div><div class="pp-btn edit">✎</div><div class="pp-btn del">✕</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="pp-row" style="border-bottom:none">
+            <div class="pp-check"></div>
+            <div class="pp-body">
+              <div class="pp-name">Nettoyage filtre à air <span class="pp-due">Dans 427h</span></div>
+              <div class="pp-tags">
+                <span class="pp-tag freq">Tous les 500h</span>
+                <span class="pp-tag prest" style="cursor:pointer;text-decoration:underline;text-underline-offset:2px">📋 Froid service →</span>
+                <span class="pp-tag todo">⏰ À faire</span>
+              </div>
+              <div class="pp-dateline">
+                <span class="pp-date">15/02/2027</span>
+                <div class="pp-actions"><div class="pp-btn ok">✓</div><div class="pp-btn edit">✎</div><div class="pp-btn del">✕</div></div>
+              </div>
+            </div>
+          </div>
+          <!-- Séparateur dossier -->
+          <div style="margin:6px -10px 0;padding:4px 10px 3px;background:rgba(99,102,241,.07);border-top:1px solid rgba(99,102,241,.2);border-bottom:1px solid rgba(99,102,241,.2);display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:8px;font-weight:700;color:#818cf8">📋 Dossier prestataire · Froid service</div>
+            <div style="font-size:7px;color:#94a3b8">Contrat · Finances · Documents</div>
+          </div>
+          <!-- KPIs financiers -->
+          <div class="dp-header" style="margin-top:5px">
+            <div class="dp-kpi"><div class="dp-kpi-val">425 000 FCFA</div><div class="dp-kpi-lbl">Coût total · 3M</div></div>
+            <div class="dp-sep"></div>
+            <div class="dp-kpi"><div class="dp-kpi-val" style="color:#fff">3</div><div class="dp-kpi-lbl">missions</div></div>
+            <div class="dp-sep"></div>
+            <div class="dp-kpi"><div class="dp-kpi-val" style="color:#fff">2</div><div class="dp-kpi-lbl">factures</div></div>
+          </div>
+          <!-- Missions + document -->
+          <div class="dp-title">Missions & documents</div>
+          <div class="dp-row"><span class="dp-eq">GE1 — Vidange huile</span><span class="dp-meta">16 nov.</span><span class="dp-cost" style="margin:0 5px">230 000 FCFA</span><span class="dp-badge">✅ Réalisé</span></div>
+          <div class="dp-row"><span class="dp-eq">CF Cuisine — Révision</span><span class="dp-meta">8 nov.</span><span class="dp-cost" style="margin:0 5px">145 000 FCFA</span><span class="dp-badge">✅ Réalisé</span></div>
+          <div class="dp-row" style="border-bottom:none"><span style="font-size:8px;color:#818cf8">📄 Facture_nov2026.pdf</span><span class="dp-meta" style="margin-left:auto">17 nov. 2026</span></div>
+        </div>
+      </div>
+      <div class="frame-label">Plan préventif &amp; dossier prestataire</div>
+      <div class="frame-sub">Plans actifs → Prestataire → Contrat · Missions · Factures</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 3 — VISION DT GROUPE × 11 HÔTELS
+══════════════════════════════════════════════════════ -->
+<div class="slide" id="s3">
+  <div class="top">
+    <div><div class="logo-text">Gen<em>Track</em></div><div class="slide-label">Vision Directeur Technique · Groupe Azalaï</div></div>
+    <div class="meet-info">18 novembre 2026<br>Groupe Azalaï · Confidentiel</div>
+  </div>
+  <div class="hero">
+    <h1><strong>La vue DT.</strong> 11 hôtels. Temps réel.</h1>
+    <div class="sub">Ce tableau de bord existera le jour où les 11 hôtels sont on GenTrack.</div>
+  </div>
+  <div class="note-banner">Les données Azalaï Dakar sont réelles · Les 10 autres hôtels sont illustratifs</div>
+
+  <div class="frames5">
+
+    <!-- FRAME DT 1 — Accueil groupe -->
+    <div style="display:flex;flex-direction:column">
+      <div class="browser" style="flex:1">
+        <div class="bbar">
+          <div class="bd" style="background:#E24B4A"></div>
+          <div class="bd" style="background:#C49830"></div>
+          <div class="bd" style="background:#2A7D55"></div>
+          <span class="burl">dashboard.gentrack.app · Accueil groupe</span>
+        </div>
+        <div class="bscreen">
+          <div class="dt-title">Accueil · Groupe Azalaï</div>
+          <div class="dt-ab">⚠ 14 alertes actives sur 11 sites</div>
+          <div class="dt-kpis">
+            <div class="dtk"><div class="dtk-n">11</div><div class="dtk-l">Hôtels</div></div>
+            <div class="dtk"><div class="dtk-n rd">14</div><div class="dtk-l">Alertes groupe</div></div>
+            <div class="dtk"><div class="dtk-n gn">96%</div><div class="dtk-l">Conf. rondes</div></div>
+          </div>
+          <div class="hotel-row"><div class="h-dot" style="background:var(--green)"></div><span class="h-name5">Dakar ✓</span><span class="h-eq5">14 éq.</span><span class="h-al5 rd">6</span></div>
+          <div class="hotel-row"><div class="h-dot" style="background:var(--green)"></div><span class="h-name5">Abidjan</span><span class="h-eq5">18 éq.</span><span class="h-al5 gn">0</span></div>
+          <div class="hotel-row"><div class="h-dot" style="background:var(--green)"></div><span class="h-name5">Bamako Bourse</span><span class="h-eq5">12 éq.</span><span class="h-al5 go">2</span></div>
+          <div class="hotel-row"><div class="h-dot" style="background:var(--green)"></div><span class="h-name5">Cotonou</span><span class="h-eq5">10 éq.</span><span class="h-al5 rd">3</span></div>
+          <div class="hotel-row"><div class="h-dot" style="background:var(--green)"></div><span class="h-name5">Ouagadougou</span><span class="h-eq5">16 éq.</span><span class="h-al5 gn">0</span></div>
+          <div class="hotel-row"><div class="h-dot" style="background:var(--green)"></div><span class="h-name5">Nouakchott</span><span class="h-eq5">11 éq.</span><span class="h-al5 go">1</span></div>
+          <div class="hotel-row"><div class="h-dot" style="background:var(--gold)"></div><span class="h-name5">Dunia Bissau</span><span class="h-eq5">8 éq.</span><span class="h-al5 go">1</span></div>
+          <div class="hotel-row"><div class="h-dot" style="background:var(--gold)"></div><span class="h-name5">Dunia Bamako ACI</span><span class="h-eq5">14 éq.</span><span class="h-al5 go">1</span></div>
+          <div class="hotel-row"><div class="h-dot" style="background:var(--gold)"></div><span class="h-name5">Dunia Loumbila</span><span class="h-eq5">9 éq.</span><span class="h-al5 gn">0</span></div>
+          <div class="hotel-row"><div class="h-dot" style="background:var(--border)"></div><span class="h-name5" style="color:var(--muted)">Conakry</span><span class="h-eq5" style="color:var(--border)">—</span><span class="h-al5" style="color:var(--border)">—</span></div>
+          <div class="hotel-row"><div class="h-dot" style="background:var(--border)"></div><span class="h-name5" style="color:var(--muted)">Niamey</span><span class="h-eq5" style="color:var(--border)">—</span><span class="h-al5" style="color:var(--border)">—</span></div>
+        </div>
+      </div>
+      <div class="frame-label">Vue d'ensemble groupe</div>
+      <div class="frame-sub">Toutes alertes · Tous sites · 1 écran</div>
+    </div>
+
+    <!-- FRAME DT 2 — Fiabilité consolidée -->
+    <div style="display:flex;flex-direction:column">
+      <div class="browser" style="flex:1">
+        <div class="bbar">
+          <div class="bd" style="background:#E24B4A"></div>
+          <div class="bd" style="background:#C49830"></div>
+          <div class="bd" style="background:#2A7D55"></div>
+          <span class="burl">dashboard.gentrack.app · Fiabilité groupe</span>
+        </div>
+        <div class="bscreen">
+          <div class="dt-title" style="margin-bottom:4px">Fiabilité Groupe · 90 jours</div>
+          <div class="dt2-kpis">
+            <div class="dt2k"><div class="dt2k-n go">12</div><div class="dt2k-l">Pannes résolues</div></div>
+            <div class="dt2k"><div class="dt2k-n gn">2.4j</div><div class="dt2k-l">MTTR moyen groupe</div></div>
+            <div class="dt2k"><div class="dt2k-n">9</div><div class="dt2k-l">Hôtels actifs</div></div>
+            <div class="dt2k"><div class="dt2k-n">112</div><div class="dt2k-l">Équipements</div></div>
+          </div>
+          <div class="dt2-tbl-h">
+            <div class="dt2-th">Hôtel</div><div class="dt2-th">Pannes</div><div class="dt2-th">MTTR</div><div class="dt2-th">Éq.</div>
+          </div>
+          <div class="dt2-row"><div class="dt2-td">Dakar</div><div class="dt2-td go">4</div><div class="dt2-td">2.7j</div><div class="dt2-td">14</div></div>
+          <div class="dt2-row"><div class="dt2-td">Abidjan</div><div class="dt2-td go">2</div><div class="dt2-td gn">1.9j</div><div class="dt2-td">18</div></div>
+          <div class="dt2-row"><div class="dt2-td">Bamako</div><div class="dt2-td go">1</div><div class="dt2-td gn">1.2j</div><div class="dt2-td">12</div></div>
+          <div class="dt2-row"><div class="dt2-td">Cotonou</div><div class="dt2-td go">2</div><div class="dt2-td">3.1j</div><div class="dt2-td">10</div></div>
+          <div class="dt2-row"><div class="dt2-td">Ouaga.</div><div class="dt2-td gn">0</div><div class="dt2-td gn">—</div><div class="dt2-td">16</div></div>
+          <div class="dt2-row"><div class="dt2-td">Nouakch.</div><div class="dt2-td go">1</div><div class="dt2-td">2.0j</div><div class="dt2-td">11</div></div>
+          <div class="dt2-row"><div class="dt2-td">Bissau</div><div class="dt2-td go">1</div><div class="dt2-td">1.5j</div><div class="dt2-td">8</div></div>
+          <div class="dt2-row"><div class="dt2-td">Bmk ACI</div><div class="dt2-td go">1</div><div class="dt2-td">2.8j</div><div class="dt2-td">14</div></div>
+          <div class="dt2-row"><div class="dt2-td">Loumbila</div><div class="dt2-td gn">0</div><div class="dt2-td gn">—</div><div class="dt2-td">9</div></div>
+        </div>
+      </div>
+      <div class="frame-label">Fiabilité consolidée</div>
+      <div class="frame-sub">MTBF &amp; MTTR par hôtel · Vue groupe</div>
+    </div>
+
+    <!-- FRAME DT 3 — Énergie inter-sites -->
+    <div style="display:flex;flex-direction:column">
+      <div class="browser" style="flex:1">
+        <div class="bbar">
+          <div class="bd" style="background:#E24B4A"></div>
+          <div class="bd" style="background:#C49830"></div>
+          <div class="bd" style="background:#2A7D55"></div>
+          <span class="burl">dashboard.gentrack.app · Énergie groupe</span>
+        </div>
+        <div class="bscreen">
+          <div class="dt-title" style="margin-bottom:4px">Énergie Groupe · Oct. 2026</div>
+          <div class="dt3-kpis">
+            <div class="dt3k"><div class="dt3k-n gn">317 M</div><div class="dt3k-l">FCFA énergie groupe</div></div>
+            <div class="dt3k"><div class="dt3k-n gn">−4.8%</div><div class="dt3k-l">vs budget groupe</div></div>
+            <div class="dt3k"><div class="dt3k-n">9</div><div class="dt3k-l">Sites actifs</div></div>
+            <div class="dt3k"><div class="dt3k-n go">2</div><div class="dt3k-l">Dépassements</div></div>
+          </div>
+          <div class="dt3-cmp">
+            <div class="dt3-cmp-h">Coût énergie / hôtel (M FCFA)</div>
+            <div class="dt3-site-row"><span class="dt3-site-name">Abidjan</span><div class="dt3-bar-wrap"><div class="dt3-bar" style="width:100%;background:var(--red)"></div></div><span class="dt3-val">48.2</span></div>
+            <div class="dt3-site-row"><span class="dt3-site-name">Ouaga.</span><div class="dt3-bar-wrap"><div class="dt3-bar" style="width:85%;background:var(--gold)"></div></div><span class="dt3-val">41.0</span></div>
+            <div class="dt3-site-row"><span class="dt3-site-name">Bamako</span><div class="dt3-bar-wrap"><div class="dt3-bar" style="width:78%;background:var(--gold)"></div></div><span class="dt3-val">37.6</span></div>
+            <div class="dt3-site-row"><span class="dt3-site-name" style="font-weight:600">Dakar ✓</span><div class="dt3-bar-wrap"><div class="dt3-bar" style="width:73%;background:var(--green)"></div></div><span class="dt3-val" style="font-weight:600">35.4</span></div>
+            <div class="dt3-site-row"><span class="dt3-site-name">Cotonou</span><div class="dt3-bar-wrap"><div class="dt3-bar" style="width:60%;background:var(--green)"></div></div><span class="dt3-val">29.1</span></div>
+            <div class="dt3-site-row"><span class="dt3-site-name">Bmk ACI</span><div class="dt3-bar-wrap"><div class="dt3-bar" style="width:68%;background:var(--green)"></div></div><span class="dt3-val">32.8</span></div>
+            <div class="dt3-site-row"><span class="dt3-site-name">Nouakch.</span><div class="dt3-bar-wrap"><div class="dt3-bar" style="width:46%;background:var(--green)"></div></div><span class="dt3-val">22.4</span></div>
+            <div class="dt3-site-row"><span class="dt3-site-name">Bissau</span><div class="dt3-bar-wrap"><div class="dt3-bar" style="width:38%;background:var(--green)"></div></div><span class="dt3-val">18.3</span></div>
+            <div class="dt3-site-row"><span class="dt3-site-name">Loumbila</span><div class="dt3-bar-wrap"><div class="dt3-bar" style="width:42%;background:var(--green)"></div></div><span class="dt3-val">20.1</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="frame-label">Énergie &amp; budget inter-sites</div>
+      <div class="frame-sub">Comparatif automatique · Chaque mois</div>
+    </div>
+
+  </div>
+
+  <div style="background:var(--gold-bg);border:1px solid var(--gold-border);border-radius:7px;padding:8px 16px;text-align:center;margin-top:10px">
+    <div style="font-size:11.5px;font-weight:700;color:var(--text)">M. Boussaïd voit ça chaque matin — dès que les 11 hôtels sont en ligne.</div>
+    <div style="font-size:9.5px;color:var(--amber);margin-top:2px">Zéro consolidation manuelle · Zéro rapport PDF · Données en temps réel</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 4 — SCÉNARIOS
+══════════════════════════════════════════════════════ -->
+<div class="slide" id="s4">
+  <div class="top">
+    <div><div class="logo-text">Gen<em>Track</em></div><div class="slide-label">Positionnement &amp; scénarios</div></div>
+    <div class="meet-info">18 novembre 2026<br>Groupe Azalaï · Confidentiel</div>
+  </div>
+  <div class="hero">
+    <h1><strong>Deux façons de travailler avec GenTrack.</strong></h1>
+    <div class="sub">La donnée terrain construit la connaissance de vos équipements — rondes, relevés, historique, interventions. Deux configurations possibles.</div>
+  </div>
+  <div class="sc-grid">
+    <div class="sc pref">
+      <div class="sc-badge a">Scénario A — Remplacement</div>
+      <div class="sc-title">GenTrack remplace votre prestataire actuel</div>
+      <div class="sc-sub">GenTrack prend en charge l'intégralité du suivi et de la maintenance. Éventuel audit de certification conservé.</div>
+      <div class="sc-items">
+        <div class="si"><div class="si-dot gold"></div><div class="si-text">Rondes quotidiennes via WhatsApp — 365 jours/an</div></div>
+        <div class="si"><div class="si-dot gold"></div><div class="si-text">Plans de maintenance préventive — compteur horaire ou calendrier</div></div>
+        <div class="si"><div class="si-dot gold"></div><div class="si-text">Alertes automatiques sur seuils — avant la panne</div></div>
+        <div class="si"><div class="si-dot gold"></div><div class="si-text">Relevés énergie &amp; suivi budget par hôtel</div></div>
+        <div class="si"><div class="si-dot gold"></div><div class="si-text">Dashboard groupe + rapport mensuel PDF direction</div></div>
+      </div>
+    </div>
+    <div class="sc">
+      <div class="sc-badge b">Scénario B — Complémentarité</div>
+      <div class="sc-title">GenTrack + votre GMAO existant</div>
+      <div class="sc-sub">GenTrack apporte la donnée terrain. Votre GMAO garde les certifications et les travaux lourds.</div>
+      <div class="sc-divider"></div>
+      <div class="split-row">
+        <div class="split-pill gold-pill">
+          <div class="split-pill-label gold">GenTrack · Données</div>
+          <div class="split-pill-items">Rondes &amp; relevés quotidiens<br>Plans de maintenance préventive<br>Alertes &amp; interventions<br>Énergie &amp; budget</div>
+        </div>
+        <div class="split-pill">
+          <div class="split-pill-label">GMAO / Partenaire</div>
+          <div class="split-pill-items">Certifications &amp; audits<br>Planification travaux lourds<br>Partenariats prestataires</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="nuance" style="margin-bottom:12px">
+    <div class="nuance-text">La vraie différence : <strong>la donnée produit la maintenance.</strong> Vos techniciens relèvent les compteurs via WhatsApp chaque matin. GenTrack sait quand la prochaine vidange est due — pas selon un calendrier théorique, selon les heures réelles de fonctionnement.</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 5 — DÉPLOIEMENT + OFFRE
+══════════════════════════════════════════════════════ -->
+<div class="slide" id="s5">
+  <div class="top">
+    <div><div class="logo-text">Gen<em>Track</em></div><div class="slide-label">Déploiement &amp; offre commerciale</div></div>
+    <div class="meet-info">18 novembre 2026<br>Groupe Azalaï · Confidentiel</div>
+  </div>
+  <div class="hero">
+    <h1><strong>Dakar tourne depuis 5 mois.</strong> On propose de déployer sur le groupe.</h1>
+    <div class="sub">Deux volets distincts · Abonnement annuel récurrent + programme déploiement terrain optionnel · Dakar déjà opérationnel</div>
+  </div>
+  <div class="volets">
+    <div class="volet va">
+      <div class="vl-badge a">Volet 1 — Abonnement annuel (récurrent)</div>
+      <div class="vl-title">Accès GenTrack · 11 établissements</div>
+      <div class="vl-desc">Plateforme complète — rondes, maintenance, signalements, énergie, dashboard groupe, rapports PDF. Tous les modules. Tous les hôtels.</div>
+      <div class="vl-price">200 000 FCFA</div>
+      <div class="vl-price-unit">par hôtel · par mois</div>
+      <div class="vl-total">= 2 200 000 FCFA / mois → <span style="color:var(--gold)">26 400 000 FCFA / an</span></div>
+      <div class="vl-pills">
+        <span class="vl-pill">✓ Tous modules inclus</span>
+        <span class="vl-pill">✓ Dashboard groupe</span>
+        <span class="vl-pill">✓ Rapport mensuel PDF</span>
+        <span class="vl-pill">✓ Support WhatsApp</span>
+        <span class="vl-pill">✓ Zéro installation IT</span>
+      </div>
+    </div>
+    <div class="volet vb">
+      <div class="vl-badge b">Volet 2 — Déploiement terrain (optionnel, ponctuel)</div>
+      <div class="vl-title">Paramétrage · Formation · Mise en production</div>
+      <div class="vl-desc">Notre équipe intervient dans chaque établissement — audit des installations, cartographie équipements, configuration GenTrack, formation techniciens &amp; RT, première ronde validée sur place.</div>
+      <div class="vl-price">1 000 000 FCFA</div>
+      <div class="vl-price-unit">par hôtel · déplacements &amp; hébergement inclus</div>
+      <div class="vl-total">= <span style="color:var(--green)">10 000 000 FCFA</span> pour les 10 hôtels restants</div>
+      <div class="vl-modal">Modalités · 50% à la commande · 50% fin du programme · Calendrier établi conjointement · Déc. 2026 → Mars 2027</div>
+    </div>
+  </div>
+  <div class="synth-box">
+    <div class="synth-line"><span class="synth-lbl">Abonnement annuel GenTrack · 11 hôtels · 12 mois</span><span class="synth-val">26 400 000 FCFA</span></div>
+    <div class="synth-line"><span class="synth-lbl">Déploiement terrain · 10 hôtels · prestation ponctuelle</span><span class="synth-val">10 000 000 FCFA</span></div>
+    <div class="synth-total"><span class="synth-tl">Total première année</span><span class="synth-tv">36 400 000 FCFA</span></div>
+  </div>
+  <div style="font-size:10px;color:var(--muted);text-align:center;margin-top:8px">11 hôtels · 7 pays · Dakar déjà opérationnel · GenTrack est prêt dès aujourd'hui</div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     SLIDE 6 — PLAN DE DÉPLOIEMENT GROUPE
+══════════════════════════════════════════════════════ -->
+<div class="slide" id="s6">
+  <div class="top">
+    <div><div class="logo-text">Gen<em>Track</em></div><div class="slide-label">Plan de déploiement groupe</div></div>
+    <div class="meet-info">18 novembre 2026<br>Groupe Azalaï · Confidentiel</div>
+  </div>
+  <div class="hero">
+    <h1><strong>Dakar tourne depuis 5 mois.</strong> On propose de dupliquer.</h1>
+    <div class="sub">Déploiement progressif · Tarif groupe dégressif · 30 min de configuration par hôtel</div>
+  </div>
+  <div class="dep-layout">
+    <div style="display:flex;flex-direction:column">
+      <div class="col-title">Plan de déploiement progressif</div>
+      <div class="steps">
+        <div class="step"><div class="step-num done">✓</div><div><div class="step-date done">Terminé · Azalaï Dakar</div><div class="step-title">Étape 1 — Pilote validé</div><div class="step-sub">5 mois en production · 0 jour manqué · 100% conformité rondes</div></div></div>
+        <div class="step"><div class="step-num">2</div><div><div class="step-date">Déc. 2026 → Jan. 2027</div><div class="step-title">Étape 2 — Zone proche</div><div class="step-sub">Mauritanie · Guinée-Bissau</div></div></div>
+        <div class="step"><div class="step-num">3</div><div><div class="step-date">Jan. → Fév. 2027</div><div class="step-title">Étape 3 — Extension</div><div class="step-sub">Abidjan · Cotonou · Bamako</div></div></div>
+        <div class="step"><div class="step-num">4</div><div><div class="step-date">Mars 2027</div><div class="step-title">Étape 4 — Standard groupe</div><div class="step-sub">11 hôtels · 7 pays · Vue groupe en temps réel</div></div></div>
+      </div>
+      <div class="col-title" style="margin-top:14px">Hôtels du groupe</div>
+      <div class="hotels-g">
+        <div class="hotel on"><div class="hdot on"></div><div><div class="hname">Azalaï Dakar</div><div class="hcity">Actif · Pilote</div></div></div>
+        <div class="hotel"><div class="hdot off"></div><div><div class="hname off">Azalaï Abidjan</div><div class="hcity off">Côte d'Ivoire</div></div></div>
+        <div class="hotel"><div class="hdot off"></div><div><div class="hname off">Azalaï Bamako Bourse</div><div class="hcity off">Mali</div></div></div>
+        <div class="hotel"><div class="hdot off"></div><div><div class="hname off">Dunia Bamako ACI</div><div class="hcity off">Mali</div></div></div>
+        <div class="hotel"><div class="hdot off"></div><div><div class="hname off">Azalaï Cotonou</div><div class="hcity off">Bénin</div></div></div>
+        <div class="hotel"><div class="hdot off"></div><div><div class="hname off">Azalaï Ouagadougou</div><div class="hcity off">Burkina Faso</div></div></div>
+        <div class="hotel"><div class="hdot off"></div><div><div class="hname off">Dunia Loumbila</div><div class="hcity off">Burkina Faso</div></div></div>
+        <div class="hotel"><div class="hdot off"></div><div><div class="hname off">Dunia Bissau</div><div class="hcity off">Guinée-Bissau</div></div></div>
+        <div class="hotel"><div class="hdot off"></div><div><div class="hname off">Azalaï Nouakchott</div><div class="hcity off">Mauritanie</div></div></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column">
+      <div class="col-title">Tarif groupe — déploiement progressif</div>
+      <div class="price-box" style="flex:1;display:flex;flex-direction:column">
+        <table class="price-tbl">
+          <thead>
+            <tr>
+              <th style="text-align:left">Palier</th>
+              <th style="text-align:right">/ hôtel / mois</th>
+              <th style="text-align:right">/ an par hôtel</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1 à 3 hôtels</td><td class="val">350 000 FCFA</td><td class="ann">4.2M FCFA</td></tr>
+            <tr><td>3 à 5 hôtels</td><td class="val">300 000 FCFA</td><td class="ann">3.6M FCFA</td></tr>
+            <tr><td>5 à 11 hôtels</td><td class="val">200 000 FCFA</td><td class="ann">2.4M FCFA</td></tr>
+            <tr class="hl"><td>Groupe complet · 11 hôtels</td><td class="val">2 200 000 FCFA/mois</td><td class="ann">26.4M FCFA/an</td></tr>
+          </tbody>
+        </table>
+        <div class="price-incl">
+          <span class="pill">✓ Paramétrage inclus</span>
+          <span class="pill">✓ Cartographie équipements</span>
+          <span class="pill">✓ Formation incluse</span>
+          <span class="pill">✓ Zéro installation IT</span>
+          <span class="pill">✓ Zéro migration</span>
+          <span class="pill">✓ Support WhatsApp</span>
+          <span class="pill">✓ Rapport mensuel PDF</span>
+          <span class="pill">✓ Dashboard groupe</span>
+        </div>
+        <div class="cta" style="margin-top:auto">
+          <div class="cta-t">Dakar tourne. On démarre quand vous êtes prêts.</div>
+          <div class="cta-s">Phase 2 · Décembre 2026 · 30 min de configuration par hôtel</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /deck -->
+
+<div class="dots">
+  <div class="dot on" id="d1"></div>
+  <div class="dot" id="d2"></div>
+  <div class="dot" id="d3"></div>
+  <div class="dot" id="d4"></div>
+  <div class="dot" id="d5"></div>
+  <div class="dot" id="d6"></div>
+</div>
+<div class="counter" id="ctr">1 / 6</div>
+<div class="nav">
+  <button id="prev" disabled onclick="go(-1)">← Précédent</button>
+  <button id="next" onclick="go(1)">Suivant →</button>
+</div>
+<script>
+var c=1,t=6;
+function go(d){
+  document.getElementById('s'+c).classList.remove('active');
+  document.getElementById('d'+c).classList.remove('on');
+  c=Math.max(1,Math.min(t,c+d));
+  document.getElementById('s'+c).classList.add('active');
+  document.getElementById('d'+c).classList.add('on');
+  document.getElementById('ctr').textContent=c+' / '+t;
+  document.getElementById('prev').disabled=c===1;
+  document.getElementById('next').disabled=c===t;
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='ArrowRight'||e.key==='ArrowDown')go(1);
+  if(e.key==='ArrowLeft'||e.key==='ArrowUp')go(-1);
+});
+</script>
+</body>
+</html>

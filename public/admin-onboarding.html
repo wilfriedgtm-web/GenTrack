@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GenTrack — Admin Onboarding</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:#f5f5f3;color:#1a1a1a;min-height:100vh}
+  .topbar{background:#1a1a1a;color:#fff;padding:14px 24px;display:flex;align-items:center;gap:12px}
+  .topbar h1{font-size:16px;font-weight:600;letter-spacing:-0.3px}
+  .topbar .badge{background:#f5f5f3;color:#1a1a1a;font-size:11px;padding:3px 8px;border-radius:20px;font-weight:600}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px 16px}
+  .toolbar{display:flex;gap:10px;margin-bottom:20px;align-items:center}
+  .filter-btn{padding:7px 14px;border-radius:6px;border:1px solid #ddd;background:#fff;font-size:13px;cursor:pointer;font-weight:500;transition:all .15s}
+  .filter-btn.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+  .card{background:#fff;border-radius:12px;border:1px solid #e5e5e3;margin-bottom:12px;overflow:hidden}
+  .card-header{padding:16px 20px;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none}
+  .card-header:hover{background:#fafaf9}
+  .badge-status{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600}
+  .badge-status.pending{background:#fff8e1;color:#f59e0b}
+  .badge-status.validated{background:#e8f5e9;color:#22c55e}
+  .badge-status.rejected{background:#fce4ec;color:#ef4444}
+  .card-title{font-size:15px;font-weight:600;flex:1}
+  .card-meta{font-size:12px;color:#888}
+  .chevron{font-size:16px;color:#aaa;transition:transform .2s}
+  .chevron.open{transform:rotate(90deg)}
+  .card-body{display:none;padding:0 20px 20px;border-top:1px solid #f0f0ee}
+  .card-body.open{display:block}
+  .section{margin-top:16px}
+  .section h3{font-size:12px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+  .info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+  .info-item{background:#f9f9f8;border-radius:8px;padding:10px 12px}
+  .info-item label{display:block;font-size:11px;color:#999;margin-bottom:2px}
+  .info-item span{font-size:13px;font-weight:500}
+  .eq-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+  .eq-table th{text-align:left;padding:7px 10px;background:#f5f5f3;font-weight:600;font-size:11px;color:#666;border-bottom:1px solid #e5e5e3}
+  .eq-table td{padding:7px 10px;border-bottom:1px solid #f0f0ee}
+  .eq-table tr:last-child td{border-bottom:none}
+  .actions{display:flex;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid #f0f0ee}
+  .btn{padding:10px 20px;border-radius:8px;border:none;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn-validate{background:#1a1a1a;color:#fff}
+  .btn-reject{background:#fff;color:#ef4444;border:1px solid #ef4444}
+  .btn-dl{background:#fff;color:#1a1a1a;border:1px solid #ddd}
+  .btn:hover:not(:disabled){opacity:.8}
+  .empty{text-align:center;padding:60px 20px;color:#aaa;font-size:15px}
+  .tag{display:inline-block;background:#f0f0ee;color:#666;font-size:11px;padding:2px 8px;border-radius:4px;margin:2px}
+  .toast{position:fixed;bottom:24px;right:24px;background:#1a1a1a;color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9999}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+
+<div class="topbar">
+  <span style="font-size:20px">⚙️</span>
+  <h1>Admin Onboarding</h1>
+  <span class="badge" id="pending-count">0 en attente</span>
+  <span style="flex:1"></span>
+  <span style="font-size:12px;color:#888">GenTrack</span>
+</div>
+
+<div class="wrap">
+  <div class="toolbar">
+    <button class="filter-btn active" onclick="setFilter('pending')">En attente</button>
+    <button class="filter-btn" onclick="setFilter('validated')">Validés</button>
+    <button class="filter-btn" onclick="setFilter('rejected')">Rejetés</button>
+    <button class="filter-btn" onclick="setFilter('all')">Tous</button>
+    <button class="filter-btn" onclick="loadRows()" style="margin-left:auto">↻ Actualiser</button>
+  </div>
+  <div id="list"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SB_URL = 'https://zbpoxjlkqxnqjzxohasq.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+const SB_HDR = {'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'};
+var currentFilter = 'pending';
+var allRows = [];
+
+window.addEventListener('DOMContentLoaded', function(){
+  loadRows();
+  var params = new URLSearchParams(location.search);
+  if(params.get('id')) setTimeout(function(){ openCard(params.get('id')); }, 600);
+});
+
+function toast(msg, ok){
+  var el=document.getElementById('toast');
+  el.textContent=msg;
+  el.style.background=ok===false?'#ef4444':'#1a1a1a';
+  el.classList.add('show');
+  setTimeout(function(){el.classList.remove('show');},3000);
+}
+
+async function loadRows(){
+  var res = await fetch(SB_URL+'/rest/v1/onboarding_pending?select=*&order=created_at.desc', {headers:SB_HDR});
+  allRows = await res.json();
+  var pending = allRows.filter(function(r){return r.status==='pending';}).length;
+  document.getElementById('pending-count').textContent = pending+' en attente';
+  renderList();
+}
+
+function setFilter(f){
+  currentFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(function(b,i){
+    b.classList.toggle('active', ['pending','validated','rejected','all'][i]===f);
+  });
+  renderList();
+}
+
+function renderList(){
+  var rows = currentFilter==='all' ? allRows : allRows.filter(function(r){return r.status===currentFilter;});
+  var el = document.getElementById('list');
+  if(!rows.length){
+    el.innerHTML='<div class="empty">Aucune demande '+currentFilter+'.</div>';
+    return;
+  }
+  el.innerHTML = rows.map(function(r){ return cardHtml(r); }).join('');
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function cardHtml(r){
+  var S = r.payload || {};
+  var dt = new Date(r.created_at).toLocaleString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  var equipsHtml = (S.equips||[]).map(function(eq){
+    var seuil = eq.type_mesure==='instantane'
+      ? (eq.seuil_min||'?')+' → '+(eq.seuil_max||'?')+' '+(eq.seuil_unite||'')
+      : eq.type_mesure==='index'
+      ? 'Alerte '+(eq.seuil||'?')+(eq.seuil_unite||'')+', interval '+(eq.seuil_intervalle||'?')+(eq.seuil_unite||'')
+      : 'État ON/OFF';
+    return '<tr><td>'+esc(eq.nom)+'</td><td style="text-align:center">'+esc(eq.qty||1)+'</td><td>'+esc(eq.marque||'-')+'</td><td>'+esc(eq.type_mesure||'-')+'</td><td>'+esc(seuil)+'</td></tr>';
+  }).join('');
+  var zonesHtml = (S.zones||[]).map(function(z){
+    return '<span class="tag">'+esc(z.label)+' ('+esc((z.inventaire||[]).length)+')</span>';
+  }).join('');
+  var equipeHtml = (S.equipe||[]).map(function(m){
+    return '<div class="info-item"><label>'+esc(m.role||'')+'</label><span>'+esc(m.nom)+'</span><br><small style="color:#888">📱 '+esc(m.tel||'-')+'</small></div>';
+  }).join('');
+  var fluidesHtml = (S.fluides_actif && S.fluides&&S.fluides.length)
+    ? (S.fluides||[]).map(function(f){return '<span class="tag">'+esc(f.nom)+' ('+esc(f.unite)+')</span>';}).join('')
+    : '<span style="color:#aaa;font-size:13px">Non activé</span>';
+
+  return `
+<div class="card" id="card-${r.id}">
+  <div class="card-header" onclick="toggleCard('${r.id}')">
+    <span class="badge-status ${r.status}">${r.status==='pending'?'En attente':r.status==='validated'?'✓ Validé':'✗ Rejeté'}</span>
+    <div class="card-title">${esc(r.site_nom)} — ${esc(r.site_ville)}</div>
+    <div class="card-meta">${esc(r.contact_nom)} · ${r.nb_equips} équip. · ${r.nb_zones} zones · ${dt}</div>
+    <span class="chevron" id="chev-${r.id}">›</span>
+  </div>
+  <div class="card-body" id="body-${r.id}">
+
+    <div class="section">
+      <h3>Établissement</h3>
+      <div class="info-grid">
+        <div class="info-item"><label>Nom</label><span>${esc(S.site?.nom)}</span></div>
+        <div class="info-item"><label>Ville / Pays</label><span>${esc(S.site?.ville)}, ${esc(S.site?.pays)}</span></div>
+        <div class="info-item"><label>Chambres</label><span>${esc(S.site?.nb_chambres)}</span></div>
+        <div class="info-item"><label>Classement</label><span>${esc(S.site?.classement||'-')}</span></div>
+        <div class="info-item"><label>Bâtiments</label><span>${esc((S.batiments||[]).length)}</span></div>
+        <div class="info-item"><label>Timezone</label><span>${esc(S.site?.timezone||'-')}</span></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>Contact principal</h3>
+      <div class="info-grid">
+        <div class="info-item"><label>Nom & rôle</label><span>${esc(S.contact?.nom)} (${esc(S.contact?.role)})</span></div>
+        <div class="info-item"><label>WhatsApp</label><span>📱 ${esc(S.contact?.tel||'-')}</span></div>
+        <div class="info-item"><label>Email</label><span>✉️ ${esc(S.contact?.email||'-')}</span></div>
+      </div>
+    </div>
+
+    ${equipeHtml ? `<div class="section"><h3>Équipe (${(S.equipe||[]).length})</h3><div class="info-grid">${equipeHtml}</div></div>` : ''}
+
+    <div class="section">
+      <h3>Zones (${(S.zones||[]).length})</h3>
+      <div>${zonesHtml || '<span style="color:#aaa;font-size:13px">Aucune zone</span>'}</div>
+    </div>
+
+    <div class="section">
+      <h3>Équipements critiques (${(S.equips||[]).length})</h3>
+      ${equipsHtml ? `<table class="eq-table"><thead><tr><th>Équipement</th><th>Qté</th><th>Marque</th><th>Type mesure</th><th>Seuil</th></tr></thead><tbody>${equipsHtml}</tbody></table>` : '<span style="color:#aaa;font-size:13px">Aucun équipement</span>'}
+    </div>
+
+    <div class="section">
+      <h3>Fluides / Énergie</h3>
+      <div>${fluidesHtml}</div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-dl" onclick="downloadFiche('${r.id}')">📄 Télécharger la fiche</button>
+      ${r.status==='pending' ? `
+      <button class="btn btn-validate" id="btn-val-${r.id}" onclick="doAction('${r.id}','validate')">✓ Valider et importer</button>
+      <button class="btn btn-reject"   id="btn-rej-${r.id}" onclick="doAction('${r.id}','reject')">✗ Rejeter</button>
+      ` : `<span style="font-size:13px;color:#888;align-self:center">Traité — <strong>${r.status}</strong></span>`}
+    </div>
+  </div>
+</div>`;
+}
+
+function toggleCard(id){
+  var body = document.getElementById('body-'+id);
+  var chev = document.getElementById('chev-'+id);
+  var open = body.classList.toggle('open');
+  chev.classList.toggle('open', open);
+}
+
+function openCard(id){
+  var body = document.getElementById('body-'+id);
+  var chev = document.getElementById('chev-'+id);
+  if(body && !body.classList.contains('open')){
+    body.classList.add('open');
+    chev.classList.add('open');
+    document.getElementById('card-'+id)?.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+}
+
+function downloadFiche(id){
+  var r = allRows.find(function(x){return x.id===id;});
+  if(!r) return;
+  var S = r.payload || {};
+  var dt = new Date(r.created_at).toLocaleString('fr-FR',{day:'2-digit',month:'long',year:'numeric'});
+
+  var equipsRows = (S.equips||[]).map(function(eq,i){
+    var seuil = eq.type_mesure==='instantane'
+      ? (eq.seuil_min||'?')+' → '+(eq.seuil_max||'?')+' '+(eq.seuil_unite||'')
+      : eq.type_mesure==='index'
+      ? 'Alerte '+(eq.seuil||'?')+(eq.seuil_unite||'')+', interval '+(eq.seuil_intervalle||'?')+(eq.seuil_unite||'')
+      : 'État ON/OFF';
+    return '<tr><td>'+(i+1)+'</td><td>'+esc(eq.nom)+'</td><td style="text-align:center">'+esc(eq.qty||1)+'</td><td>'+esc(eq.marque||'-')+'</td><td>'+esc(eq.type_mesure||'-')+'</td><td>'+esc(seuil)+'</td><td>'+esc(eq.freq||'journalier')+'</td></tr>';
+  }).join('');
+
+  var zonesRows = (S.zones||[]).map(function(z){
+    return '<tr><td>'+esc(z.label)+'</td><td>'+esc(z.cat||'-')+'</td><td>'+esc((z.inventaire||[]).join(', ')||'-')+'</td></tr>';
+  }).join('');
+
+  var equipeRows = [{nom:S.contact?.nom,role:S.contact?.role,tel:S.contact?.tel,email:S.contact?.email}]
+    .concat(S.equipe||[])
+    .filter(function(m){return m&&m.nom;})
+    .map(function(m){
+      return '<tr><td>'+esc(m.nom)+'</td><td>'+esc(m.role||'-')+'</td><td>'+esc(m.tel||'-')+'</td><td>'+esc(m.email||'-')+'</td></tr>';
+    }).join('');
+
+  var fluidesRows = (S.fluides_actif&&S.fluides&&S.fluides.length)
+    ? (S.fluides||[]).map(function(f){return '<tr><td>'+esc(f.nom)+'</td><td>'+esc(f.unite)+'</td><td>'+esc(f.type_valeur||'-')+'</td><td>'+esc(f.tarif||0)+' '+esc(f.devise||'XOF')+'</td></tr>';}).join('')
+    : '<tr><td colspan="4" style="color:#aaa">Non activé</td></tr>';
+
+  var batRows = (S.batiments||[]).map(function(b){
+    return '<tr><td>'+esc(b.nom)+'</td><td style="text-align:center">'+esc(b.nb_etages)+'</td><td style="text-align:center">'+esc(b.app_debut)+' → '+esc(b.app_fin)+'</td></tr>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
+    +'<title>Fiche onboarding — '+esc(S.site?.nom)+'</title>'
+    +'<style>'
+    +'body{font-family:Inter,Arial,sans-serif;font-size:13px;color:#1a1a1a;padding:30px;max-width:900px;margin:0 auto}'
+    +'h1{font-size:20px;margin-bottom:4px}h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#666;margin:20px 0 8px;border-bottom:1px solid #e5e5e3;padding-bottom:4px}'
+    +'.meta{font-size:12px;color:#888;margin-bottom:20px}'
+    +'.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}'
+    +'.item{background:#f9f9f8;border-radius:6px;padding:8px 10px}'
+    +'.item label{display:block;font-size:10px;color:#999;margin-bottom:2px}'
+    +'.item span{font-weight:500}'
+    +'table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px}'
+    +'th{background:#f5f5f3;text-align:left;padding:6px 8px;font-weight:600;color:#555;border-bottom:2px solid #e5e5e3}'
+    +'td{padding:6px 8px;border-bottom:1px solid #f0f0ee}'
+    +'.badge{display:inline-block;background:#1a1a1a;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px}'
+    +'@media print{body{padding:0}}'
+    +'</style></head><body>'
+    +'<h1>🏨 '+esc(S.site?.nom||'—')+'</h1>'
+    +'<div class="meta">Fiche onboarding GenTrack — '+dt+' &nbsp;|&nbsp; ID: '+esc(r.id)+'</div>'
+
+    +'<h2>Établissement</h2>'
+    +'<div class="grid">'
+    +'<div class="item"><label>Nom</label><span>'+esc(S.site?.nom||'-')+'</span></div>'
+    +'<div class="item"><label>Ville / Pays</label><span>'+esc(S.site?.ville||'-')+', '+esc(S.site?.pays||'-')+'</span></div>'
+    +'<div class="item"><label>Nb chambres</label><span>'+esc(S.site?.nb_chambres||'-')+'</span></div>'
+    +'<div class="item"><label>Classement</label><span>'+esc(S.site?.classement||'-')+'</span></div>'
+    +'<div class="item"><label>Timezone</label><span>'+esc(S.site?.timezone||'-')+'</span></div>'
+    +'</div>'
+
+    +'<h2>Bâtiments ('+esc((S.batiments||[]).length)+')</h2>'
+    +'<table><thead><tr><th>Nom</th><th>Étages</th><th>Appartements</th></tr></thead><tbody>'+batRows+'</tbody></table>'
+
+    +'<h2>Équipe & contacts</h2>'
+    +'<table><thead><tr><th>Nom</th><th>Rôle</th><th>WhatsApp</th><th>Email</th></tr></thead><tbody>'+equipeRows+'</tbody></table>'
+
+    +'<h2>Zones ('+esc((S.zones||[]).length)+')</h2>'
+    +'<table><thead><tr><th>Zone</th><th>Catégorie</th><th>Inventaire</th></tr></thead><tbody>'+zonesRows+'</tbody></table>'
+
+    +'<h2>Équipements critiques ('+esc((S.equips||[]).length)+')</h2>'
+    +'<table><thead><tr><th>#</th><th>Équipement</th><th>Qté</th><th>Marque</th><th>Type mesure</th><th>Seuil</th><th>Fréquence</th></tr></thead><tbody>'+equipsRows+'</tbody></table>'
+
+    +'<h2>Fluides / Énergie</h2>'
+    +'<table><thead><tr><th>Fluide</th><th>Unité</th><th>Type valeur</th><th>Tarif</th></tr></thead><tbody>'+fluidesRows+'</tbody></table>'
+
+    +'<script>window.onload=function(){window.print();}<\/script>'
+    +'</body></html>';
+
+  var w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
+async function doAction(id, action){
+  var btnV = document.getElementById('btn-val-'+id);
+  var btnR = document.getElementById('btn-rej-'+id);
+  if(btnV) btnV.disabled=true;
+  if(btnR) btnR.disabled=true;
+  if(action==='validate' && btnV) btnV.textContent='⏳ Import en cours…';
+
+  try {
+    var res = await fetch(SB_URL+'/functions/v1/import-onboarding', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_KEY},
+      body: JSON.stringify({id, action})
+    });
+    var data = await res.json();
+    if(!res.ok) throw new Error(data.error||'Erreur serveur');
+
+    if(action==='validate'){
+      toast('✅ Site importé avec succès dans GenTrack !', true);
+    } else {
+      toast('Demande rejetée.');
+    }
+    await loadRows();
+  } catch(e){
+    toast('Erreur : '+e.message, false);
+    if(btnV){ btnV.disabled=false; btnV.textContent='✓ Valider et importer'; }
+    if(btnR){ btnR.disabled=false; }
+  }
+}
+</script>
+</body>
+</html>

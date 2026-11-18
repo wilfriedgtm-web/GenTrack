@@ -1,7 +1,7 @@
 // supabase/functions/notify-signalement/index.ts
-// GenTrack — Notification signalement v4
+// GenTrack — Notification signalement v5
 // Fix EarlyDrop : waitUntil + Promise.race timeout 8s
-// Notifie : 1) resp_tech + dir_tech  2) signaleur (confirmation + lien suivi) si signaleur_whatsapp fourni
+// Notifie : contacts avec notif_signalement=true (indépendant du rôle — configuré dans le dashboard)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -108,21 +108,12 @@ async function sendNotifications(payload: any) {
     site_nom = Array.isArray(sites) && sites[0]?.nom ? sites[0].nom : '';
   }
 
-  // ── Matrice destinataires ────────────────────────────────────────────────
-  // Externe (QR code / résident) : tout le monde (resp_tech + dir_tech + technicien)
-  // Interne panne / fuite / seuil : resp_tech + dir_tech
-  // Interne anomalie / bruit / odeur / autre : resp_tech seulement
-  const isExternal = !signaleur_contact_id;
-  const isUrgent   = ['panne', 'fuite', 'seuil'].includes(type);
-
-  const roleFilter = isExternal
-    ? 'role=in.(resp_tech,dir_tech,technicien)'
-    : isUrgent
-      ? 'role=in.(resp_tech,dir_tech)'
-      : 'role=eq.resp_tech';
-
+  // ── Destinataires ────────────────────────────────────────────────────────
+  // Reçoit la notification : tout contact avec notif_signalement=true ET actif=true
+  // La sélection se fait dans le dashboard (checkbox "📲 Signalements") — indépendant du rôle
+  // dir_tech, techs non désignés → notif_signalement=false → ne reçoivent rien
   const destinataires = await db('contacts', {
-    query: `&site_id=eq.${site_id}&${roleFilter}&actif=eq.true`,
+    query: `&site_id=eq.${site_id}&notif_signalement=eq.true&actif=eq.true`,
     select: 'whatsapp',
   });
 
@@ -132,7 +123,7 @@ async function sendNotifications(payload: any) {
     `${typeLabel}${equipement_nom ? ' — ' + equipement_nom : ''}` +
     `${lieu ? '\n📍 ' + lieu : ''}` +
     `${signale_par ? '\n👤 ' + signale_par : ''}` +
-    `${signaleur_whatsapp && isExternal ? '\n📞 ' + signaleur_whatsapp : ''}` +
+    `${signaleur_whatsapp && !signaleur_contact_id ? '\n📞 ' + signaleur_whatsapp : ''}` +
     `\n\n📝 ${description}` +
     `${ref_code ? '\n\n_Réf : ' + ref_code + '_\n_Répondre *OK ' + ref_code + '* pour PEC · ou *AFFECTER ' + ref_code + ' NomTech* pour assigner._' : ''}` +
     `\n_${heure}_`;
@@ -146,7 +137,7 @@ async function sendNotifications(payload: any) {
     }
   }
 
-  console.log(`notify: DONE — roleFilter=${roleFilter} → ${dejaEnvoyes.size} envoyés`);
+  console.log(`notify: DONE — notif_signalement=true → ${dejaEnvoyes.size} envoyés`);
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
