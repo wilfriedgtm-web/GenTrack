@@ -15037,7 +15037,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
     sites.map(function(site,i){
       var d=siteData[site.id];
       var sConf=d.rondesTot>0?Math.round(d.rondesVal/d.rondesTot*100):null;
-      var total=d.coutCarb+d.mntCout+d.panneCout;
+      var total=d.coutCarb+(d.mntCoutPreventif+d.mntCoutCorrectif)+d.panneCout;
       var critique=sConf!==null&&sConf<70||d.pannes>=3;
       var excellent=(sConf===null||sConf>=90)&&d.pannes===0;
       var scoreLabel=critique?'Critique':excellent?'Bon':'À surveiller';
@@ -15152,7 +15152,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   sites.forEach(function(site,si){
     var d=siteData[site.id];
     var sConf=d.rondesTot>0?Math.round(d.rondesVal/d.rondesTot*100):null;
-    var total=d.coutCarb+d.mntCout+d.panneCout;
+    var total=d.coutCarb+(d.mntCoutPreventif+d.mntCoutCorrectif)+d.panneCout;
     var siteSignalements=signalements.filter(function(s){return s.groupe_id===site.id;});
     var siteMaintenances=maintenances.filter(function(m){return m.groupe_id===site.id;});
     var col=HCOLS[si%HCOLS.length];
@@ -15181,7 +15181,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
           (d.toMoy!=null?'<div class="kpi"><div class="kpi-label">TO moyen</div><div class="kpi-value" style="font-size:20px;color:'+kpiCol(d.toMoy,60,80,false)+'">'+d.toMoy+'%</div><div class="kpi-sub">taux d\'occupation</div></div>':'')+
           (d.couvertsTotal!=null?'<div class="kpi"><div class="kpi-label">Couverts</div><div class="kpi-value" style="font-size:20px">'+d.couvertsTotal.toLocaleString('fr-FR')+'</div><div class="kpi-sub">servis sur la période</div></div>':'')+
           (rzBySite[site.id]&&rzBySite[site.id].count?'<div class="kpi"><div class="kpi-label">Rondes zones</div><div class="kpi-value" style="font-size:20px;color:#2D7A4F">'+rzBySite[site.id].count+'</div><div class="kpi-sub">'+(rzBySite[site.id].anomalies>0?rzBySite[site.id].anomalies+' anomalie'+(rzBySite[site.id].anomalies>1?'s':''):'0 anomalie')+'</div></div>':'')+
-          (d.mntCout>0?'<div class="kpi" style="border-color:'+col+'55;background:'+pale+'"><div class="kpi-label">Coût maintenance</div><div class="kpi-value" style="font-size:20px;color:'+col+'">'+d.mntCout.toLocaleString('fr-FR')+'</div><div class="kpi-sub">FCFA · préventif + correctif</div></div>':'')+
+          ((d.mntCoutPreventif+d.mntCoutCorrectif)>0?'<div class="kpi" style="border-color:'+col+'55;background:'+pale+'"><div class="kpi-label">Coût maintenance</div><div class="kpi-value" style="font-size:20px;color:'+col+'">'+(d.mntCoutPreventif+d.mntCoutCorrectif).toLocaleString('fr-FR')+'</div><div class="kpi-sub">FCFA · préventif + correctif</div></div>':'')+
         '</div>'+
         '<div class="edit-hint">Observations (modifiable)</div>'+
         '<div class="obs-zone" contenteditable="true" data-placeholder="Observations pour '+escape_html(site.nom)+' : constats, recommandations, actions..."></div>'+
@@ -15271,8 +15271,8 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
                 (d.mntCoutPreventif>0?' · <strong style="color:#2D7A4F">'+fmtCout(d.mntCoutPreventif,'XOF')+'</strong>':'')+
               '</div>'
               :'')+
-            (d.mntCout>0
-              ?'<div style="background:var(--creme);border:1px solid var(--border);border-radius:5px;padding:5px 10px;font-size:11px"><strong>Total</strong> · '+fmtCout(d.mntCout,'XOF')+'</div>'
+            ((d.mntCoutPreventif+d.mntCoutCorrectif)>0
+              ?'<div style="background:var(--creme);border:1px solid var(--border);border-radius:5px;padding:5px 10px;font-size:11px"><strong>Total</strong> · '+fmtCout(d.mntCoutPreventif+d.mntCoutCorrectif,'XOF')+'</div>'
               :'')+
             '</div>';
           return '<div style="margin-top:14px">'+
