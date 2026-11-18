@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GenTrack × Groupe Azalaï Hotels — Proposition Financière</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #EDE9E0;
+  color: #1A1411;
+  font-family: system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* PRINT BAR */
+.print-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  background: #1A1411;
+  color: rgba(255,255,255,.75);
+  font-size: 11px;
+  padding: 8px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 100;
+}
+.print-bar .hint { display: flex; align-items: center; gap: 8px; }
+.print-bar .hint span { color: #C9A84C; }
+.print-btn {
+  background: #C9A84C;
+  color: #1A1411;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  border: none;
+  padding: 6px 18px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.print-btn:hover { background: #b8963e; }
+
+.page-wrap {
+  margin-top: 40px;
+  padding: 32px 0 60px;
+}
+
+.page {
+  max-width: 780px;
+  margin: 0 auto;
+  background: #FFFFFF;
+  border: 1px solid #D8D0C4;
+}
+
+/* HEADER */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 48px;
+  border-bottom: 0.5px solid #E8E2D8;
+}
+.logo { font-size: 15px; font-weight: 900; letter-spacing: .5px; }
+.gen { color: #1A1411; }
+.track { color: #C9A84C; }
+.top-meta { font-size: 9px; color: #8A7E72; letter-spacing: .8px; text-align: right; line-height: 1.7; text-transform: uppercase; }
+
+/* HERO */
+.hero {
+  padding: 40px 48px 32px;
+  border-bottom: 0.5px solid #E8E2D8;
+}
+.eyebrow {
+  font-size: 9px; font-weight: 800;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: #C9A84C;
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 16px;
+}
+.eyebrow::after { content: ''; flex: 1; height: 1px; background: #E8E2D8; }
+.hero h1 {
+  font-size: 32px; font-weight: 900; line-height: 1.1;
+  color: #1A1411; margin-bottom: 10px;
+}
+.hero .sub { font-size: 11px; color: #8A7E72; line-height: 1.7; }
+.hero .sub strong { color: #1A1411; }
+
+/* DESTINATAIRES */
+.dest-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.dest-card {
+  background: #F7F4EF; border: 1px solid #E8E2D8;
+  padding: 16px 20px;
+}
+.dest-label { font-size: 8px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: #C9A84C; margin-bottom: 8px; }
+.dest-name { font-size: 13px; font-weight: 700; color: #1A1411; margin-bottom: 2px; }
+.dest-info { font-size: 10px; color: #8A7E72; line-height: 1.6; }
+
+/* SECTION */
+.section { padding: 28px 48px; border-bottom: 0.5px solid #E8E2D8; }
+.section-label {
+  font-size: 9px; font-weight: 800; letter-spacing: 1.5px;
+  text-transform: uppercase; color: #C9A84C;
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.section-label::after { content: ''; flex: 1; height: 1px; background: #E8E2D8; }
+
+/* CONSTAT BOX */
+.constat {
+  background: #F7F4EF; border-left: 2px solid #C9A84C;
+  padding: 18px 22px;
+  font-size: 10.5px; color: #4A3E32; line-height: 1.8;
+}
+.constat strong { color: #1A1411; }
+
+/* COMPARAISON */
+.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+.compare-card { border: 1px solid #E8E2D8; padding: 20px; }
+.compare-card.classic { background: #F7F4EF; }
+.compare-card.gentrack { background: #1A1411; }
+.compare-label {
+  font-size: 8px; font-weight: 800; letter-spacing: 1.2px;
+  text-transform: uppercase; margin-bottom: 12px;
+}
+.compare-card.classic .compare-label { color: #8A7E72; }
+.compare-card.gentrack .compare-label { color: #C9A84C; }
+.compare-title { font-size: 12px; font-weight: 700; margin-bottom: 10px; }
+.compare-card.classic .compare-title { color: #1A1411; }
+.compare-card.gentrack .compare-title { color: #FFFFFF; }
+.compare-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 0; border-bottom: 0.5px solid;
+  font-size: 9.5px;
+}
+.compare-card.classic .compare-item { border-color: #E8E2D8; color: #4A3E32; }
+.compare-card.gentrack .compare-item { border-color: rgba(255,255,255,.1); color: rgba(255,255,255,.75); }
+.compare-item:last-child { border-bottom: none; }
+.compare-val {
+  font-weight: 700; font-size: 10px;
+}
+.compare-card.classic .compare-val { color: #C0392B; }
+.compare-card.gentrack .compare-val { color: #C9A84C; }
+.compare-total {
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid;
+  font-size: 11px; font-weight: 900;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.compare-card.classic .compare-total { border-color: #E8E2D8; color: #1A1411; }
+.compare-card.gentrack .compare-total { border-color: rgba(201,168,76,.4); color: #C9A84C; }
+.compare-note { font-size: 8.5px; margin-top: 8px; line-height: 1.6; }
+.compare-card.classic .compare-note { color: #8A7E72; }
+.compare-card.gentrack .compare-note { color: rgba(255,255,255,.5); }
+.saving-banner {
+  background: #EDE9E0; border: 1px solid #C9A84C;
+  padding: 12px 20px; margin-top: 12px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.saving-label { font-size: 9px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: #8A7E72; }
+.saving-val { font-size: 14px; font-weight: 900; color: #C9A84C; }
+
+/* MODULES GRID */
+.modules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 4px; }
+.module-item {
+  padding: 14px 0; border-bottom: 0.5px solid #E8E2D8;
+  display: flex; align-items: flex-start; gap: 12px;
+}
+.module-item:nth-child(odd) { padding-right: 20px; border-right: 0.5px solid #E8E2D8; }
+.module-item:nth-child(even) { padding-left: 20px; }
+.module-num { font-size: 11px; font-weight: 900; color: #C9A84C; min-width: 20px; }
+.module-name { font-size: 11px; font-weight: 700; color: #1A1411; margin-bottom: 2px; }
+.module-desc { font-size: 9.5px; color: #8A7E72; line-height: 1.5; }
+
+/* UNLIMITED SECTION */
+.unlimited-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 4px; }
+.unlimited-card {
+  background: #F7F4EF; border: 1px solid #E8E2D8;
+  padding: 16px 18px;
+}
+.unlimited-icon { font-size: 20px; margin-bottom: 8px; }
+.unlimited-role { font-size: 11px; font-weight: 700; color: #1A1411; margin-bottom: 2px; }
+.unlimited-badge {
+  display: inline-block;
+  background: #EDE9E0; border: 1px solid #C9A84C;
+  color: #C9A84C; font-size: 8px; font-weight: 800;
+  letter-spacing: .8px; text-transform: uppercase;
+  padding: 2px 8px; margin-bottom: 6px;
+}
+.unlimited-desc { font-size: 9.5px; color: #8A7E72; line-height: 1.5; }
+
+/* WHAT'S INCLUDED CHECK LIST */
+.check-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 4px; }
+.check-item {
+  padding: 10px 0; border-bottom: 0.5px solid #E8E2D8;
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 10px; color: #4A3E32; line-height: 1.5;
+}
+.check-item:nth-child(odd) { padding-right: 20px; border-right: 0.5px solid #E8E2D8; }
+.check-item:nth-child(even) { padding-left: 20px; }
+.check-tick { color: #C9A84C; font-size: 11px; font-weight: 900; min-width: 14px; }
+
+/* PRICING DARK BOX */
+.pricing-box { background: #1A1411; padding: 28px 32px; margin-top: 4px; }
+.pricing-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+.pricing-label { font-size: 8px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: #C9A84C; margin-bottom: 8px; }
+.pricing-main { font-size: 36px; font-weight: 900; color: #C9A84C; line-height: 1; }
+.pricing-main .currency { font-size: 16px; font-weight: 700; margin-right: 4px; }
+.pricing-main .unit { font-size: 12px; font-weight: 400; color: rgba(255,255,255,.5); }
+.pricing-editable-hint { font-size: 8.5px; color: rgba(201,168,76,.6); margin-top: 4px; }
+.pricing-per-hotel { text-align: right; }
+.pricing-per-hotel .per-label { font-size: 9px; color: rgba(255,255,255,.5); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 4px; }
+.pricing-per-hotel .per-val { font-size: 18px; font-weight: 900; color: rgba(255,255,255,.85); }
+.pricing-per-hotel .per-unit { font-size: 10px; color: rgba(255,255,255,.4); }
+.pricing-divider { height: 0.5px; background: rgba(255,255,255,.1); margin: 16px 0; }
+.pricing-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 7px 0; border-bottom: 0.5px solid rgba(255,255,255,.07);
+  font-size: 10px; color: rgba(255,255,255,.65);
+}
+.pricing-row:last-child { border-bottom: none; }
+.pricing-row .row-val { font-weight: 700; color: rgba(255,255,255,.85); }
+.pricing-row .row-val.ok { color: #2ECC71; }
+
+/* CONDITIONS */
+.conditions-box {
+  background: #F7F4EF; border-left: 2px solid #C9A84C;
+  padding: 16px 22px; margin-top: 20px;
+}
+.conditions-title { font-size: 9px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #C9A84C; margin-bottom: 10px; }
+.conditions-list { list-style: none; }
+.conditions-list li {
+  font-size: 10px; color: #4A3E32; line-height: 1.6;
+  padding: 4px 0; border-bottom: 0.5px solid #E8E2D8; display: flex; gap: 8px;
+}
+.conditions-list li:last-child { border-bottom: none; }
+.conditions-list li::before { content: '—'; color: #C9A84C; font-weight: 700; min-width: 12px; }
+
+/* VALIDITE */
+.validity-box {
+  background: #FEF8EC; border: 1px solid #EDD98A;
+  padding: 14px 20px; margin-top: 12px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.validity-label { font-size: 9px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #C9A84C; }
+.validity-val { font-size: 11px; font-weight: 700; color: #1A1411; }
+
+/* NEXT STEP */
+.next-box { background: #1A1411; padding: 20px 28px; margin-top: 4px; }
+.next-label { font-size: 8px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: #C9A84C; margin-bottom: 8px; }
+.next-text { font-size: 11px; color: rgba(255,255,255,.8); line-height: 1.65; }
+.next-text strong { color: #FFFFFF; }
+
+/* BPA */
+.bpa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 20px; }
+.bpa-col { }
+.bpa-party { font-size: 9px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #C9A84C; margin-bottom: 8px; }
+.bpa-name { font-size: 11px; font-weight: 700; color: #1A1411; margin-bottom: 2px; }
+.bpa-role { font-size: 9.5px; color: #8A7E72; margin-bottom: 20px; }
+.bpa-sig-line { border-bottom: 1px solid #1A1411; margin-bottom: 6px; height: 32px; }
+.bpa-sig-label { font-size: 8.5px; color: #8A7E72; }
+
+/* FOOTER */
+.footer {
+  background: #F7F4EF; border-top: 0.5px solid #E8E2D8;
+  padding: 16px 48px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.footer-logo { font-size: 13px; font-weight: 900; letter-spacing: .5px; }
+.footer-info { font-size: 9px; color: #8A7E72; text-align: right; line-height: 1.7; letter-spacing: .3px; }
+
+/* PRINT */
+@media print {
+  .print-bar { display: none !important; }
+  .page-wrap { margin-top: 0; padding: 0; }
+  body { background: white; }
+  .page { border: none; max-width: 100%; }
+  [contenteditable] { border-bottom: none !important; outline: none !important; }
+  .pricing-editable-hint { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- PRINT BAR -->
+<div class="print-bar">
+  <div class="hint"><span>✏</span> Cliquez sur le prix pour le modifier avant d'imprimer</div>
+  <button class="print-btn" onclick="window.print()">Imprimer / PDF</button>
+</div>
+
+<div class="page-wrap">
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="top-bar">
+    <div class="logo"><span class="gen">GEN</span><span class="track">TRACK</span></div>
+    <div class="top-meta">
+      Réf · GT-AZL-2026-11H<br>
+      Dakar, le 18 novembre 2026<br>
+      Digitalisation de la ronde technique
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="eyebrow">Proposition Financière · Groupe</div>
+    <h1>Groupe Azalaï<br>Hotels — 11 Sites</h1>
+    <div class="sub">
+      À l'attention de <strong>M. Modeste, Directeur des Opérations</strong><br>
+      Solution SaaS GMAO · Maintenance &amp; Rondes Techniques via WhatsApp
+    </div>
+  </div>
+
+  <!-- DESTINATAIRES -->
+  <div class="section">
+    <div class="dest-grid">
+      <div class="dest-card">
+        <div class="dest-label">Destinataire</div>
+        <div class="dest-name">Groupe Azalaï Hotels</div>
+        <div class="dest-info">
+          M. Modeste, Directeur des Opérations<br>
+          11 hôtels · Dakar, Bamako, Ouagadougou,<br>
+          Cotonou, Niamey, Conakry
+        </div>
+      </div>
+      <div class="dest-card">
+        <div class="dest-label">Émetteur</div>
+        <div class="dest-name">GenTrack — The Wire.W</div>
+        <div class="dest-info">
+          Wilfried Tchinda, Fondateur<br>
+          gentrack.io · Dakar, Sénégal<br>
+          contact@gentrack.io
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONSTAT -->
+  <div class="section">
+    <div class="section-label">01 — Le constat</div>
+    <div class="constat">
+      La gestion technique d'un groupe hôtelier multi-sites implique des dizaines d'intervenants : techniciens de chaque hôtel, superviseurs régionaux, prestataires externes, chefs de service. <strong>La majorité des solutions GMAO facturent par utilisateur et par module</strong> — ce qui fait exploser le coût dès que l'organisation grandit.<br><br>
+      GenTrack adopte le modèle inverse : <strong>un forfait groupe, tous utilisateurs inclus, sans limitation</strong>. Vous pouvez ajouter des techniciens, des prestataires, des superviseurs, des demandeurs — le prix ne change pas.
+    </div>
+
+    <!-- COMPARAISON -->
+    <div class="compare-grid">
+      <div class="compare-card classic">
+        <div class="compare-label">Solutions classiques (par utilisateur)</div>
+        <div class="compare-title">Exemple — 11 hôtels, équipes réelles</div>
+        <div class="compare-item">
+          <span>Techniciens (3/hôtel × 11)</span>
+          <span class="compare-val">33 × 25 000 = 825 000</span>
+        </div>
+        <div class="compare-item">
+          <span>Superviseurs (5 régionaux)</span>
+          <span class="compare-val">5 × 35 000 = 175 000</span>
+        </div>
+        <div class="compare-item">
+          <span>Prestataires externes (10)</span>
+          <span class="compare-val">10 × 20 000 = 200 000</span>
+        </div>
+        <div class="compare-item">
+          <span>Module maintenance + ronde</span>
+          <span class="compare-val">+500 000</span>
+        </div>
+        <div class="compare-total">
+          <span>Total estimé / mois</span>
+          <span>~1 700 000 FCFA</span>
+        </div>
+        <div class="compare-note">Hors frais d'installation, formation payante, support annuel. Le coût augmente à chaque recrutement.</div>
+      </div>
+      <div class="compare-card gentrack">
+        <div class="compare-label">GenTrack — forfait groupe</div>
+        <div class="compare-title">11 hôtels · Utilisateurs illimités</div>
+        <div class="compare-item">
+          <span>Techniciens</span>
+          <span class="compare-val">∞ Illimité</span>
+        </div>
+        <div class="compare-item">
+          <span>Superviseurs &amp; Responsables</span>
+          <span class="compare-val">∞ Illimité</span>
+        </div>
+        <div class="compare-item">
+          <span>Prestataires externes</span>
+          <span class="compare-val">∞ Illimité</span>
+        </div>
+        <div class="compare-item">
+          <span>Demandeurs / Signaleurs QR</span>
+          <span class="compare-val">∞ Illimité</span>
+        </div>
+        <div class="compare-total">
+          <span>Forfait mensuel fixe</span>
+          <span>1 650 000 FCFA</span>
+        </div>
+        <div class="compare-note">Déploiement inclus, formation incluse, support WhatsApp inclus. Le prix ne change pas si vous recrutez.</div>
+      </div>
+    </div>
+    <div class="saving-banner">
+      <div>
+        <div class="saving-label">Économie vs modèle par utilisateur</div>
+        <div style="font-size:9px;color:#8A7E72;margin-top:2px">Basé sur les équipes actuelles du groupe — la différence s'accentue avec les recrutements</div>
+      </div>
+      <div class="saving-val">Prix maîtrisé · Croissance illimitée</div>
+    </div>
+  </div>
+
+  <!-- MODULES -->
+  <div class="section">
+    <div class="section-label">02 — Modules inclus</div>
+    <div class="modules-grid">
+      <div class="module-item">
+        <div class="module-num">01</div>
+        <div>
+          <div class="module-name">Ronde technique</div>
+          <div class="module-desc">Ronde quotidienne via WhatsApp — sans app à installer. Relevés équipements, alertes en temps réel, historique.</div>
+        </div>
+      </div>
+      <div class="module-item">
+        <div class="module-num">02</div>
+        <div>
+          <div class="module-name">Maintenance préventive</div>
+          <div class="module-desc">Planification des tâches périodiques, assignation aux techniciens, suivi et validation, rapport mensuel.</div>
+        </div>
+      </div>
+      <div class="module-item">
+        <div class="module-num">03</div>
+        <div>
+          <div class="module-name">Maintenance corrective</div>
+          <div class="module-desc">Signalements QR code (clients ou staff), prise en charge en 1 clic, suivi des pannes et clôture.</div>
+        </div>
+      </div>
+      <div class="module-item">
+        <div class="module-num">04</div>
+        <div>
+          <div class="module-name">Suivi énergétique</div>
+          <div class="module-desc">Relevés eau, électricité, groupe électrogène. Consommations par hôtel, tendances, alertes dépassement.</div>
+        </div>
+      </div>
+      <div class="module-item">
+        <div class="module-num">05</div>
+        <div>
+          <div class="module-name">Rapports automatiques</div>
+          <div class="module-desc">Rapport RT (par site) et rapport DT (vue groupe multi-sites). Export PDF mensuel automatique.</div>
+        </div>
+      </div>
+      <div class="module-item">
+        <div class="module-num">06</div>
+        <div>
+          <div class="module-name">Gestion des prestataires</div>
+          <div class="module-desc">Dossier prestataire, historique des interventions, suivi des commandes et bons de commande.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UTILISATEURS ILLIMITÉS -->
+  <div class="section">
+    <div class="section-label">03 — Utilisateurs illimités, sans supplément</div>
+    <div class="unlimited-grid">
+      <div class="unlimited-card">
+        <div class="unlimited-icon">🔧</div>
+        <div class="unlimited-role">Techniciens</div>
+        <div class="unlimited-badge">Illimité</div>
+        <div class="unlimited-desc">Réalisent les rondes et maintenances via WhatsApp. Reçoivent les alertes et les affectations en temps réel.</div>
+      </div>
+      <div class="unlimited-card">
+        <div class="unlimited-icon">👁</div>
+        <div class="unlimited-role">Superviseurs & Resp. Techniques</div>
+        <div class="unlimited-badge">Illimité</div>
+        <div class="unlimited-desc">Accès dashboard web multi-sites. Validations, rapports, vue d'ensemble groupe en temps réel.</div>
+      </div>
+      <div class="unlimited-card">
+        <div class="unlimited-icon">🏢</div>
+        <div class="unlimited-role">Prestataires externes</div>
+        <div class="unlimited-badge">Illimité</div>
+        <div class="unlimited-desc">Reçoivent leurs missions par WhatsApp, rapportent les interventions, sont suivis sans accès back-office.</div>
+      </div>
+      <div class="unlimited-card">
+        <div class="unlimited-icon">📱</div>
+        <div class="unlimited-role">Demandeurs & Signaleurs QR</div>
+        <div class="unlimited-badge">Illimité</div>
+        <div class="unlimited-desc">Staff hôtel ou client qui scanne un QR code pour signaler une anomalie. Aucun compte requis.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CE QUI EST INCLUS -->
+  <div class="section">
+    <div class="section-label">04 — Ce qui est inclus dans l'abonnement</div>
+    <div class="check-grid">
+      <div class="check-item">
+        <span class="check-tick">✓</span>
+        <span>Déploiement à distance — 11 hôtels paramétrés</span>
+      </div>
+      <div class="check-item">
+        <span class="check-tick">✓</span>
+        <span>Formation des techniciens et responsables</span>
+      </div>
+      <div class="check-item">
+        <span class="check-tick">✓</span>
+        <span>Création des QR codes de signalement par site</span>
+      </div>
+      <div class="check-item">
+        <span class="check-tick">✓</span>
+        <span>Bot WhatsApp configuré pour chaque hôtel</span>
+      </div>
+      <div class="check-item">
+        <span class="check-tick">✓</span>
+        <span>Dashboard web multi-sites (DT groupe)</span>
+      </div>
+      <div class="check-item">
+        <span class="check-tick">✓</span>
+        <span>Rapports PDF mensuels automatiques</span>
+      </div>
+      <div class="check-item">
+        <span class="check-tick">✓</span>
+        <span>Notifications WhatsApp temps réel (pannes, alertes)</span>
+      </div>
+      <div class="check-item">
+        <span class="check-tick">✓</span>
+        <span>Support technique WhatsApp inclus</span>
+      </div>
+      <div class="check-item">
+        <span class="check-tick">✓</span>
+        <span>Ajout d'équipements et de sites sans surcoût</span>
+      </div>
+      <div class="check-item">
+        <span class="check-tick">✓</span>
+        <span>Mises à jour de la plateforme incluses</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TARIFICATION -->
+  <div class="section">
+    <div class="section-label">05 — Tarification groupe</div>
+    <div class="pricing-box">
+      <div class="pricing-top">
+        <div>
+          <div class="pricing-label">Abonnement mensuel — 11 hôtels</div>
+          <div class="pricing-main">
+            <span class="currency">FCFA</span><span contenteditable="true" style="border-bottom:1px solid rgba(201,168,76,.4);outline:none;min-width:40px;display:inline-block;">1 650 000</span> <span class="unit">/ mois</span>
+          </div>
+          <div class="pricing-editable-hint">✏ Cliquez sur le montant pour le modifier</div>
+        </div>
+        <div class="pricing-per-hotel">
+          <div class="per-label">Par hôtel</div>
+          <div class="per-val">150 000</div>
+          <div class="per-unit">FCFA / mois / hôtel</div>
+        </div>
+      </div>
+      <div class="pricing-divider"></div>
+      <div class="pricing-row">
+        <span>Périmètre</span>
+        <span class="row-val">11 hôtels · Groupe Azalaï</span>
+      </div>
+      <div class="pricing-row">
+        <span>Durée d'engagement</span>
+        <span class="row-val">12 mois renouvelables</span>
+      </div>
+      <div class="pricing-row">
+        <span>Facturation</span>
+        <span class="row-val">Mensuelle</span>
+      </div>
+      <div class="pricing-row">
+        <span>Utilisateurs</span>
+        <span class="row-val ok">∞ Illimité · Tous profils</span>
+      </div>
+      <div class="pricing-row">
+        <span>Déploiement</span>
+        <span class="row-val ok">Inclus · Sous 48h à distance</span>
+      </div>
+      <div class="pricing-row">
+        <span>Formation</span>
+        <span class="row-val ok">Incluse</span>
+      </div>
+      <div class="pricing-row">
+        <span>Support</span>
+        <span class="row-val ok">Inclus · WhatsApp prioritaire</span>
+      </div>
+    </div>
+
+    <div class="conditions-box">
+      <div class="conditions-title">Conditions</div>
+      <ul class="conditions-list">
+        <li>Facturation mensuelle en début de période</li>
+        <li>Préavis de résiliation : 30 jours avant la fin de la période en cours</li>
+        <li>Nouveaux hôtels ajoutables en cours d'engagement (tarif au prorata)</li>
+        <li>Extension à d'autres sites du groupe sur devis</li>
+        <li>Hébergement sécurisé sur infrastructure cloud (Supabase / Vercel)</li>
+      </ul>
+    </div>
+
+    <div class="validity-box">
+      <div class="validity-label">Validité de l'offre</div>
+      <div class="validity-val">Jusqu'au 31 décembre 2026</div>
+    </div>
+  </div>
+
+  <!-- PROCHAINE ÉTAPE -->
+  <div class="section">
+    <div class="section-label">06 — Prochaine étape</div>
+    <div class="next-box">
+      <div class="next-label">Prochaine étape</div>
+      <div class="next-text">
+        Dès signature, nous lançons le déploiement sur les <strong>11 hôtels Azalaï</strong> sous <strong>48h à distance</strong>, sans interruption d'activité.<br><br>
+        Wilfried Tchinda assurera personnellement le suivi du déploiement et la formation des équipes techniques de chaque site.
+      </div>
+    </div>
+  </div>
+
+  <!-- BON POUR ACCORD -->
+  <div class="section">
+    <div class="section-label">07 — Bon pour accord</div>
+    <div class="bpa-grid">
+      <div class="bpa-col">
+        <div class="bpa-party">Groupe Azalaï Hotels</div>
+        <div class="bpa-name">M. Modeste</div>
+        <div class="bpa-role">Directeur des Opérations</div>
+        <div class="bpa-sig-line"></div>
+        <div class="bpa-sig-label">Signature · Date · Cachet</div>
+      </div>
+      <div class="bpa-col">
+        <div class="bpa-party">GenTrack — The Wire.W</div>
+        <div class="bpa-name">Wilfried Tchinda</div>
+        <div class="bpa-role">Fondateur & Directeur Général</div>
+        <div class="bpa-sig-line"></div>
+        <div class="bpa-sig-label">Signature · Date</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-logo"><span class="gen">GEN</span><span class="track">TRACK</span></div>
+    <div class="footer-info">
+      gentrack.io · contact@gentrack.io<br>
+      Réf GT-AZL-2026-11H · Dakar, Sénégal
+    </div>
+  </div>
+
+</div>
+</div>
+
+</body>
+</html>

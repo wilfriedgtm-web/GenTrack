@@ -371,10 +371,9 @@ async function alerterSeuilsEnArrierePlan(equip: any, questions: any[], reponses
       }
     }
   }
-  // 2. Toujours notifier resp_tech + dir_tech + technicien du site
+  // 2. Notifier resp_tech uniquement (pas dir_tech, pas les autres techniciens)
   const responsables = await getResponsablesForSite(equip.site_id);
-  const techsSeuil = await db('contacts', { query: `&site_id=eq.${equip.site_id}&role=eq.technicien&actif=eq.true` }).catch(() => []);
-  const destsSeuil = [...(Array.isArray(responsables) ? responsables : []), ...(Array.isArray(techsSeuil) ? techsSeuil : [])];
+  const destsSeuil = (Array.isArray(responsables) ? responsables : []).filter((r: any) => r.role === 'resp_tech');
   for (const r of destsSeuil) {
     if (r.whatsapp && !dejaEnvoyes.has(r.whatsapp)) {
       dejaEnvoyes.add(r.whatsapp);
@@ -560,12 +559,12 @@ async function sendRapportRonde(rondeId: string, phone: string, techNom: string,
   résumé += `\n\n📋 *Rapport complet :*\n${lienRapport}`;
   const messages: string[] = [résumé];
 
-  const dejaEnvoyes = new Set<string>([phone]);
-  for (const m of messages) await sendWA(phone, m);
+  // Envoyer uniquement aux resp_tech (pas au technicien qui vient de faire la ronde, pas dir_tech)
+  const dejaEnvoyes = new Set<string>();
   const responsables = await getResponsablesForSite(siteId);
   if (Array.isArray(responsables)) {
     for (const r of responsables) {
-      if (!r.whatsapp || dejaEnvoyes.has(r.whatsapp)) continue;
+      if (!r.whatsapp || r.role !== 'resp_tech' || dejaEnvoyes.has(r.whatsapp)) continue;
       dejaEnvoyes.add(r.whatsapp);
       for (const m of messages) await sendWA(r.whatsapp, m);
     }
@@ -722,6 +721,17 @@ async function continuerRonde(phone: string, sd: any, contact: any, site: any): 
   if (!restants.length) {
     await sendRapportRonde(sd.ronde_id, phone, contact.nom, site?.nom || sd.site_nom, sd.client_id || '', sd.site_id, sd.frequence);
     return sendMenuPostAction(phone, site?.nom || sd.site_nom, sd.active_site_id || sd.site_id, 'ronde');
+  }
+  // Si un seul équipement restant, l'enchaîner directement sans demander
+  if (restants.length === 1) {
+    const equip = restants[0];
+    const questions = await getQuestions(equip.id, sd.frequence);
+    if (!questions.length) return sendWA(phone, `Aucune question configurée pour ${equip.nom}.`);
+    const reId = await getOrCreateRondeEquipement(sd.ronde_id, equip.id);
+    const lastValues = await getLastValues(questions);
+    const contexte = await getLastSaisieContext(equip.id, questions, lastValues);
+    await setSession(phone, 'saisie_question', { ...sd, equip_id: equip.id, equip_nom: equip.nom, re_id: reId, questions, reponses: [], q_idx: 0, lastValues });
+    return sendWA(phone, `📝 *${equip.nom}* (dernier équipement)\n\n${contexte}${fmtQuestion(questions[0], lastValues[questions[0].id])}`);
   }
   const liste = restants.map((e: any, i: number) => `*${i + 1}* — ${e.nom}`).join('\n');
   await setSession(phone, 'saisie_choix_equip', { ...sd, restants: restants.map((e: any) => ({ id: e.id, nom: e.nom })) });
@@ -1074,7 +1084,7 @@ async function envoyerBilan(phone: string, contact: any, sd: any, blocages: stri
   let envoyeCount = 0;
   if (Array.isArray(responsables)) {
     for (const r of responsables) {
-      if (r.whatsapp && r.whatsapp !== phone) { await sendWA(r.whatsapp, recapMsg); envoyeCount++; }
+      if (r.whatsapp && r.whatsapp !== phone && r.role === 'resp_tech') { await sendWA(r.whatsapp, recapMsg); envoyeCount++; }
     }
   }
   await sendWA(phone, envoyeCount > 0 ? `✅ Bilan envoyé à votre responsable. 📲` : `⚠️ Bilan enregistré — aucun responsable configuré.`);
@@ -1285,11 +1295,6 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
     const newReponses = [...reponses, { question_id: q.id, valeur }];
     const next = qIdx + 1;
 
-    // Alerte seuil en arrière-plan — ne bloque pas la saisie
-    const equipRaw = await db('equipements', { query: `&id=eq.${sd.equip_id}&limit=1` });
-    const equip = Array.isArray(equipRaw) ? equipRaw[0] : null;
-    if (equip) alerterSeuilsEnArrierePlan(equip, [q], [{ question_id: q.id, valeur }], siteNom, contact).catch(() => {});
-
     if (next < questions.length) {
       await setSession(phone, 'saisie_question', { ...sd, reponses: newReponses, q_idx: next });
       const nextQ = questions[next];
@@ -1385,13 +1390,12 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       source: 'ronde',
       ronde_id: sd.ronde_id || null,
     }}).catch(() => {});
-    // Notifier resp_tech + dir_tech + techniciens (sauf l'émetteur)
+    // Notifier resp_tech uniquement (pas dir_tech, pas les autres techniciens)
     const responsablesAno = await getResponsablesForSite(sd.site_id).catch(() => []);
-    const techsAno = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=eq.technicien&actif=eq.true` }).catch(() => []);
     const alertMsg = `⚠️ *Anomalie signalée — ${sd.equip_nom}*\n_${siteNom}_\n\n"${desc}"\n\n_Signalé par ${contact.nom} · ${getHeure()}_`;
     const dejaAno = new Set<string>([phone]);
-    for (const r of [...(Array.isArray(responsablesAno) ? responsablesAno : []), ...(Array.isArray(techsAno) ? techsAno : [])]) {
-      if (r.whatsapp && !dejaAno.has(r.whatsapp)) { dejaAno.add(r.whatsapp); await sendWA(r.whatsapp, alertMsg).catch(() => {}); }
+    for (const r of (Array.isArray(responsablesAno) ? responsablesAno : [])) {
+      if (r.whatsapp && r.role === 'resp_tech' && !dejaAno.has(r.whatsapp)) { dejaAno.add(r.whatsapp); await sendWA(r.whatsapp, alertMsg).catch(() => {}); }
     }
 
     await sendWA(phone, `✅ Anomalie enregistrée. Responsables notifiés.`);
@@ -1457,10 +1461,9 @@ async function handleStates(phone: string, msg: string, bodyText: string, contac
       message: `PANNE — ${sd.equip_nom} — ${sd.panne_type_label}`,
       resolue: false,
     }}).catch(() => {});
-    // Notifier resp_tech + dir_tech + technicien du site (multi-site inclus)
+    // Notifier resp_tech uniquement (pas dir_tech, pas les autres techniciens)
     const responsables = await getResponsablesForSite(sd.site_id);
-    const techniciens = await db('contacts', { query: `&site_id=eq.${sd.site_id}&role=eq.technicien&actif=eq.true` });
-    const tousDestinataires = [...(Array.isArray(responsables) ? responsables : []), ...(Array.isArray(techniciens) ? techniciens : [])];
+    const tousDestinataires = (Array.isArray(responsables) ? responsables : []).filter((r: any) => r.role === 'resp_tech');
     const refLine = refCode ? `\n\n_Répondre *OK ${refCode}* pour PEC · ou *AFFECTER ${refCode}* pour assigner à un tech._` : `\n\n_Tapez *resolu* pour clôturer._`;
     const photoLine = publicPhotoUrl ? `\n📷 Photo jointe` : '';
     const alertMsg = `🚨 *PANNE SIGNALÉE — GenTrack*\n*${siteNom}*\n\n🔧 Équipement : *${sd.equip_nom}*\n⚠️ Type : *${sd.panne_type_label}*${desc ? `\n📝 Détail : ${desc}` : ''}${photoLine}\n\n👤 Signalé par : ${contact.nom}\n🕐 ${today} ${getHeure()}${refLine}`;
