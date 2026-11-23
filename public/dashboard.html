@@ -5629,23 +5629,48 @@ async function _mntCreerMissionPrest(eqId,sid){
   var missionUrl=baseUrl+'?token='+mission.token;
   var nbTaches=planIds.length;
   var eqNomTxt=window._mntCurrentEqNom||'Équipement';
-  var msg='🏢 Mission de maintenance — Prestataire\n'+( prestNom?'Société : '+prestNom+'\n':'')+eqNomTxt+' · '+nbTaches+' tâche'+(nbTaches>1?'s':'')+'\n\nAccédez à votre mission :\n'+missionUrl;
-  // WhatsApp
-  if(prestTel){
-    var telClean=prestTel.replace(/\s+/g,'');
-    var waUrl='https://wa.me/'+telClean.replace(/^\+/,'')+'?text='+encodeURIComponent(msg);
-    window.open(waUrl,'_blank');
-  }
-  // Email
-  if(prestEmail){
-    var mailSub=encodeURIComponent('Mission maintenance — '+eqNomTxt);
+  if(statusEl){statusEl.style.color='#16a34a';statusEl.textContent='✅ Mission créée !';}
+  // ── Stocker pour la confirmation ──────────────────────────────────────────
+  window._mntMissionDispatch={missionUrl:missionUrl,prestNom:prestNom,prestTel:prestTel,prestEmail:prestEmail,eqNomTxt:eqNomTxt,nbTaches:nbTaches};
+  var hasWa=!!(prestTel&&prestTel.trim());
+  var hasEmail=!!(prestEmail&&prestEmail.trim());
+  var msgPreview='🏢 Mission de maintenance — '+eqNomTxt+'\n'+(prestNom?'Prestataire : '+prestNom+'\n':'')+nbTaches+' tâche'+(nbTaches>1?'s':'')+' à réaliser\n\nAccédez à votre mission :\n'+missionUrl;
+  _showCfgModal(
+    '<div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:4px">🏢 Envoyer au prestataire</div>'+
+    '<div style="font-size:12px;color:#64748b;margin-bottom:12px"><strong>'+escape_html(prestNom)+'</strong>'+
+      (hasWa?' · <span style="color:#25D366;font-weight:700">📱 WA</span>':'')+
+      (hasEmail?' · <span style="color:#1e40af;font-weight:700">✉️ Email</span>':'')+
+      (!hasWa&&!hasEmail?' <span style="color:#ef4444">⚠️ aucun moyen de contact renseigné</span>':'')+
+    '</div>'+
+    '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px;font-size:11px;color:#1e293b;white-space:pre-wrap;line-height:1.55;margin-bottom:12px;max-height:140px;overflow-y:auto">'+escape_html(msgPreview)+'</div>'+
+    '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#94a3b8;margin-bottom:4px">Note pour le prestataire (optionnel)</div>'+
+    '<textarea id="mnt-mission-note" rows="2" placeholder="Ex : Pièces à prévoir, accès par l\'entrée de service…" style="width:100%;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;resize:none;font-family:inherit;outline:none;margin-bottom:12px;box-sizing:border-box"></textarea>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button onclick="_closeCfgModal()" style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;background:white;cursor:pointer;color:#64748b">✕ Fermer</button>'+
+      (hasWa?'<button onclick="_mntConfirmMissionPrest(\'wa\')" style="flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:#25D366;color:white;cursor:pointer">📱 WhatsApp</button>':'')+
+      (hasEmail?'<button onclick="_mntConfirmMissionPrest(\'email\')" style="flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:#1e40af;color:white;cursor:pointer">✉️ Email</button>':'')+
+      '<button onclick="_mntConfirmMissionPrest(\'copy\')" style="flex:1;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;font-weight:600;background:white;color:#374151;cursor:pointer">📋 Copier lien</button>'+
+    '</div>'
+  );
+}
+function _mntConfirmMissionPrest(mode){
+  var d=window._mntMissionDispatch||{};
+  var note=((document.getElementById('mnt-mission-note')||{}).value||'').trim();
+  var msg='🏢 Mission de maintenance — '+(d.eqNomTxt||'Équipement')+'\n'+(d.prestNom?'Prestataire : '+d.prestNom+'\n':'')+(d.nbTaches||1)+' tâche'+((d.nbTaches||1)>1?'s':'')+' à réaliser'+(note?'\n\n📋 Note : '+note:'')+'\n\nAccédez à votre mission :\n'+(d.missionUrl||'');
+  if(mode==='wa'&&d.prestTel){
+    var telClean=d.prestTel.replace(/\s+/g,'');
+    window.open('https://wa.me/'+telClean.replace(/^\+/,'')+'?text='+encodeURIComponent(msg),'_blank');
+    _closeCfgModal();
+  }else if(mode==='email'&&d.prestEmail){
+    var mailSub=encodeURIComponent('Mission maintenance — '+(d.eqNomTxt||'Équipement'));
     var mailBody=encodeURIComponent(msg);
-    window.open('mailto:'+prestEmail+'?subject='+mailSub+'&body='+mailBody,'_blank');
+    window.open('mailto:'+d.prestEmail+'?subject='+mailSub+'&body='+mailBody,'_blank');
+    _closeCfgModal();
+  }else if(mode==='copy'){
+    if(navigator.clipboard){navigator.clipboard.writeText(d.missionUrl||'');}
+    else{prompt('Copiez ce lien :',d.missionUrl||'');}
+    _closeCfgModal();
   }
-  if(!prestTel&&!prestEmail){
-    prompt('Copiez ce lien à envoyer au prestataire :',missionUrl);
-  }
-  if(statusEl){statusEl.style.color='#1e40af';statusEl.textContent='✅ Mission créée ! '+(prestTel?'WhatsApp ':'')+(prestEmail?'Email ':'')+' ouvert'+(prestTel||prestEmail?'s.':'');}
 }
 
 // ── Dossier prestataire ───────────────────────────────────────────────────
