@@ -3231,6 +3231,7 @@ var _DEMANDE_TYPES={carburant:{label:'Carburant',icon:'⛽',unite:'litres'},piec
 var _DEMANDE_URGENCES=['normal','urgent','critique'];
 var _DEMANDE_URGENCE_LABELS={normal:'Normal',urgent:'Urgent 🔶',critique:'Critique 🔴'};
 var _demandeTypeActuel='autre';
+var _cmdFilter='tous';
 var _demandeUrgenceActuelle='normal';
 var _dmPannes=[];
 var _dmCurrentSid=null;
@@ -3304,16 +3305,35 @@ async function _rtCommandes(sid,session){
   }
   window._commandes_cuveMap=cuveMap;
 
-  var enAttente=demandes.filter(function(d){return d.statut==='en_attente';});
+  // ── KPIs ──
+  var _now2=new Date();
+  var _moisD=new Date(_now2.getFullYear(),_now2.getMonth(),1).toISOString();
+  var _dMois=demandes.filter(function(d){return d.created_at>=_moisD;});
+  var _dAtt=demandes.filter(function(d){return d.statut==='en_attente';});
+  var _dApp=demandes.filter(function(d){return d.statut==='approuve';});
+  var _dLiv=_dMois.filter(function(d){return d.statut==='livre';});
+  function _sc(arr){return arr.reduce(function(s,d){return s+(d.cout||0);},0);}
+  function _ff(n){return n?n.toLocaleString('fr-FR')+' F':'—';}
+  var _engM=_sc(_dMois.filter(function(d){return d.statut!=='annule';}));
+  var _cf=window._cmdFilter||'tous';
 
-  // ── Header ──
-  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">'+
+  var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
     '<div>'+
-      '<div style="font-size:18px;font-weight:800;color:var(--dark)">📦 Commandes</div>'+
-      '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+(enAttente.length?enAttente.length+' demande'+(enAttente.length>1?'s':'')+'  en attente':'Aucune demande en attente')+'</div>'+
+      '<div style="font-size:16px;font-weight:800;color:var(--dark)">📦 Commandes</div>'+
+      '<div style="font-size:11px;color:var(--text2);margin-top:1px">Engagé ce mois : <strong>'+_ff(_engM)+'</strong></div>'+
     '</div>'+
     '<button onclick="_ouvrirNouvelleDemandeLibre(\''+sid+'\')" style="padding:8px 16px;background:var(--dark);color:white;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer">+ Nouvelle commande</button>'+
   '</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">';
+  [{f:'tous',label:'Total',val:demandes.length,sub:_ff(_sc(demandes)),accent:'var(--dark)'},{f:'en_attente',label:'En attente',val:_dAtt.length,sub:_ff(_sc(_dAtt)),accent:'var(--amber)'},{f:'approuve',label:'Approuvé',val:_dApp.length,sub:_ff(_sc(_dApp)),accent:'#7c3aed'},{f:'livre',label:'Livré (mois)',val:_dLiv.length,sub:_ff(_sc(_dLiv)),accent:'var(--vert)'}].forEach(function(k){
+    var active=_cf===k.f;
+    h+='<div onclick="_cmdSetFilter(\''+k.f+'\')" style="background:white;border:1.5px solid '+(active?'var(--amber)':'var(--border)')+';border-radius:10px;padding:10px 12px;cursor:pointer">'+
+      '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:3px">'+k.label+'</div>'+
+      '<div style="font-size:18px;font-weight:800;color:'+k.accent+'">'+k.val+'</div>'+
+      (k.sub?'<div style="font-size:10px;color:var(--text3);margin-top:1px">'+k.sub+'</div>':'')+
+    '</div>';
+  });
+  h+='</div>';
 
   // ── Section équipements classiques ──
   if(equips.length){
@@ -3364,55 +3384,78 @@ async function _rtCommandes(sid,session){
     '</div>';
   }
 
-  // ── Historique commandes (classiques + zone) ──
-  h+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">Historique des commandes</div>';
-  if(!demandes.length){
-    h+='<div style="text-align:center;padding:32px;color:var(--text3);font-size:13px">Aucune demande envoyée</div>';
-  } else {
+  // ── Historique commandes (filtré) ──
+  var _dFiltered=_cf==='tous'?demandes:demandes.filter(function(d){return d.statut===_cf;});
+  h+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">'+
+    (_cf==='tous'?'Toutes les commandes':_cf==='en_attente'?'En attente':_cf==='approuve'?'Approuvées':_cf==='livre'?'Livrées':'Commandes')+
+    ' ('+_dFiltered.length+')'+
+  '</div>';
+  if(!_dFiltered.length){
+    h+='<div style="text-align:center;padding:32px;color:var(--text3);font-size:13px">Aucune commande pour ce filtre</div>';
+  }else{
     var STATUT_STYLE={en_attente:{label:'En attente',color:'var(--orange)',bg:'var(--orange-pale)'},approuve:{label:'Approuvé',color:'#7c3aed',bg:'#f3e8ff'},livre:{label:'Livré ✅',color:'var(--vert)',bg:'var(--vert-pale)'},annule:{label:'Annulé',color:'var(--text3)',bg:'#f5f5f5'}};
     var btnStyle='font-size:10px;font-weight:700;padding:4px 10px;border-radius:6px;border:1.5px solid;cursor:pointer;background:white;';
-    demandes.forEach(function(d){
+    var URGBORDER={urgent:'border-left:3px solid var(--orange)',critique:'border-left:3px solid var(--rouge)'};
+    _dFiltered.forEach(function(d){
       var t=_DEMANDE_TYPES[d.type]||{label:d.type,icon:'📝'};
       var u=STATUT_STYLE[d.statut]||STATUT_STYLE['en_attente'];
       var date=d.created_at?new Date(d.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-      var ref=d.note?'<span style="font-size:10px;color:var(--text3);font-family:monospace">'+escape_html(d.note)+'</span>':'';
-      // Équipement display (classique ou zone)
+      var urgBorder=d.urgence&&URGBORDER[d.urgence]?URGBORDER[d.urgence]:'';
       var eqDisplay='';
-      if(d.equipements&&d.equipements.nom){
-        eqDisplay='🔧 '+d.equipements.nom;
-      }else if(d.equipements_zone&&d.equipements_zone.nom){
-        eqDisplay='📍 '+d.equipements_zone.nom+(d.equipements_zone.zones&&d.equipements_zone.zones.nom?' · '+d.equipements_zone.zones.nom:'');
-      }
-      // Boutons selon statut
+      if(d.equipements&&d.equipements.nom)eqDisplay='🔧 '+d.equipements.nom;
+      else if(d.equipements_zone&&d.equipements_zone.nom)eqDisplay='📍 '+d.equipements_zone.nom+(d.equipements_zone.zones&&d.equipements_zone.zones.nom?' · '+d.equipements_zone.zones.nom:'');
+      var urgChip=d.urgence&&d.urgence!=='normal'?'<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:var(--orange-pale);color:var(--orange)">'+escape_html(_DEMANDE_URGENCE_LABELS[d.urgence]||d.urgence)+'</span>':'';
+      var coutHtml=d.cout?'<div style="text-align:right;flex-shrink:0;margin-left:8px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3)">Coût</div><div style="font-size:13px;font-weight:800;color:'+(d.statut==='livre'?'var(--vert)':'var(--dark)')+'">'+d.cout.toLocaleString('fr-FR')+' F</div></div>':'';
       var actions='';
       if(d.statut==='en_attente'){
-        actions='<div style="display:flex;gap:6px;margin-top:8px">'+
+        actions='<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--bg)">'+
           '<button onclick="_demandeChangerStatut(\''+d.id+'\',\'approuve\')" style="'+btnStyle+'border-color:var(--vert);color:var(--vert)">✅ Approuver</button>'+
           '<button onclick="_demandeChangerStatut(\''+d.id+'\',\'annule\')" style="'+btnStyle+'border-color:var(--rouge);color:var(--rouge)">❌ Annuler</button>'+
         '</div>';
-      } else if(d.statut==='approuve'){
-        actions='<div style="display:flex;gap:6px;margin-top:8px">'+
+      }else if(d.statut==='approuve'){
+        actions='<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--bg)">'+
           '<button onclick="_demandeChangerStatut(\''+d.id+'\',\'livre\')" style="'+btnStyle+'border-color:var(--vert);color:var(--vert)">📦 Marquer livré</button>'+
           '<button onclick="_demandeChangerStatut(\''+d.id+'\',\'annule\')" style="'+btnStyle+'border-color:var(--rouge);color:var(--rouge)">❌ Annuler</button>'+
         '</div>';
       }
-      h+='<div style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:8px">'+
-        '<div style="display:flex;align-items:flex-start;gap:12px">'+
+      h+='<div style="background:white;border:1.5px solid var(--border);'+urgBorder+';border-radius:10px;padding:12px 14px;margin-bottom:8px">'+
+        '<div style="display:flex;align-items:flex-start;gap:10px">'+
           '<div style="font-size:22px;flex-shrink:0">'+t.icon+'</div>'+
           '<div style="flex:1;min-width:0">'+
-            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">'+
+            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">'+
               '<span style="font-size:12px;font-weight:700;color:var(--dark)">'+escape_html(t.label)+'</span>'+
               (d.quantite?'<span style="font-size:11px;color:var(--text2)">· '+d.quantite+' '+(d.unite||'')+'</span>':'')+
+              urgChip+
               '<span style="margin-left:auto;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;color:'+u.color+';background:'+u.bg+'">'+u.label+'</span>'+
             '</div>'+
             (eqDisplay?'<div style="font-size:11px;color:var(--text3);margin-bottom:2px">'+escape_html(eqDisplay)+'</div>':'')+
             (d.description?'<div style="font-size:11px;color:var(--text2);margin-bottom:3px">'+escape_html(d.description.substring(0,80))+'</div>':'')+
-            '<div style="font-size:10px;color:var(--text3);display:flex;gap:8px;align-items:center">'+date+ref+'</div>'+
+            '<div style="font-size:10px;color:var(--text3);display:flex;gap:8px;align-items:center">'+date+(d.note?'<span style="font-family:monospace">'+escape_html(d.note)+'</span>':'')+'</div>'+
             actions+
           '</div>'+
+          coutHtml+
         '</div>'+
       '</div>';
     });
+  }
+  // ── Récap par catégorie (ce mois) ──
+  var _dMoisActifs=_dMois.filter(function(d){return d.statut!=='annule';});
+  if(_dMoisActifs.length){
+    h+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin:16px 0 8px;display:flex;align-items:center;gap:10px">Récap ce mois par catégorie<span style="flex:1;height:1px;background:var(--border);display:inline-block"></span></div>';
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px">';
+    Object.entries(_DEMANDE_TYPES).forEach(function(kv){
+      var k=kv[0],v=kv[1];
+      var arr=_dMois.filter(function(d){return d.type===k&&d.statut!=='annule';});
+      if(!arr.length)return;
+      var total=_sc(arr);
+      h+='<div style="background:white;border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center">'+
+        '<div style="font-size:18px">'+v.icon+'</div>'+
+        '<div style="font-size:11px;font-weight:700;color:var(--dark);margin:3px 0">'+arr.length+' cmd</div>'+
+        (total?'<div style="font-size:10px;color:var(--text2)">'+total.toLocaleString('fr-FR')+' F</div>':'<div style="font-size:10px;color:var(--text3)">sans montant</div>')+
+        '<div style="font-size:9px;color:var(--text3)">'+v.label+'</div>'+
+      '</div>';
+    });
+    h+='</div>';
   }
   return h;
 }
@@ -3935,6 +3978,8 @@ async function _demandePleinOui(){
     orig.onclick=async function(){await _origClick.call(this);_dtRefreshCommandes();};
   }
 }
+
+function _cmdSetFilter(f){window._cmdFilter=f;_dtRefreshCommandes();}
 
 function _dtRefreshCommandes(){
   if(!_session)return;
