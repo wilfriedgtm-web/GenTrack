@@ -85,8 +85,52 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   background:var(--white);color:var(--text2);font-size:14px;font-weight:600;cursor:pointer;
 }
 
-/* Already resolved */
+/* Already resolved (fallback) */
 .rp-done-screen{display:none;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:40px 24px;text-align:center}
+
+/* ── Vue lecture rapport résolu ── */
+.rv-header{background:linear-gradient(145deg,var(--dark) 0%,var(--dark2) 100%);padding:calc(env(safe-area-inset-top,0px) + 18px) 20px 22px;box-shadow:0 2px 20px rgba(0,0,0,.25)}
+.rv-logo{font-size:10px;font-weight:800;letter-spacing:.2em;color:var(--amber);text-transform:uppercase;margin-bottom:10px}
+.rv-title{font-size:20px;font-weight:800;color:#fff;letter-spacing:-.02em;margin-bottom:3px}
+.rv-meta{font-size:12px;color:rgba(255,255,255,.5);margin-bottom:10px}
+.rv-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(27,122,74,.35);border:1px solid rgba(168,222,192,.4);border-radius:20px;padding:4px 11px;font-size:11px;font-weight:700;color:#7EE8A2;letter-spacing:.03em}
+
+.rv-body{padding:16px 16px 32px;max-width:480px;margin:0 auto}
+
+.rv-card{background:var(--white);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.rv-card-dark{background:var(--dark2);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.rv-section-label{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);margin-bottom:10px}
+.rv-section-label-light{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+.rv-type{font-size:16px;font-weight:800;color:#fff;margin-bottom:5px}
+.rv-row{font-size:12px;color:rgba(255,255,255,.6);line-height:1.8}
+.rv-desc{font-size:13px;color:rgba(255,255,255,.85);line-height:1.5;background:rgba(255,255,255,.06);border-radius:8px;padding:10px 12px;margin-top:8px}
+.rv-photo{width:100%;border-radius:10px;margin-top:10px;max-height:280px;object-fit:cover;display:block;border:1.5px solid var(--border)}
+.rv-photo-dark{width:100%;border-radius:10px;margin-top:10px;max-height:280px;object-fit:cover;display:block;border:1.5px solid rgba(255,255,255,.12)}
+.rv-field{margin-bottom:12px}
+.rv-field:last-child{margin-bottom:0}
+.rv-field-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:4px}
+.rv-field-value{font-size:14px;font-weight:600;color:var(--text);line-height:1.5}
+.rv-field-value-muted{font-size:13px;color:var(--text2);line-height:1.6}
+.rv-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rv-kpi{background:var(--bg);border-radius:10px;padding:11px 13px}
+.rv-kpi-label{font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.rv-kpi-val{font-size:16px;font-weight:800;color:var(--dark)}
+.rv-kpi-val-amber{font-size:16px;font-weight:800;color:var(--amber-dark)}
+.rv-photos-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.rv-photos-grid img{width:100%;height:140px;object-fit:cover;border-radius:10px;border:1.5px solid var(--border);display:block}
+.rv-photos-label{font-size:10px;font-weight:700;color:var(--text3);text-align:center;margin-top:4px;letter-spacing:.05em;text-transform:uppercase}
+.rv-print-btn{width:100%;padding:14px;border:none;border-radius:var(--radius);background:var(--dark);color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;letter-spacing:-.01em;box-shadow:0 2px 10px rgba(18,21,30,.18);margin-bottom:12px}
+.rv-print-btn:active{opacity:.8}
+.rv-ref{font-size:11px;font-weight:700;color:var(--amber);letter-spacing:.08em;margin-top:2px}
+
+@media print{
+  .rv-print-btn{display:none!important}
+  .rv-header{background:#1A1D28!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .rv-card-dark{background:#1E2332!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .rv-card{box-shadow:none;border:1px solid #E4E6EF}
+  body{background:white}
+  .rv-body{padding:12px}
+}
 </style>
 </head>
 <body>
@@ -106,6 +150,72 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   <div style="font-size:52px;margin-bottom:16px">✅</div>
   <div style="font-size:18px;font-weight:700;color:var(--dark);margin-bottom:8px">Déjà traité</div>
   <div style="font-size:14px;color:var(--text2)">Ce signalement a déjà été résolu.<br>Merci pour votre intervention !</div>
+</div>
+
+<!-- Vue lecture rapport résolu -->
+<div id="rp-view" style="display:none">
+  <div class="rv-header">
+    <div class="rv-logo">GenTrack · Rapport d'intervention</div>
+    <div class="rv-title" id="rv-title">Rapport d'intervention</div>
+    <div class="rv-meta" id="rv-meta"></div>
+    <div><span class="rv-badge">✅ Résolu</span></div>
+  </div>
+  <div class="rv-body">
+
+    <button class="rv-print-btn" onclick="window.print()">🖨️ Imprimer / Télécharger PDF</button>
+
+    <!-- Signalement -->
+    <div class="rv-card-dark" id="rv-sg-card">
+      <div class="rv-section-label">Signalement</div>
+      <div class="rv-type" id="rv-sg-type"></div>
+      <div class="rv-row" id="rv-sg-meta"></div>
+      <div class="rv-desc" id="rv-sg-desc"></div>
+    </div>
+
+    <!-- Photo avant -->
+    <div id="rv-avant-wrap" style="display:none">
+      <div class="rv-card">
+        <div class="rv-section-label-light">📸 Photo — Avant intervention</div>
+        <img id="rv-photo-avant" class="rv-photo" alt="Avant"/>
+      </div>
+    </div>
+
+    <!-- Intervention -->
+    <div class="rv-card">
+      <div class="rv-section-label-light">🔧 Intervention</div>
+      <div class="rv-field">
+        <div class="rv-field-label">Technicien / Prestataire</div>
+        <div class="rv-field-value" id="rv-tech">—</div>
+      </div>
+      <div class="rv-field">
+        <div class="rv-field-label">Date d'intervention</div>
+        <div class="rv-field-value" id="rv-date">—</div>
+      </div>
+      <div class="rv-field">
+        <div class="rv-field-label">Travaux effectués</div>
+        <div class="rv-field-value-muted" id="rv-travaux">—</div>
+      </div>
+      <div class="rv-grid" style="margin-top:4px" id="rv-kpis">
+        <div class="rv-kpi" id="rv-kpi-cout" style="display:none">
+          <div class="rv-kpi-label">Coût</div>
+          <div class="rv-kpi-val-amber" id="rv-kpi-cout-val"></div>
+        </div>
+        <div class="rv-kpi" id="rv-kpi-duree" style="display:none">
+          <div class="rv-kpi-label">Durée</div>
+          <div class="rv-kpi-val" id="rv-kpi-duree-val"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Photo après -->
+    <div id="rv-apres-wrap" style="display:none">
+      <div class="rv-card">
+        <div class="rv-section-label-light">📸 Photo — Après intervention</div>
+        <img id="rv-photo-apres" class="rv-photo" alt="Après"/>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <div id="rp-main" style="display:none">
@@ -214,6 +324,73 @@ function supaPost(table,data){
   }).then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error(t);});});
 }
 
+function _esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function _renderView(sg,mnt,siteNom){
+  var TYPE_LABELS={panne:'⚡ Panne',anomalie:'👁 Anomalie',bruit:'🔊 Bruit anormal',odeur:'💨 Odeur suspecte',fuite:'💧 Fuite',seuil:'📈 Seuil dépassé',autre:'📝 Autre'};
+  var eqNom=sg.equipements&&sg.equipements.nom?sg.equipements.nom:'';
+
+  // Header
+  var refStr=sg.ref_code?(' · '+sg.ref_code):'';
+  document.getElementById('rv-title').textContent=(eqNom||TYPE_LABELS[sg.type]||'Signalement')+refStr;
+  var metaParts=[];
+  if(siteNom)metaParts.push(siteNom);
+  if(sg.created_at)metaParts.push('Signalé le '+new Date(sg.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'}));
+  document.getElementById('rv-meta').textContent=metaParts.join(' · ');
+
+  // Signalement card
+  document.getElementById('rv-sg-type').textContent=TYPE_LABELS[sg.type]||sg.type||'Signalement';
+  var sgMeta=[];
+  if(eqNom)sgMeta.push('⚙️ '+eqNom);
+  if(sg.lieu)sgMeta.push('📍 '+sg.lieu);
+  if(sg.assigne_a)sgMeta.push('👷 '+sg.assigne_a);
+  document.getElementById('rv-sg-meta').textContent=sgMeta.join('  ');
+  document.getElementById('rv-sg-desc').textContent=sg.description||'—';
+
+  // Photo avant
+  if(sg.photo_url){
+    document.getElementById('rv-photo-avant').src=sg.photo_url;
+    document.getElementById('rv-avant-wrap').style.display='';
+  }
+
+  // Intervention data (maintenance > signalement fallback)
+  var techNom=mnt?(mnt.prestataire||mnt.created_by||''):null;
+  if(!techNom)techNom=sg.resolved_by||sg.assigne_a||'—';
+  document.getElementById('rv-tech').textContent=techNom;
+
+  var dateInt=mnt&&mnt.date_intervention
+    ?new Date(mnt.date_intervention+'T12:00:00').toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})
+    :sg.resolved_at
+      ?new Date(sg.resolved_at).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})
+      :'—';
+  document.getElementById('rv-date').textContent=dateInt;
+
+  var travaux=mnt&&mnt.description?mnt.description:(sg.note_resolution||'—');
+  document.getElementById('rv-travaux').textContent=travaux;
+
+  // KPIs
+  var cout=mnt&&mnt.cout!=null?parseFloat(mnt.cout):(sg.cout_intervention!=null?parseFloat(sg.cout_intervention):null);
+  if(cout!=null&&!isNaN(cout)){
+    document.getElementById('rv-kpi-cout-val').textContent=cout.toLocaleString('fr-FR')+' FCFA';
+    document.getElementById('rv-kpi-cout').style.display='';
+  }
+  if(mnt&&mnt.duree_valeur!=null){
+    var d=parseFloat(mnt.duree_valeur);
+    var u=mnt.duree_unite||'heures';
+    var uLabel=u==='heures'?'h':u==='minutes'?'min':'j';
+    document.getElementById('rv-kpi-duree-val').textContent=d.toFixed(d%1===0?0:1)+' '+uLabel;
+    document.getElementById('rv-kpi-duree').style.display='';
+  }
+
+  // Photo après
+  if(mnt&&mnt.photo_url){
+    document.getElementById('rv-photo-apres').src=mnt.photo_url;
+    document.getElementById('rv-apres-wrap').style.display='';
+  }
+
+  document.getElementById('rp-view').style.display='block';
+}
+
 async function init(){
   var params=new URLSearchParams(location.search);
   var sgId=params.get('sg');
@@ -222,15 +399,22 @@ async function init(){
   // Fetch signalement + site
   var rows=await supa('signalements',
     'id=eq.'+sgId+
-    '&select=id,type,description,lieu,statut,assigne_a,groupe_id,equipement_id,created_at,photo_url,prestataire_id,equipements(nom)'
+    '&select=id,ref_code,type,description,lieu,statut,assigne_a,groupe_id,equipement_id,created_at,photo_url,prestataire_id,note_resolution,resolved_by,resolved_at,cout_intervention,equipements(nom)'
   );
   if(!rows||!rows[0]){_showInvalid();return;}
   _sg=rows[0];
 
-  // Already resolved ?
+  // Already resolved → show full read-only report
   if(_sg.statut==='resolu'){
+    // Fetch site name + maintenance liée en parallèle
+    var [siteRowsR,mntRows]=await Promise.all([
+      _sg.groupe_id?supa('sites','id=eq.'+_sg.groupe_id+'&select=nom'):Promise.resolve([]),
+      supa('maintenances','signalement_id=eq.'+_sg.id+'&statut=eq.realise&order=created_at.desc&limit=1&select=id,titre,description,prestataire,created_by,date_intervention,cout,duree_valeur,duree_unite,photo_url')
+    ]);
+    var siteNomR=(siteRowsR&&siteRowsR[0])?siteRowsR[0].nom||'':'';
+    var mnt=(mntRows&&mntRows[0])?mntRows[0]:null;
     document.getElementById('rp-loading').style.display='none';
-    document.getElementById('rp-done-screen').style.display='flex';
+    _renderView(_sg,mnt,siteNomR);
     return;
   }
 
