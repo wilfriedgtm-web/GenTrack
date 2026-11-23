@@ -3261,7 +3261,13 @@ async function _rtCommandes(sid,session){
   var zoneEqIds=eqsZone.map(function(e){return e.id;});
   var sigZone=[];
   if(zoneEqIds.length){
-    sigZone=(await supaGet('signalements','equipement_zone_id=in.('+zoneEqIds.join(',')+')'+'&created_at=gte.'+cutoff30+'T00:00:00&select=id,equipement_zone_id,description,statut,created_at&order=created_at.desc&limit=200'))||[];
+    // Batch par 100 IDs pour éviter URL trop longue (PostgREST HTTP 400)
+    var _sigChunks=[];
+    for(var _ci=0;_ci<zoneEqIds.length;_ci+=100)_sigChunks.push(zoneEqIds.slice(_ci,_ci+100));
+    var _sigResults=await Promise.all(_sigChunks.map(function(chunk){
+      return supaGet('signalements','equipement_zone_id=in.('+chunk.join(',')+')'+'&created_at=gte.'+cutoff30+'T00:00:00&select=id,equipement_zone_id,description,statut,created_at&order=created_at.desc&limit=200');
+    }));
+    sigZone=_sigResults.reduce(function(acc,r){return acc.concat(r||[]);},[]);
   }
 
   // Groupements
@@ -8192,7 +8198,7 @@ async function _zonesSaveEqZone(zoneId,sid){
   if(!nom)return;
   var btn=document.getElementById('zeq-save');
   if(btn){btn.disabled=true;btn.textContent='Ajout…';}
-  await supaPost('equipements_zone',{site_id:sid,groupe_id:sid,zone_id:zoneId,nom:nom,actif:true});
+  await supaPost('equipements_zone',{site_id:sid,zone_id:zoneId,nom:nom,actif:true});
   _closeCfgModal();
   _zonesRefresh();
 }
