@@ -2535,6 +2535,7 @@ function _sgRenderKanban(sid){
           '<div style="width:8px;height:8px;border-radius:50%;background:'+col.dot+';flex-shrink:0"></div>'+
           '<div style="font-size:12px;font-weight:700;color:var(--dark);flex:1">'+col.label+'</div>'+
           '<div style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;background:'+col.cntBg+';color:'+col.cntColor+'">'+items.length+'</div>'+
+          (col.key==='resolu'&&items.length>1?'<button onclick="event.stopPropagation();_sgOuvrirTousRapports(this)" data-ids="'+items.map(function(r){return r.id;}).join(',')+'" title="Ouvrir tous les rapports" style="padding:3px 7px;font-size:10px;font-weight:700;border:1.5px solid var(--vert-border);border-radius:6px;background:var(--vert-pale);color:var(--vert);cursor:pointer;white-space:nowrap;flex-shrink:0">📄×'+items.length+'</button>':'')+
         '</div>'+
         '<div style="padding:8px;overflow-y:auto;max-height:520px;display:flex;flex-direction:column;gap:6px">'+
           (items.length===0?'<div style="text-align:center;padding:32px 0;font-size:12px;color:var(--text3)">—</div>':items.map(function(r){return _sgBuildCard(r,zones,col.key);}).join(''))+
@@ -2580,6 +2581,13 @@ function _sgBuildCard(r,zones,colKey){
       (preneur?'<span style="font-size:11px;color:var(--orange);flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">⚡ '+escape_html(preneur)+'</span>':'')+
       '<button onclick="event.stopPropagation();_sgResoudre(\''+r.id+'\')" style="padding:5px 8px;font-size:11px;font-weight:600;border:1.5px solid var(--vert-border);border-radius:6px;background:var(--vert-pale);color:var(--vert);cursor:pointer;white-space:nowrap;font-family:inherit">✅ Résoudre</button>'+
       '<button onclick="event.stopPropagation();_sgAffecter(\''+r.id+'\')" style="padding:5px 8px;font-size:11px;border:1.5px solid var(--border);border-radius:6px;background:white;color:var(--text2);cursor:pointer;font-family:inherit">↩</button>'+
+    '</div>';
+  } else if(colKey==='resolu'){
+    var preneurR=r.assigne_a||r.pris_en_charge_par||r.resolved_by||'';
+    var rapUrl='rapport.html?sg='+r.id;
+    quickActions='<div style="display:flex;align-items:center;gap:5px;margin-top:7px;padding-top:7px;border-top:1px solid var(--border)">'+
+      (preneurR?'<span style="font-size:10px;color:var(--vert);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600">✅ '+escape_html(preneurR)+'</span>':'')+
+      '<a href="'+rapUrl+'" target="_blank" onclick="event.stopPropagation()" style="padding:4px 10px;font-size:11px;font-weight:700;border:1.5px solid var(--vert-border);border-radius:6px;background:var(--vert-pale);color:var(--vert);text-decoration:none;white-space:nowrap;flex-shrink:0">📄 Rapport</a>'+
     '</div>';
   }
   return '<div id="sg-card-'+r.id+'" onclick="_sgSelectCard(\''+r.id+'\')" style="border:1.5px solid '+(isSel?'var(--amber)':'var(--border)')+';border-left:4px solid '+accent+';border-radius:8px;padding:10px 11px;cursor:pointer;background:'+(isSel?'var(--amber-pale)':'white')+';transition:border-color .12s">'+
@@ -2912,6 +2920,7 @@ var _sgAffecterPreviewWa=null;
 var _sgAffPrestId=null;
 var _sgAffPrestNom=null;
 var _sgAffPrestTel=null;
+var _sgAffPrestEmail=null;
 
 function _sgAffecterPreview(sgId,techNom,techWa){
   _sgAffecterPreviewId=sgId;
@@ -2967,6 +2976,12 @@ function _sgAffecterUpdatePreview(id){
   if(el)el.textContent=_sgAffecterMsg(r,instr.trim(),rapportUrl);
 }
 
+
+function _sgOuvrirTousRapports(btn){
+  var ids=(btn.dataset.ids||'').split(',').filter(Boolean);
+  if(!ids.length)return;
+  ids.forEach(function(id){window.open('rapport.html?sg='+id,'_blank');});
+}
 
 function _sgAffecter(id){
   var r=window._sgRows&&window._sgRows[id];
@@ -3048,55 +3063,76 @@ function _sgAffecterShowTab(id,tab,r,sid){
         prest.map(function(p){
           var ini=p.nom.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
           var hasTel=!!(p.telephone&&p.telephone.trim());
+          var hasEmail=!!(p.email&&p.email.trim());
           var nomJs=p.nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
           var telJs=(p.telephone||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-          return '<button onclick="_sgAffecterPrestatairePreview(\''+id+'\',\''+p.id+'\',\''+nomJs+'\',\''+telJs+'\')" style="width:100%;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;background:white;text-align:left">'+
+          var emailJs=(p.email||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+          var badges='';
+          if(hasTel)badges+='<span style="font-size:10px;font-weight:700;color:#25D366;background:#e8f5e9;border-radius:5px;padding:2px 7px">📱 WA</span>';
+          if(hasEmail)badges+='<span style="font-size:10px;font-weight:700;color:#1e40af;background:#eff6ff;border-radius:5px;padding:2px 7px">✉️</span>';
+          if(!hasTel&&!hasEmail)badges='<span style="font-size:10px;color:var(--text3)">sans contact</span>';
+          return '<button onclick="_sgAffecterPrestatairePreview(\''+id+'\',\''+p.id+'\',\''+nomJs+'\',\''+telJs+'\',\''+emailJs+'\')" style="width:100%;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;cursor:pointer;margin-bottom:6px;background:white;text-align:left">'+
             '<div style="width:36px;height:36px;border-radius:50%;background:var(--amber-pale);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--amber-dark);flex-shrink:0">'+escape_html(ini)+'</div>'+
             '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(p.nom)+'</div><div style="font-size:11px;color:var(--text3)">'+(p.specialite?escape_html(p.specialite):'Prestataire')+'</div></div>'+
-            (hasTel?'<span style="font-size:11px;font-weight:600;color:#25D366;background:#e8f5e9;border-radius:6px;padding:3px 8px">📱 WA</span>':'<span style="font-size:10px;color:var(--text3)">pas de WA</span>')+
+            '<div style="display:flex;gap:4px;flex-shrink:0">'+badges+'</div>'+
           '</button>';
         }).join('');
     });
   }
 }
 
-function _sgAffecterPrestatairePreview(sgId,prestId,prestNom,prestTel){
+function _sgAffecterPrestatairePreview(sgId,prestId,prestNom,prestTel,prestEmail){
   _sgAffPrestId=prestId;
   _sgAffPrestNom=prestNom;
-  _sgAffPrestTel=prestTel;
+  _sgAffPrestTel=prestTel||'';
+  _sgAffPrestEmail=prestEmail||'';
   var r=window._sgRows&&window._sgRows[sgId];
   var rapportUrl=location.origin+location.pathname.replace('dashboard.html','rapport.html')+'?sg='+sgId;
   var eqNom=r?((r.equipements&&r.equipements.nom)?r.equipements.nom:(r.equipements_zone&&r.equipements_zone.nom?r.equipements_zone.nom:'')):'' ;
   var typeLabel=r?(_SG_TYPES[r.type]||r.type||'Signalement'):'Signalement';
-  var msgPreview='🔧 *Demande d\'intervention — GenTrack*\n\n'+
+  var msgBody='🔧 Demande d\'intervention — GenTrack\n\n'+
+    typeLabel+(eqNom?' · '+eqNom:'')+'\n'+
+    (r&&r.lieu?'Lieu : '+r.lieu+'\n':'')+
+    (r?r.description||'':'')+
+    '\n\nFiche intervention : '+rapportUrl;
+  var msgWa='🔧 *Demande d\'intervention — GenTrack*\n\n'+
     '📍 *'+typeLabel+(eqNom?' · '+eqNom:'')+'*\n'+
     (r&&r.lieu?'📍 Lieu : '+r.lieu+'\n':'')+
     (r?'📝 '+(r.description||''):'')+
     '\n\n✅ Fiche intervention'+(r&&r.photo_url?' (photo incluse)':'')+' :\n'+rapportUrl;
   var hasWa=!!(prestTel&&prestTel.trim());
+  var hasEmail=!!(prestEmail&&prestEmail.trim());
+  var sujEmail=encodeURIComponent('Demande d\'intervention GenTrack'+(eqNom?' — '+eqNom:''));
+  var bodyEmail=encodeURIComponent(msgBody);
+  var mailtoHref='mailto:'+encodeURIComponent(prestEmail||'')+'?subject='+sujEmail+'&body='+bodyEmail;
   _showCfgModal(
     '<div style="font-size:15px;font-weight:700;color:var(--dark);margin-bottom:4px">🏢 Envoyer au prestataire</div>'+
-    '<div style="font-size:12px;color:var(--text2);margin-bottom:12px">À envoyer à <strong>'+escape_html(prestNom)+'</strong>'+(hasWa?'':' <span style="color:var(--rouge)">⚠️ pas de WA</span>')+'</div>'+
-    '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px;font-size:11px;color:var(--dark);white-space:pre-wrap;line-height:1.55;margin-bottom:12px;max-height:160px;overflow-y:auto">'+escape_html(msgPreview)+'</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:12px"><strong>'+escape_html(prestNom)+'</strong>'+
+      (hasWa?' · <span style="color:#25D366;font-weight:700">📱 WA</span>':'')+
+      (hasEmail?' · <span style="color:#1e40af;font-weight:700">✉️ Email</span>':'')+
+      (!hasWa&&!hasEmail?' <span style="color:var(--rouge)">⚠️ aucun moyen de contact</span>':'')+
+    '</div>'+
+    '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px;font-size:11px;color:var(--dark);white-space:pre-wrap;line-height:1.55;margin-bottom:12px;max-height:150px;overflow-y:auto">'+escape_html(msgWa)+'</div>'+
     '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Note pour le prestataire (optionnel)</div>'+
     '<textarea id="sg-aff-prest-note" rows="2" placeholder="Ex : Pièces à prévoir, accès par l\'entrée de service…" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;resize:none;font-family:inherit;outline:none;margin-bottom:12px;box-sizing:border-box"></textarea>'+
-    '<div style="display:flex;gap:8px">'+
-      '<button onclick="_sgAffecter(\''+sgId+'\')" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:white;cursor:pointer;color:var(--text2)">← Retour</button>'+
-      '<button onclick="_sgAffecterPrestataireConfirm(\''+sgId+'\')" style="flex:2;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:'+(hasWa?'#25D366':'var(--amber-dark)')+';color:white;cursor:pointer">'+(hasWa?'📱 Envoyer WA':'✅ Affecter sans WA')+'</button>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button onclick="_sgAffecter(\''+sgId+'\')" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;background:white;cursor:pointer;color:var(--text2)">← Retour</button>'+
+      (hasWa?'<button onclick="_sgAffecterPrestataireConfirm(\''+sgId+'\',\'wa\')" style="flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:#25D366;color:white;cursor:pointer">📱 WhatsApp</button>':'')+
+      (hasEmail?'<a href="'+mailtoHref+'" onclick="_sgAffecterPrestataireConfirm(\''+sgId+'\',\'email\')" style="flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:#1e40af;color:white;cursor:pointer;text-decoration:none;text-align:center;display:inline-flex;align-items:center;justify-content:center">✉️ Email</a>':'')+
+      (!hasWa&&!hasEmail?'<button onclick="_sgAffecterPrestataireConfirm(\''+sgId+'\',\'none\')" style="flex:2;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:var(--amber-dark);color:white;cursor:pointer">✅ Affecter sans contact</button>':'')+
     '</div>'
   );
 }
 
-async function _sgAffecterPrestataireConfirm(sgId){
+async function _sgAffecterPrestataireConfirm(sgId,mode){
   var r=window._sgRows&&window._sgRows[sgId];
   var prestId=_sgAffPrestId;
   var prestNom=_sgAffPrestNom;
-  var prestTel=_sgAffPrestTel;
-  var sid=r&&(r.groupe_id||r.site_id)||(_session&&_session.site_ids&&_session.site_ids[0]);
+  var prestTel=_sgAffPrestTel||'';
   var eqNom=r?((r.equipements&&r.equipements.nom)?r.equipements.nom:(r.equipements_zone&&r.equipements_zone.nom?r.equipements_zone.nom:'')):'' ;
   var typeLabel=r?(_SG_TYPES[r.type]||r.type||'Signalement'):'Signalement';
   var note=((document.getElementById('sg-aff-prest-note')||{}).value||'').trim();
-  // 1. Patch le signalement → en_cours + prestataire_id
+  // 1. Patch signalement → en_cours + prestataire_id
   await supaPatch('signalements',sgId,{
     statut:'en_cours',
     assigne_a:prestNom,
@@ -3105,8 +3141,8 @@ async function _sgAffecterPrestataireConfirm(sgId){
     pris_en_charge_at:new Date().toISOString()
   });
   _closeCfgModal();
-  // 3. Ouvrir WhatsApp si numéro disponible
-  if(prestTel&&prestTel.trim()){
+  // 2. Ouvrir WhatsApp si mode=wa
+  if(mode==='wa'&&prestTel.trim()){
     var rapportUrl=location.origin+location.pathname.replace('dashboard.html','rapport.html')+'?sg='+sgId;
     var msg='🔧 *Demande d\'intervention — GenTrack*\n\n'+
       '📍 *'+typeLabel+(eqNom?' · '+eqNom:'')+'*\n'+
@@ -3117,7 +3153,8 @@ async function _sgAffecterPrestataireConfirm(sgId){
     var waNum=prestTel.replace(/\D/g,'');
     window.open('https://wa.me/'+waNum+'?text='+encodeURIComponent(msg),'_blank');
   }
-  // 4. Rafraîchir
+  // (Email mode: le href mailto a déjà été cliqué via le lien <a>)
+  // 3. Rafraîchir
   if(_session){
     var nav=_pecFromNav||_currentNav||'signalements';
     if(_doCurrentSite)renderDirOpsSite(_session,_doCurrentSite.id,_doCurrentSite.nom,nav);
