@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>GenTrack · Rapports groupés</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --dark:#12151E;--dark2:#1E2332;
+  --text:#1A1D28;--text2:#5A5F78;--text3:#9AA0B8;
+  --border:#E4E6EF;--bg:#F4F5FA;--white:#FFFFFF;
+  --amber:#E8A020;--amber-pale:#FFF6E0;--amber-border:#F5D080;
+  --vert:#1B7A4A;--vert-pale:#E8F7EE;--vert-border:#A8DEC0;
+  --rouge:#C0392B;--rouge-pale:#FDF0EE;
+  --shadow:0 2px 12px rgba(18,21,30,.07);
+  --radius:14px;
+}
+body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;color:var(--text)}
+
+/* Barre fixe */
+.top-bar{position:sticky;top:0;z-index:100;background:var(--dark);padding:12px 20px;display:flex;align-items:center;gap:14px}
+.tb-logo{font-size:11px;font-weight:800;letter-spacing:.18em;color:var(--amber);text-transform:uppercase;white-space:nowrap}
+.tb-title{font-size:13px;color:rgba(255,255,255,.65);flex:1}
+.tb-print{background:var(--amber);color:var(--dark);border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.tb-print:hover{background:#d08010}
+
+/* Conteneur rapports */
+.reports-wrap{max-width:620px;margin:0 auto;padding:20px 16px 48px}
+
+/* Un rapport */
+.report-block{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:28px;border:1px solid var(--border)}
+.rb-header{background:linear-gradient(135deg,var(--dark) 0%,var(--dark2) 100%);padding:16px 18px 14px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.rb-h-left{flex:1;min-width:0}
+.rb-title{font-size:17px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rb-meta{font-size:12px;color:rgba(255,255,255,.55);margin-top:3px}
+.rb-badge{flex-shrink:0;background:var(--vert-pale);color:var(--vert);border:1px solid var(--vert-border);border-radius:20px;font-size:11px;font-weight:700;padding:3px 10px;white-space:nowrap}
+
+.rb-body{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+
+/* Carte signalement */
+.sg-card{background:var(--dark2);border-radius:10px;padding:12px 14px;color:#fff}
+.sg-card-label{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--amber);margin-bottom:6px}
+.sg-card-type{font-size:14px;font-weight:800;color:#fff;margin-bottom:4px}
+.sg-card-row{font-size:12px;color:rgba(255,255,255,.6);line-height:1.6}
+.sg-card-desc{font-size:12px;color:rgba(255,255,255,.85);margin-top:8px;background:rgba(255,255,255,.07);border-radius:6px;padding:8px 10px;line-height:1.5}
+
+/* Photo */
+.photo-block{background:var(--bg);border-radius:10px;overflow:hidden;border:1px solid var(--border)}
+.photo-label{padding:8px 12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);border-bottom:1px solid var(--border)}
+.photo-block img{width:100%;max-height:260px;object-fit:cover;display:block}
+
+/* Intervention */
+.int-card{background:var(--bg);border-radius:10px;padding:12px 14px;border:1px solid var(--border)}
+.int-label{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+.int-row{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--text)}
+.int-row:last-child{border-bottom:none}
+.int-row-label{color:var(--text2);font-size:12px}
+.int-travaux{font-size:13px;color:var(--text);line-height:1.5;padding-top:4px;white-space:pre-wrap}
+
+/* KPI row */
+.kpi-row{display:flex;gap:10px}
+.kpi{flex:1;background:var(--white);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:center}
+.kpi-val{font-size:17px;font-weight:800;color:var(--dark)}
+.kpi-lbl{font-size:10px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:.06em}
+
+/* Séparateur page print */
+@media print{
+  .top-bar{display:none}
+  .report-block{page-break-inside:avoid;break-inside:avoid;box-shadow:none}
+  body{background:white}
+}
+
+/* Spinner */
+#loading{padding:60px;text-align:center;color:var(--text3);font-size:14px}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="tb-logo">GenTrack</div>
+  <div class="tb-title" id="tb-title">Chargement…</div>
+  <button class="tb-print" onclick="window.print()">🖨️ Imprimer tout</button>
+</div>
+
+<div id="loading">Chargement des rapports…</div>
+<div class="reports-wrap" id="reports-wrap" style="display:none"></div>
+
+<script>
+var SUPA_URL='https://zbpoxjlkqxnqjzxohasq.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicG94amxrcXhucWp6eG9oYXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1MjM3ODAsImV4cCI6MjA5NzA5OTc4MH0.9-QyWgon93jGDo5QKMIh_-QbQZ_P9rQrYJnVxegJe7M';
+
+var TYPE_LABELS={panne:'⚡ Panne',anomalie:'👁 Anomalie',bruit:'🔊 Bruit anormal',odeur:'💨 Odeur suspecte',fuite:'💧 Fuite',seuil:'📈 Seuil dépassé',autre:'📝 Autre'};
+
+function supa(table,query){
+  return fetch(SUPA_URL+'/rest/v1/'+table+'?'+query,{
+    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Accept':'application/json'}
+  }).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];});
+}
+
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function fmt_date(d){
+  if(!d)return '—';
+  return new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
+}
+
+function renderReport(sg,mnt,siteNom){
+  var eqNom=sg.equipements&&sg.equipements.nom?sg.equipements.nom:'';
+  var refStr=sg.ref_code?' · '+esc(sg.ref_code):'';
+  var title=esc(eqNom||TYPE_LABELS[sg.type]||'Signalement')+refStr;
+  var metaParts=[];
+  if(siteNom)metaParts.push(esc(siteNom));
+  metaParts.push('Signalé le '+fmt_date(sg.created_at));
+  var meta=metaParts.join(' · ');
+
+  var typeLabel=esc(TYPE_LABELS[sg.type]||sg.type||'Signalement');
+  var sgMeta=[];
+  if(eqNom)sgMeta.push('⚙️ '+esc(eqNom));
+  if(sg.lieu)sgMeta.push('📍 '+esc(sg.lieu));
+  if(sg.assigne_a)sgMeta.push('👷 '+esc(sg.assigne_a));
+
+  var techNom=mnt?(mnt.prestataire||mnt.created_by||null):null;
+  if(!techNom)techNom=sg.resolved_by||sg.assigne_a||'—';
+
+  var dateInt=mnt&&mnt.date_intervention
+    ?fmt_date(mnt.date_intervention+'T12:00:00')
+    :fmt_date(sg.resolved_at);
+
+  var travaux=mnt&&mnt.description?mnt.description:(sg.note_resolution||'—');
+
+  var cout=mnt&&mnt.cout!=null?parseFloat(mnt.cout):(sg.cout_intervention!=null?parseFloat(sg.cout_intervention):null);
+  var duree='';
+  if(mnt&&mnt.duree_valeur!=null){
+    var d=parseFloat(mnt.duree_valeur);
+    var u=mnt.duree_unite||'heures';
+    var uL=u==='heures'?'h':u==='minutes'?'min':'j';
+    duree=d.toFixed(d%1===0?0:1)+' '+uL;
+  }
+
+  var kpiHtml='';
+  if(cout!=null&&!isNaN(cout)||duree){
+    kpiHtml='<div class="kpi-row">';
+    if(cout!=null&&!isNaN(cout))kpiHtml+='<div class="kpi"><div class="kpi-val">'+cout.toLocaleString('fr-FR')+' <small style="font-size:12px;font-weight:600">FCFA</small></div><div class="kpi-lbl">Coût</div></div>';
+    if(duree)kpiHtml+='<div class="kpi"><div class="kpi-val">'+esc(duree)+'</div><div class="kpi-lbl">Durée</div></div>';
+    kpiHtml+='</div>';
+  }
+
+  var photoAvantHtml='';
+  if(sg.photo_url){
+    photoAvantHtml='<div class="photo-block"><div class="photo-label">📷 Photo — avant intervention</div><img src="'+esc(sg.photo_url)+'" alt="avant"/></div>';
+  }
+  var photoApresHtml='';
+  if(mnt&&mnt.photo_url){
+    photoApresHtml='<div class="photo-block"><div class="photo-label">📷 Photo — après intervention</div><img src="'+esc(mnt.photo_url)+'" alt="après"/></div>';
+  }
+
+  return '<div class="report-block">'
+    +'<div class="rb-header">'
+      +'<div class="rb-h-left"><div class="rb-title">'+title+'</div><div class="rb-meta">'+meta+'</div></div>'
+      +'<div class="rb-badge">✅ Résolu</div>'
+    +'</div>'
+    +'<div class="rb-body">'
+      +'<div class="sg-card">'
+        +'<div class="sg-card-label">Signalement</div>'
+        +'<div class="sg-card-type">'+typeLabel+'</div>'
+        +(sgMeta.length?'<div class="sg-card-row">'+sgMeta.join('  &nbsp;')+'</div>':'')
+        +(sg.description?'<div class="sg-card-desc">'+esc(sg.description)+'</div>':'')
+      +'</div>'
+      +photoAvantHtml
+      +'<div class="int-card">'
+        +'<div class="int-label">Intervention</div>'
+        +'<div class="int-row"><span class="int-row-label">Technicien</span><span>'+esc(techNom)+'</span></div>'
+        +'<div class="int-row"><span class="int-row-label">Date</span><span>'+dateInt+'</span></div>'
+        +(travaux&&travaux!=='—'?'<div style="margin-top:8px"><div class="int-row-label" style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Travaux réalisés</div><div class="int-travaux">'+esc(travaux)+'</div></div>':'')
+      +'</div>'
+      +kpiHtml
+      +photoApresHtml
+    +'</div>'
+  +'</div>';
+}
+
+async function init(){
+  var params=new URLSearchParams(location.search);
+  var ids=(params.get('ids')||'').split(',').filter(Boolean);
+  if(!ids.length){
+    document.getElementById('loading').textContent='Aucun rapport à afficher.';
+    return;
+  }
+
+  // Charge tous les signalements + maintenances en parallèle
+  var sgQuery='id=in.('+ids.join(',')+')'
+    +'&select=id,ref_code,type,description,lieu,statut,assigne_a,groupe_id,equipement_id,created_at,photo_url,note_resolution,resolved_by,resolved_at,cout_intervention,equipements(nom)';
+  var mntQuery='signalement_id=in.('+ids.join(',')+')'
+    +'&statut=eq.realise'
+    +'&order=created_at.desc'
+    +'&select=id,signalement_id,titre,description,prestataire,created_by,date_intervention,cout,duree_valeur,duree_unite,photo_url';
+
+  var [sgRows,mntRows]=await Promise.all([supa('signalements',sgQuery),supa('maintenances',mntQuery)]);
+
+  if(!sgRows||!sgRows.length){
+    document.getElementById('loading').textContent='Rapports introuvables.';
+    return;
+  }
+
+  // Index maintenances par signalement_id (garde le plus récent — déjà trié desc)
+  var mntBySg={};
+  (mntRows||[]).forEach(function(m){if(!mntBySg[m.signalement_id])mntBySg[m.signalement_id]=m;});
+
+  // Charge noms de sites en parallèle
+  var siteIds=[...new Set(sgRows.map(function(r){return r.groupe_id;}).filter(Boolean))];
+  var siteMap={};
+  if(siteIds.length){
+    var siteRows=await supa('sites','id=in.('+siteIds.join(',')+')'+'&select=id,nom');
+    (siteRows||[]).forEach(function(s){siteMap[s.id]=s.nom||'';});
+  }
+
+  // Trie dans l'ordre des IDs passés en paramètre
+  var sgById={};
+  sgRows.forEach(function(r){sgById[r.id]=r;});
+
+  var html='';
+  ids.forEach(function(id){
+    var sg=sgById[id];
+    if(!sg)return;
+    var mnt=mntBySg[id]||null;
+    var siteNom=sg.groupe_id?siteMap[sg.groupe_id]||'':'';
+    html+=renderReport(sg,mnt,siteNom);
+  });
+
+  document.getElementById('loading').style.display='none';
+  var wrap=document.getElementById('reports-wrap');
+  wrap.innerHTML=html;
+  wrap.style.display='';
+
+  document.getElementById('tb-title').textContent=sgRows.length+' rapport'+(sgRows.length>1?'s':'');
+}
+
+init();
+</script>
+</body>
+</html>

@@ -2344,6 +2344,7 @@ var _sgFilter='tous';
 var _sgZoneFilter=null;
 var _sgSearch='';
 var _sgSelected=null;
+var _sgResolusFilter='30j';
 
 var _SG_TYPES={panne:'Panne',anomalie:'Anomalie',bruit:'Bruit',odeur:'Odeur',fuite:'Fuite',seuil:'Seuil dépassé',autre:'Autre'};
 var _SG_ICONS={panne:'⚡',anomalie:'👁',bruit:'🔊',odeur:'💨',fuite:'💧',seuil:'📈',autre:'📝'};
@@ -2521,21 +2522,41 @@ function _sgRenderKanban(sid){
   var byStatut={ouvert:[],en_cours:[],resolu:[]};
   rows.forEach(function(r){if(byStatut[r.statut])byStatut[r.statut].push(r);});
 
+  // Filtre période sur résolus
+  if(_sgResolusFilter!=='tout'){
+    var daysMap={'7j':7,'30j':30,'3m':90};
+    var days=daysMap[_sgResolusFilter]||30;
+    var cutoffR=new Date();cutoffR.setDate(cutoffR.getDate()-days);
+    byStatut.resolu=byStatut.resolu.filter(function(r){
+      return r.resolved_at?new Date(r.resolved_at)>=cutoffR:new Date(r.created_at)>=cutoffR;
+    });
+  }
+
   var cols=[
     {key:'ouvert',label:'Ouvert',dot:'var(--rouge)',cntBg:'var(--rouge-pale)',cntColor:'var(--rouge)'},
     {key:'en_cours',label:'En cours',dot:'var(--orange)',cntBg:'var(--orange-pale)',cntColor:'var(--orange)'},
     {key:'resolu',label:'Résolu',dot:'var(--vert)',cntBg:'var(--vert-pale)',cntColor:'var(--vert)'}
   ];
 
+  var _fOpts=[['7j','7j'],['30j','30j'],['3m','3m'],['tout','Tout']];
+
   kEl.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">'+
     cols.map(function(col){
       var items=byStatut[col.key]||[];
+      var colIdsStr=items.map(function(r){return r.id;}).join(',');
+      var filterChips=col.key==='resolu'
+        ?'<div style="display:flex;gap:3px;margin:0 2px">'+_fOpts.map(function(fo){
+            var active=fo[0]===_sgResolusFilter;
+            return '<button onclick="event.stopPropagation();_sgSetResolusFilter(\''+fo[0]+'\')" style="padding:2px 6px;border:1px solid '+(active?'var(--vert)':'var(--border)')+';border-radius:4px;font-size:9px;font-weight:700;background:'+(active?'var(--vert-pale)':'white')+';color:'+(active?'var(--vert)':'var(--text3)')+';cursor:pointer">'+fo[1]+'</button>';
+          }).join('')+'</div>'
+        :'';
       return '<div style="background:white;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column">'+
-        '<div style="display:flex;align-items:center;gap:7px;padding:10px 12px;border-bottom:1.5px solid var(--border);background:var(--bg)">'+
+        '<div style="display:flex;align-items:center;gap:5px;padding:10px 12px;border-bottom:1.5px solid var(--border);background:var(--bg);flex-wrap:wrap">'+
           '<div style="width:8px;height:8px;border-radius:50%;background:'+col.dot+';flex-shrink:0"></div>'+
-          '<div style="font-size:12px;font-weight:700;color:var(--dark);flex:1">'+col.label+'</div>'+
+          '<div style="font-size:12px;font-weight:700;color:var(--dark)">'+col.label+'</div>'+
           '<div style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;background:'+col.cntBg+';color:'+col.cntColor+'">'+items.length+'</div>'+
-          (col.key==='resolu'&&items.length>1?'<button onclick="event.stopPropagation();_sgOuvrirTousRapports(this)" data-ids="'+items.map(function(r){return r.id;}).join(',')+'" title="Ouvrir tous les rapports" style="padding:3px 7px;font-size:10px;font-weight:700;border:1.5px solid var(--vert-border);border-radius:6px;background:var(--vert-pale);color:var(--vert);cursor:pointer;white-space:nowrap;flex-shrink:0">📄×'+items.length+'</button>':'')+
+          filterChips+
+          (col.key==='resolu'&&items.length>1?'<a href="rapports-multi.html?ids='+colIdsStr+'" target="_blank" onclick="event.stopPropagation()" title="Imprimer tous les rapports" style="margin-left:auto;padding:3px 7px;font-size:10px;font-weight:700;border:1.5px solid var(--vert-border);border-radius:6px;background:var(--vert-pale);color:var(--vert);text-decoration:none;white-space:nowrap;flex-shrink:0">🖨️ Tous ('+items.length+')</a>':'')+
         '</div>'+
         '<div style="padding:8px;overflow-y:auto;max-height:520px;display:flex;flex-direction:column;gap:6px">'+
           (items.length===0?'<div style="text-align:center;padding:32px 0;font-size:12px;color:var(--text3)">—</div>':items.map(function(r){return _sgBuildCard(r,zones,col.key);}).join(''))+
@@ -2977,10 +2998,9 @@ function _sgAffecterUpdatePreview(id){
 }
 
 
-function _sgOuvrirTousRapports(btn){
-  var ids=(btn.dataset.ids||'').split(',').filter(Boolean);
-  if(!ids.length)return;
-  ids.forEach(function(id){window.open('rapport.html?sg='+id,'_blank');});
+function _sgSetResolusFilter(f){
+  _sgResolusFilter=f;
+  _sgRenderKanban(window._sgAllRows||[]);
 }
 
 function _sgAffecter(id){
