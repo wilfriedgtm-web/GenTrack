@@ -592,10 +592,24 @@ async function renderDashboard(s){
     renderRTSitePicker(s);
     return;
   }
-  // Pré-charger les modules du site avant de construire le nav (sinon hasModule() retourne toujours true)
+  // Pré-charger les modules avant de construire le nav (sinon hasModule() retourne toujours true)
+  // dir_tech / dir_ops : union des modules de tous leurs sites (un seul site vide ne doit pas masquer les onglets)
+  // resp_tech : un seul site actif à la fois
   var sid=_activeSiteId||(s.site_ids&&s.site_ids[0]);
-  if(!_activeSiteId)_activeSiteId=sid; // init single-site
-  if(sid){
+  if(!_activeSiteId)_activeSiteId=sid;
+  if(s.role==='dir_tech'||s.role==='dir_ops'){
+    var _allSids=s.site_ids||[];
+    if(_allSids.length){
+      try{
+        var _allSitesArr=await supaGet('sites','id=in.('+_allSids.join(',')+')'+'&select=modules');
+        var _modUnion=[];
+        _allSitesArr.forEach(function(st){
+          if(Array.isArray(st.modules))st.modules.forEach(function(m){if(_modUnion.indexOf(m)<0)_modUnion.push(m);});
+        });
+        _siteModules=_modUnion.length?_modUnion:['general'];
+      }catch(e){ _siteModules=['general']; }
+    }
+  } else if(sid){
     try{
       var siteArr=await supaGet('sites','select=modules,nom&id=eq.'+sid);
       _siteModules=(siteArr&&siteArr[0]&&Array.isArray(siteArr[0].modules))?siteArr[0].modules:['general'];
