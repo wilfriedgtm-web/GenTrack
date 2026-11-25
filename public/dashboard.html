@@ -16097,15 +16097,15 @@ function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,relev
     h+='<td>'+(l.conso!=null?Math.round(l.conso).toLocaleString('fr-FR')+' '+escape_html(l.f.unite||''):'—')+'</td>';
     h+='<td>'+(l.obj?Math.round(l.obj).toLocaleString('fr-FR')+' '+escape_html(l.f.unite||''):'—')+'</td>';
     h+='<td><span style="color:'+ecC+';font-weight:600">'+fmtPct(l.ecartConso)+'</span></td>';
-    h+='<td>'+(l.coutReel!=null?fmtN(l.coutReel)+' XOF':'—')+'</td>';
-    h+='<td>'+(l.budget?fmtN(l.budget)+' XOF'+(l.budgetDyn?' <span style="font-size:9px;color:#aaa">dyn.</span>':''):'—')+'</td>';
+    h+='<td>'+(l.coutReel!=null?fmtN(l.coutReel)+' '+_D():'—')+'</td>';
+    h+='<td>'+(l.budget?fmtN(l.budget)+' '+_D()+(l.budgetDyn?' <span style="font-size:9px;color:#aaa">dyn.</span>':''):'—')+'</td>';
     h+='<td>'+(l.ecartPct!=null?'<span style="color:'+pctCol(l.ecartPct)+';font-weight:600">'+fmtPct(l.ecartPct)+'</span>':'—')+'</td>';
     h+='</tr>';
   });
   if(hasCout){
     h+='<tr class="tr-total"><td>Total</td><td>—</td><td>—</td><td>—</td>';
-    h+='<td>'+fmtN(coutTotal)+' XOF</td>';
-    h+='<td>'+(budgetTotal?fmtN(budgetTotal)+' XOF':'—')+'</td>';
+    h+='<td>'+fmtN(coutTotal)+' '+_D()+'</td>';
+    h+='<td>'+(budgetTotal?fmtN(budgetTotal)+' '+_D():'—')+'</td>';
     h+='<td>'+(ecartTotalPct!=null?'<span style="color:'+pctCol(ecartTotalPct)+';font-weight:600">'+fmtPct(ecartTotalPct)+'</span>':'—')+'</td>';
     h+='</tr>';
   }
@@ -16113,9 +16113,9 @@ function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,relev
   if(fcfaParCh&&chambresOcc){
     h+='<h2>Ratio '+_D()+' / chambre</h2>';
     h+='<div style="background:white;border:1px solid #e5e0d8;border-radius:10px;padding:16px 20px;display:flex;gap:32px;flex-wrap:wrap;margin-bottom:24px">';
-    h+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Réel</div><div style="font-size:22px;font-weight:700">'+fmtN(fcfaParCh)+'</div><div style="font-size:10px;color:#aaa">XOF / ch. nuitée</div></div>';
+    h+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Réel</div><div style="font-size:22px;font-weight:700">'+fmtN(fcfaParCh)+'</div><div style="font-size:10px;color:#aaa">'+_D()+' / ch. nuitée</div></div>';
     if(fcfaParChBudget){
-      h+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Budget</div><div style="font-size:22px;font-weight:700;color:#aaa">'+fmtN(fcfaParChBudget)+'</div><div style="font-size:10px;color:#aaa">XOF / ch. nuitée</div></div>';
+      h+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Budget</div><div style="font-size:22px;font-weight:700;color:#aaa">'+fmtN(fcfaParChBudget)+'</div><div style="font-size:10px;color:#aaa">'+_D()+' / ch. nuitée</div></div>';
       var ecFcfa=fcfaParCh-fcfaParChBudget;
       var ecFcfaPct=Math.round(ecFcfa/fcfaParChBudget*100);
       h+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Écart</div>';
@@ -16762,7 +16762,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
         }
       }
       if(_fpChR){
-        h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">'+(siteData[site.id].devise||'XOF')+' / ch. nuitée</div>';
+        h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">'+_D()+' / ch. nuitée</div>';
         h+='<div style="font-size:17px;font-weight:700">'+_fpChR.toLocaleString('fr-FR')+'<span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:2px">XOF/ch</span></div>';
         h+=(_fbChR?'<div style="font-size:10px;color:var(--text3);margin-top:2px">Budget : '+_fbChR.toLocaleString('fr-FR')+' XOF/ch</div>':'');
         h+=(_ecartChR!=null?'<div style="font-size:10px;font-weight:700;color:'+(_ecartChR>5?'#E8841A':_ecartChR<-5?'var(--vert)':'var(--text3)')+'">'+(_ecartChR>0?'↑ +':_ecartChR<0?'↓ ':'')+Math.abs(_ecartChR)+'% vs budget</div>':'');
@@ -18093,7 +18093,7 @@ async function _rtEnergie(sid){
       var _budgCh=hasBudgetData&&chambresOcc?Math.round(budgetTotalMois/(chambresOcc*daysInMonth)):null;
       var _ecartBpc=_budgCh?Math.round((_fcfaCh-_budgCh)/_budgCh*1000)/10:null;
       kpiHtml+='<div style="background:white;border:1.5px solid #fef3c7;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px">'+
-        '<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px">💰 '+(siteData[site.id].devise||'XOF')+' / ch. nuitée</div>'+
+        '<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px">💰 '+_D()+' / ch. nuitée</div>'+
         '<div style="font-size:28px;font-weight:800;color:var(--dark)">'+_fcfaCh.toLocaleString('fr-FR')+
           '<span style="font-size:13px;font-weight:500;color:var(--text3);margin-left:3px">XOF/ch</span>'+
         '</div>'+
