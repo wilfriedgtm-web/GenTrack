@@ -15183,7 +15183,7 @@ async function _openRapportDT(period){
 
     var _now=new Date();
     var[sites,pleins,maintenances,signalements,rondes,energieFluidesDT,relevesEnergieDT,budgetsMensuels,relevesZonesDT,missionsDT]=await Promise.all([
-      supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres'),
+      supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres,devise'),
       supaGet('pleins','site_id=in.('+sidStr+')&date=gte.'+cutoff+'&select=id,site_id,litres_ajoutes,cout,date&order=date.asc'),
       supaGet('maintenances','groupe_id=in.('+sidStr+')&date_intervention=gte.'+cutoff+'&select=id,groupe_id,type,titre,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=200'),
       supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+cutoff+'T00:00:00&select=id,groupe_id,type,description,statut,signale_par,assigne_a,pris_en_charge_par,cout_intervention,created_at,resolved_at,equipement_id,equipement_zone_id,lieu,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=200'),
@@ -15219,7 +15219,9 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
 
   // ── Agrégation par site ──
   var siteData={};
-  sites.forEach(function(s){siteData[s.id]={nom:s.nom,litres:0,coutCarb:0,pannes:0,pannesTot:0,panneCout:0,mntCout:0,mntCount:0,mntPreventif:0,mntCoutPreventif:0,mntCorrectif:0,mntCoutCorrectif:0,rondes:0,rondesVal:0,rondesTot:0,mttrH:[],mttr:null,toVals:[],toMoy:null,couvertsTotal:null};});
+  sites.forEach(function(s){siteData[s.id]={nom:s.nom,devise:s.devise||'XOF',litres:0,coutCarb:0,pannes:0,pannesTot:0,panneCout:0,mntCout:0,mntCount:0,mntPreventif:0,mntCoutPreventif:0,mntCorrectif:0,mntCoutCorrectif:0,rondes:0,rondesVal:0,rondesTot:0,mttrH:[],mttr:null,toVals:[],toMoy:null,couvertsTotal:null};});
+  var _devises=[...new Set(sites.map(function(s){return s.devise||'XOF';}))];
+  var _reportDevise=_devises.length===1?_devises[0]:null;
   pleins.forEach(function(p){if(siteData[p.site_id]){siteData[p.site_id].litres+=Number(p.litres_ajoutes)||0;siteData[p.site_id].coutCarb+=Number(p.cout)||0;}});
   maintenances.forEach(function(m){if(siteData[m.groupe_id]){if(m.type!=='ravitaillement'){siteData[m.groupe_id].mntCout+=Number(m.cout)||0;}siteData[m.groupe_id].mntCount++;if(m.type==='panne'){siteData[m.groupe_id].mntCorrectif++;siteData[m.groupe_id].mntCoutCorrectif+=Number(m.cout)||0;}else if(m.type!=='ravitaillement'){siteData[m.groupe_id].mntPreventif++;siteData[m.groupe_id].mntCoutPreventif+=Number(m.cout)||0;}}});
   missions.forEach(function(m){if(siteData[m.site_id]){siteData[m.site_id].mntCout+=Number(m.cout)||0;siteData[m.site_id].mntPreventif++;siteData[m.site_id].mntCoutPreventif+=Number(m.cout)||0;}});
@@ -15342,9 +15344,9 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   // ── Narratives ──
   var narGlobal='Bilan sur la période du '+periodeStr+'. ';
   if(confPct!==null)narGlobal+='Taux de conformité rondes (multi-sites) : '+confPct+'%. ';
-  narGlobal+=totLitres>0?'Consommation carburant : '+Math.round(totLitres).toLocaleString('fr-FR')+' L'+(totCarb>0?' ('+totCarb.toLocaleString('fr-FR')+' '+_D()+')':'')+'. ':'';
+  narGlobal+=totLitres>0?'Consommation carburant : '+Math.round(totLitres).toLocaleString('fr-FR')+' L'+(totCarb>0?' ('+totCarb.toLocaleString('fr-FR')+(_reportDevise?' '+_reportDevise:'')+')':'')+'. ':'';
   narGlobal+=totPannes>0?totPannes+' panne'+(totPannes>1?'s':'')+' active'+(totPannes>1?'s':'')+' en cours. ':'Aucune panne active. ';
-  narGlobal+=totMnt>0?totMnt+' intervention'+(totMnt>1?'s':'')+' de maintenance'+(totMntCout>0?' pour '+totMntCout.toLocaleString('fr-FR')+' '+_D():'')+'.':'';
+  narGlobal+=totMnt>0?totMnt+' intervention'+(totMnt>1?'s':'')+' de maintenance'+(totMntCout>0?' pour '+totMntCout.toLocaleString('fr-FR')+(_reportDevise?' '+_reportDevise:''):'')+'.':'';
 
   // ── HTML ──
   var h='';
@@ -15371,10 +15373,10 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   // ── KPIs globaux ──
   h+='<div class="kpi-row">'+
     '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+kpiCol(confPct,70,90,false)+'">'+(confPct!==null?confPct+'%':'—')+'</div><div class="kpi-sub">Tous sites · '+period+' jours</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+' '+_D():'Coût non saisi')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+(_reportDevise?' '+_reportDevise:''):'Coût non saisi')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+kpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-sub">MTTR moy. : '+fmtDur(avgMttr)+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Maint. préventif</div><div class="kpi-value">'+totMntPreventif+'</div><div class="kpi-sub">'+(totMntCoutPreventif>0?fmtCout(totMntCoutPreventif,_D()):'aucun coût')+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Maint. correctif</div><div class="kpi-value" style="color:'+(totMntCorrectif>0?'#C0392B':'#2D7A4F')+'">'+totMntCorrectif+'</div><div class="kpi-sub">'+(totMntCoutCorrectif>0?fmtCout(totMntCoutCorrectif,_D()):'aucun coût')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Maint. préventif</div><div class="kpi-value">'+totMntPreventif+'</div><div class="kpi-sub">'+(totMntCoutPreventif>0?fmtCout(totMntCoutPreventif,_reportDevise):'aucun coût')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Maint. correctif</div><div class="kpi-value" style="color:'+(totMntCorrectif>0?'#C0392B':'#2D7A4F')+'">'+totMntCorrectif+'</div><div class="kpi-sub">'+(totMntCoutCorrectif>0?fmtCout(totMntCoutCorrectif,_reportDevise):'aucun coût')+'</div></div>'+
   '</div>';
 
   // ── Légende couleurs (réutilisée partout) ──
@@ -15424,7 +15426,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
         '<td style="text-align:center;padding:9px 11px;font-weight:700;color:'+kpiCol(d.pannes,1,3,true)+'">'+d.pannes+'</td>'+
         '<td style="text-align:center;padding:9px 11px;font-weight:600;color:'+mttrCol+'">'+fmtDur(d.mttr)+'</td>'+
         '<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</td>'+
-        '<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+(total>0?total.toLocaleString('fr-FR')+' '+_D():'—')+'</td>'+
+        '<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+(total>0?total.toLocaleString('fr-FR')+' '+(d.devise||'XOF'):'—')+'</td>'+
         (hasEnergie?'<td style="text-align:center;padding:9px 11px;font-weight:600;color:'+efCol+'">'+efLabel+'</td>':'')+
         (hasTO?'<td style="text-align:center;padding:9px 11px;font-weight:600;color:'+kpiCol(d.toMoy,60,80,false)+'">'+(d.toMoy!=null?d.toMoy+'%':'—')+'</td>':'')+
         (hasCouv?'<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+(d.couvertsTotal!=null?d.couvertsTotal.toLocaleString('fr-FR'):'—')+'</td>':'')+
@@ -15445,8 +15447,8 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
         '<div style="background:'+col+'18;border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:8px">'+
           '<div style="width:10px;height:10px;border-radius:50%;background:'+col+'"></div>'+
           '<div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(site.nom)+'</div>'+
-          (ef.totalCout!=null?'<div style="margin-left:auto;font-size:11px;color:var(--text2)">Coût : <strong>'+fmtCout(ef.totalCout,_D())+'</strong>'+(ef.totalBudget!=null?' / Budget : '+fmtCout(ef.totalBudget,_D()):'')+
-            (ef.totalVs!=null?' <span style="color:'+(ef.totalVs>0?'#C0392B':'#2D7A4F')+';font-weight:700">'+(ef.totalVs>0?'+':'')+fmtCout(ef.totalVs,_D())+'</span>':'')+'</div>':'')+
+          (ef.totalCout!=null?'<div style="margin-left:auto;font-size:11px;color:var(--text2)">Coût : <strong>'+fmtCout(ef.totalCout,siteData[site.id].devise||'XOF')+'</strong>'+(ef.totalBudget!=null?' / Budget : '+fmtCout(ef.totalBudget,siteData[site.id].devise||'XOF'):'')+
+            (ef.totalVs!=null?' <span style="color:'+(ef.totalVs>0?'#C0392B':'#2D7A4F')+';font-weight:700">'+(ef.totalVs>0?'+':'')+fmtCout(ef.totalVs,siteData[site.id].devise||'XOF')+'</span>':'')+'</div>':'')+
         '</div>'+
         '<div style="padding:12px 16px">'+
           (indexItems.length?_svgMultiChartDT(indexItems):'')+
@@ -15466,20 +15468,20 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
             return '<tr style="background:'+(ii%2?'#FAFAF8':'white')+';border-bottom:1px solid #EDE5D8">'+
               '<td style="padding:7px 8px"><span style="font-weight:500">'+escape_html(it.f.nom)+'</span>'+sub+'</td>'+
               '<td style="text-align:right;padding:7px 8px;color:'+pctCol+'">'+consoStr+(it.pct!=null?' <span style="font-size:10px">('+it.pct+'%)</span>':'')+'</td>'+
-              '<td style="text-align:right;padding:7px 8px;font-weight:600">'+(it.cout!=null?fmtCout(it.cout,_D()):'—')+'</td>'+
-              '<td style="text-align:right;padding:7px 8px;color:var(--text3)">'+(it.budget!=null?fmtCout(it.budget,_D()):'—')+'</td>'+
-              '<td style="text-align:right;padding:7px 8px;font-weight:600;color:'+vsCol+'">'+(it.vs!=null?(it.vs>0?'+':'')+fmtCout(it.vs,_D()):'—')+'</td>'+
+              '<td style="text-align:right;padding:7px 8px;font-weight:600">'+(it.cout!=null?fmtCout(it.cout,siteData[site.id].devise||'XOF'):'—')+'</td>'+
+              '<td style="text-align:right;padding:7px 8px;color:var(--text3)">'+(it.budget!=null?fmtCout(it.budget,siteData[site.id].devise||'XOF'):'—')+'</td>'+
+              '<td style="text-align:right;padding:7px 8px;font-weight:600;color:'+vsCol+'">'+(it.vs!=null?(it.vs>0?'+':'')+fmtCout(it.vs,siteData[site.id].devise||'XOF'):'—')+'</td>'+
             '</tr>';
           }).join('')+
           '</tbody></table>'+
           (ef.totalCout!=null||ef.totalBudget!=null?
             '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
-              (ef.totalCout!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Coût total énergie</div><div style="font-size:16px;font-weight:700;color:'+col+'">'+fmtCout(ef.totalCout,_D())+'</div></div>':'')+
-              (ef.totalBudget!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Budget pro-rata '+period+'j</div><div style="font-size:16px;font-weight:700;color:var(--text2)">'+fmtCout(ef.totalBudget,_D())+'</div></div>':'')+
+              (ef.totalCout!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Coût total énergie</div><div style="font-size:16px;font-weight:700;color:'+col+'">'+fmtCout(ef.totalCout,siteData[site.id].devise||'XOF')+'</div></div>':'')+
+              (ef.totalBudget!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Budget pro-rata '+period+'j</div><div style="font-size:16px;font-weight:700;color:var(--text2)">'+fmtCout(ef.totalBudget,siteData[site.id].devise||'XOF')+'</div></div>':'')+
               (ef.totalVs!=null?
-                (function(){var vCol=ef.totalVs>0?'#C0392B':'#2D7A4F';var vPct=ef.totalBudget?Math.round(ef.totalVs/ef.totalBudget*100):null;return'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Écart vs budget</div><div style="font-size:16px;font-weight:700;color:'+vCol+'">'+(vPct!=null?(vPct>0?'+':'')+vPct+'%':'—')+'</div><div style="font-size:10px;color:'+vCol+'">'+(ef.totalVs>0?'+':'')+fmtCout(ef.totalVs,_D())+'</div></div>';})()
+                (function(){var vCol=ef.totalVs>0?'#C0392B':'#2D7A4F';var vPct=ef.totalBudget?Math.round(ef.totalVs/ef.totalBudget*100):null;return'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Écart vs budget</div><div style="font-size:16px;font-weight:700;color:'+vCol+'">'+(vPct!=null?(vPct>0?'+':'')+vPct+'%':'—')+'</div><div style="font-size:10px;color:'+vCol+'">'+(ef.totalVs>0?'+':'')+fmtCout(ef.totalVs,siteData[site.id].devise||'XOF')+'</div></div>';})()
               :'')+
-              (ef.fcfaPerCh!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">'+_D()+' / ch. nuitée</div><div style="font-size:16px;font-weight:700">'+ef.fcfaPerCh.toLocaleString('fr-FR')+'<span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:2px">XOF/ch</span></div>'+(ef.fcfaPerChBudget!=null?'<div style="font-size:10px;color:var(--text3)">Budget : '+ef.fcfaPerChBudget.toLocaleString('fr-FR')+' XOF/ch</div>':'')+(ef.toMoy!=null?'<div style="font-size:10px;color:var(--text3)">'+ef.chambresOcc+' ch.occ./j · TO '+ef.toMoy+'%</div>':'')+'</div>':'')+
+              (ef.fcfaPerCh!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">'+(siteData[site.id].devise||'XOF')+' / ch. nuitée</div><div style="font-size:16px;font-weight:700">'+ef.fcfaPerCh.toLocaleString('fr-FR')+'<span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:2px">XOF/ch</span></div>'+(ef.fcfaPerChBudget!=null?'<div style="font-size:10px;color:var(--text3)">Budget : '+ef.fcfaPerChBudget.toLocaleString('fr-FR')+' XOF/ch</div>':'')+(ef.toMoy!=null?'<div style="font-size:10px;color:var(--text3)">'+ef.chambresOcc+' ch.occ./j · TO '+ef.toMoy+'%</div>':'')+'</div>':'')+
             '</div>'
           :'')+
         '</div>'+
@@ -15515,7 +15517,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   // ── Détail par hôtel ──
   h+='<h2>Détail par hôtel</h2>';
   sites.forEach(function(site,si){
-    var d=siteData[site.id];
+    var d=siteData[site.id];var siteDev=d.devise||'XOF';
     var sConf=d.rondesTot>0?Math.round(d.rondesVal/d.rondesTot*100):null;
     var total=d.coutCarb+(d.mntCoutPreventif+d.mntCoutCorrectif)+d.panneCout;
     var siteSignalements=signalements.filter(function(s){return s.groupe_id===site.id;});
@@ -15542,11 +15544,11 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
           '<div class="kpi"><div class="kpi-label">Rondes</div><div class="kpi-value" style="font-size:20px;color:'+kpiCol(sConf,70,90,false)+'">'+(sConf!==null?sConf+'%':'—')+'</div><div class="kpi-sub">'+d.rondes+' rondes</div></div>'+
           '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="font-size:20px;color:'+kpiCol(d.pannes,1,3,true)+'">'+d.pannes+'</div><div class="kpi-sub">'+d.pannesTot+' total période</div></div>'+
           '<div class="kpi"><div class="kpi-label">MTTR moyen</div><div class="kpi-value" style="font-size:20px;color:'+(d.mttr===null?'#888':d.mttr<=2?'#2D7A4F':d.mttr<=8?'#C49A1C':'#C0392B')+'">'+fmtDur(d.mttr)+'</div><div class="kpi-sub">temps résolution</div></div>'+
-          '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value" style="font-size:20px">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' '+_D():'—')+'</div></div>'+
+          '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value" style="font-size:20px">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' '+siteDev:'—')+'</div></div>'+
           (d.toMoy!=null?'<div class="kpi"><div class="kpi-label">TO moyen</div><div class="kpi-value" style="font-size:20px;color:'+kpiCol(d.toMoy,60,80,false)+'">'+d.toMoy+'%</div><div class="kpi-sub">taux d\'occupation</div></div>':'')+
           (d.couvertsTotal!=null?'<div class="kpi"><div class="kpi-label">Couverts</div><div class="kpi-value" style="font-size:20px">'+d.couvertsTotal.toLocaleString('fr-FR')+'</div><div class="kpi-sub">servis sur la période</div></div>':'')+
           (rzBySite[site.id]&&rzBySite[site.id].count?'<div class="kpi"><div class="kpi-label">Rondes zones</div><div class="kpi-value" style="font-size:20px;color:#2D7A4F">'+rzBySite[site.id].count+'</div><div class="kpi-sub">'+(rzBySite[site.id].anomalies>0?rzBySite[site.id].anomalies+' anomalie'+(rzBySite[site.id].anomalies>1?'s':''):'0 anomalie')+'</div></div>':'')+
-          ((d.mntCoutPreventif+d.mntCoutCorrectif)>0?'<div class="kpi" style="border-color:'+col+'55;background:'+pale+'"><div class="kpi-label">Coût maintenance</div><div class="kpi-value" style="font-size:20px;color:'+col+'">'+(d.mntCoutPreventif+d.mntCoutCorrectif).toLocaleString('fr-FR')+'</div><div class="kpi-sub">'+_D()+' · préventif + correctif</div></div>':'')+
+          ((d.mntCoutPreventif+d.mntCoutCorrectif)>0?'<div class="kpi" style="border-color:'+col+'55;background:'+pale+'"><div class="kpi-label">Coût maintenance</div><div class="kpi-value" style="font-size:20px;color:'+col+'">'+(d.mntCoutPreventif+d.mntCoutCorrectif).toLocaleString('fr-FR')+'</div><div class="kpi-sub">'+siteDev+' · préventif + correctif</div></div>':'')+
         '</div>'+
         '<div class="edit-hint">Observations (modifiable)</div>'+
         '<div class="obs-zone" contenteditable="true" data-placeholder="Observations pour '+escape_html(site.nom)+' : constats, recommandations, actions..."></div>'+
@@ -15617,7 +15619,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
                   '<td style="font-size:11px;color:'+typeCol+'">'+typeLabel+'</td>'+
                   '<td style="font-size:11px">'+inter+'</td>'+
                   '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
-                  '<td style="font-size:11px;font-weight:600">'+(Number(m.cout)||0).toLocaleString('fr-FR')+' '+_D()+'</td>'+
+                  '<td style="font-size:11px;font-weight:600">'+(Number(m.cout)||0).toLocaleString('fr-FR')+' '+siteDev+'</td>'+
                 '</tr>';
               }).join('')+
             '</tbody></table>';
@@ -15627,17 +15629,17 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
             (d.mntCorrectif>0
               ?'<div style="background:#FEF0F0;border:1px solid #F5C0B8;border-radius:5px;padding:5px 10px;font-size:11px">'+
                 '<span style="font-weight:700;color:#C0392B">⚡ Correctif</span> · '+d.mntCorrectif+' interv.'+
-                (d.mntCoutCorrectif>0?' · <strong style="color:#C0392B">'+fmtCout(d.mntCoutCorrectif,_D())+'</strong>':'')+
+                (d.mntCoutCorrectif>0?' · <strong style="color:#C0392B">'+fmtCout(d.mntCoutCorrectif,siteDev)+'</strong>':'')+
               '</div>'
               :'<div style="background:#F4F5FA;border:1px solid #E4E6EF;border-radius:5px;padding:5px 10px;font-size:11px;color:var(--text3)">⚡ Pas de correctif ✓</div>')+
             (d.mntPreventif>0
               ?'<div style="background:#EEF9F3;border:1px solid #A8DEC0;border-radius:5px;padding:5px 10px;font-size:11px">'+
                 '<span style="font-weight:700;color:#2D7A4F">🗓 Préventif</span> · '+d.mntPreventif+' interv.'+
-                (d.mntCoutPreventif>0?' · <strong style="color:#2D7A4F">'+fmtCout(d.mntCoutPreventif,_D())+'</strong>':'')+
+                (d.mntCoutPreventif>0?' · <strong style="color:#2D7A4F">'+fmtCout(d.mntCoutPreventif,siteDev)+'</strong>':'')+
               '</div>'
               :'')+
             ((d.mntCoutPreventif+d.mntCoutCorrectif)>0
-              ?'<div style="background:var(--creme);border:1px solid var(--border);border-radius:5px;padding:5px 10px;font-size:11px"><strong>Total</strong> · '+fmtCout(d.mntCoutPreventif+d.mntCoutCorrectif,_D())+'</div>'
+              ?'<div style="background:var(--creme);border:1px solid var(--border);border-radius:5px;padding:5px 10px;font-size:11px"><strong>Total</strong> · '+fmtCout(d.mntCoutPreventif+d.mntCoutCorrectif,siteDev)+'</div>'
               :'')+
             '</div>';
           return '<div style="margin-top:14px">'+
@@ -15668,7 +15670,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
           var titre=m.plan_titre||'Mission prestataire';
           var eqDisp=m.eq_nom||'';
           var ts=m.completed_at?new Date(m.completed_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
-          var coutStr=(Number(m.cout)||0)>0?(Number(m.cout)).toLocaleString('fr-FR')+' '+_D():'—';
+          var coutStr=(Number(m.cout)||0)>0?(Number(m.cout)).toLocaleString('fr-FR')+' '+(siteData[site.id]?siteData[site.id].devise||'XOF':'XOF'):'—';
           return '<tr style="background:#F4FCF9">'+
             '<td><strong>'+escape_html(titre)+'</strong>'+(eqDisp?'<br><span style="font-size:10px;color:#0F6E56">'+escape_html(eqDisp)+'</span>':'')+'</td>'+
             '<td style="color:#0F6E56">préventive</td>'+
@@ -15687,7 +15689,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
           var prestTag=m.prestataire&&m.prestataire.trim()
             ?'<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:#EEF4FF;color:#3B6FD4;border:1px solid #BFCFF8">🔧 '+escape_html(m.prestataire)+'</span>'
             :'<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:#F4F5FA;color:#5A5F78;border:1px solid #E4E6EF">Interne</span>';
-          var coutStr=(Number(m.cout)||0)>0?(Number(m.cout)).toLocaleString('fr-FR')+' '+_D():'—';
+          var coutStr=(Number(m.cout)||0)>0?(Number(m.cout)).toLocaleString('fr-FR')+' '+(siteData[site.id]?siteData[site.id].devise||'XOF':'XOF'):'—';
           return '<tr>'+
             '<td><strong>'+escape_html(m.titre||'Intervention')+'</strong>'+eqNom+'</td>'+
             '<td>'+typeTag+'</td>'+
@@ -16081,7 +16083,7 @@ function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,relev
     h+='<div class="kpi"><div class="kpi-lbl">Coût total</div><div class="kpi-val">'+fmtN(coutTotal)+'</div><div class="kpi-sub">XOF HT</div></div>';
     h+='<div class="kpi"><div class="kpi-lbl">Budget</div><div class="kpi-val">'+fmtN(budgetTotal||null)+'</div><div class="kpi-sub">XOF HT</div></div>';
     h+='<div class="kpi"><div class="kpi-lbl">Écart</div><div class="kpi-val" style="color:'+pctCol(ecartTotalPct)+'">'+fmtPct(ecartTotalPct)+'</div><div class="kpi-sub">'+(ecartTotal!=null?(ecartTotal>0?'+':'')+fmtN(ecartTotal)+' XOF':'—')+'</div></div>';
-    h+='<div class="kpi"><div class="kpi-lbl">'+_D()+' / ch. nuitée</div><div class="kpi-val">'+fmtN(fcfaParCh)+'</div><div class="kpi-sub">'+(fcfaParChBudget?'Budget : '+fmtN(fcfaParChBudget):'Budget non défini')+'</div></div>';
+    h+='<div class="kpi"><div class="kpi-lbl">'+(siteData[site.id].devise||'XOF')+' / ch. nuitée</div><div class="kpi-val">'+fmtN(fcfaParCh)+'</div><div class="kpi-sub">'+(fcfaParChBudget?'Budget : '+fmtN(fcfaParChBudget):'Budget non défini')+'</div></div>';
     h+='</div>';
   }
   h+='<h2>Détail par fluide</h2>';
@@ -16758,7 +16760,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
         }
       }
       if(_fpChR){
-        h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">'+_D()+' / ch. nuitée</div>';
+        h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">'+(siteData[site.id].devise||'XOF')+' / ch. nuitée</div>';
         h+='<div style="font-size:17px;font-weight:700">'+_fpChR.toLocaleString('fr-FR')+'<span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:2px">XOF/ch</span></div>';
         h+=(_fbChR?'<div style="font-size:10px;color:var(--text3);margin-top:2px">Budget : '+_fbChR.toLocaleString('fr-FR')+' XOF/ch</div>':'');
         h+=(_ecartChR!=null?'<div style="font-size:10px;font-weight:700;color:'+(_ecartChR>5?'#E8841A':_ecartChR<-5?'var(--vert)':'var(--text3)')+'">'+(_ecartChR>0?'↑ +':_ecartChR<0?'↓ ':'')+Math.abs(_ecartChR)+'% vs budget</div>':'');
@@ -18089,7 +18091,7 @@ async function _rtEnergie(sid){
       var _budgCh=hasBudgetData&&chambresOcc?Math.round(budgetTotalMois/(chambresOcc*daysInMonth)):null;
       var _ecartBpc=_budgCh?Math.round((_fcfaCh-_budgCh)/_budgCh*1000)/10:null;
       kpiHtml+='<div style="background:white;border:1.5px solid #fef3c7;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px">'+
-        '<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px">💰 '+_D()+' / ch. nuitée</div>'+
+        '<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px">💰 '+(siteData[site.id].devise||'XOF')+' / ch. nuitée</div>'+
         '<div style="font-size:28px;font-weight:800;color:var(--dark)">'+_fcfaCh.toLocaleString('fr-FR')+
           '<span style="font-size:13px;font-weight:500;color:var(--text3);margin-left:3px">XOF/ch</span>'+
         '</div>'+
