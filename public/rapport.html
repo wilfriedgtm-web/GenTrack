@@ -423,12 +423,14 @@ async function init(){
   }
 
   // Site name (fetch separately since no FK on groupe_id→sites)
-  var siteNom='';
+  var siteNom='';var _siteDevise='FCFA';
   if(_sg.groupe_id){
-    var siteRows=await supa('sites','id=eq.'+_sg.groupe_id+'&select=nom');
-    if(siteRows&&siteRows[0])siteNom=siteRows[0].nom||'';
+    var siteRows=await supa('sites','id=eq.'+_sg.groupe_id+'&select=nom,devise');
+    if(siteRows&&siteRows[0]){siteNom=siteRows[0].nom||'';_siteDevise=siteRows[0].devise||'FCFA';}
   }
   document.getElementById('rp-site-name').textContent=siteNom;
+  var rpLblForm=document.getElementById('rp-label-cout');
+  if(rpLblForm)rpLblForm.textContent='Coût matériaux ('+_siteDevise+')';
 
   // Context card
   var typeLabel=_TYPE_LABELS[_sg.type]||_sg.type||'Signalement';
