@@ -962,14 +962,12 @@ async function saveSite(siteId, clientId) {
   const p = getPaysInfo(pays_code);
   await api('sites', `&id=eq.${siteId}`, '*', 'PATCH', {
     nom,
-    description: document.getElementById('es-desc').value||null,
     ville: document.getElementById('es-ville').value||null,
     pays: p.nom,
     pays_code: p.code,
     devise: p.devise,
     locale: p.locale,
     timezone: p.timezone,
-    reference: document.getElementById('es-ref').value||null,
     whatsapp_responsable: document.getElementById('es-wa').value||null,
     heure_rappel: parseInt(document.getElementById('es-heure-rappel').value)||8,
   });
