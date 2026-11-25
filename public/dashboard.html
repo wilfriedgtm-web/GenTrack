@@ -12023,7 +12023,7 @@ async function _dtAccueil(session,sids,cid){
           '</div>';
         }).join('');
         var _cT=0,_bT=0,_hc=false;efItems.forEach(function(x){if(x.cout!=null){_cT+=x.cout;_hc=true;}if(x.budget)_bT+=x.budget;});
-        function _fmtAcc(v){if(v==null)return'—';var a=Math.abs(v),s=v<0?'-':'';if(a>=1e6)return s+(a/1e6).toFixed(1).replace('.',',')+' M XOF';if(a>=1e3)return s+Math.round(a/1e3)+' k XOF';return s+Math.round(a)+' XOF';}
+        function _fmtAcc(v){if(v==null)return'—';var a=Math.abs(v),s=v<0?'-':'';if(a>=1e6)return s+(a/1e6).toFixed(1).replace('.',',')+' M '+_D();if(a>=1e3)return s+Math.round(a/1e3)+' k '+_D();return s+Math.round(a)+' '+_D();}
         var _ecC=_hc&&_bT?(_cT>_bT?'var(--rouge)':'var(--vert)'):'var(--text3)';
         return '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">'+
           '<div style="font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">⚡ Énergie · ce mois</div>'+
@@ -15373,8 +15373,8 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
     '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+kpiCol(confPct,70,90,false)+'">'+(confPct!==null?confPct+'%':'—')+'</div><div class="kpi-sub">Tous sites · '+period+' jours</div></div>'+
     '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+' '+_D():'Coût non saisi')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+kpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-sub">MTTR moy. : '+fmtDur(avgMttr)+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Maint. préventif</div><div class="kpi-value">'+totMntPreventif+'</div><div class="kpi-sub">'+(totMntCoutPreventif>0?fmtCout(totMntCoutPreventif,'XOF'):'aucun coût')+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Maint. correctif</div><div class="kpi-value" style="color:'+(totMntCorrectif>0?'#C0392B':'#2D7A4F')+'">'+totMntCorrectif+'</div><div class="kpi-sub">'+(totMntCoutCorrectif>0?fmtCout(totMntCoutCorrectif,'XOF'):'aucun coût')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Maint. préventif</div><div class="kpi-value">'+totMntPreventif+'</div><div class="kpi-sub">'+(totMntCoutPreventif>0?fmtCout(totMntCoutPreventif,_D()):'aucun coût')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Maint. correctif</div><div class="kpi-value" style="color:'+(totMntCorrectif>0?'#C0392B':'#2D7A4F')+'">'+totMntCorrectif+'</div><div class="kpi-sub">'+(totMntCoutCorrectif>0?fmtCout(totMntCoutCorrectif,_D()):'aucun coût')+'</div></div>'+
   '</div>';
 
   // ── Légende couleurs (réutilisée partout) ──
@@ -15445,8 +15445,8 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
         '<div style="background:'+col+'18;border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:8px">'+
           '<div style="width:10px;height:10px;border-radius:50%;background:'+col+'"></div>'+
           '<div style="font-size:13px;font-weight:600;color:var(--dark)">'+escape_html(site.nom)+'</div>'+
-          (ef.totalCout!=null?'<div style="margin-left:auto;font-size:11px;color:var(--text2)">Coût : <strong>'+fmtCout(ef.totalCout,'XOF')+'</strong>'+(ef.totalBudget!=null?' / Budget : '+fmtCout(ef.totalBudget,'XOF'):'')+
-            (ef.totalVs!=null?' <span style="color:'+(ef.totalVs>0?'#C0392B':'#2D7A4F')+';font-weight:700">'+(ef.totalVs>0?'+':'')+fmtCout(ef.totalVs,'XOF')+'</span>':'')+'</div>':'')+
+          (ef.totalCout!=null?'<div style="margin-left:auto;font-size:11px;color:var(--text2)">Coût : <strong>'+fmtCout(ef.totalCout,_D())+'</strong>'+(ef.totalBudget!=null?' / Budget : '+fmtCout(ef.totalBudget,_D()):'')+
+            (ef.totalVs!=null?' <span style="color:'+(ef.totalVs>0?'#C0392B':'#2D7A4F')+';font-weight:700">'+(ef.totalVs>0?'+':'')+fmtCout(ef.totalVs,_D())+'</span>':'')+'</div>':'')+
         '</div>'+
         '<div style="padding:12px 16px">'+
           (indexItems.length?_svgMultiChartDT(indexItems):'')+
@@ -15466,18 +15466,18 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
             return '<tr style="background:'+(ii%2?'#FAFAF8':'white')+';border-bottom:1px solid #EDE5D8">'+
               '<td style="padding:7px 8px"><span style="font-weight:500">'+escape_html(it.f.nom)+'</span>'+sub+'</td>'+
               '<td style="text-align:right;padding:7px 8px;color:'+pctCol+'">'+consoStr+(it.pct!=null?' <span style="font-size:10px">('+it.pct+'%)</span>':'')+'</td>'+
-              '<td style="text-align:right;padding:7px 8px;font-weight:600">'+(it.cout!=null?fmtCout(it.cout,'XOF'):'—')+'</td>'+
-              '<td style="text-align:right;padding:7px 8px;color:var(--text3)">'+(it.budget!=null?fmtCout(it.budget,'XOF'):'—')+'</td>'+
-              '<td style="text-align:right;padding:7px 8px;font-weight:600;color:'+vsCol+'">'+(it.vs!=null?(it.vs>0?'+':'')+fmtCout(it.vs,'XOF'):'—')+'</td>'+
+              '<td style="text-align:right;padding:7px 8px;font-weight:600">'+(it.cout!=null?fmtCout(it.cout,_D()):'—')+'</td>'+
+              '<td style="text-align:right;padding:7px 8px;color:var(--text3)">'+(it.budget!=null?fmtCout(it.budget,_D()):'—')+'</td>'+
+              '<td style="text-align:right;padding:7px 8px;font-weight:600;color:'+vsCol+'">'+(it.vs!=null?(it.vs>0?'+':'')+fmtCout(it.vs,_D()):'—')+'</td>'+
             '</tr>';
           }).join('')+
           '</tbody></table>'+
           (ef.totalCout!=null||ef.totalBudget!=null?
             '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
-              (ef.totalCout!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Coût total énergie</div><div style="font-size:16px;font-weight:700;color:'+col+'">'+fmtCout(ef.totalCout,'XOF')+'</div></div>':'')+
-              (ef.totalBudget!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Budget pro-rata '+period+'j</div><div style="font-size:16px;font-weight:700;color:var(--text2)">'+fmtCout(ef.totalBudget,'XOF')+'</div></div>':'')+
+              (ef.totalCout!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Coût total énergie</div><div style="font-size:16px;font-weight:700;color:'+col+'">'+fmtCout(ef.totalCout,_D())+'</div></div>':'')+
+              (ef.totalBudget!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Budget pro-rata '+period+'j</div><div style="font-size:16px;font-weight:700;color:var(--text2)">'+fmtCout(ef.totalBudget,_D())+'</div></div>':'')+
               (ef.totalVs!=null?
-                (function(){var vCol=ef.totalVs>0?'#C0392B':'#2D7A4F';var vPct=ef.totalBudget?Math.round(ef.totalVs/ef.totalBudget*100):null;return'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Écart vs budget</div><div style="font-size:16px;font-weight:700;color:'+vCol+'">'+(vPct!=null?(vPct>0?'+':'')+vPct+'%':'—')+'</div><div style="font-size:10px;color:'+vCol+'">'+(ef.totalVs>0?'+':'')+fmtCout(ef.totalVs,'XOF')+'</div></div>';})()
+                (function(){var vCol=ef.totalVs>0?'#C0392B':'#2D7A4F';var vPct=ef.totalBudget?Math.round(ef.totalVs/ef.totalBudget*100):null;return'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Écart vs budget</div><div style="font-size:16px;font-weight:700;color:'+vCol+'">'+(vPct!=null?(vPct>0?'+':'')+vPct+'%':'—')+'</div><div style="font-size:10px;color:'+vCol+'">'+(ef.totalVs>0?'+':'')+fmtCout(ef.totalVs,_D())+'</div></div>';})()
               :'')+
               (ef.fcfaPerCh!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">'+_D()+' / ch. nuitée</div><div style="font-size:16px;font-weight:700">'+ef.fcfaPerCh.toLocaleString('fr-FR')+'<span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:2px">XOF/ch</span></div>'+(ef.fcfaPerChBudget!=null?'<div style="font-size:10px;color:var(--text3)">Budget : '+ef.fcfaPerChBudget.toLocaleString('fr-FR')+' XOF/ch</div>':'')+(ef.toMoy!=null?'<div style="font-size:10px;color:var(--text3)">'+ef.chambresOcc+' ch.occ./j · TO '+ef.toMoy+'%</div>':'')+'</div>':'')+
             '</div>'
@@ -15627,17 +15627,17 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
             (d.mntCorrectif>0
               ?'<div style="background:#FEF0F0;border:1px solid #F5C0B8;border-radius:5px;padding:5px 10px;font-size:11px">'+
                 '<span style="font-weight:700;color:#C0392B">⚡ Correctif</span> · '+d.mntCorrectif+' interv.'+
-                (d.mntCoutCorrectif>0?' · <strong style="color:#C0392B">'+fmtCout(d.mntCoutCorrectif,'XOF')+'</strong>':'')+
+                (d.mntCoutCorrectif>0?' · <strong style="color:#C0392B">'+fmtCout(d.mntCoutCorrectif,_D())+'</strong>':'')+
               '</div>'
               :'<div style="background:#F4F5FA;border:1px solid #E4E6EF;border-radius:5px;padding:5px 10px;font-size:11px;color:var(--text3)">⚡ Pas de correctif ✓</div>')+
             (d.mntPreventif>0
               ?'<div style="background:#EEF9F3;border:1px solid #A8DEC0;border-radius:5px;padding:5px 10px;font-size:11px">'+
                 '<span style="font-weight:700;color:#2D7A4F">🗓 Préventif</span> · '+d.mntPreventif+' interv.'+
-                (d.mntCoutPreventif>0?' · <strong style="color:#2D7A4F">'+fmtCout(d.mntCoutPreventif,'XOF')+'</strong>':'')+
+                (d.mntCoutPreventif>0?' · <strong style="color:#2D7A4F">'+fmtCout(d.mntCoutPreventif,_D())+'</strong>':'')+
               '</div>'
               :'')+
             ((d.mntCoutPreventif+d.mntCoutCorrectif)>0
-              ?'<div style="background:var(--creme);border:1px solid var(--border);border-radius:5px;padding:5px 10px;font-size:11px"><strong>Total</strong> · '+fmtCout(d.mntCoutPreventif+d.mntCoutCorrectif,'XOF')+'</div>'
+              ?'<div style="background:var(--creme);border:1px solid var(--border);border-radius:5px;padding:5px 10px;font-size:11px"><strong>Total</strong> · '+fmtCout(d.mntCoutPreventif+d.mntCoutCorrectif,_D())+'</div>'
               :'')+
             '</div>';
           return '<div style="margin-top:14px">'+
@@ -16507,8 +16507,8 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   h+='<div class="kpi-row">'+
     '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+kpiCol(tauxRondes,70,90,false)+'">'+(tauxRondes!==null?tauxRondes+'%':'—')+'</div><div class="kpi-sub">'+rondes.length+' ronde(s)</div></div>'+
     '<div class="kpi"><div class="kpi-label">Signalements actifs</div><div class="kpi-value" style="color:'+kpiCol(nbSgOuverts,1,3,true)+'">'+nbSgOuverts+'</div><div class="kpi-sub">'+nbSgResolus+' résolu(s)</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Maint. préventif</div><div class="kpi-value">'+nbPreventif+'</div><div class="kpi-sub">'+(coutPreventif>0?fmtCout(coutPreventif,'XOF'):'aucun coût')+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Maint. correctif</div><div class="kpi-value" style="color:'+(nbCorrectif>0?'var(--rouge)':'var(--vert)')+'">'+nbCorrectif+'</div><div class="kpi-sub">'+(coutCorrectif>0?fmtCout(coutCorrectif,'XOF'):'aucun coût')+' · missions prest.</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Maint. préventif</div><div class="kpi-value">'+nbPreventif+'</div><div class="kpi-sub">'+(coutPreventif>0?fmtCout(coutPreventif,_D()):'aucun coût')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Maint. correctif</div><div class="kpi-value" style="color:'+(nbCorrectif>0?'var(--rouge)':'var(--vert)')+'">'+nbCorrectif+'</div><div class="kpi-sub">'+(coutCorrectif>0?fmtCout(coutCorrectif,_D()):'aucun coût')+' · missions prest.</div></div>'+
     '<div class="kpi"><div class="kpi-label">Équipements actifs</div><div class="kpi-value">'+equips.length+'</div><div class="kpi-sub">'+ges.length+' groupe(s) · '+cuves.length+' cuve(s)</div></div>'+
     '<div class="kpi"><div class="kpi-label">MTTR moyen</div><div class="kpi-value" style="color:'+(mttrH===null?'var(--text3)':mttrH<24?'var(--vert)':mttrH<72?'var(--amber)':'var(--rouge)')+'">'+fmtDur(mttrH)+'</div><div class="kpi-sub">'+(sgsResolus.length>0?sgsResolus.length+' résolution(s)':'—')+'</div></div>'+
   '</div>';
@@ -16552,7 +16552,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   h+='<div style="background:#FEF0F0;border-left:4px solid #C0392B;border-radius:6px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">'+
     '<div style="font-weight:700;color:#C0392B;font-size:13px">⚡ Correctif — pannes résolues</div>'+
     '<div style="font-size:11px;color:#C0392B;font-weight:600">'+maintCorr.length+' intervention'+(maintCorr.length>1?'s':'')+
-      (coutCorrectif>0?' · '+fmtCout(coutCorrectif,'XOF'):'')+
+      (coutCorrectif>0?' · '+fmtCout(coutCorrectif,_D()):'')+
     '</div>'+
   '</div>';
   if(maintCorr.length>0){
@@ -16572,7 +16572,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
         '<td>'+intervenantBadge+'</td>'+
         '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
         '<td>'+(realise?'<span class="badge badge-ok">Résolu</span>':'<span class="badge badge-warn">En cours</span>')+'</td>'+
-        '<td style="font-size:11px">'+(coutVal?fmtCout(coutVal,'XOF'):'—')+'</td>'+
+        '<td style="font-size:11px">'+(coutVal?fmtCout(coutVal,_D()):'—')+'</td>'+
       '</tr>';
     });
     h+='</tbody></table>';
@@ -16585,7 +16585,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   h+='<div style="background:#EEF9F3;border-left:4px solid #2D7A4F;border-radius:6px;padding:10px 14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">'+
     '<div style="font-weight:700;color:#2D7A4F;font-size:13px">🗓 Préventif — plans réalisés</div>'+
     '<div style="font-size:11px;color:#2D7A4F;font-weight:600">'+(maintPrev.length+_missionsPrev.length)+' intervention'+((maintPrev.length+_missionsPrev.length)>1?'s':'')+
-      (coutPreventif>0?' · '+fmtCout(coutPreventif,'XOF'):'')+
+      (coutPreventif>0?' · '+fmtCout(coutPreventif,_D()):'')+
     '</div>'+
   '</div>';
   if(maintPrev.length>0||_missionsPrev.length>0){
@@ -16605,7 +16605,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
         '<td>'+intervenantBadge+'</td>'+
         '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
         '<td>'+(realise?'<span class="badge badge-ok">Réalisé</span>':'<span class="badge badge-warn">Planifié</span>')+'</td>'+
-        '<td style="font-size:11px">'+(coutVal?fmtCout(coutVal,'XOF'):'—')+'</td>'+
+        '<td style="font-size:11px">'+(coutVal?fmtCout(coutVal,_D()):'—')+'</td>'+
       '</tr>';
     });
     _missionsPrev.forEach(function(m){
@@ -16622,19 +16622,19 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
         '<td><span style="background:#EEF4FF;color:#3B6FD4;border:1px solid #BFCFF8;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:600">🔧 '+escape_html(prestNom)+'</span></td>'+
         '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
         '<td><span class="badge badge-ok">Réalisé</span></td>'+
-        '<td style="font-size:11px">'+(coutV?fmtCout(coutV,'XOF'):'—')+'</td>'+
+        '<td style="font-size:11px">'+(coutV?fmtCout(coutV,_D()):'—')+'</td>'+
       '</tr>';
     });
     // Ligne total
     if(coutPreventif>0||coutCorrectif>0){
       h+='<tr style="background:var(--creme);font-weight:700;border-top:2px solid var(--border)">'+
         '<td colspan="5" style="text-align:right;font-size:12px;padding-right:12px">'+
-          (coutCorrectif>0?fmtCout(coutCorrectif,'XOF')+' correctif':'')+
+          (coutCorrectif>0?fmtCout(coutCorrectif,_D())+' correctif':'')+
           (coutCorrectif>0&&coutPreventif>0?' + ':'')+
-          (coutPreventif>0?fmtCout(coutPreventif,'XOF')+' préventif':'')+
+          (coutPreventif>0?fmtCout(coutPreventif,_D())+' préventif':'')+
           ' → Total'+
         '</td>'+
-        '<td style="font-size:12px;white-space:nowrap">'+fmtCout(coutTotal,'XOF')+'</td>'+
+        '<td style="font-size:12px;white-space:nowrap">'+fmtCout(coutTotal,_D())+'</td>'+
       '</tr>';
     }
     h+='</tbody></table>';
@@ -16659,15 +16659,15 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
             '<div style="font-size:10px;color:var(--text3);margin-top:2px">'+elecSynthPdf.noms.join(' + ')+'</div>'+
           '</div>'+
           '<div style="text-align:right">'+
-            '<div class="fluid-val">'+fmtCout(elecSynthPdf.cout,'XOF')+'</div>'+
-            (elecSynthPdf.budget?'<div style="font-size:10px;color:var(--text3);margin-top:2px">Budget : '+fmtCout(elecSynthPdf.budget,'XOF')+'</div>':'')+
+            '<div class="fluid-val">'+fmtCout(elecSynthPdf.cout,_D())+'</div>'+
+            (elecSynthPdf.budget?'<div style="font-size:10px;color:var(--text3);margin-top:2px">Budget : '+fmtCout(elecSynthPdf.budget,_D())+'</div>':'')+
             (elecSynthPdf.vsPct!=null?'<span class="badge '+(elecSynthPdf.vsPct>0?'badge-ko':'badge-ok')+'" style="margin-top:6px;display:inline-block">'+(elecSynthPdf.vsPct>0?'Dépassement +':'OK ')+Math.abs(elecSynthPdf.vsPct)+'%</span>':'')+
           '</div>'+
         '</div>'+
         '<div class="fluid-row">'+
           (elecSynthPdf.conso?'<span>Conso totale : <strong>'+elecSynthPdf.conso.toLocaleString('fr-FR')+' kWh</strong></span>':'')+
-          (elecSynthPdf.budget?'<span>Budget mensuel : <strong>'+fmtCout(elecSynthPdf.budget,'XOF')+'</strong></span>':'')+
-          (elecSynthPdf.vs!=null?'<span style="color:'+_epCol+'">Écart : <strong>'+(elecSynthPdf.vs>0?'+':'')+fmtCout(elecSynthPdf.vs,'XOF')+'</strong></span>':'')+
+          (elecSynthPdf.budget?'<span>Budget mensuel : <strong>'+fmtCout(elecSynthPdf.budget,_D())+'</strong></span>':'')+
+          (elecSynthPdf.vs!=null?'<span style="color:'+_epCol+'">Écart : <strong>'+(elecSynthPdf.vs>0?'+':'')+fmtCout(elecSynthPdf.vs,_D())+'</strong></span>':'')+
         '</div>'+
         (elecSynthPdf.budget&&elecSynthPdf.cout?
           '<div style="margin-top:10px"><div style="height:6px;background:#f0ebe4;border-radius:3px;overflow:hidden">'+
@@ -16747,14 +16747,14 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
       function _fPctR(p){return p==null?'—':(p>0?'+':'')+p+'%';}
       h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0 20px">';
       h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Coût total énergie</div>';
-      h+='<div style="font-size:17px;font-weight:700">'+fmtCout(_cR,'XOF')+'</div></div>';
+      h+='<div style="font-size:17px;font-weight:700">'+fmtCout(_cR,_D())+'</div></div>';
       if(_bR){
         h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Budget mensuel</div>';
-        h+='<div style="font-size:17px;font-weight:700">'+fmtCout(_bR,'XOF')+'</div></div>';
+        h+='<div style="font-size:17px;font-weight:700">'+fmtCout(_bR,_D())+'</div></div>';
         if(_eR!=null){
           h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Écart vs budget</div>';
           h+='<div style="font-size:17px;font-weight:700;color:'+_pColR(_epR)+'">'+_fPctR(_epR)+'</div>';
-          h+='<div style="font-size:10px;color:'+_pColR(_epR)+';margin-top:2px">'+(_eR>0?'+':'')+fmtCout(_eR,'XOF')+'</div></div>';
+          h+='<div style="font-size:10px;color:'+_pColR(_epR)+';margin-top:2px">'+(_eR>0?'+':'')+fmtCout(_eR,_D())+'</div></div>';
         }
       }
       if(_fpChR){
