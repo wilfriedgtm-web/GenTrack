@@ -105,7 +105,8 @@ function fmt_date(d){
   return new Date(d).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'});
 }
 
-function renderReport(sg,mnt,siteNom){
+function renderReport(sg,mnt,siteNom,devise){
+  devise=devise||'FCFA';
   var eqNom=sg.equipements&&sg.equipements.nom?sg.equipements.nom:'';
   var refStr=sg.ref_code?' · '+esc(sg.ref_code):'';
   var title=esc(eqNom||TYPE_LABELS[sg.type]||'Signalement')+refStr;
@@ -141,7 +142,7 @@ function renderReport(sg,mnt,siteNom){
   var kpiHtml='';
   if(cout!=null&&!isNaN(cout)||duree){
     kpiHtml='<div class="kpi-row">';
-    if(cout!=null&&!isNaN(cout))kpiHtml+='<div class="kpi"><div class="kpi-val">'+cout.toLocaleString('fr-FR')+' <small style="font-size:12px;font-weight:600">FCFA</small></div><div class="kpi-lbl">Coût</div></div>';
+    if(cout!=null&&!isNaN(cout))kpiHtml+='<div class="kpi"><div class="kpi-val">'+cout.toLocaleString('fr-FR')+' <small style="font-size:12px;font-weight:600">'+devise+'</small></div><div class="kpi-lbl">Coût</div></div>';
     if(duree)kpiHtml+='<div class="kpi"><div class="kpi-val">'+esc(duree)+'</div><div class="kpi-lbl">Durée</div></div>';
     kpiHtml+='</div>';
   }
@@ -211,8 +212,8 @@ async function init(){
   var siteIds=[...new Set(sgRows.map(function(r){return r.groupe_id;}).filter(Boolean))];
   var siteMap={};
   if(siteIds.length){
-    var siteRows=await supa('sites','id=in.('+siteIds.join(',')+')'+'&select=id,nom');
-    (siteRows||[]).forEach(function(s){siteMap[s.id]=s.nom||'';});
+    var siteRows=await supa('sites','id=in.('+siteIds.join(',')+')'+'&select=id,nom,devise');
+    (siteRows||[]).forEach(function(s){siteMap[s.id]={nom:s.nom||'',devise:s.devise||'FCFA'};});
   }
 
   // Trie dans l'ordre des IDs passés en paramètre
@@ -224,8 +225,8 @@ async function init(){
     var sg=sgById[id];
     if(!sg)return;
     var mnt=mntBySg[id]||null;
-    var siteNom=sg.groupe_id?siteMap[sg.groupe_id]||'':'';
-    html+=renderReport(sg,mnt,siteNom);
+    var siteInfo=sg.groupe_id?siteMap[sg.groupe_id]||{nom:'',devise:'FCFA'}:{nom:'',devise:'FCFA'};
+    html+=renderReport(sg,mnt,siteInfo.nom,siteInfo.devise);
   });
 
   document.getElementById('loading').style.display='none';

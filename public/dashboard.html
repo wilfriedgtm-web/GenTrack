@@ -332,9 +332,12 @@ var _configSelectedEqId=null;
 var _configCurrentTab='equipements';
 var _configEquipCache={}; // id → equip object, évite les problèmes d'échappement dans onclick
 var _siteModules=['general']; // modules actifs du site courant, mis à jour dans _rtConfig
-var _activeSiteId=null;    // site actif pour resp_tech (multi-site)
-var _activeSiteNom='';     // nom du site actif
-var _rtPickerSites=[];     // cache sites pour le picker multi-site
+var _activeSiteId=null;      // site actif pour resp_tech (multi-site)
+var _activeSiteNom='';       // nom du site actif
+var _activeSiteDevise='FCFA'; // devise du site actif (XOF, XAF, GNF, MAD…)
+var _activeSiteLocale='fr-FR';// locale pour formatage des nombres
+var _rtPickerSites=[];       // cache sites pour le picker multi-site
+function _D(){return _activeSiteDevise||'FCFA';} // shorthand devise dans les templates
 var _configTypesCache=[]; // types_equipements, mis à jour dans _rtConfig pour le template import
 // ── Résidence+ wizard state ──────────────────────────────────────────────────
 var _resSubTab='config';
@@ -611,9 +614,10 @@ async function renderDashboard(s){
     }
   } else if(sid){
     try{
-      var siteArr=await supaGet('sites','select=modules,nom&id=eq.'+sid);
+      var siteArr=await supaGet('sites','select=modules,nom,devise,locale&id=eq.'+sid);
       _siteModules=(siteArr&&siteArr[0]&&Array.isArray(siteArr[0].modules))?siteArr[0].modules:['general'];
       if(!_activeSiteNom&&siteArr&&siteArr[0])_activeSiteNom=siteArr[0].nom||'';
+      if(siteArr&&siteArr[0]&&siteArr[0].devise){_activeSiteDevise=siteArr[0].devise;_activeSiteLocale=siteArr[0].locale||'fr-FR';}
     }catch(e){ _siteModules=['general']; }
   }
   if(s.role==='resp_tech'||!s.role)renderRespTech(s,'accueil');
@@ -629,7 +633,7 @@ function renderRTSitePicker(session){
 
 async function _loadRTSitePicker(session){
   var sids=session.site_ids||[];
-  try{_rtPickerSites=await supaGet('sites','id=in.('+sids.join(',')+')'+'&select=id,nom,modules&order=nom.asc');}catch(e){_rtPickerSites=[];}
+  try{_rtPickerSites=await supaGet('sites','id=in.('+sids.join(',')+')'+'&select=id,nom,modules,devise,locale&order=nom.asc');}catch(e){_rtPickerSites=[];}
   var nom=(session.contact&&session.contact.nom)||'';
   var itemsHtml=_rtPickerSites.map(function(s){
     return '<button onclick="_rtSetActiveSite(\''+s.id+'\')" style="width:100%;display:flex;align-items:center;gap:14px;padding:16px;border:1.5px solid var(--border);border-radius:14px;background:var(--white);cursor:pointer;text-align:left;transition:all .15s" onmouseover="this.style.borderColor=\'var(--amber)\';this.style.background=\'var(--amber-pale)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'var(--white)\'">'+
@@ -653,6 +657,7 @@ async function _rtSetActiveSite(sid){
   _activeSiteId=sid;
   _activeSiteNom=siteData.nom||'';
   _siteModules=Array.isArray(siteData.modules)?siteData.modules:['general'];
+  if(siteData.devise){_activeSiteDevise=siteData.devise;_activeSiteLocale=siteData.locale||'fr-FR';}
   renderRespTech(_session,'accueil');
 }
 // Navigate to a specific signalement card and highlight it
@@ -1286,7 +1291,7 @@ function _buildCuveSection(cuveEquips,cuveQs,pleinsHist,gasoilNiveau){
           var d=new Date(p.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
           var litr=p.litres_ajoutes?'+'+Math.round(p.litres_ajoutes).toLocaleString('fr-FR')+'L → ':'';
           var apres=p.niveau_apres!=null?Math.round(p.niveau_apres).toLocaleString('fr-FR')+'L':'';
-          var cout=p.cout?(' · '+(p.cout).toLocaleString('fr-FR')+' FCFA'):'';
+          var cout=p.cout?(' · '+(p.cout).toLocaleString('fr-FR')+' '+_D()):'';
           var oper=p.operateur?' · '+p.operateur:'';
           return '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);padding:4px 0;border-top:1px solid var(--border)">'+
             '<span>'+d+oper+'</span>'+
@@ -1431,7 +1436,7 @@ function _buildVidangesSection(geEquips,geQs,vidangesHist,sid){
         if(!hist.length)return '';
         var rows=hist.map(function(v){
           var d=new Date(v.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short',year:'numeric'});
-          var cout=v.cout?(' · '+(v.cout).toLocaleString('fr-FR')+' FCFA'):'';
+          var cout=v.cout?(' · '+(v.cout).toLocaleString('fr-FR')+' '+_D()):'';
           var notes=v.notes?(' — '+v.notes):'';
           return '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);padding:4px 0;border-top:1px solid var(--border)">'+
             '<span>'+d+(notes?'<br><span style="font-style:italic">'+v.notes+'</span>':'')+'</span>'+
@@ -1459,7 +1464,7 @@ function openDeclareVidange(eqId,eqNom,currentH,sid){
   m.innerHTML='<div style="background:var(--card1);border-radius:16px;padding:24px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.3)">'+
     '<div style="font-size:16px;font-weight:700;color:var(--text1);margin-bottom:8px">🛢 Vidange – '+escape_html(eqNom)+'</div>'+
     compteurTxt+
-    '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Coût vidange (FCFA, optionnel)</label>'+
+    '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Coût vidange ('+_D()+', optionnel)</label>'+
     '<input id="mv-cout" type="number" step="100" placeholder="ex: 45 000" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:10px"/>'+
     '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Notes (optionnel)</label>'+
     '<input id="mv-notes" type="text" placeholder="ex: Huile 15W40, filtre changé" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:13px;box-sizing:border-box;margin-bottom:16px"/>'+
@@ -1520,13 +1525,13 @@ function openDeclarePlein(eqId,eqNom,cap,currentNiveau,operateur,prixLitre){
     document.body.appendChild(m);
   }
   var niveauInfo=currentNiveau!=null?'<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Niveau actuel : <strong>'+Math.round(currentNiveau).toLocaleString('fr-FR')+' L</strong> / '+Math.round(cap).toLocaleString('fr-FR')+' L</div>':'';
-  var prixInfo=prixLitre?'<div style="font-size:10px;color:var(--text3);margin-top:3px">Coût calculé automatiquement ('+prixLitre.toLocaleString('fr-FR')+' FCFA/L)</div>':'';
+  var prixInfo=prixLitre?'<div style="font-size:10px;color:var(--text3);margin-top:3px">Coût calculé automatiquement ('+prixLitre.toLocaleString('fr-FR')+' '+_D()+'/L)</div>':'';
   m.innerHTML='<div style="background:var(--card1);border-radius:16px;padding:24px;width:100%;max-width:360px;box-shadow:0 8px 32px rgba(0,0,0,.3)">'+
     '<div style="font-size:16px;font-weight:700;color:var(--text1);margin-bottom:12px">⛽ Ravitaillement – '+escape_html(eqNom)+'</div>'+
     niveauInfo+
     '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Litres ajoutés</label>'+
     '<input id="mp-litres" type="number" step="1" placeholder="ex: 3 000" oninput="_mpUpdateCout('+( prixLitre||0)+')" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:10px"/>'+
-    '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Coût (FCFA)</label>'+
+    '<label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Coût ('+_D()+')</label>'+
     '<input id="mp-cout" type="number" step="100" placeholder="ex: 1 800 000" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text1);font-size:15px;box-sizing:border-box;margin-bottom:4px"/>'+
     prixInfo+
     '<div style="margin-bottom:10px"></div>'+
@@ -2420,7 +2425,7 @@ async function _rtSignalements(sid){
     _sgKpi('Ce mois','var(--dark)',rowsMois.length+'',resolus30.length+' résolus')+
     _sgKpi('Ouverts',ouverts>0?'var(--rouge)':'var(--dark)',ouverts+'','en attente')+
     _sgKpi('En cours',enCours>0?'var(--orange)':'var(--dark)',enCours+'','pris en charge')+
-    _sgKpi('Coût mois','var(--dark)',Math.round(totalCout/1000)+'k','FCFA interventions')+
+    _sgKpi('Coût mois','var(--dark)',Math.round(totalCout/1000)+'k',_D()+' interventions')+
   '</div>';
 
   // Points chauds
@@ -2684,7 +2689,7 @@ function _sgBuildDetail(r,zones,sid){
     '<div style="background:var(--vert-pale);border:1px solid var(--vert-border);border-radius:8px;padding:10px 12px;margin-bottom:12px">'+
       '<div style="font-size:11px;font-weight:700;color:var(--vert);margin-bottom:4px">🔧 Intervention'+(tech?' · '+escape_html(tech):'')+'</div>'+
       (r.note_resolution?'<div style="font-size:12px;color:var(--vert);margin-bottom:4px;line-height:1.5">'+escape_html(r.note_resolution)+'</div>':'')+
-      (r.cout_intervention?'<div style="font-size:12px;font-weight:700;color:var(--vert)">'+Number(r.cout_intervention).toLocaleString('fr-FR')+' FCFA</div>':'')+
+      (r.cout_intervention?'<div style="font-size:12px;font-weight:700;color:var(--vert)">'+Number(r.cout_intervention).toLocaleString('fr-FR')+' '+_D()+'</div>':'')+
     '</div>':'';
 
   var actionsHtml='';
@@ -2748,7 +2753,7 @@ function _sgResoudre(id){
     '<div style="display:flex;flex-direction:column;gap:12px">'+
       '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">NOTE DE RÉSOLUTION</label>'+
       '<textarea id="sg-r-note" rows="3" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;resize:none" placeholder="Décrivez la résolution…"></textarea></div>'+
-      '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">COÛT DE L\'INTERVENTION (FCFA)</label>'+
+      '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">COÛT DE L\'INTERVENTION ('+_D()+')</label>'+
       '<input id="sg-r-cout" type="number" placeholder="0 si gratuit" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
     '</div>'+
     '<div style="display:flex;gap:8px;margin-top:16px">'+
@@ -2779,7 +2784,7 @@ async function _sgResoudreSubmit(id){
       '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">'+
         '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">PRESTATAIRE / TECHNICIEN</label>'+
         '<input id="sg-mnt-prest" type="text" value="'+escape_html(r.assigne_a||'')+'" placeholder="Nom du technicien" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
-        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">COÛT RÉEL (FCFA)</label>'+
+        '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">COÛT RÉEL ('+_D()+')</label>'+
         '<input id="sg-mnt-cout" type="number" value="'+(cout||'')+'" placeholder="0 si gratuit" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
         '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">DURÉE D\'INTERVENTION</label>'+
         '<div style="display:flex;gap:6px">'+
@@ -3499,7 +3504,7 @@ function _dmUpdateCoutTotal(){
   var calc=document.getElementById('dm-cout-calc');
   if(!calc)return;
   if(qte&&prix){
-    calc.textContent='= '+(qte*prix).toLocaleString('fr-FR')+' FCFA';
+    calc.textContent='= '+(qte*prix).toLocaleString('fr-FR')+' '+_D();
     calc.style.color='var(--vert)';calc.style.fontWeight='700';
   }else{calc.textContent='= —';calc.style.color='var(--text3)';calc.style.fontWeight='400';}
 }
@@ -3711,7 +3716,7 @@ function _buildDemandeModalContent(){
     '</div>'+
     // Ligne prix carburant (visible seulement si type=carburant)
     '<div id="dm-row-prixl" style="display:'+(typeDefaut==='carburant'?'block':'none')+';margin-bottom:12px">'+
-      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Prix / litre (FCFA)</div>'+
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Prix / litre ('+_D()+')</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center">'+
         '<input id="dm-prix-l" type="number" min="0" step="10" placeholder="Ex : 1 200" oninput="_dmUpdateCoutTotal()" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">'+
         '<div id="dm-cout-calc" style="font-size:12px;color:var(--text3);padding:8px 4px;white-space:nowrap">= —</div>'+
@@ -3719,7 +3724,7 @@ function _buildDemandeModalContent(){
     '</div>'+
     // Ligne coût estimé (visible seulement si type ≠ carburant)
     '<div id="dm-row-cout" style="display:'+(typeDefaut!=='carburant'?'block':'none')+';margin-bottom:12px">'+
-      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Coût estimé (FCFA)</div>'+
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Coût estimé ('+_D()+')</div>'+
       '<input id="dm-cout" type="number" min="0" step="1000" placeholder="Ex : 150 000" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none;box-sizing:border-box">'+
     '</div>'+
     '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:4px">Urgence</div>'+
@@ -3801,8 +3806,8 @@ function _showDemandePreview(){
         '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-bottom:7px">Détail de la demande</div>'+
         '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Type</span><span>'+typeIcon+' '+escape_html(typeLabel)+'</span></div>'+
         (qte?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Quantité</span><span style="font-weight:700">'+qte.toLocaleString('fr-FR')+(unite?' '+escape_html(unite):'')+'</span></div>':'')+
-        (cout?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Coût estimé</span><span style="font-weight:700">'+cout.toLocaleString('fr-FR')+' FCFA</span></div>':'')+
-        (window._dmCurrentPrixL&&qte?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Prix/L</span><span>'+window._dmCurrentPrixL.toLocaleString('fr-FR')+' FCFA/L</span></div>':'')+
+        (cout?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Coût estimé</span><span style="font-weight:700">'+cout.toLocaleString('fr-FR')+' '+_D()+'</span></div>':'')+
+        (window._dmCurrentPrixL&&qte?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Prix/L</span><span>'+window._dmCurrentPrixL.toLocaleString('fr-FR')+' '+_D()+'/L</span></div>':'')+
         '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Urgence</span><span style="font-weight:600;color:'+(urgCol.replace('var(--vert)','#3b6d11').replace('var(--amber)','#854f0b').replace('var(--rouge)','#a32d2d'))+'">'+_DEMANDE_URGENCE_LABELS[_demandeUrgenceActuelle]+'</span></div>'+
         (_dmCurrentEqNom?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Équipement</span><span>'+escape_html(_dmCurrentEqNom)+'</span></div>':_dmCurrentEqZoneNom?'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Équipement</span><span>📍 '+escape_html(_dmCurrentEqZoneNom)+'</span></div>':'')+
         '<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:#666">Demandé par</span><span>'+escape_html(auteurNom)+' — '+escape_html(roleName(auteurRole))+'</span></div>'+
@@ -4256,7 +4261,7 @@ document.addEventListener('click',function(){document.querySelectorAll('[id^="kp
 
 function _mntFmtCout(v,devise){
   if(v==null||isNaN(v))return '—';
-  devise=devise||'FCFA';
+  devise=devise||_activeSiteDevise||'FCFA';
   if(v>=1000000)return (v/1000000).toFixed(1).replace(/\.0$/,'')+'M '+devise;
   if(v>=1000)return Math.round(v/1000)+'k '+devise;
   return v+' '+devise;
@@ -4343,7 +4348,7 @@ async function _rtMaintenances(sid){
   var nbMissionsAvecCout=missions30.filter(function(m){return m.cout!=null;}).length;
   var nbMissionsRealisees=missions30.filter(function(m){return m.statut==='realisee';}).length;
   var nbMissionsTotal=missions30.length;
-  var devMnt=missions30.length&&missions30[0].devise?missions30[0].devise:'FCFA';
+  var devMnt=missions30.length&&missions30[0].devise?missions30[0].devise:_D();
   var tauxReal=nbMissionsTotal?Math.round(nbMissionsRealisees/nbMissionsTotal*100):null;
 
   // Grouper équipements par type
@@ -5253,7 +5258,7 @@ async function _mntSelectEq(eqId,eqNom,sid){
     var subParts=[];
     if(who)subParts.push('→ '+escape_html(who));
     if(m.duree_heures!=null){var dh=parseFloat(m.duree_heures);subParts.push(dh.toFixed(dh%1===0?0:1)+'h');}
-    if(m.cout!=null){var mCoutDev=m.devise||'FCFA';subParts.push(parseFloat(m.cout).toLocaleString('fr-FR')+' '+mCoutDev);}
+    if(m.cout!=null){var mCoutDev=m.devise||_D();subParts.push(parseFloat(m.cout).toLocaleString('fr-FR')+' '+mCoutDev);}
     if(motifBlocage)subParts.push('⚠️ '+escape_html(motifBlocage));
     events.push({date:m.date_realisee||m.created_at,col:col,colBg:colBg,badge:badge,
       title:escape_html(m.titre||m.type||'Intervention'),
@@ -5791,7 +5796,7 @@ async function _mntDossierPrestataire(prestId,prestNom,sid,months){
   (correctives||[]).forEach(function(m){
     if(m.cout!=null){hasCoutData=true;totalCout+=parseFloat(m.cout)||0;}
   });
-  var devise=(missions.find(function(m){return m.devise;})||{}).devise||'FCFA';
+  var devise=(missions.find(function(m){return m.devise;})||{}).devise||_D();
   var fmtMnt=function(n){return n.toLocaleString('fr-FR')+(n%1!==0?'':'')+' '+devise;};
 
   html+='<div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:12px;padding:14px 16px;margin-bottom:14px;color:white">';
@@ -6016,7 +6021,7 @@ async function _mntUploadDocPrest(input,prestId,sid,prestNom){
     if(missionId&&montant!==null&&!isNaN(montant)&&!isNewMission){
       await supaPatch('missions',missionId,{cout:montant}).catch(function(){});
     }
-    var msg=isNewMission?'✅ Mission créée et document importé !'+(montant?' Coût : '+montant.toLocaleString('fr-FR')+' FCFA.':''):'✅ Document importé !'+(missionId&&montant?' Coût mission mis à jour.':'');
+    var msg=isNewMission?'✅ Mission créée et document importé !'+(montant?' Coût : '+montant.toLocaleString('fr-FR')+' '+_D()+'.':''):'✅ Document importé !'+(missionId&&montant?' Coût mission mis à jour.':'');
     if(status){status.style.color='#16a34a';status.textContent=msg;}
     setTimeout(function(){_mntDossierPrestataire(prestId,prestNom||'',sid);},400);
   } else {
@@ -6110,7 +6115,7 @@ async function _mntDeleteDoc(docId,prestId,sid,prestNom){
 }
 
 function _mntEditMissionCoutPrompt(missionId,currentCout,prestId,sid,prestNom){
-  var v=prompt('Montant de la mission (FCFA) :',(currentCout!=null&&currentCout!==''?String(currentCout):''));
+  var v=prompt('Montant de la mission ('+_D()+') :',(currentCout!=null&&currentCout!==''?String(currentCout):''));
   if(v===null)return;
   var n=parseFloat(v.replace(/\s/g,'').replace(',','.'));
   if(isNaN(n)||n<0){alert('Montant invalide.');return;}
@@ -6676,7 +6681,7 @@ function _mntCloturerPlan(planId,planTitre,freq,eqId,sid){
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
         '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">DATE RÉALISATION</label>'+
           '<input id="clot-date" type="date" value="'+today+'" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
-        '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">COÛT (FCFA)</label>'+
+        '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">COÛT ('+_D()+')</label>'+
           '<input id="clot-cout" type="number" placeholder="0" style="width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
       '</div>'+
       '<div><label style="font-size:11px;font-weight:700;color:#64748b;display:block;margin-bottom:4px">INTERVENANT / PRESTATAIRE</label>'+
@@ -6843,7 +6848,7 @@ async function _mntGeneratePDF(mntId){
   doc.text('COÛT',ml,y);doc.text('TYPE',ml+95,y);
   y+=5;
   doc.setTextColor(30,41,59);doc.setFontSize(11);doc.setFont('helvetica','bold');
-  doc.text(m.cout?parseFloat(m.cout).toLocaleString('fr-FR')+' FCFA':'—',ml,y);
+  doc.text(m.cout?parseFloat(m.cout).toLocaleString('fr-FR')+' '+_D():'—',ml,y);
   doc.text(m.type==='preventive'?'Préventive':m.type==='corrective'?'Corrective':m.type||'—',ml+95,y);
   y+=10;
   doc.setDrawColor(226,232,240);doc.line(ml,y,ml+cw,y);
@@ -6970,7 +6975,7 @@ async function _mntFichePrestPDF(eqId,eqNomArg,sid){
       doc.setTextColor(30,41,59);doc.setFont('helvetica','normal');doc.setFontSize(9);
       doc.text('•  '+dStr+' — '+(m.titre||m.type||'Intervention'),ml+2,y);
       doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(100,116,139);
-      doc.text('Intervenant: '+who+(m.cout?' · '+(parseFloat(m.cout)||0).toLocaleString('fr-FR')+' FCFA':''),ml+2,y+4);
+      doc.text('Intervenant: '+who+(m.cout?' · '+(parseFloat(m.cout)||0).toLocaleString('fr-FR')+' '+_D():''),ml+2,y+4);
       y+=10;
     });
   }else{
@@ -7316,7 +7321,7 @@ function _mntEditer(id,source,currentCout,currentNotes){
   _showCfgModal(
     '<div style="font-size:15px;font-weight:700;margin-bottom:16px">✏️ Modifier l\'entrée</div>'+
     '<div style="display:flex;flex-direction:column;gap:12px">'+
-      '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">COÛT (FCFA)</label>'+
+      '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">COÛT ('+_D()+')</label>'+
       '<input id="mnt-e-cout" type="number" min="0" step="1000" value="'+(currentCout||'')+'" placeholder="0" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;box-sizing:border-box"/></div>'+
       (source==='maintenance'||source==='vidange'?
         '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">NOTES</label>'+
@@ -7347,7 +7352,7 @@ function _mntMarquerRealise(id){
     '<div style="display:flex;flex-direction:column;gap:12px">'+
       '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">DATE DE RÉALISATION</label>'+
       '<input id="mnt-r-date" type="date" value="'+new Date().toISOString().split('T')[0]+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
-      '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">COÛT RÉEL (FCFA)</label>'+
+      '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">COÛT RÉEL ('+_D()+')</label>'+
       '<input id="mnt-r-cout" type="number" placeholder="0 si gratuit" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
       '<div><label style="font-size:11px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">PRESTATAIRE</label>'+
       '<input id="mnt-r-prest" type="text" placeholder="Nom du technicien / prestataire" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px"/></div>'+
@@ -7436,7 +7441,7 @@ function _mntCreer(sid){
       fld('TITRE',inp('mnt-m-titre','text','Ex : Remplacement filtre GE…'))+
       fld('DATE',inp('mnt-m-date','date','',' value="'+today+'"'))+
       '<div style="display:flex;gap:10px">'+
-        '<div style="flex:1">'+fld('COÛT (FCFA)',inp('mnt-m-cout','number','0'))+'</div>'+
+        '<div style="flex:1">'+fld('COÛT ('+_D()+')',inp('mnt-m-cout','number','0'))+'</div>'+
         '<div style="flex:1">'+fld('PRESTATAIRE',inp('mnt-m-prest','text','Nom…'))+'</div>'+
       '</div>'+
       fld('NOTES','<textarea id="mnt-m-desc" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;resize:none;box-sizing:border-box" placeholder="Détails de l\'opération…"></textarea>')+
@@ -11399,7 +11404,7 @@ function _openEditEquipModal(eqId, nom, actif, actifRonde, actifReleve, typeId, 
           '<input id="eq-edit-conso" class="cfg-form-input" type="number" step="0.1" placeholder="ex: 65" value="'+(consoLh||'')+'" />'+
         '</div>'+
         '<div class="cfg-form-group">'+
-          '<label class="cfg-form-label">Prix carburant (FCFA/L) <span style="font-weight:400;color:var(--text3)">(optionnel)</span></label>'+
+          '<label class="cfg-form-label">Prix carburant ('+_D()+'/L) <span style="font-weight:400;color:var(--text3)">(optionnel)</span></label>'+
           '<input id="eq-edit-prix" class="cfg-form-input" type="number" step="1" placeholder="ex: 750" value="'+(prixLitre||'')+'" />'+
         '</div>'+
       '</div>';
@@ -11420,7 +11425,7 @@ function _openEditEquipModal(eqId, nom, actif, actifRonde, actifReleve, typeId, 
           '</div>'+
         '</div>'+
         '<div class="cfg-form-group">'+
-          '<label class="cfg-form-label">Prix carburant (FCFA/L)</label>'+
+          '<label class="cfg-form-label">Prix carburant ('+_D()+'/L)</label>'+
           '<input id="eq-edit-prix" class="cfg-form-input" type="number" step="1" placeholder="ex: 750" value="'+(prixLitre||'')+'" />'+
           '<div style="font-size:10px;color:var(--text3);margin-top:3px">Coût calculé automatiquement lors d\'un ravitaillement</div>'+
         '</div>'+
@@ -12955,7 +12960,7 @@ async function _dtMaintenances(sids){
           '</div>'+
           '<div style="background:'+pale+';border-radius:8px;padding:8px 10px;text-align:center">'+
             '<div style="font-size:14px;font-weight:800;color:'+col+'">'+(st.cout?Math.round(st.cout/1000)+'k':'—')+'</div>'+
-            '<div style="font-size:9px;color:var(--text3);margin-top:1px">FCFA</div>'+
+            '<div style="font-size:9px;color:var(--text3);margin-top:1px">'+_D()+'</div>'+
           '</div>'+
         '</div>'+
         top3Html+
@@ -13011,7 +13016,7 @@ async function _dtMaintenances(sids){
               '</td>'+
               '<td style="text-align:center;padding:8px 10px;font-size:13px;font-weight:800;color:var(--dark)">'+eq.nb+'</td>'+
               '<td style="text-align:center;padding:8px 10px;font-size:12px;font-weight:700;color:'+tc+'">'+(taux!=null?taux+'%':'—')+'</td>'+
-              '<td style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text2)">'+(eq.cout?eq.cout.toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+              '<td style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text2)">'+(eq.cout?eq.cout.toLocaleString('fr-FR')+' '+_D():'—')+'</td>'+
               '<td style="padding:8px 10px;font-size:11px;color:var(--text3)">'+lastStr+'</td>'+
             '</tr>';
           }).join('')+
@@ -13267,9 +13272,9 @@ async function _dtRapport(sids,session){
   var _efDepassement=0,_efTotal=0;
   Object.values(energieRapBySite).forEach(function(items){items.forEach(function(f){_efTotal++;if(f.pct!=null&&f.pct>100)_efDepassement++;});});
   var kpis='<div class="kpi-grid" style="margin-bottom:16px">'+
-    '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-trend">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+' FCFA':'Coût non saisi')+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+dtKpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-trend">'+(totCoutPannes>0?totCoutPannes.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Coût maintenance</div><div class="kpi-value">'+totMnt.toLocaleString('fr-FR')+'</div><div class="kpi-trend">FCFA réalisées</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-trend">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+' '+_D():'Coût non saisi')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+dtKpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-trend">'+(totCoutPannes>0?totCoutPannes.toLocaleString('fr-FR')+' '+_D():'—')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Coût maintenance</div><div class="kpi-value">'+totMnt.toLocaleString('fr-FR')+'</div><div class="kpi-trend">'+_D()+' réalisées</div></div>'+
     (_efTotal>0?'<div class="kpi"><div class="kpi-label">Énergie hors objectif</div><div class="kpi-value" style="color:'+(_efDepassement>0?'var(--rouge)':'var(--vert)')+'">'+_efDepassement+' / '+_efTotal+'</div><div class="kpi-trend">fluides dépassant l\'objectif</div></div>':'')+
   '</div>'+
   '<div style="background:#FAFAF8;border:1px solid #E8DFD0;border-radius:10px;padding:12px 16px;margin-bottom:20px">'+
@@ -13277,7 +13282,7 @@ async function _dtRapport(sids,session){
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">'+
       [
         {label:'Pannes actives (total)',val:totPannes,statut:totPannes===0?'✓ Bon':totPannes<=3?'⚠ À surveiller':'✗ Critique',col:totPannes===0?'#2D7A4F':totPannes<=3?'#C49A1C':'#C0392B',norme:'Cible : 0 panne active'},
-        {label:'Coût total (carb. + mnt. + pannes)',val:(totCarb+totMnt+totCoutPannes).toLocaleString('fr-FR')+' FCFA',statut:'',col:'var(--text2)',norme:'Carburant + maintenance + interventions'},
+        {label:'Coût total (carb. + mnt. + pannes)',val:(totCarb+totMnt+totCoutPannes).toLocaleString('fr-FR')+' '+_D(),statut:'',col:'var(--text2)',norme:'Carburant + maintenance + interventions'},
         {label:'Sites en alerte',val:sids.filter(function(sid){var d=sitesData[sid];return d.pannes>0;}).length+' / '+sids.length,statut:sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===0?'✓ Tous bons':sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===1?'⚠ 1 site':'✗ Plusieurs',col:sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===0?'#2D7A4F':sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===1?'#C49A1C':'#C0392B',norme:'Sites avec pannes actives'},
       ].map(function(r){return'<div style="background:white;border:1px solid #E8DFD0;border-radius:8px;padding:10px 12px">'+
         '<div style="font-size:10px;color:var(--text3);margin-bottom:4px">'+r.label+'</div>'+
@@ -13297,10 +13302,10 @@ async function _dtRapport(sids,session){
         '<div style="font-size:12px;font-weight:700;color:'+siteStatut[1]+'">'+siteStatut[0]+'</div>'+
       '</div>'+
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">'+
-        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Carburant</div><div style="font-size:18px;font-weight:800;color:var(--dark)">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div style="font-size:11px;color:var(--text3)">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' FCFA':'Coût non saisi')+'</div></div>'+
-        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Pannes</div><div style="font-size:18px;font-weight:800;color:'+(d.pannes>0?'var(--rouge)':'var(--vert)')+'">'+d.pannes+'</div><div style="font-size:11px;color:var(--text3)">'+(d.coutPannes>0?d.coutPannes.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
-        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Maintenance</div><div style="font-size:18px;font-weight:800;color:var(--dark)">'+d.mntCout.toLocaleString('fr-FR')+' FCFA</div><div style="font-size:11px;color:var(--text3)">'+d.rondes+' rondes effectuées</div></div>'+
-        (total>0?'<div style="background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--amber-dark);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Total coûts</div><div style="font-size:18px;font-weight:800;color:var(--amber-dark)">'+total.toLocaleString('fr-FR')+' FCFA</div></div>':'')+
+        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Carburant</div><div style="font-size:18px;font-weight:800;color:var(--dark)">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div style="font-size:11px;color:var(--text3)">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' '+_D():'Coût non saisi')+'</div></div>'+
+        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Pannes</div><div style="font-size:18px;font-weight:800;color:'+(d.pannes>0?'var(--rouge)':'var(--vert)')+'">'+d.pannes+'</div><div style="font-size:11px;color:var(--text3)">'+(d.coutPannes>0?d.coutPannes.toLocaleString('fr-FR')+' '+_D():'—')+'</div></div>'+
+        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Maintenance</div><div style="font-size:18px;font-weight:800;color:var(--dark)">'+d.mntCout.toLocaleString('fr-FR')+' '+_D()+'</div><div style="font-size:11px;color:var(--text3)">'+d.rondes+' rondes effectuées</div></div>'+
+        (total>0?'<div style="background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--amber-dark);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Total coûts</div><div style="font-size:18px;font-weight:800;color:var(--amber-dark)">'+total.toLocaleString('fr-FR')+' '+_D()+'</div></div>':'')+
       '</div>'+
       (function(){
         var ef=energieRapBySite[sid]||[];if(!ef.length)return '';
@@ -14147,7 +14152,7 @@ async function _dtEquipe(sids,session){
         '<td style="padding:10px 12px;text-align:center;font-weight:700;color:'+enCoursCol+'">'+r.enCours+'</td>'+
         '<td style="padding:10px 12px;text-align:center;color:var(--vert);font-weight:600">'+r.resolus+(taux!==null?' <span style="font-size:10px;color:var(--text3)">('+taux+'%)</span>':'')+'</td>'+
         '<td style="padding:10px 12px;text-align:center;font-weight:700;color:'+mttrCol+'">'+fmtH(mttr)+'</td>'+
-        '<td style="padding:10px 12px;text-align:right;font-size:12px;color:var(--text2)">'+(r.cout>0?r.cout.toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+        '<td style="padding:10px 12px;text-align:right;font-size:12px;color:var(--text2)">'+(r.cout>0?r.cout.toLocaleString('fr-FR')+' '+_D():'—')+'</td>'+
       '</tr>';
     }).join('')+
   '</tbody></table></div>';
@@ -15313,7 +15318,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
     var totalCout=items.some(function(it){return it.cout!=null;})?items.reduce(function(a,it){return a+(it.cout||0);},0):null;
     var totalBudget=items.some(function(it){return it.budget!=null;})?items.reduce(function(a,it){return a+(it.budget||0);},0):null;
     var totalVs=totalCout!=null&&totalBudget!=null?totalCout-totalBudget:null;
-    // FCFA/ch.nuitée : coût total / (chambres moy/jour × nb jours) — norme industrie hôtelière
+    // '+_D()+'/ch.nuitée : coût total / (chambres moy/jour × nb jours) — norme industrie hôtelière
     var fcfaPerCh=totalCout&&chambresOcc&&period?Math.round(totalCout/(chambresOcc*period)):null;
     var fcfaPerChBudget=totalBudget&&chambresOcc&&period?Math.round(totalBudget/(chambresOcc*period)):null;
     energieBySite[site.id]={items:items,totalCout:totalCout,totalBudget:totalBudget,totalVs:totalVs,toMoy:toMoyS?Math.round(toMoyS):null,chambresOcc:chambresOcc,fcfaPerCh:fcfaPerCh,fcfaPerChBudget:fcfaPerChBudget,nbCh:nbCh};
@@ -15335,9 +15340,9 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   // ── Narratives ──
   var narGlobal='Bilan sur la période du '+periodeStr+'. ';
   if(confPct!==null)narGlobal+='Taux de conformité rondes (multi-sites) : '+confPct+'%. ';
-  narGlobal+=totLitres>0?'Consommation carburant : '+Math.round(totLitres).toLocaleString('fr-FR')+' L'+(totCarb>0?' ('+totCarb.toLocaleString('fr-FR')+' FCFA)':'')+'. ':'';
+  narGlobal+=totLitres>0?'Consommation carburant : '+Math.round(totLitres).toLocaleString('fr-FR')+' L'+(totCarb>0?' ('+totCarb.toLocaleString('fr-FR')+' '+_D()+')':'')+'. ':'';
   narGlobal+=totPannes>0?totPannes+' panne'+(totPannes>1?'s':'')+' active'+(totPannes>1?'s':'')+' en cours. ':'Aucune panne active. ';
-  narGlobal+=totMnt>0?totMnt+' intervention'+(totMnt>1?'s':'')+' de maintenance'+(totMntCout>0?' pour '+totMntCout.toLocaleString('fr-FR')+' FCFA':'')+'.':'';
+  narGlobal+=totMnt>0?totMnt+' intervention'+(totMnt>1?'s':'')+' de maintenance'+(totMntCout>0?' pour '+totMntCout.toLocaleString('fr-FR')+' '+_D():'')+'.':'';
 
   // ── HTML ──
   var h='';
@@ -15364,7 +15369,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   // ── KPIs globaux ──
   h+='<div class="kpi-row">'+
     '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+kpiCol(confPct,70,90,false)+'">'+(confPct!==null?confPct+'%':'—')+'</div><div class="kpi-sub">Tous sites · '+period+' jours</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+' FCFA':'Coût non saisi')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+' '+_D():'Coût non saisi')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+kpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-sub">MTTR moy. : '+fmtDur(avgMttr)+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Maint. préventif</div><div class="kpi-value">'+totMntPreventif+'</div><div class="kpi-sub">'+(totMntCoutPreventif>0?fmtCout(totMntCoutPreventif,'XOF'):'aucun coût')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Maint. correctif</div><div class="kpi-value" style="color:'+(totMntCorrectif>0?'#C0392B':'#2D7A4F')+'">'+totMntCorrectif+'</div><div class="kpi-sub">'+(totMntCoutCorrectif>0?fmtCout(totMntCoutCorrectif,'XOF'):'aucun coût')+'</div></div>'+
@@ -15417,7 +15422,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
         '<td style="text-align:center;padding:9px 11px;font-weight:700;color:'+kpiCol(d.pannes,1,3,true)+'">'+d.pannes+'</td>'+
         '<td style="text-align:center;padding:9px 11px;font-weight:600;color:'+mttrCol+'">'+fmtDur(d.mttr)+'</td>'+
         '<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</td>'+
-        '<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+(total>0?total.toLocaleString('fr-FR')+' FCFA':'—')+'</td>'+
+        '<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+(total>0?total.toLocaleString('fr-FR')+' '+_D():'—')+'</td>'+
         (hasEnergie?'<td style="text-align:center;padding:9px 11px;font-weight:600;color:'+efCol+'">'+efLabel+'</td>':'')+
         (hasTO?'<td style="text-align:center;padding:9px 11px;font-weight:600;color:'+kpiCol(d.toMoy,60,80,false)+'">'+(d.toMoy!=null?d.toMoy+'%':'—')+'</td>':'')+
         (hasCouv?'<td style="text-align:center;padding:9px 11px;color:var(--text2)">'+(d.couvertsTotal!=null?d.couvertsTotal.toLocaleString('fr-FR'):'—')+'</td>':'')+
@@ -15472,7 +15477,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
               (ef.totalVs!=null?
                 (function(){var vCol=ef.totalVs>0?'#C0392B':'#2D7A4F';var vPct=ef.totalBudget?Math.round(ef.totalVs/ef.totalBudget*100):null;return'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">Écart vs budget</div><div style="font-size:16px;font-weight:700;color:'+vCol+'">'+(vPct!=null?(vPct>0?'+':'')+vPct+'%':'—')+'</div><div style="font-size:10px;color:'+vCol+'">'+(ef.totalVs>0?'+':'')+fmtCout(ef.totalVs,'XOF')+'</div></div>';})()
               :'')+
-              (ef.fcfaPerCh!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">FCFA / ch. nuitée</div><div style="font-size:16px;font-weight:700">'+ef.fcfaPerCh.toLocaleString('fr-FR')+'<span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:2px">XOF/ch</span></div>'+(ef.fcfaPerChBudget!=null?'<div style="font-size:10px;color:var(--text3)">Budget : '+ef.fcfaPerChBudget.toLocaleString('fr-FR')+' XOF/ch</div>':'')+(ef.toMoy!=null?'<div style="font-size:10px;color:var(--text3)">'+ef.chambresOcc+' ch.occ./j · TO '+ef.toMoy+'%</div>':'')+'</div>':'')+
+              (ef.fcfaPerCh!=null?'<div style="background:#F9F6F0;border-radius:6px;padding:8px 12px;min-width:110px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em">'+_D()+' / ch. nuitée</div><div style="font-size:16px;font-weight:700">'+ef.fcfaPerCh.toLocaleString('fr-FR')+'<span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:2px">XOF/ch</span></div>'+(ef.fcfaPerChBudget!=null?'<div style="font-size:10px;color:var(--text3)">Budget : '+ef.fcfaPerChBudget.toLocaleString('fr-FR')+' XOF/ch</div>':'')+(ef.toMoy!=null?'<div style="font-size:10px;color:var(--text3)">'+ef.chambresOcc+' ch.occ./j · TO '+ef.toMoy+'%</div>':'')+'</div>':'')+
             '</div>'
           :'')+
         '</div>'+
@@ -15535,11 +15540,11 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
           '<div class="kpi"><div class="kpi-label">Rondes</div><div class="kpi-value" style="font-size:20px;color:'+kpiCol(sConf,70,90,false)+'">'+(sConf!==null?sConf+'%':'—')+'</div><div class="kpi-sub">'+d.rondes+' rondes</div></div>'+
           '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="font-size:20px;color:'+kpiCol(d.pannes,1,3,true)+'">'+d.pannes+'</div><div class="kpi-sub">'+d.pannesTot+' total période</div></div>'+
           '<div class="kpi"><div class="kpi-label">MTTR moyen</div><div class="kpi-value" style="font-size:20px;color:'+(d.mttr===null?'#888':d.mttr<=2?'#2D7A4F':d.mttr<=8?'#C49A1C':'#C0392B')+'">'+fmtDur(d.mttr)+'</div><div class="kpi-sub">temps résolution</div></div>'+
-          '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value" style="font-size:20px">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' FCFA':'—')+'</div></div>'+
+          '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value" style="font-size:20px">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' '+_D():'—')+'</div></div>'+
           (d.toMoy!=null?'<div class="kpi"><div class="kpi-label">TO moyen</div><div class="kpi-value" style="font-size:20px;color:'+kpiCol(d.toMoy,60,80,false)+'">'+d.toMoy+'%</div><div class="kpi-sub">taux d\'occupation</div></div>':'')+
           (d.couvertsTotal!=null?'<div class="kpi"><div class="kpi-label">Couverts</div><div class="kpi-value" style="font-size:20px">'+d.couvertsTotal.toLocaleString('fr-FR')+'</div><div class="kpi-sub">servis sur la période</div></div>':'')+
           (rzBySite[site.id]&&rzBySite[site.id].count?'<div class="kpi"><div class="kpi-label">Rondes zones</div><div class="kpi-value" style="font-size:20px;color:#2D7A4F">'+rzBySite[site.id].count+'</div><div class="kpi-sub">'+(rzBySite[site.id].anomalies>0?rzBySite[site.id].anomalies+' anomalie'+(rzBySite[site.id].anomalies>1?'s':''):'0 anomalie')+'</div></div>':'')+
-          ((d.mntCoutPreventif+d.mntCoutCorrectif)>0?'<div class="kpi" style="border-color:'+col+'55;background:'+pale+'"><div class="kpi-label">Coût maintenance</div><div class="kpi-value" style="font-size:20px;color:'+col+'">'+(d.mntCoutPreventif+d.mntCoutCorrectif).toLocaleString('fr-FR')+'</div><div class="kpi-sub">FCFA · préventif + correctif</div></div>':'')+
+          ((d.mntCoutPreventif+d.mntCoutCorrectif)>0?'<div class="kpi" style="border-color:'+col+'55;background:'+pale+'"><div class="kpi-label">Coût maintenance</div><div class="kpi-value" style="font-size:20px;color:'+col+'">'+(d.mntCoutPreventif+d.mntCoutCorrectif).toLocaleString('fr-FR')+'</div><div class="kpi-sub">'+_D()+' · préventif + correctif</div></div>':'')+
         '</div>'+
         '<div class="edit-hint">Observations (modifiable)</div>'+
         '<div class="obs-zone" contenteditable="true" data-placeholder="Observations pour '+escape_html(site.nom)+' : constats, recommandations, actions..."></div>'+
@@ -15610,7 +15615,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
                   '<td style="font-size:11px;color:'+typeCol+'">'+typeLabel+'</td>'+
                   '<td style="font-size:11px">'+inter+'</td>'+
                   '<td style="white-space:nowrap;font-size:11px;color:var(--text2)">'+ts+'</td>'+
-                  '<td style="font-size:11px;font-weight:600">'+(Number(m.cout)||0).toLocaleString('fr-FR')+' FCFA</td>'+
+                  '<td style="font-size:11px;font-weight:600">'+(Number(m.cout)||0).toLocaleString('fr-FR')+' '+_D()+'</td>'+
                 '</tr>';
               }).join('')+
             '</tbody></table>';
@@ -15661,7 +15666,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
           var titre=m.plan_titre||'Mission prestataire';
           var eqDisp=m.eq_nom||'';
           var ts=m.completed_at?new Date(m.completed_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'—';
-          var coutStr=(Number(m.cout)||0)>0?(Number(m.cout)).toLocaleString('fr-FR')+' FCFA':'—';
+          var coutStr=(Number(m.cout)||0)>0?(Number(m.cout)).toLocaleString('fr-FR')+' '+_D():'—';
           return '<tr style="background:#F4FCF9">'+
             '<td><strong>'+escape_html(titre)+'</strong>'+(eqDisp?'<br><span style="font-size:10px;color:#0F6E56">'+escape_html(eqDisp)+'</span>':'')+'</td>'+
             '<td style="color:#0F6E56">préventive</td>'+
@@ -15680,7 +15685,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
           var prestTag=m.prestataire&&m.prestataire.trim()
             ?'<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:#EEF4FF;color:#3B6FD4;border:1px solid #BFCFF8">🔧 '+escape_html(m.prestataire)+'</span>'
             :'<span style="font-size:10px;padding:1px 6px;border-radius:3px;background:#F4F5FA;color:#5A5F78;border:1px solid #E4E6EF">Interne</span>';
-          var coutStr=(Number(m.cout)||0)>0?(Number(m.cout)).toLocaleString('fr-FR')+' FCFA':'—';
+          var coutStr=(Number(m.cout)||0)>0?(Number(m.cout)).toLocaleString('fr-FR')+' '+_D():'—';
           return '<tr>'+
             '<td><strong>'+escape_html(m.titre||'Intervention')+'</strong>'+eqNom+'</td>'+
             '<td>'+typeTag+'</td>'+
@@ -16031,7 +16036,7 @@ function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,relev
   lignes.forEach(function(l){if(l.coutReel!=null){coutTotal+=l.coutReel;hasCout=true;}if(l.budget)budgetTotal+=l.budget;});
   var ecartTotal=hasCout&&budgetTotal?coutTotal-budgetTotal:null;
   var ecartTotalPct=ecartTotal!=null&&budgetTotal?Math.round(ecartTotal/budgetTotal*100):null;
-  // FCFA/ch.nuitée : coût total / (chambres moy/jour × nb jours du mois) — norme industrie hôtelière
+  // '+_D()+'/ch.nuitée : coût total / (chambres moy/jour × nb jours du mois) — norme industrie hôtelière
   var fcfaParCh=hasCout&&chambresOcc&&daysInMonth?Math.round(coutTotal/(chambresOcc*daysInMonth)):null;
   var fcfaParChBudget=budgetTotal&&chambresOcc&&daysInMonth?Math.round(budgetTotal/(chambresOcc*daysInMonth)):null;
   function fmtN(n){return n!=null?Math.round(n).toLocaleString('fr-FR'):'—';}
@@ -16074,11 +16079,11 @@ function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,relev
     h+='<div class="kpi"><div class="kpi-lbl">Coût total</div><div class="kpi-val">'+fmtN(coutTotal)+'</div><div class="kpi-sub">XOF HT</div></div>';
     h+='<div class="kpi"><div class="kpi-lbl">Budget</div><div class="kpi-val">'+fmtN(budgetTotal||null)+'</div><div class="kpi-sub">XOF HT</div></div>';
     h+='<div class="kpi"><div class="kpi-lbl">Écart</div><div class="kpi-val" style="color:'+pctCol(ecartTotalPct)+'">'+fmtPct(ecartTotalPct)+'</div><div class="kpi-sub">'+(ecartTotal!=null?(ecartTotal>0?'+':'')+fmtN(ecartTotal)+' XOF':'—')+'</div></div>';
-    h+='<div class="kpi"><div class="kpi-lbl">FCFA / ch. nuitée</div><div class="kpi-val">'+fmtN(fcfaParCh)+'</div><div class="kpi-sub">'+(fcfaParChBudget?'Budget : '+fmtN(fcfaParChBudget):'Budget non défini')+'</div></div>';
+    h+='<div class="kpi"><div class="kpi-lbl">'+_D()+' / ch. nuitée</div><div class="kpi-val">'+fmtN(fcfaParCh)+'</div><div class="kpi-sub">'+(fcfaParChBudget?'Budget : '+fmtN(fcfaParChBudget):'Budget non défini')+'</div></div>';
     h+='</div>';
   }
   h+='<h2>Détail par fluide</h2>';
-  h+='<table><thead><tr><th>Fluide</th><th>Conso réelle</th><th>Objectif</th><th>Écart conso</th><th>Coût FCFA</th><th>Budget FCFA</th><th>Écart coût</th></tr></thead><tbody>';
+  h+='<table><thead><tr><th>Fluide</th><th>Conso réelle</th><th>Objectif</th><th>Écart conso</th><th>Coût '+_D()+'</th><th>Budget '+_D()+'</th><th>Écart coût</th></tr></thead><tbody>';
   lignes.forEach(function(l){
     var ecC=l.ecartConso!=null?(l.ecartConso<=0?'#2D7A4F':l.ecartConso<=10?'#C49A1C':'#C0392B'):'#888';
     h+='<tr>';
@@ -16100,7 +16105,7 @@ function _buildRapportEnergieMensuel_REMOVED(moisLabel,daysInMonth,fluides,relev
   }
   h+='</tbody></table>';
   if(fcfaParCh&&chambresOcc){
-    h+='<h2>Ratio FCFA / chambre</h2>';
+    h+='<h2>Ratio '+_D()+' / chambre</h2>';
     h+='<div style="background:white;border:1px solid #e5e0d8;border-radius:10px;padding:16px 20px;display:flex;gap:32px;flex-wrap:wrap;margin-bottom:24px">';
     h+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Réel</div><div style="font-size:22px;font-weight:700">'+fmtN(fcfaParCh)+'</div><div style="font-size:10px;color:#aaa">XOF / ch. nuitée</div></div>';
     if(fcfaParChBudget){
@@ -16161,7 +16166,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   if(tauxRondes!==null)narResume+='Taux de conformité des rondes : '+tauxRondes+'%. ';
   if(signalements.length===0)narResume+='Aucun signalement enregistré sur la période. ';
   else narResume+=(signalements.length)+' signalement'+(signalements.length>1?'s':'')+' enregistré'+(signalements.length>1?'s':'')+' dont '+nbSgOuverts+' en cours et '+nbSgResolus+' résolu'+(nbSgResolus>1?'s':'')+'. ';
-  if(coutTotal>0)narResume+='Coût total des interventions : '+coutTotal.toLocaleString('fr-FR')+' FCFA.';
+  if(coutTotal>0)narResume+='Coût total des interventions : '+coutTotal.toLocaleString('fr-FR')+' '+_D()+'.';
 
   // Équipements — narrative GE uniquement (niveaux cuves dans section Énergie)
   var narEquip='';
@@ -16210,8 +16215,8 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
   else{
     var realises=maintenances.filter(function(m){return m.statut==='realise';});
     narMaint+=realises.length+' intervention'+(realises.length>1?'s':'')+(realises.length>1?' réalisées':' réalisée')+' sur la période. ';
-    if(coutPreventif>0||coutCorrectif>0){narMaint+='Coût préventif : '+(coutPreventif>0?coutPreventif.toLocaleString('fr-FR')+' FCFA':'—')+'. Coût correctif : '+(coutCorrectif>0?coutCorrectif.toLocaleString('fr-FR')+' FCFA':'—')+'.';}
-    else if(coutTotal>0){narMaint+='Coût total : '+coutTotal.toLocaleString('fr-FR')+' FCFA.';}
+    if(coutPreventif>0||coutCorrectif>0){narMaint+='Coût préventif : '+(coutPreventif>0?coutPreventif.toLocaleString('fr-FR')+' '+_D():'—')+'. Coût correctif : '+(coutCorrectif>0?coutCorrectif.toLocaleString('fr-FR')+' '+_D():'—')+'.';}
+    else if(coutTotal>0){narMaint+='Coût total : '+coutTotal.toLocaleString('fr-FR')+' '+_D()+'.';}
   }
 
   // ── KPI couleurs ──
@@ -16751,7 +16756,7 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
         }
       }
       if(_fpChR){
-        h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">FCFA / ch. nuitée</div>';
+        h+='<div class="fluid-card" style="margin:0"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">'+_D()+' / ch. nuitée</div>';
         h+='<div style="font-size:17px;font-weight:700">'+_fpChR.toLocaleString('fr-FR')+'<span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:2px">XOF/ch</span></div>';
         h+=(_fbChR?'<div style="font-size:10px;color:var(--text3);margin-top:2px">Budget : '+_fbChR.toLocaleString('fr-FR')+' XOF/ch</div>':'');
         h+=(_ecartChR!=null?'<div style="font-size:10px;font-weight:700;color:'+(_ecartChR>5?'#E8841A':_ecartChR<-5?'var(--vert)':'var(--text3)')+'">'+(_ecartChR>0?'↑ +':_ecartChR<0?'↓ ':'')+Math.abs(_ecartChR)+'% vs budget</div>':'');
@@ -18076,13 +18081,13 @@ async function _rtEnergie(sid){
       '</div>';
     }
     if(hasCoutData&&chambresOcc){
-      // FCFA/ch.nuitée : coût total / (chambres moy/jour × nb jours) — norme industrie hôtelière
+      // '+_D()+'/ch.nuitée : coût total / (chambres moy/jour × nb jours) — norme industrie hôtelière
       var _fcfaCh=Math.round(coutTotalMois/(chambresOcc*daysInMonth));
       // Budget/ch.nuitée : budget mensuel par chambre-nuitée
       var _budgCh=hasBudgetData&&chambresOcc?Math.round(budgetTotalMois/(chambresOcc*daysInMonth)):null;
       var _ecartBpc=_budgCh?Math.round((_fcfaCh-_budgCh)/_budgCh*1000)/10:null;
       kpiHtml+='<div style="background:white;border:1.5px solid #fef3c7;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px">'+
-        '<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px">💰 FCFA / ch. nuitée</div>'+
+        '<div style="font-size:10px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:.5px">💰 '+_D()+' / ch. nuitée</div>'+
         '<div style="font-size:28px;font-weight:800;color:var(--dark)">'+_fcfaCh.toLocaleString('fr-FR')+
           '<span style="font-size:13px;font-weight:500;color:var(--text3);margin-left:3px">XOF/ch</span>'+
         '</div>'+
