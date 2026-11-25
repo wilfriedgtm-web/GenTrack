@@ -12542,49 +12542,112 @@ async function _dtHistorique(sids){
 var _dtSgFilter='tous';
 var _dtSgSiteFilter='tous';
 var _dtSgTypeFilter='tous';
+var _dtSgSelected=null;
 function _dtSetSgFilter(f){_dtSgFilter=f;if(_session)renderDirTech(_session,'signalements');}
 function _dtSetSgSiteFilter(v){_dtSgSiteFilter=v;if(_session)renderDirTech(_session,'signalements');}
 function _dtSetSgTypeFilter(v){_dtSgTypeFilter=v;if(_session)renderDirTech(_session,'signalements');}
+function _dtSgSelectCard(id){_dtSgSelected=(_dtSgSelected===id)?null:id;if(_session)renderDirTech(_session,'signalements');}
 
 async function _dtSignalements(sids){
   var dc=document.getElementById('dash-content-main');
-  if(dc){dc.style.padding='24px';dc.style.maxWidth='none';}
+  if(dc){dc.style.padding='20px 24px';dc.style.maxWidth='none';}
   if(!sids.length)return '<div class="placeholder-card"><div class="placeholder-icon">📍</div>Aucun site configuré</div>';
   var sidStr=sids.join(',');
   var since30=dateNJours(30);
   var[sites,allRows]=await Promise.all([
-    supaGet('sites','id=in.('+sidStr+')&select=id,nom&order=nom.asc'),
-    supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+since30+'T00:00:00&order=created_at.desc&limit=400&select=id,groupe_id,type,description,statut,signale_par,lieu,assigne_a,pris_en_charge_par,ref_code,created_at,equipement_id,equipement_zone_id,equipements(nom),equipements_zone(nom,zones(nom))')
+    supaGet('sites','id=in.('+sidStr+')&select=id,nom,devise&order=nom.asc'),
+    supaGet('signalements',
+      'groupe_id=in.('+sidStr+')&created_at=gte.'+since30+'T00:00:00&order=created_at.desc&limit=400'+
+      '&select=id,groupe_id,type,description,statut,signale_par,lieu,assigne_a,pris_en_charge_par,pris_en_charge_at,ref_code,created_at,resolved_at,note_resolution,cout_intervention,resolved_by,photo_url,source,equipement_id,equipement_zone_id,equipements(nom),equipements_zone(nom,zones(nom)),maintenances!signalement_id(photo_url,prestataire,statut)'
+    )
   ]);
-  var siteMap={};sites.forEach(function(s){siteMap[s.id]=s.nom;});
+  sites=sites||[];allRows=allRows||[];
+  var siteMap={};sites.forEach(function(s){siteMap[s.id]={nom:s.nom,devise:s.devise||'FCFA'};});
 
-  // Cache rows for _sgAffecter
+  // Cache rows for detail panel + actions
   if(!window._sgRows)window._sgRows={};
   allRows.forEach(function(r){window._sgRows[r.id]=r;});
 
-  // KPIs globaux
+  // ── KPIs ──
   var cOuvert=allRows.filter(function(r){return r.statut==='ouvert';}).length;
   var cEnCours=allRows.filter(function(r){return r.statut==='en_cours';}).length;
   var cResolu=allRows.filter(function(r){return r.statut==='resolu';}).length;
-  // Zones actives = zones uniques avec signalements non résolus
   var _zonesActives=new Set();
   allRows.filter(function(r){return r.statut!=='resolu';}).forEach(function(r){
-    if(r.equipements_zone&&r.equipements_zone.zones&&r.equipements_zone.zones.nom)_zonesActives.add(r.equipements_zone.zones.nom);
+    var zn=(r.equipements_zone&&r.equipements_zone.zones&&r.equipements_zone.zones.nom)||(r.equipements_zone&&r.equipements_zone.nom)||r.lieu;
+    if(zn)_zonesActives.add(zn);
   });
+  // MTTR moyen sur résolus du mois (heures)
+  var resolusAvecDuree=allRows.filter(function(r){return r.statut==='resolu'&&r.created_at&&r.resolved_at;});
+  var mttrH=resolusAvecDuree.length?
+    Math.round(resolusAvecDuree.reduce(function(s,r){return s+(new Date(r.resolved_at)-new Date(r.created_at))/(1000*3600);},0)/resolusAvecDuree.length):null;
+  var mttrStr=mttrH===null?'—':mttrH<24?(mttrH+'h'):(Math.round(mttrH/24*10)/10+' j');
 
-  // Zones chaudes = top 5 par nb signalements non résolus
-  var _zoneCounts={};
-  allRows.filter(function(r){return r.statut!=='resolu';}).forEach(function(r){
+  var kpisHtml='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px">'+
+    '<div class="kpi"><div class="kpi-label">Ouverts</div><div class="kpi-value" style="color:var(--rouge)">'+cOuvert+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">En cours</div><div class="kpi-value" style="color:var(--orange)">'+cEnCours+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Résolus (30j)</div><div class="kpi-value" style="color:var(--vert)">'+cResolu+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Zones actives</div><div class="kpi-value">'+_zonesActives.size+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">MTTR moyen</div><div class="kpi-value" style="font-size:16px">'+mttrStr+'</div></div>'+
+  '</div>';
+
+  // ── Points chauds : zones + équipements (tous signalements, pas seulement actifs) ──
+  var _zoneCounts={};var _eqCounts={};
+  allRows.forEach(function(r){
     var zNom=(r.equipements_zone&&r.equipements_zone.zones&&r.equipements_zone.zones.nom)||
-             (r.equipements_zone&&r.equipements_zone.nom)||
-             (r.equipements&&r.equipements.nom)||
-             (r.lieu)||'—';
+             (r.equipements_zone&&r.equipements_zone.nom)||r.lieu||'—';
     _zoneCounts[zNom]=(_zoneCounts[zNom]||0)+1;
+    var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:null;
+    if(eqNom)_eqCounts[eqNom]=(_eqCounts[eqNom]||0)+1;
   });
-  var _hotZones=Object.keys(_zoneCounts).map(function(k){return{nom:k,n:_zoneCounts[k]};}).sort(function(a,b){return b.n-a.n;}).slice(0,5);
-  var _maxHot=_hotZones.length?_hotZones[0].n:1;
+  var hotZones=Object.keys(_zoneCounts).map(function(k){return{nom:k,n:_zoneCounts[k]};}).sort(function(a,b){return b.n-a.n;}).slice(0,5);
+  var hotEquip=Object.keys(_eqCounts).map(function(k){return{nom:k,n:_eqCounts[k]};}).sort(function(a,b){return b.n-a.n;}).slice(0,4);
+  var maxHot=hotZones.length?hotZones[0].n:1;
+  var maxEq=hotEquip.length?hotEquip[0].n:1;
 
-  // Apply filters
+  function _hotBar(nom,n,maxN){
+    var col=n>=3?'var(--rouge)':n>=2?'var(--orange)':'var(--vert)';
+    var barW=Math.round(n/maxN*100);
+    return '<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:0.5px solid var(--border)">'+
+      '<span style="font-size:10px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escape_html(nom)+'">'+escape_html(nom)+'</span>'+
+      '<div style="width:50px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;flex-shrink:0"><div style="height:100%;width:'+barW+'%;background:'+col+'"></div></div>'+
+      '<span style="font-size:11px;font-weight:700;color:'+col+';min-width:14px;text-align:right;flex-shrink:0">'+n+'</span>'+
+    '</div>';
+  }
+
+  var hotHtml='<div style="margin-bottom:12px">'+
+    '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">🔥 Zones</div>'+
+    (hotZones.length?hotZones.map(function(z){return _hotBar(z.nom,z.n,maxHot);}).join(''):'<div style="font-size:11px;color:var(--text3)">—</div>')+
+  '</div>'+
+  '<div style="margin-bottom:12px">'+
+    '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">🔧 Équipements</div>'+
+    (hotEquip.length?hotEquip.map(function(e){return _hotBar(e.nom,e.n,maxEq);}).join(''):'<div style="font-size:11px;color:var(--text3)">—</div>')+
+  '</div>';
+
+  // Récap par hôtel
+  var recapHtml='<div>'+
+    '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:6px">Par hôtel</div>'+
+    '<div style="background:white;border:0.5px solid var(--border);border-radius:8px;overflow:hidden">'+
+    sites.map(function(s,i){
+      var sr=allRows.filter(function(r){return r.groupe_id===s.id;});
+      var sO=sr.filter(function(r){return r.statut==='ouvert';}).length;
+      var sE=sr.filter(function(r){return r.statut==='en_cours';}).length;
+      var sR=sr.filter(function(r){return r.statut==='resolu';}).length;
+      return '<div style="padding:5px 8px;'+(i>0?'border-top:0.5px solid var(--border)':'')+';display:flex;justify-content:space-between;align-items:center;gap:4px">'+
+        '<span style="font-size:10px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+escape_html(s.nom)+'</span>'+
+        '<span style="font-size:10px;flex-shrink:0;white-space:nowrap">'+
+          (sO?'<b style="color:var(--rouge)">'+sO+'</b>':'<span style="color:var(--vert)">0</span>')+
+          '<span style="color:var(--text3)"> / </span>'+
+          '<span style="color:var(--orange)">'+sE+'</span>'+
+          '<span style="color:var(--text3)"> / </span>'+
+          '<span style="color:var(--vert)">'+sR+'</span>'+
+        '</span>'+
+      '</div>';
+    }).join('')+
+    '</div>'+
+  '</div>';
+
+  // ── Filters ──
   var rows=allRows.filter(function(r){
     if(_dtSgFilter!=='tous'&&r.statut!==_dtSgFilter)return false;
     if(_dtSgSiteFilter!=='tous'&&r.groupe_id!==_dtSgSiteFilter)return false;
@@ -12592,145 +12655,172 @@ async function _dtSignalements(sids){
     return true;
   });
 
-  // KPI bar
-  var kpisHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">'+
-    '<div class="kpi"><div class="kpi-label">Ouverts</div><div class="kpi-value" style="color:var(--rouge)">'+cOuvert+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">En cours</div><div class="kpi-value" style="color:var(--orange)">'+cEnCours+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Résolus (30j)</div><div class="kpi-value" style="color:var(--vert)">'+cResolu+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Zones actives</div><div class="kpi-value">'+_zonesActives.size+'</div></div>'+
-  '</div>';
-
-  // Filters
   var stPills=['tous','ouvert','en_cours','resolu'].map(function(f){
     var labels={tous:'Tous',ouvert:'Ouverts',en_cours:'En cours',resolu:'Résolus'};
     var n={tous:allRows.length,ouvert:cOuvert,en_cours:cEnCours,resolu:cResolu}[f];
     var active=_dtSgFilter===f;
-    return '<button onclick="_dtSetSgFilter(\''+f+'\')" style="padding:5px 13px;border-radius:20px;border:1.5px solid '+(active?'var(--amber)':'var(--border)')+';background:'+(active?'var(--amber-pale)':'white')+';font-size:12px;font-weight:'+(active?'700':'500')+';color:'+(active?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+labels[f]+' ('+n+')</button>';
+    return '<button onclick="_dtSetSgFilter(\''+f+'\')" style="padding:4px 12px;border-radius:20px;border:1.5px solid '+(active?'var(--amber)':'var(--border)')+';background:'+(active?'var(--amber-pale)':'white')+';font-size:11px;font-weight:'+(active?'700':'500')+';color:'+(active?'var(--amber-dark)':'var(--text2)')+';cursor:pointer">'+labels[f]+' ('+n+')</button>';
   }).join('');
-  var siteSelect='<select onchange="_dtSetSgSiteFilter(this.value)" style="padding:5px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px"><option value="tous">Tous les sites</option>'+
+  var siteSelect='<select onchange="_dtSetSgSiteFilter(this.value)" style="padding:4px 8px;border:1px solid var(--border);border-radius:8px;font-size:11px;background:white;color:var(--dark)"><option value="tous">Tous sites</option>'+
     sites.map(function(s){return '<option value="'+s.id+'"'+(s.id===_dtSgSiteFilter?' selected':'')+'>'+escape_html(s.nom)+'</option>';}).join('')+'</select>';
-  var typeSelect='<select onchange="_dtSetSgTypeFilter(this.value)" style="padding:5px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px"><option value="tous">Tous types</option><option value="panne">Panne</option><option value="anomalie">Anomalie</option><option value="observation">Observation</option></select>';
-
-  var filtersHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:16px">'+
+  var typeSelect='<select onchange="_dtSetSgTypeFilter(this.value)" style="padding:4px 8px;border:1px solid var(--border);border-radius:8px;font-size:11px;background:white;color:var(--dark)">'+
+    '<option value="tous"'+(_dtSgTypeFilter==='tous'?' selected':'')+'>Tous types</option>'+
+    '<option value="panne"'+(_dtSgTypeFilter==='panne'?' selected':'')+'>Panne</option>'+
+    '<option value="anomalie"'+(_dtSgTypeFilter==='anomalie'?' selected':'')+'>Anomalie</option>'+
+    '<option value="observation"'+(_dtSgTypeFilter==='observation'?' selected':'')+'>Observation</option>'+
+  '</select>';
+  var filtersHtml='<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+
     stPills+
-    '<span style="margin-left:auto;display:flex;gap:6px">'+siteSelect+typeSelect+'</span>'+
+    '<span style="margin-left:auto;display:flex;gap:5px">'+siteSelect+typeSelect+'</span>'+
   '</div>';
 
-  // Group by site → zone
-  var bySite={};
-  rows.forEach(function(r){
-    if(!bySite[r.groupe_id])bySite[r.groupe_id]=[];
-    bySite[r.groupe_id].push(r);
-  });
-
-  function _sgAccentColor(statut){return statut==='ouvert'?'var(--rouge)':statut==='en_cours'?'var(--orange)':'var(--vert)';}
-
-  var siteCardsHtml='';
+  // ── Liste plate chronologique ──
+  var listHtml='';
   if(!rows.length){
-    siteCardsHtml='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:40px;margin-bottom:12px;opacity:.4">📍</div><div>Aucun signalement</div></div>';
+    listHtml='<div style="text-align:center;padding:48px 24px;color:var(--text3)"><div style="font-size:36px;margin-bottom:10px;opacity:.4">📍</div><div>Aucun signalement</div></div>';
   }else{
-    sites.forEach(function(site){
-      var sRows=bySite[site.id];
-      if(!sRows||!sRows.length)return;
-      var sOuv=sRows.filter(function(r){return r.statut==='ouvert';}).length;
-      var sEnc=sRows.filter(function(r){return r.statut==='en_cours';}).length;
-      // Group by zone
-      var byZone={};
-      sRows.forEach(function(r){
-        var zKey=(r.equipements_zone&&r.equipements_zone.zones&&r.equipements_zone.zones.nom)||'Sans zone';
-        if(!byZone[zKey])byZone[zKey]=[];
-        byZone[zKey].push(r);
-      });
-      var badgeHtml='';
-      if(sOuv>0)badgeHtml+='<span style="font-size:10px;font-weight:700;color:var(--rouge);background:#FDECEA;padding:2px 8px;border-radius:10px;border:1px solid var(--rouge)">'+sOuv+' ouvert'+(sOuv>1?'s':'')+'</span>';
-      if(sEnc>0)badgeHtml+='<span style="font-size:10px;font-weight:700;color:var(--orange);background:#FDF3E3;padding:2px 8px;border-radius:10px;border:1px solid var(--orange);margin-left:4px">'+sEnc+' en cours</span>';
-
-      var zonesHtml='';
-      Object.keys(byZone).forEach(function(zNom){
-        var zRows=byZone[zNom];
-        var sgCardsHtml=zRows.map(function(r){
-          var acc=_sgAccentColor(r.statut);
-          var st=(_SG_STATUTS&&_SG_STATUTS[r.statut])||{label:r.statut,color:'var(--text2)',bg:'var(--bg)'};
-          var typeLabel=(_SG_TYPES&&_SG_TYPES[r.type])||r.type||'Signalement';
-          var eqZNom=r.equipements_zone&&r.equipements_zone.nom?r.equipements_zone.nom:null;
-          var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:null;
-          // Breadcrumb: Zone > EquipZone > Equip
-          var bc='<span style="color:var(--text3);font-size:10px">'+escape_html(zNom)+'</span>';
-          if(eqZNom)bc+='<span style="color:var(--text3);font-size:10px"> › </span><span style="color:var(--text3);font-size:10px">'+escape_html(eqZNom)+'</span>';
-          if(eqNom)bc+='<span style="color:var(--text3);font-size:10px"> › </span><span style="color:var(--text3);font-size:10px;opacity:.7">'+escape_html(eqNom)+'</span>';
-          var date=r.created_at?new Date(r.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short'}):'';
-          var assignee=r.assigne_a||r.pris_en_charge_par||'';
-          var assignBadge=assignee
-            ?'<span style="font-size:11px;font-weight:600;color:var(--amber-dark);background:var(--amber-pale);padding:2px 8px;border-radius:10px;border:1px solid var(--amber)">👷 '+escape_html(assignee)+'</span>'
-            +'<button onclick="_sgAffecter(\''+r.id+'\')" style="font-size:11px;font-weight:600;color:var(--bleu);background:var(--bleu-pale);padding:2px 8px;border-radius:10px;border:1px solid var(--bleu);cursor:pointer;margin-left:4px">✏️ Réassigner</button>'
-            :'<button onclick="_sgAffecter(\''+r.id+'\')" style="font-size:11px;font-weight:600;color:var(--text2);background:white;padding:2px 8px;border-radius:10px;border:1.5px dashed var(--border);cursor:pointer">+ Assigner</button>';
-          return '<div id="sg-card-'+r.id+'" style="background:white;border:0.5px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;border-left:3px solid '+acc+'">'+
-            '<div style="margin-bottom:4px">'+bc+'</div>'+
-            '<div style="display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:5px">'+
-              '<span style="font-size:12px;font-weight:600;color:var(--dark)">'+escape_html(typeLabel)+'</span>'+
-              '<span style="font-size:11px;padding:2px 7px;border-radius:8px;background:'+st.bg+';color:'+st.color+';font-weight:600">'+st.label+'</span>'+
-            '</div>'+
-            '<div style="font-size:12px;color:var(--text);line-height:1.4;margin-bottom:6px">'+escape_html((r.description||'').substring(0,150))+((r.description||'').length>150?'…':'')+'</div>'+
-            '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
-              '<span style="font-size:11px;color:var(--text3)">🕐 '+date+(r.signale_par?' · 👤 '+escape_html(r.signale_par):'')+'</span>'+
-              assignBadge+
-            '</div>'+
-          '</div>';
-        }).join('');
-        zonesHtml+='<div style="margin-left:10px;margin-bottom:10px">'+
-          '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);padding:4px 0 4px 8px;border-left:2px solid var(--border);margin-bottom:6px">'+
-            '📍 '+escape_html(zNom)+
-          '</div>'+
-          sgCardsHtml+
-        '</div>';
-      });
-
-      siteCardsHtml+='<div style="margin-bottom:14px">'+
-        '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg);border-radius:8px;margin-bottom:8px">'+
-          '<span style="font-size:14px">🏨</span>'+
-          '<span style="font-size:13px;font-weight:700;color:var(--dark);flex:1">'+escape_html(site.nom)+'</span>'+
-          badgeHtml+
-        '</div>'+
-        zonesHtml+
-      '</div>';
-    });
+    listHtml=rows.map(function(r){return _dtSgBuildCard(r,siteMap);}).join('');
   }
 
-  // Zones chaudes
-  var hotHtml='<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:10px">🔥 Zones chaudes</div>';
-  if(_hotZones.length){
-    hotHtml+=_hotZones.map(function(z){
-      var barW=Math.round(z.n/_maxHot*100);
-      var col=z.n>=3?'var(--rouge)':z.n>=2?'var(--orange)':'var(--vert)';
-      return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid var(--border)">'+
-        '<span style="font-size:11px;color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100px">'+escape_html(z.nom)+'</span>'+
-        '<div style="flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+barW+'%;background:'+col+';border-radius:3px"></div></div>'+
-        '<span style="font-size:12px;font-weight:700;color:'+col+';min-width:14px;text-align:right">'+z.n+'</span>'+
-      '</div>';
-    }).join('');
-  }else{
-    hotHtml+='<div style="font-size:12px;color:var(--text3)">Aucun signalement actif</div>';
+  // ── Panneau de détail ──
+  var detailHtml='';
+  if(_dtSgSelected&&window._sgRows&&window._sgRows[_dtSgSelected]){
+    detailHtml=_dtSgBuildDetail(window._sgRows[_dtSgSelected],siteMap);
   }
-  // Récap par site
-  var recapHtml='<div style="margin-top:16px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px">Par hôtel</div>'+
-    '<div style="background:white;border:0.5px solid var(--border);border-radius:8px;overflow:hidden">'+
-    sites.map(function(s,i){
-      var sr=allRows.filter(function(r){return r.groupe_id===s.id;});
-      var sO=sr.filter(function(r){return r.statut==='ouvert';}).length;
-      var sE=sr.filter(function(r){return r.statut==='en_cours';}).length;
-      return '<div style="padding:7px 10px;'+(i>0?'border-top:0.5px solid var(--border)':'')+';display:flex;justify-content:space-between;align-items:center">'+
-        '<span style="font-size:11px;color:var(--text2)">'+escape_html(s.nom)+'</span>'+
-        '<span style="font-size:11px">'+(sO?'<b style="color:var(--rouge)">'+sO+'</b> <span style="color:var(--text3)">ouv.</span> ':'<span style="color:var(--vert)">0</span> <span style="color:var(--text3)">ouv.</span> ')+(sE?'· <b style="color:var(--orange)">'+sE+'</b> <span style="color:var(--text3)">enc.</span>':'')+'</span>'+
-      '</div>';
-    }).join('')+
-  '</div>';
+
+  var sidebarContent=detailHtml?
+    '<div style="margin-bottom:12px">'+detailHtml+'</div>'+
+    '<div style="border-top:1px solid var(--border);padding-top:10px">'+hotHtml+recapHtml+'</div>':
+    hotHtml+recapHtml;
 
   return '<div>'+
     kpisHtml+
     filtersHtml+
-    '<div style="display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:16px;align-items:start">'+
-      '<div>'+siteCardsHtml+'</div>'+
-      '<div>'+hotHtml+recapHtml+'</div>'+
+    '<div style="display:grid;grid-template-columns:minmax(0,1fr) 230px;gap:14px;align-items:start">'+
+      '<div>'+listHtml+'</div>'+
+      '<div style="background:white;border:1.5px solid var(--border);border-radius:12px;padding:12px;position:sticky;top:16px">'+
+        sidebarContent+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function _dtSgBuildCard(r,siteMap){
+  var acc=r.statut==='ouvert'?'var(--rouge)':r.statut==='en_cours'?'var(--orange)':'var(--vert)';
+  var st=(_SG_STATUTS&&_SG_STATUTS[r.statut])||{label:r.statut||'',color:'var(--text2)',bg:'var(--bg)'};
+  var typeLabel=(_SG_TYPES&&_SG_TYPES[r.type])||r.type||'Signalement';
+  var icon=(_SG_ICONS&&_SG_ICONS[r.type])||'📝';
+  var siteInfo=siteMap[r.groupe_id]||{nom:'—',devise:'FCFA'};
+  var siteNom=siteInfo.nom||'—';
+  var zNom=(r.equipements_zone&&r.equipements_zone.zones&&r.equipements_zone.zones.nom)||(r.equipements_zone&&r.equipements_zone.nom)||r.lieu||'';
+  var eqNom=r.equipements&&r.equipements.nom?r.equipements.nom:null;
+  // Breadcrumb
+  var bc='<span style="font-size:10px;color:var(--text3)">'+escape_html(siteNom)+'</span>';
+  if(zNom)bc+='<span style="font-size:10px;color:var(--text3)"> › '+escape_html(zNom)+'</span>';
+  if(eqNom)bc+='<span style="font-size:10px;color:var(--text3);opacity:.7"> › '+escape_html(eqNom)+'</span>';
+  var date=r.created_at?new Date(r.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+  var isSel=_dtSgSelected===r.id;
+  // Photo miniature
+  var photoThumb='';
+  if(r.photo_url)photoThumb='<img src="'+r.photo_url+'" style="width:52px;height:38px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0;margin-left:8px" onerror="this.style.display=\'none\'" onclick="event.stopPropagation()">';
+  var assignee=r.assigne_a||r.pris_en_charge_par||'';
+  // Coût si résolu
+  var costStr='';
+  if(r.statut==='resolu'&&r.cout_intervention){
+    var devise=siteInfo.devise||'FCFA';
+    costStr=' · <span style="color:var(--vert);font-weight:600">💰 '+Number(r.cout_intervention).toLocaleString('fr-FR')+' '+devise+'</span>';
+  }
+  return '<div id="sg-card-'+r.id+'" onclick="_dtSgSelectCard(\''+r.id+'\')" style="background:'+(isSel?'var(--amber-pale)':'white')+';border:1.5px solid '+(isSel?'var(--amber)':'var(--border)')+';border-left:4px solid '+acc+';border-radius:10px;padding:10px 12px;margin-bottom:7px;cursor:pointer;transition:border-color .12s,background .12s">'+
+    '<div style="display:flex;align-items:flex-start">'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="margin-bottom:3px">'+bc+'</div>'+
+        '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:4px">'+
+          '<span style="font-size:12px">'+icon+'</span>'+
+          '<span style="font-size:12px;font-weight:700;color:var(--dark)">'+escape_html(typeLabel)+'</span>'+
+          '<span style="font-size:10px;padding:1px 6px;border-radius:7px;background:'+st.bg+';color:'+st.color+';font-weight:600">'+st.label+'</span>'+
+        '</div>'+
+        '<div style="font-size:12px;color:var(--text);line-height:1.4;margin-bottom:5px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">'+escape_html((r.description||'').substring(0,200))+'</div>'+
+        '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">'+
+          '<span style="font-size:10px;color:var(--text3)">🕐 '+date+(r.signale_par?' · 👤 '+escape_html(r.signale_par):'')+costStr+'</span>'+
+          (assignee?'<span style="font-size:10px;color:var(--amber-dark);background:var(--amber-pale);padding:1px 5px;border-radius:5px;border:1px solid var(--amber);font-weight:600">👷 '+escape_html(assignee)+'</span>':'')+
+        '</div>'+
+      '</div>'+
+      photoThumb+
+    '</div>'+
+  '</div>';
+}
+
+function _dtSgBuildDetail(r,siteMap){
+  var acc=r.statut==='ouvert'?'var(--rouge)':r.statut==='en_cours'?'var(--orange)':'var(--vert)';
+  var st=(_SG_STATUTS&&_SG_STATUTS[r.statut])||{label:r.statut||'',color:'var(--text2)',bg:'var(--bg)'};
+  var typeLabel=(_SG_TYPES&&_SG_TYPES[r.type])||r.type||'Signalement';
+  var icon=(_SG_ICONS&&_SG_ICONS[r.type])||'📝';
+  var siteInfo=siteMap[r.groupe_id]||{nom:'—',devise:'FCFA'};
+  var siteNom=siteInfo.nom||'—';
+  var devise=siteInfo.devise||'FCFA';
+  var eqNom=(r.equipements&&r.equipements.nom)||(r.equipements_zone&&r.equipements_zone.nom)||'';
+  var dateStr=r.created_at?new Date(r.created_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+  var resolvedStr=r.resolved_at?new Date(r.resolved_at).toLocaleDateString('fr-FR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+  // MTTR individuel
+  var mttrStr2='';
+  if(r.created_at&&r.resolved_at){
+    var dh=Math.round((new Date(r.resolved_at)-new Date(r.created_at))/(1000*3600));
+    mttrStr2=dh<24?(dh+'h'):(Math.round(dh/24*10)/10+' j');
+  }
+  // Photos avant / après
+  var mnt=null;
+  if(r.maintenances&&r.maintenances.length){
+    mnt=r.maintenances.find(function(m){return m.photo_url;})||r.maintenances[0];
+  }
+  var photoApres=mnt&&mnt.photo_url?mnt.photo_url:null;
+  var tech=r.resolved_by||(mnt&&mnt.prestataire)||r.assigne_a||r.pris_en_charge_par||'';
+  var photosHtml='';
+  if(r.photo_url||photoApres){
+    var cols=r.photo_url&&photoApres?'1fr 1fr':'1fr';
+    photosHtml='<div style="display:grid;grid-template-columns:'+cols+';gap:6px;margin-bottom:9px">';
+    if(r.photo_url)photosHtml+='<div><div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:3px">Avant</div><a href="'+r.photo_url+'" target="_blank"><img src="'+r.photo_url+'" style="width:100%;height:68px;object-fit:cover;border-radius:6px;border:1px solid var(--border);display:block" onerror="this.style.display=\'none\'"></a></div>';
+    if(photoApres)photosHtml+='<div><div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--vert);margin-bottom:3px">Après</div><a href="'+photoApres+'" target="_blank"><img src="'+photoApres+'" style="width:100%;height:68px;object-fit:cover;border-radius:6px;border:1.5px solid var(--vert);display:block" onerror="this.style.display=\'none\'"></a></div>';
+    photosHtml+='</div>';
+  }
+  // Bloc résolution
+  var resolHtml='';
+  if(r.statut==='resolu'){
+    resolHtml='<div style="background:#F0FAF4;border:1px solid #8DC9A5;border-radius:8px;padding:8px 10px;margin-bottom:9px">'+
+      '<div style="font-size:9px;font-weight:700;color:var(--vert);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em">✅ Résolution'+(tech?' · '+escape_html(tech):'')+'</div>'+
+      (r.note_resolution?'<div style="font-size:11px;color:#1a5c33;line-height:1.4;margin-bottom:5px">'+escape_html(r.note_resolution)+'</div>':'')+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        (r.cout_intervention?'<span style="font-size:10px;font-weight:700;color:var(--vert)">💰 '+Number(r.cout_intervention).toLocaleString('fr-FR')+' '+devise+'</span>':'')+
+        (mttrStr2?'<span style="font-size:10px;color:var(--vert)">⏱ '+mttrStr2+'</span>':'')+
+        (resolvedStr?'<span style="font-size:10px;color:var(--vert)">📅 '+resolvedStr+'</span>':'')+
+      '</div>'+
+    '</div>';
+  }
+  // Actions
+  var actionsHtml='';
+  if(r.statut==='ouvert'||r.statut==='en_cours'){
+    actionsHtml='<button onclick="_sgAffecter(\''+r.id+'\')" style="width:100%;padding:7px;border:1.5px solid var(--amber);border-radius:8px;font-size:11px;font-weight:700;color:var(--amber-dark);background:var(--amber-pale);cursor:pointer;font-family:inherit;margin-top:4px">👷 Assigner / Réassigner</button>';
+  }
+  return '<div style="border-top:3px solid '+acc+'">'+
+    '<div style="padding-top:8px">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'+
+        '<div style="display:flex;align-items:center;gap:4px">'+
+          '<span>'+icon+'</span>'+
+          '<span style="font-size:11px;font-weight:700;color:var(--dark)">'+escape_html(typeLabel)+'</span>'+
+          '<span style="font-size:9px;padding:1px 5px;border-radius:5px;background:'+st.bg+';color:'+st.color+';font-weight:700">'+st.label+'</span>'+
+        '</div>'+
+        '<button onclick="_dtSgSelectCard(\''+r.id+'\')" style="font-size:14px;color:var(--text3);background:none;border:none;cursor:pointer;padding:0 3px;line-height:1" title="Fermer">✕</button>'+
+      '</div>'+
+      '<div style="font-size:9px;color:var(--text3);margin-bottom:7px">'+escape_html(siteNom)+(r.ref_code?' · <code style="font-size:9px">'+escape_html(r.ref_code)+'</code>':'')+'</div>'+
+      '<div style="font-size:11px;color:var(--dark);line-height:1.5;margin-bottom:7px">'+escape_html(r.description||'')+'</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:9px">'+
+        (dateStr?'<div style="font-size:9px;color:var(--text3)"><span style="font-weight:700;color:var(--text2)">Signalé</span><br>'+dateStr+'</div>':'')+
+        (r.signale_par?'<div style="font-size:9px;color:var(--text3)"><span style="font-weight:700;color:var(--text2)">Par</span><br>'+escape_html(r.signale_par)+'</div>':'')+
+        (eqNom?'<div style="font-size:9px;color:var(--text3)"><span style="font-weight:700;color:var(--text2)">Équipement</span><br>'+escape_html(eqNom)+'</div>':'')+
+        ((r.assigne_a||r.pris_en_charge_par)?'<div style="font-size:9px;color:var(--amber-dark)"><span style="font-weight:700">Assigné à</span><br>'+escape_html(r.assigne_a||r.pris_en_charge_par)+'</div>':'')+
+      '</div>'+
+      photosHtml+
+      resolHtml+
+      actionsHtml+
     '</div>'+
   '</div>';
 }
