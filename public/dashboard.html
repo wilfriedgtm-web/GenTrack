@@ -13304,8 +13304,8 @@ async function _dtRapport(sids,session){
     supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&select=id,site_id,nom,unite,type_valeur,objectif_mensuel&order=ordre.asc'),
     supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=site_id,date_releve,valeurs,to_percent,nb_couverts&order=date_releve.asc&limit=500')
   ]);
-  var siteMap={};var nbChambresMapR={};
-  sites.forEach(function(s){siteMap[s.id]=s.nom;nbChambresMapR[s.id]=s.nb_chambres?parseInt(s.nb_chambres):null;});
+  var siteMap={};var nbChambresMapR={};var siteDeviseMap={};
+  sites.forEach(function(s){siteMap[s.id]=s.nom;nbChambresMapR[s.id]=s.nb_chambres?parseInt(s.nb_chambres):null;siteDeviseMap[s.id]=s.devise||'FCFA';});
   // TO% moyen par site sur la période
   var toMoyenRapBySite={};
   (rapRels||[]).forEach(function(r){
@@ -13333,6 +13333,21 @@ async function _dtRapport(sids,session){
   rondes.forEach(function(r){if(sitesData[r.site_id])sitesData[r.site_id].rondes++;});
   var totLitres=0,totCarb=0,totPannes=0,totCoutPannes=0,totMnt=0;
   Object.values(sitesData).forEach(function(d){totLitres+=d.litres;totCarb+=d.coutCarb;totPannes+=d.pannes;totCoutPannes+=d.coutPannes;totMnt+=d.mntCout;});
+  // Regroupement par devise (multi-pays)
+  var _byDev={carb:{},pannes:{},mnt:{},total:{}};
+  sids.forEach(function(sid){
+    var dv=siteDeviseMap[sid]||'FCFA';var sd=sitesData[sid];
+    if(sd.coutCarb>0)_byDev.carb[dv]=(_byDev.carb[dv]||0)+sd.coutCarb;
+    if(sd.coutPannes>0)_byDev.pannes[dv]=(_byDev.pannes[dv]||0)+sd.coutPannes;
+    if(sd.mntCout>0)_byDev.mnt[dv]=(_byDev.mnt[dv]||0)+sd.mntCout;
+    var t=sd.coutCarb+sd.mntCout+sd.coutPannes;
+    if(t>0)_byDev.total[dv]=(_byDev.total[dv]||0)+t;
+  });
+  function _fmtDev(byDev){
+    var parts=Object.keys(byDev).filter(function(d){return byDev[d]>0;})
+      .sort().map(function(d){return byDev[d].toLocaleString('fr-FR')+' '+d;});
+    return parts.length?parts.join(' · '):'—';
+  }
 
   // ── Énergie : conso sur la période par site/fluide ──
   var _rapEflsBySite={};
@@ -13366,9 +13381,9 @@ async function _dtRapport(sids,session){
   var _efDepassement=0,_efTotal=0;
   Object.values(energieRapBySite).forEach(function(items){items.forEach(function(f){_efTotal++;if(f.pct!=null&&f.pct>100)_efDepassement++;});});
   var kpis='<div class="kpi-grid" style="margin-bottom:16px">'+
-    '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-trend">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+' '+_D():'Coût non saisi')+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+dtKpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-trend">'+(totCoutPannes>0?totCoutPannes.toLocaleString('fr-FR')+' '+_D():'—')+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Coût maintenance</div><div class="kpi-value">'+totMnt.toLocaleString('fr-FR')+'</div><div class="kpi-trend">'+_D()+' réalisées</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-trend">'+(totCarb>0?_fmtDev(_byDev.carb):'Coût non saisi')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+dtKpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-trend">'+(totCoutPannes>0?_fmtDev(_byDev.pannes):'—')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Coût maintenance</div><div class="kpi-value" style="font-size:16px;line-height:1.3">'+_fmtDev(_byDev.mnt)+'</div><div class="kpi-trend">réalisées</div></div>'+
     (_efTotal>0?'<div class="kpi"><div class="kpi-label">Énergie hors objectif</div><div class="kpi-value" style="color:'+(_efDepassement>0?'var(--rouge)':'var(--vert)')+'">'+_efDepassement+' / '+_efTotal+'</div><div class="kpi-trend">fluides dépassant l\'objectif</div></div>':'')+
   '</div>'+
   '<div style="background:#FAFAF8;border:1px solid #E8DFD0;border-radius:10px;padding:12px 16px;margin-bottom:20px">'+
@@ -13376,7 +13391,7 @@ async function _dtRapport(sids,session){
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">'+
       [
         {label:'Pannes actives (total)',val:totPannes,statut:totPannes===0?'✓ Bon':totPannes<=3?'⚠ À surveiller':'✗ Critique',col:totPannes===0?'#2D7A4F':totPannes<=3?'#C49A1C':'#C0392B',norme:'Cible : 0 panne active'},
-        {label:'Coût total (carb. + mnt. + pannes)',val:(totCarb+totMnt+totCoutPannes).toLocaleString('fr-FR')+' '+_D(),statut:'',col:'var(--text2)',norme:'Carburant + maintenance + interventions'},
+        {label:'Coût total (carb. + mnt. + pannes)',val:_fmtDev(_byDev.total)||'—',statut:'',col:'var(--text2)',norme:'Carburant + maintenance + interventions'},
         {label:'Sites en alerte',val:sids.filter(function(sid){var d=sitesData[sid];return d.pannes>0;}).length+' / '+sids.length,statut:sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===0?'✓ Tous bons':sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===1?'⚠ 1 site':'✗ Plusieurs',col:sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===0?'#2D7A4F':sids.filter(function(sid){return sitesData[sid].pannes>0;}).length===1?'#C49A1C':'#C0392B',norme:'Sites avec pannes actives'},
       ].map(function(r){return'<div style="background:white;border:1px solid #E8DFD0;border-radius:8px;padding:10px 12px">'+
         '<div style="font-size:10px;color:var(--text3);margin-bottom:4px">'+r.label+'</div>'+
@@ -13396,10 +13411,10 @@ async function _dtRapport(sids,session){
         '<div style="font-size:12px;font-weight:700;color:'+siteStatut[1]+'">'+siteStatut[0]+'</div>'+
       '</div>'+
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">'+
-        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Carburant</div><div style="font-size:18px;font-weight:800;color:var(--dark)">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div style="font-size:11px;color:var(--text3)">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' '+_D():'Coût non saisi')+'</div></div>'+
-        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Pannes</div><div style="font-size:18px;font-weight:800;color:'+(d.pannes>0?'var(--rouge)':'var(--vert)')+'">'+d.pannes+'</div><div style="font-size:11px;color:var(--text3)">'+(d.coutPannes>0?d.coutPannes.toLocaleString('fr-FR')+' '+_D():'—')+'</div></div>'+
-        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Maintenance</div><div style="font-size:18px;font-weight:800;color:var(--dark)">'+d.mntCout.toLocaleString('fr-FR')+' '+_D()+'</div><div style="font-size:11px;color:var(--text3)">'+d.rondes+' rondes effectuées</div></div>'+
-        (total>0?'<div style="background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--amber-dark);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Total coûts</div><div style="font-size:18px;font-weight:800;color:var(--amber-dark)">'+total.toLocaleString('fr-FR')+' '+_D()+'</div></div>':'')+
+        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Carburant</div><div style="font-size:18px;font-weight:800;color:var(--dark)">'+Math.round(d.litres).toLocaleString('fr-FR')+' L</div><div style="font-size:11px;color:var(--text3)">'+(d.coutCarb>0?d.coutCarb.toLocaleString('fr-FR')+' '+(siteDeviseMap[sid]||'FCFA'):'Coût non saisi')+'</div></div>'+
+        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Pannes</div><div style="font-size:18px;font-weight:800;color:'+(d.pannes>0?'var(--rouge)':'var(--vert)')+'">'+d.pannes+'</div><div style="font-size:11px;color:var(--text3)">'+(d.coutPannes>0?d.coutPannes.toLocaleString('fr-FR')+' '+(siteDeviseMap[sid]||'FCFA'):'—')+'</div></div>'+
+        '<div style="background:var(--bg);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Maintenance</div><div style="font-size:18px;font-weight:800;color:var(--dark)">'+d.mntCout.toLocaleString('fr-FR')+' '+(siteDeviseMap[sid]||'FCFA')+'</div><div style="font-size:11px;color:var(--text3)">'+d.rondes+' rondes effectuées</div></div>'+
+        (total>0?'<div style="background:var(--amber-pale);border:1.5px solid var(--amber-border);border-radius:10px;padding:12px 14px"><div style="font-size:10px;font-weight:700;color:var(--amber-dark);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px">Total coûts</div><div style="font-size:18px;font-weight:800;color:var(--amber-dark)">'+total.toLocaleString('fr-FR')+' '+(siteDeviseMap[sid]||'FCFA')+'</div></div>':'')+
       '</div>'+
       (function(){
         var ef=energieRapBySite[sid]||[];if(!ef.length)return '';
@@ -13508,7 +13523,7 @@ async function _dtEnergie(sids,session){
   moisLabel=moisLabel.charAt(0).toUpperCase()+moisLabel.slice(1);
 
   var[sites,fluides,releves,objs,niveauxFluides,budgetsMensuels]=await Promise.all([
-    supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres&order=nom.asc'),
+    supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres,devise&order=nom.asc'),
     supaGet('energie_config','site_id=in.('+sidStr+')&actif=eq.true&type_valeur=neq.instantane&select=id,site_id,nom,unite,type_valeur,objectif_mensuel,devise,tarif&order=ordre.asc'),
     supaGet('releves_energie','site_id=in.('+sidStr+')&date_releve=gte.'+moisDebut+'&date_releve=lte.'+moisFin+'&select=site_id,date_releve,valeurs,to_percent,nb_couverts&order=date_releve.asc&limit=600'),
     supaGet('objectifs_energie','site_id=in.('+sidStr+')&select=fluide_id,valeur,date_debut,date_fin&order=date_debut.desc&limit=400'),
