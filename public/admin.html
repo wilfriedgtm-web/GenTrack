@@ -938,16 +938,12 @@ function openEditSite(siteId, clientId) {
     <div class="modal-header"><h3>Modifier le site</h3><button class="close-btn" onclick="closeModal('modal-edit-site')">×</button></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Nom du site *</label><input class="form-input" id="es-nom" value="${esc(site.nom||'')}" /></div>
-      <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="es-desc" value="${esc(site.description||'')}" /></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group"><label class="form-label">Ville</label><input class="form-input" id="es-ville" value="${esc(site.ville||'')}" /></div>
         <div class="form-group"><label class="form-label">Pays *</label>
           <select class="form-input" id="es-pays-code">${paysSelectOpts(site.pays_code||'SN')}</select>
         </div>
-        <div class="form-group"><label class="form-label">Adresse</label><input class="form-input" id="es-adresse" value="${esc(site.adresse||'')}" /></div>
-        <div class="form-group"><label class="form-label">Référence</label><input class="form-input" id="es-ref" value="${esc(site.reference||'')}" /></div>
       </div>
-      <div class="form-group"><label class="form-label">WhatsApp responsable</label><input class="form-input" id="es-wa" value="${esc(site.whatsapp_responsable||'')}" /></div>
       <div class="form-group"><label class="form-label">Heure du rappel (UTC)</label>
         <select class="form-input" id="es-heure-rappel">${opts}</select>
       </div>
@@ -968,7 +964,6 @@ async function saveSite(siteId, clientId) {
     devise: p.devise,
     locale: p.locale,
     timezone: p.timezone,
-    whatsapp_responsable: document.getElementById('es-wa').value||null,
     heure_rappel: parseInt(document.getElementById('es-heure-rappel').value)||8,
   });
   closeModal('modal-edit-site'); toast('Site mis à jour'); await loadAll(); openClient(clientId,'sites');
