@@ -869,25 +869,43 @@ async function createClient() {
 }
 
 // ── SITES ──────────────────────────────────────────────────
+const PAYS_OPTIONS = [
+  { code:'SN', nom:'Sénégal',       devise:'XOF', locale:'fr-SN', timezone:'Africa/Dakar',      heure:8 },
+  { code:'CI', nom:"Côte d'Ivoire", devise:'XOF', locale:'fr-CI', timezone:'Africa/Abidjan',    heure:8 },
+  { code:'BJ', nom:'Bénin',         devise:'XOF', locale:'fr-BJ', timezone:'Africa/Porto-Novo', heure:8 },
+  { code:'CM', nom:'Cameroun',       devise:'XAF', locale:'fr-CM', timezone:'Africa/Douala',     heure:7 },
+  { code:'MA', nom:'Maroc',          devise:'MAD', locale:'fr-MA', timezone:'Africa/Casablanca',  heure:9 },
+  { code:'GN', nom:'Guinée',         devise:'GNF', locale:'fr-GN', timezone:'Africa/Conakry',    heure:8 },
+];
+function getPaysInfo(code) {
+  return PAYS_OPTIONS.find(p=>p.code===code) || { code:'SN', nom:'Sénégal', devise:'XOF', locale:'fr-SN', timezone:'Africa/Dakar', heure:8 };
+}
+function paysSelectOpts(selectedCode) {
+  return PAYS_OPTIONS.map(p=>`<option value="${p.code}"${p.code===selectedCode?' selected':''}>${p.nom}</option>`).join('');
+}
+
 function openAddSite(clientId) {
   const client = S.clients.find(c=>c.id===clientId)||{};
+  const defaultCode = client.pays_code || 'SN';
   showModal('modal-site',`<div class="modal modal-md">
     <div class="modal-header"><h3>Nouveau site</h3><button class="close-btn" onclick="closeModal('modal-site')">×</button></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Nom du site *</label><input class="form-input" id="s-nom" placeholder="Bâtiment principal, Annexe Nord…" /></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Ville</label><input class="form-input" id="s-ville" value="${esc(client.ville||'')}" /></div>
-        <div class="form-group"><label class="form-label">Pays</label><input class="form-input" id="s-pays" value="${esc(client.pays||'Sénégal')}" /></div>
+        <div class="form-group"><label class="form-label">Pays *</label>
+          <select class="form-input" id="s-pays-code">${paysSelectOpts(defaultCode)}</select>
+        </div>
       </div>
       <div class="form-group"><label class="form-label">Heure du rappel (UTC)</label>
         <select class="form-input" id="s-heure-rappel">
-          <option value="6">6h UTC (7h Dakar)</option>
-          <option value="7">7h UTC (8h Dakar)</option>
-          <option value="8" selected>8h UTC (9h Dakar) — défaut</option>
-          <option value="9">9h UTC (10h Dakar)</option>
-          <option value="10">10h UTC (11h Dakar)</option>
-          <option value="11">11h UTC (12h Dakar)</option>
-          <option value="12">12h UTC (13h Dakar)</option>
+          <option value="6">6h UTC (7h locale)</option>
+          <option value="7">7h UTC (8h locale)</option>
+          <option value="8" selected>8h UTC (9h locale) — défaut</option>
+          <option value="9">9h UTC (10h locale)</option>
+          <option value="10">10h UTC (11h locale)</option>
+          <option value="11">11h UTC (12h locale)</option>
+          <option value="12">12h UTC (13h locale)</option>
         </select>
       </div>
     </div>
@@ -895,13 +913,19 @@ function openAddSite(clientId) {
   </div>`);
 }
 async function createSite(clientId) {
-  const nom=document.getElementById('s-nom').value.trim(); if(!nom){toast('Nom requis');return;}
+  const nom = document.getElementById('s-nom').value.trim(); if(!nom){toast('Nom requis');return;}
+  const pays_code = document.getElementById('s-pays-code').value;
+  const p = getPaysInfo(pays_code);
   const result = await api('sites','','*','POST',{
     nom, client_id:clientId,
-    ville:document.getElementById('s-ville').value||null,
-    pays:document.getElementById('s-pays').value||null,
-    heure_rappel:parseInt(document.getElementById('s-heure-rappel').value)||8,
-    actif:true,
+    ville:    document.getElementById('s-ville').value||null,
+    pays:     p.nom,
+    pays_code: p.code,
+    devise:   p.devise,
+    locale:   p.locale,
+    timezone: p.timezone,
+    heure_rappel: parseInt(document.getElementById('s-heure-rappel').value)||8,
+    actif: true,
   });
   if(!result||!result[0]){toast('Erreur lors de la création du site','error');return;}
   closeModal('modal-site'); toast('Site ajouté'); await loadAll(); openClient(clientId,'sites');
@@ -917,7 +941,9 @@ function openEditSite(siteId, clientId) {
       <div class="form-group"><label class="form-label">Description</label><input class="form-input" id="es-desc" value="${esc(site.description||'')}" /></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group"><label class="form-label">Ville</label><input class="form-input" id="es-ville" value="${esc(site.ville||'')}" /></div>
-        <div class="form-group"><label class="form-label">Pays</label><input class="form-input" id="es-pays" value="${esc(site.pays||'')}" /></div>
+        <div class="form-group"><label class="form-label">Pays *</label>
+          <select class="form-input" id="es-pays-code">${paysSelectOpts(site.pays_code||'SN')}</select>
+        </div>
         <div class="form-group"><label class="form-label">Adresse</label><input class="form-input" id="es-adresse" value="${esc(site.adresse||'')}" /></div>
         <div class="form-group"><label class="form-label">Référence</label><input class="form-input" id="es-ref" value="${esc(site.reference||'')}" /></div>
       </div>
@@ -932,12 +958,18 @@ function openEditSite(siteId, clientId) {
 async function saveSite(siteId, clientId) {
   const nom = document.getElementById('es-nom').value.trim();
   if (!nom) { toast('Nom requis'); return; }
+  const pays_code = document.getElementById('es-pays-code').value;
+  const p = getPaysInfo(pays_code);
   await api('sites', `&id=eq.${siteId}`, '*', 'PATCH', {
     nom,
     description: document.getElementById('es-desc').value||null,
     adresse: document.getElementById('es-adresse').value||null,
     ville: document.getElementById('es-ville').value||null,
-    pays: document.getElementById('es-pays').value||null,
+    pays: p.nom,
+    pays_code: p.code,
+    devise: p.devise,
+    locale: p.locale,
+    timezone: p.timezone,
     reference: document.getElementById('es-ref').value||null,
     whatsapp_responsable: document.getElementById('es-wa').value||null,
     heure_rappel: parseInt(document.getElementById('es-heure-rappel').value)||8,
