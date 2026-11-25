@@ -13296,7 +13296,7 @@ async function _dtRapport(sids,session){
   var moisLabel=_ml.charAt(0).toUpperCase()+_ml.slice(1);
   var sidStr=sids.join(',');
   var[sites,pleins,maintenances,signalements,rondes,rapEfls,rapRels]=await Promise.all([
-    supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres'),
+    supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres,devise'),
     supaGet('pleins','site_id=in.('+sidStr+')&date=gte.'+moisDebut+'&date=lte.'+moisFin+'&select=id,site_id,litres_ajoutes,cout,date'),
     supaGet('maintenances','groupe_id=in.('+sidStr+')&date_intervention=gte.'+moisDebut+'&date_intervention=lte.'+moisFin+'&statut=eq.realise&select=id,groupe_id,type,cout'),
     supaGet('signalements','groupe_id=in.('+sidStr+')&type=eq.panne&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'&select=id,groupe_id,statut,cout_intervention'),
@@ -15350,6 +15350,17 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   // ── KPI globaux ──
   var totLitres=0,totCarb=0,totPannes=0,totMnt=0,totMntCout=0,totRVal=0,totRTot=0,totMntPreventif=0,totMntCoutPreventif=0,totMntCorrectif=0,totMntCoutCorrectif=0;
   Object.values(siteData).forEach(function(d){totLitres+=d.litres;totCarb+=d.coutCarb;totPannes+=d.pannes;totMnt+=d.mntCount;totMntCout+=d.mntCout;totRVal+=d.rondesVal;totRTot+=d.rondesTot;totMntPreventif+=d.mntPreventif;totMntCoutPreventif+=d.mntCoutPreventif;totMntCorrectif+=d.mntCorrectif;totMntCoutCorrectif+=d.mntCoutCorrectif;});
+  // ── Agrégation par devise (PDF multi-devise) ──
+  var _byDevPDF={carb:{},pannes:{},mntPrev:{},mntCorr:{},mnt:{}};
+  sites.forEach(function(s){var dv=siteData[s.id].devise;var sd=siteData[s.id];
+    if(sd.coutCarb>0)_byDevPDF.carb[dv]=(_byDevPDF.carb[dv]||0)+sd.coutCarb;
+    if(sd.panneCout>0)_byDevPDF.pannes[dv]=(_byDevPDF.pannes[dv]||0)+sd.panneCout;
+    if(sd.mntCoutPreventif>0)_byDevPDF.mntPrev[dv]=(_byDevPDF.mntPrev[dv]||0)+sd.mntCoutPreventif;
+    if(sd.mntCoutCorrectif>0)_byDevPDF.mntCorr[dv]=(_byDevPDF.mntCorr[dv]||0)+sd.mntCoutCorrectif;
+    var mntTot=sd.mntCoutPreventif+sd.mntCoutCorrectif;
+    if(mntTot>0)_byDevPDF.mnt[dv]=(_byDevPDF.mnt[dv]||0)+mntTot;
+  });
+  function _fmtDevPDF(byDev){var parts=Object.keys(byDev).filter(function(d){return byDev[d]>0;}).sort().map(function(d){return byDev[d].toLocaleString('fr-FR')+' '+d;});return parts.length?parts.join(' · '):'—';}
   var confPct=totRTot>0?Math.round(totRVal/totRTot*100):null;
   var allTtrs=signalements.filter(function(s){return s.statut==='resolu'&&s.created_at&&s.resolved_at;}).map(function(s){return(new Date(s.resolved_at)-new Date(s.created_at))/3600000;});
   var avgMttr=allTtrs.length?allTtrs.reduce(function(a,b){return a+b;},0)/allTtrs.length:null;
@@ -15451,9 +15462,9 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   // ── Narratives ──
   var narGlobal='Bilan sur la période du '+periodeStr+'. ';
   if(confPct!==null)narGlobal+='Taux de conformité rondes (multi-sites) : '+confPct+'%. ';
-  narGlobal+=totLitres>0?'Consommation carburant : '+Math.round(totLitres).toLocaleString('fr-FR')+' L'+(totCarb>0?' ('+totCarb.toLocaleString('fr-FR')+(_reportDevise?' '+_reportDevise:'')+')':'')+'. ':'';
+  narGlobal+=totLitres>0?'Consommation carburant : '+Math.round(totLitres).toLocaleString('fr-FR')+' L'+(totCarb>0?' ('+_fmtDevPDF(_byDevPDF.carb)+')':'')+'. ':'';
   narGlobal+=totPannes>0?totPannes+' panne'+(totPannes>1?'s':'')+' active'+(totPannes>1?'s':'')+' en cours. ':'Aucune panne active. ';
-  narGlobal+=totMnt>0?totMnt+' intervention'+(totMnt>1?'s':'')+' de maintenance'+(totMntCout>0?' pour '+totMntCout.toLocaleString('fr-FR')+(_reportDevise?' '+_reportDevise:''):'')+'.':'';
+  narGlobal+=totMnt>0?totMnt+' intervention'+(totMnt>1?'s':'')+' de maintenance'+(totMntCout>0?' pour '+_fmtDevPDF(_byDevPDF.mnt):'')+'.':'';
 
   // ── HTML ──
   var h='';
@@ -15480,10 +15491,10 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   // ── KPIs globaux ──
   h+='<div class="kpi-row">'+
     '<div class="kpi"><div class="kpi-label">Conformité rondes</div><div class="kpi-value" style="color:'+kpiCol(confPct,70,90,false)+'">'+(confPct!==null?confPct+'%':'—')+'</div><div class="kpi-sub">Tous sites · '+period+' jours</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(totCarb>0?totCarb.toLocaleString('fr-FR')+(_reportDevise?' '+_reportDevise:''):'Coût non saisi')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Carburant</div><div class="kpi-value">'+Math.round(totLitres).toLocaleString('fr-FR')+' L</div><div class="kpi-sub">'+(totCarb>0?_fmtDevPDF(_byDevPDF.carb):'Coût non saisi')+'</div></div>'+
     '<div class="kpi"><div class="kpi-label">Pannes actives</div><div class="kpi-value" style="color:'+kpiCol(totPannes,1,4,true)+'">'+totPannes+'</div><div class="kpi-sub">MTTR moy. : '+fmtDur(avgMttr)+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Maint. préventif</div><div class="kpi-value">'+totMntPreventif+'</div><div class="kpi-sub">'+(totMntCoutPreventif>0?fmtCout(totMntCoutPreventif,_reportDevise):'aucun coût')+'</div></div>'+
-    '<div class="kpi"><div class="kpi-label">Maint. correctif</div><div class="kpi-value" style="color:'+(totMntCorrectif>0?'#C0392B':'#2D7A4F')+'">'+totMntCorrectif+'</div><div class="kpi-sub">'+(totMntCoutCorrectif>0?fmtCout(totMntCoutCorrectif,_reportDevise):'aucun coût')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Maint. préventif</div><div class="kpi-value">'+totMntPreventif+'</div><div class="kpi-sub">'+(totMntCoutPreventif>0?_fmtDevPDF(_byDevPDF.mntPrev):'aucun coût')+'</div></div>'+
+    '<div class="kpi"><div class="kpi-label">Maint. correctif</div><div class="kpi-value" style="color:'+(totMntCorrectif>0?'#C0392B':'#2D7A4F')+'">'+totMntCorrectif+'</div><div class="kpi-sub">'+(totMntCoutCorrectif>0?_fmtDevPDF(_byDevPDF.mntCorr):'aucun coût')+'</div></div>'+
   '</div>';
 
   // ── Légende couleurs (réutilisée partout) ──
