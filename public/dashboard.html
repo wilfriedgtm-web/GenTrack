@@ -13366,7 +13366,7 @@ async function _openRapportDTMois(offset){
     var sidStr=sids.join(',');
     var _now2=new Date();
     var[sites,pleins,maintenances,signalements,rondes,energieFluidesDT,relevesEnergieDT,budgetsMensuels,relevesZonesDT,missionsDTMois]=await Promise.all([
-      supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres'),
+      supaGet('sites','id=in.('+sidStr+')&select=id,nom,nb_chambres,devise'),
       supaGet('pleins','site_id=in.('+sidStr+')&date=gte.'+moisDebut+'&date=lte.'+moisFin+'&select=id,site_id,litres_ajoutes,cout,date&order=date.asc'),
       supaGet('maintenances','groupe_id=in.('+sidStr+')&date_intervention=gte.'+moisDebut+'&date_intervention=lte.'+moisFin+'&select=id,groupe_id,type,titre,statut,cout,prestataire,date_intervention,equipement_id,equipements(nom)&order=date_intervention.desc&limit=200'),
       supaGet('signalements','groupe_id=in.('+sidStr+')&created_at=gte.'+moisDebut+'&created_at=lte.'+moisFin+'&select=id,groupe_id,type,description,statut,signale_par,assigne_a,pris_en_charge_par,cout_intervention,created_at,resolved_at,equipement_id,equipement_zone_id,lieu,equipements(nom),equipements_zone(nom,zones(nom))&order=created_at.desc&limit=200'),
