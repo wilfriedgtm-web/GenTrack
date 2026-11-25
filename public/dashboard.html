@@ -15248,7 +15248,7 @@ function _buildRapportDirTech(period,periodeStr,session,sites,pleins,maintenance
   var avgMttr=allTtrs.length?allTtrs.reduce(function(a,b){return a+b;},0)/allTtrs.length:null;
   function fmtDur(h){if(h===null||h===undefined)return'—';if(h<1)return Math.round(h*60)+'min';if(h<48)return h.toFixed(1)+'h';return(h/24).toFixed(1)+'j';}
   function kpiCol(val,s1,s2,inv){if(val===null||val===undefined)return'#888';if(inv)return val<=s1?'#2D7A4F':val<=s2?'#C49A1C':'#C0392B';return val>=s2?'#2D7A4F':val>=s1?'#C49A1C':'#C0392B';}
-  function fmtCout(v,devise){if(v==null||isNaN(v))return'—';var d=devise||'XOF';var abs=Math.abs(v),s=v<0?'-':'';if(abs>=1000000)return s+(abs/1000000).toFixed(1).replace('.',',')+' M '+d;if(abs>=1000)return s+Math.round(abs/1000).toLocaleString('fr-FR')+' k '+d;return s+Math.round(abs).toLocaleString('fr-FR')+' '+d;}
+  function fmtCout(v,devise){if(v==null||isNaN(v))return'—';var abs=Math.abs(v),s=v<0?'-':'';var sfx=devise?' '+devise:'';if(abs>=1000000)return s+(abs/1000000).toFixed(1).replace('.',',')+' M'+sfx;if(abs>=1000)return s+Math.round(abs/1000).toLocaleString('fr-FR')+' k'+sfx;return s+Math.round(abs).toLocaleString('fr-FR')+sfx;}
   function _svgMultiChartDT(indexItems){
     if(!indexItems.length||!indexItems.some(function(d){return d.pts.length>=2;}))return'';
     var COLORS=['#2D7A4F','#1E6FA0','#C49A1C','#C0392B','#7B4EA6'];
@@ -16320,11 +16320,11 @@ function _buildRapportPro(siteNom,periodeStr,period,session,equips,rondes,rondes
 
   function fmtCout(v,devise){
     if(v==null||isNaN(v))return'—';
-    var d=devise||'XOF';
     var abs=Math.abs(v),s=v<0?'-':'';
-    if(abs>=1000000)return s+(abs/1000000).toFixed(1).replace('.',',')+' M '+d;
-    if(abs>=1000)return s+Math.round(abs/1000).toLocaleString('fr-FR')+' k '+d;
-    return s+Math.round(abs).toLocaleString('fr-FR')+' '+d;
+    var sfx=devise?' '+devise:'';
+    if(abs>=1000000)return s+(abs/1000000).toFixed(1).replace('.',',')+' M'+sfx;
+    if(abs>=1000)return s+Math.round(abs/1000).toLocaleString('fr-FR')+' k'+sfx;
+    return s+Math.round(abs).toLocaleString('fr-FR')+sfx;
   }
   function fmtConso(d){
     if(d.conso==null)return'—';
