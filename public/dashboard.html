@@ -12755,9 +12755,9 @@ async function _dtMaintenances(sids){
   var HCOLS_PALE=['#FDF3E3','#E8F5EE','#EBF5FB','#FDF0E6','#F5EEF8','#FDEDEC'];
   var MNT=_MNT_TYPES||{};
   var sidStr=sids.join(',');
-  var sites=await supaGet('sites','id=in.('+sidStr+')&select=id,nom');
+  var sites=await supaGet('sites','id=in.('+sidStr+')&select=id,nom,devise');
   var siteMap={};
-  sites.forEach(function(s,i){siteMap[s.id]={nom:s.nom,col:HCOLS[i%HCOLS.length],pale:HCOLS_PALE[i%HCOLS_PALE.length]};});
+  sites.forEach(function(s,i){siteMap[s.id]={nom:s.nom,col:HCOLS[i%HCOLS.length],pale:HCOLS_PALE[i%HCOLS_PALE.length],devise:s.devise||'XOF'};});
   var cutoff=new Date();cutoff.setDate(cutoff.getDate()-_dtMntPeriod);
   var cutoffStr=cutoff.toISOString().slice(0,10);
   var todayStr=new Date().toISOString().slice(0,10);
@@ -12795,8 +12795,10 @@ async function _dtMaintenances(sids){
   var nbPannesActives=pannesOuvertes.length;
   var pannesCol=nbPannesActives===0?'var(--vert)':nbPannesActives<=3?'var(--amber)':'var(--rouge)';
   /* per-site stats */
+  var _dtDevises=[...new Set(sites.map(function(s){return s.devise||'XOF';}))];
+  var _dtMntDevise=_dtDevises.length===1?_dtDevises[0]:null;
   var siteStats={};
-  sites.forEach(function(s,i){siteStats[s.id]={nb:0,realises:0,cout:0,planif:0,pannes:0,col:HCOLS[i%HCOLS.length],pale:HCOLS_PALE[i%HCOLS_PALE.length],nom:s.nom};});
+  sites.forEach(function(s,i){siteStats[s.id]={nb:0,realises:0,cout:0,planif:0,pannes:0,col:HCOLS[i%HCOLS.length],pale:HCOLS_PALE[i%HCOLS_PALE.length],nom:s.nom,devise:s.devise||'XOF'};});
   rows.forEach(function(r){if(siteStats[r.groupe_id]){siteStats[r.groupe_id].nb++;if(r.statut==='realise'){siteStats[r.groupe_id].realises++;if(r.type!=='ravitaillement')siteStats[r.groupe_id].cout+=(Number(r.cout)||0);}}});
   // Ajouter le coût des missions prestataires au stats par site
   missionsW.forEach(function(m){if(m.statut==='realisee'&&siteStats[m.site_id]){siteStats[m.site_id].cout+=(Number(m.cout)||0);}});
@@ -12809,7 +12811,7 @@ async function _dtMaintenances(sids){
   var kpiHtml='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">'+
     _mntKpi('Interventions',nbTotal,_dtMntPeriod+'j · '+nbRealises+' réalisées','')+
     _mntKpi('Taux de clôture',tauxCloture!=null?tauxCloture+'%':'—',nbRealises+'/'+nbTotal+' clôturées',tauxCol)+
-    _mntKpi('Prév. / Correctif',nbPreventif+' / '+nbCorrectif,_fmtKW(coutPreventifW)+' · '+_fmtKW(coutCorrectifW)+' k XOF',nbCorrectif>nbPreventif*2?'var(--rouge)':'')+
+    _mntKpi('Prév. / Correctif',nbPreventif+' / '+nbCorrectif,_fmtKW(coutPreventifW)+(_dtMntDevise?' '+_dtMntDevise:'')+' · '+_fmtKW(coutCorrectifW)+(_dtMntDevise?' '+_dtMntDevise:''),nbCorrectif>nbPreventif*2?'var(--rouge)':'')+
     _mntKpi('Pannes actives',nbPannesActives,nbPannesActives===0?'Aucune panne ouverte':nbPannesActives+' en attente',pannesCol)+
   '</div>';
 
@@ -12962,7 +12964,7 @@ async function _dtMaintenances(sids){
           '</div>'+
           '<div style="background:'+pale+';border-radius:8px;padding:8px 10px;text-align:center">'+
             '<div style="font-size:14px;font-weight:800;color:'+col+'">'+(st.cout?Math.round(st.cout/1000)+'k':'—')+'</div>'+
-            '<div style="font-size:9px;color:var(--text3);margin-top:1px">'+_D()+'</div>'+
+            '<div style="font-size:9px;color:var(--text3);margin-top:1px">'+(s.devise||'XOF')+'</div>'+
           '</div>'+
         '</div>'+
         top3Html+
@@ -12976,8 +12978,8 @@ async function _dtMaintenances(sids){
   displayRows.forEach(function(r){
     var key=(r.equipement_id||'__'+r.groupe_id+'__'+(r.titre||''));
     var nom=r.equipements&&r.equipements.nom?r.equipements.nom:(r.titre||'—');
-    var sInfo=siteMap[r.groupe_id]||{nom:'—',col:'#aaa'};
-    if(!eqMap[key])eqMap[key]={nom:nom,siteNom:sInfo.nom,siteCol:sInfo.col,nb:0,realises:0,cout:0,lastDate:null};
+    var sInfo=siteMap[r.groupe_id]||{nom:'—',col:'#aaa',devise:'XOF'};
+    if(!eqMap[key])eqMap[key]={nom:nom,siteNom:sInfo.nom,siteCol:sInfo.col,siteDevise:sInfo.devise||'XOF',nb:0,realises:0,cout:0,lastDate:null};
     eqMap[key].nb++;
     if(r.statut==='realise')eqMap[key].realises++;
     if(r.type!=='ravitaillement')eqMap[key].cout+=Number(r.cout)||0;
@@ -13018,7 +13020,7 @@ async function _dtMaintenances(sids){
               '</td>'+
               '<td style="text-align:center;padding:8px 10px;font-size:13px;font-weight:800;color:var(--dark)">'+eq.nb+'</td>'+
               '<td style="text-align:center;padding:8px 10px;font-size:12px;font-weight:700;color:'+tc+'">'+(taux!=null?taux+'%':'—')+'</td>'+
-              '<td style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text2)">'+(eq.cout?eq.cout.toLocaleString('fr-FR')+' '+_D():'—')+'</td>'+
+              '<td style="text-align:right;padding:8px 10px;font-size:11px;color:var(--text2)">'+(eq.cout?eq.cout.toLocaleString('fr-FR')+' '+eq.siteDevise:'—')+'</td>'+
               '<td style="padding:8px 10px;font-size:11px;color:var(--text3)">'+lastStr+'</td>'+
             '</tr>';
           }).join('')+
