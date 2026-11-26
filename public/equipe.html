@@ -338,6 +338,8 @@ var _user=null; // {id, nom, role, whatsapp}
 var _contacts=[]; // all contacts for site
 var _prestataires=[]; // prestataires for site
 var _sigs=[]; // current signalements
+var _sgAffPrestId=null,_sgAffPrestNom='',_sgAffPrestTel='',_sgAffPrestEmail='',_sgAffPrestMsg='';
+var _modalDesc='';
 var _modalSgId=null;
 var _modalRef=null;
 var _refreshTimer=null;
@@ -503,19 +505,19 @@ async function _loadSignalements(){
   // Load open + en_cours + resolu today
   var [ouvert,enCours,resolus]=await Promise.all([
     supa('signalements',
-      'site_id=eq.'+_siteId+
+      'groupe_id=eq.'+_siteId+
       '&statut=eq.ouvert'+
       '&select=id,ref_code,type,description,lieu,statut,assigne_a,pris_en_charge_par,created_at,prestataire_id'+
       '&order=created_at.desc'
     ),
     supa('signalements',
-      'site_id=eq.'+_siteId+
+      'groupe_id=eq.'+_siteId+
       '&statut=eq.en_cours'+
       '&select=id,ref_code,type,description,lieu,statut,assigne_a,pris_en_charge_par,created_at,prestataire_id'+
       '&order=created_at.desc'
     ),
     supa('signalements',
-      'site_id=eq.'+_siteId+
+      'groupe_id=eq.'+_siteId+
       '&statut=eq.resolu'+
       '&resolved_at=gte.'+today+'T00:00:00'+
       '&select=id,ref_code,type,description,lieu,statut,assigne_a,resolved_at,created_at'+
@@ -656,6 +658,7 @@ async function _pec(sgId,ref){
 function _showAffecterModal(sgId,ref,desc){
   _modalSgId=sgId;
   _modalRef=ref;
+  _modalDesc=desc||'';
   document.getElementById('eq-modal-title').textContent='Affecter — '+ref;
   document.getElementById('eq-modal-sub').textContent=desc?desc.slice(0,60)+(desc.length>60?'…':''):'';
 
@@ -689,7 +692,7 @@ function _showAffecterModal(sgId,ref,desc){
       var channels=[];
       if(hasWa)channels.push('<span class="eq-pick-badge wa">WA</span>');
       if(hasEmail)channels.push('<span class="eq-pick-badge email">Email</span>');
-      return '<div class="eq-pick-item" onclick="_affecterPrestataire(\''+_esc(p.id)+'\',\''+_esc(p.nom)+'\',\''+_esc(p.telephone||'')+'\',\''+_esc(p.email||'')+'\')">'+
+      return '<div class="eq-pick-item" onclick="_affecterPrestatairePreview(\''+_esc(p.id)+'\',\''+_esc(p.nom)+'\',\''+_esc(p.telephone||'')+'\',\''+_esc(p.email||'')+'\')">'+
         '<div class="eq-pick-avatar prest">'+_esc(ini)+'</div>'+
         '<div style="flex:1;min-width:0">'+
           '<div class="eq-pick-nom">'+_esc(p.nom)+(p.specialite?' <span style="font-weight:400;color:var(--text3)">· '+_esc(p.specialite)+'</span>':'')+'</div>'+
@@ -742,10 +745,43 @@ async function _affecterTech(techId,techNom,techWa){
   _toast('✅ Assigné à '+techNom+' — notifié WA');
 }
 
-// ─── Affecter à un prestataire ──────────────────────────────
-async function _affecterPrestataire(prestId,prestNom,prestTel,prestEmail){
+// ─── Affecter à un prestataire — étape 1 : aperçu + envoi manuel ──
+function _affecterPrestatairePreview(prestId,prestNom,prestTel,prestEmail){
+  _sgAffPrestId=prestId;_sgAffPrestNom=prestNom;
+  _sgAffPrestTel=prestTel||'';_sgAffPrestEmail=prestEmail||'';
+  var allSgs=[].concat(_sigs.ouvert||[],_sigs.enCours||[]);
+  var sg=allSgs.find(function(s){return s.id===_modalSgId;})||{};
+  var rapportUrl=APP_URL+'/rapport.html?sg='+encodeURIComponent(_modalSgId);
+  var TL={panne:'⚡ Panne',anomalie:'⚠️ Anomalie',bruit:'🔊 Bruit',odeur:'💨 Odeur',fuite:'💧 Fuite',seuil:'📈 Seuil',autre:'📋 Autre'};
+  var typeLabel=TL[sg.type]||sg.type||'Signalement';
+  _sgAffPrestMsg='🔧 *Demande d\'intervention — GenTrack*\n\n📍 *'+typeLabel+'*\n'+(sg.lieu?'📍 Lieu : '+sg.lieu+'\n':'')+(sg.description?'📝 '+sg.description:'')+'\n\n✅ Fiche intervention :\n'+rapportUrl;
+  var hasWa=!!(prestTel&&prestTel.trim());
+  var hasEmail=!!(prestEmail&&prestEmail.trim());
+  var waNum=(prestTel||'').replace(/\D/g,'');
+  var mailtoHref='mailto:'+encodeURIComponent(prestEmail||'')+'?subject='+encodeURIComponent('Demande d\'intervention GenTrack')+'&body='+encodeURIComponent(_sgAffPrestMsg.replace(/\*/g,''));
+  var backFn="_showAffecterModal('"+_modalSgId+"','"+_modalRef.replace(/'/g,"\\'")+"','"+_modalDesc.replace(/'/g,"\\'").slice(0,60)+"')";
+  document.getElementById('eq-modal-content').innerHTML=
+    '<div style="font-size:14px;font-weight:700;color:var(--dark);margin-bottom:4px">🏢 Mission à envoyer</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:10px"><strong>'+_esc(prestNom)+'</strong>'+(hasWa?' · <span style="color:#25D366">📱 WA</span>':'')+(hasEmail?' · <span style="color:#1e40af">✉️ Email</span>':(!hasWa?' <span style="color:#ef4444">⚠️ aucun contact</span>':''))+'</div>'+
+    '<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:11px;font-size:11px;white-space:pre-wrap;line-height:1.55;margin-bottom:12px;max-height:150px;overflow-y:auto">'+_esc(_sgAffPrestMsg)+'</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<button onclick="'+backFn+'" style="padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:12px;background:white;cursor:pointer;color:var(--text2)">← Retour</button>'+
+      (hasWa?'<button onclick="_openWaPrest()" style="flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:#25D366;color:white;cursor:pointer">📱 WhatsApp</button>':'')+
+      (hasEmail?'<a href="'+mailtoHref+'" onclick="setTimeout(_confirmPrestEmail,400)" style="flex:1;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:#1e40af;color:white;cursor:pointer;text-decoration:none;text-align:center;display:inline-flex;align-items:center;justify-content:center">✉️ Email</a>':'')+
+      (!hasWa&&!hasEmail?'<button onclick="_affecterPrestataireConfirm()" style="flex:2;padding:10px;border:none;border-radius:10px;font-size:13px;font-weight:700;background:var(--amber-dark);color:white;cursor:pointer">✅ Affecter sans contact</button>':'')+
+    '</div>';
+}
+
+function _openWaPrest(){
+  window.open('https://wa.me/'+(_sgAffPrestTel||'').replace(/\D/g,'')+'?text='+encodeURIComponent(_sgAffPrestMsg),'_blank');
+  _affecterPrestataireConfirm();
+}
+function _confirmPrestEmail(){ _affecterPrestataireConfirm(); }
+
+// ─── Affecter à un prestataire — étape 2 : patch DB + notif resp_tech ──
+async function _affecterPrestataireConfirm(){
   if(!_modalSgId)return;
-  var sgId=_modalSgId,ref=_modalRef;
+  var sgId=_modalSgId,prestNom=_sgAffPrestNom,prestId=_sgAffPrestId;
   _closeModal();
   _toast('⏳ Affectation…',1500);
   var now=new Date().toISOString();
@@ -756,20 +792,10 @@ async function _affecterPrestataire(prestId,prestNom,prestTel,prestEmail){
     pris_en_charge_at:now,
     prestataire_id:prestId
   });
-  var rapportUrl=APP_URL+'/rapport.html?sg='+encodeURIComponent(sgId);
-  _notifyEquipe({
-    action:'affecter_prestataire',
-    signalement_id:sgId,
-    prest_nom:prestNom,
-    prest_tel:prestTel,
-    prest_email:prestEmail,
-    rapport_url:rapportUrl
-  }).catch(function(){});
+  // Notif légère au resp_tech uniquement (le prestataire est contacté manuellement ci-dessus)
+  _notifyEquipe({action:'affecter_prestataire',signalement_id:sgId,prest_nom:prestNom}).catch(function(){});
   await _loadSignalements();
-  var channels=[];
-  if(prestTel)channels.push('WA');
-  if(prestEmail)channels.push('Email');
-  _toast('✅ Assigné à '+prestNom+(channels.length?' — '+channels.join(' + '):''));
+  _toast('✅ Assigné à '+prestNom);
 }
 
 // ═══════════════════════════════════════════════════════════
