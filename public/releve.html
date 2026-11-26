@@ -238,6 +238,17 @@ body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI
   animation:spin .7s linear infinite;margin-bottom:24px;
 }
 @keyframes spin{to{transform:rotate(360deg)}}
+/* ── MODALE DELTA ÉNERGIE ── */
+.rh-delta-overlay{position:fixed;inset:0;background:rgba(18,21,30,.55);z-index:200;display:flex;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px)}
+.rh-delta-sheet{background:var(--white);border-radius:var(--radius) var(--radius) 0 0;width:100%;max-width:520px;padding:24px 20px 28px;box-shadow:var(--shadow-md)}
+.rh-delta-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px}
+.rh-delta-sub{font-size:13px;color:var(--text2);margin-bottom:18px;line-height:1.5}
+.rh-delta-item{background:var(--amber-pale);border:1px solid var(--amber-border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:10px}
+.rh-delta-item-nom{font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px}
+.rh-delta-item-detail{font-size:12px;color:var(--text2)}
+.rh-delta-btns{display:flex;gap:10px;margin-top:18px}
+.rh-delta-btn-confirm{flex:1;background:var(--amber);color:#fff;border:none;border-radius:var(--radius-sm);padding:14px;font-size:14px;font-weight:700;cursor:pointer}
+.rh-delta-btn-cancel{flex:1;background:var(--bg);color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;font-size:14px;font-weight:600;cursor:pointer}
 </style>
 </head>
 <body>
@@ -367,7 +378,7 @@ async function init(){
 
   // R6 — Fetch fluides à inclure dans le relevé horaire
   _energieFluides=await supa('energie_config',
-    'site_id=eq.'+_releve.site_id+'&inclure_releve_horaire=eq.true&actif=eq.true&select=id,nom,unite,type_valeur&order=ordre.asc'
+    'site_id=eq.'+_releve.site_id+'&inclure_releve_horaire=eq.true&actif=eq.true&select=id,nom,unite,type_valeur,seuil_delta_alerte,seuil_alerte_bas&order=ordre.asc'
   ).catch(function(){return[];});
   if(!Array.isArray(_energieFluides))_energieFluides=[];
 
@@ -638,6 +649,58 @@ function _onEnergie(fid){
   _energieValeurs[fid]=isNaN(num)?null:num;
 }
 
+// ── Détection écarts anormaux fluides énergie ──────────────────────────────
+function _detectEnergieDelta(){
+  var anomalies=[];
+  _energieFluides.forEach(function(f){
+    var val=_energieValeurs[f.id];
+    if(val==null||f.seuil_delta_alerte==null)return;
+    var last=_energieDernieres[f.id];
+    if(!last||last.valeur==null)return;
+    var lastNum=parseFloat(String(last.valeur));
+    if(isNaN(lastNum))return;
+    var delta=Math.abs(val-lastNum);
+    if(delta>f.seuil_delta_alerte){
+      var dir=val>lastNum?'+':'-';
+      anomalies.push({
+        fid:f.id, nom:f.nom, unite:f.unite||'',
+        val:val, lastNum:lastNum,
+        delta:delta, dir:dir,
+        seuil:f.seuil_delta_alerte,
+        seuil_alerte_bas:f.seuil_alerte_bas
+      });
+    }
+  });
+  return anomalies;
+}
+
+function _showDeltaModal(anomalies, onConfirm){
+  var items=anomalies.map(function(a){
+    return '<div class="rh-delta-item">'+
+      '<div class="rh-delta-item-nom">'+h(a.nom)+'</div>'+
+      '<div class="rh-delta-item-detail">'+
+        'Valeur saisie : <strong>'+a.val+(a.unite?' '+a.unite:'')+'</strong> · '+
+        'Dernier relevé : '+a.lastNum+(a.unite?' '+a.unite:'')+' · '+
+        'Écart : '+a.dir+Math.round(a.delta).toLocaleString('fr-FR')+(a.unite?' '+a.unite:'')+
+      '</div>'+
+    '</div>';
+  }).join('');
+  var overlay=document.createElement('div');
+  overlay.className='rh-delta-overlay';
+  overlay.id='rh-delta-overlay';
+  overlay.innerHTML=
+    '<div class="rh-delta-sheet">'+
+      '<div class="rh-delta-title">⚠️ Écart important détecté</div>'+
+      '<div class="rh-delta-sub">La valeur saisie s\'écarte significativement du dernier relevé. Vérifiez avant de confirmer.</div>'+
+      items+
+      '<div class="rh-delta-btns">'+
+        '<button class="rh-delta-btn-cancel" onclick="document.getElementById(\'rh-delta-overlay\').remove();var s=document.getElementById(\'rh-submit\');if(s){s.disabled=false;s.textContent=\'Valider le relevé →\';}">✏️ Corriger</button>'+
+        '<button class="rh-delta-btn-confirm" onclick="document.getElementById(\'rh-delta-overlay\').remove();_doSubmit();">✅ Confirmer la valeur</button>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(overlay);
+}
+
 function _renderQuestion(q,e){
   var html='<div class="rh-q-row" id="qrow-'+q.id+'">';
   html+=_prevValLine(q.id);
@@ -856,7 +919,18 @@ function _updateProgress(){
   }
 }
 
-async function _submitReleve(){
+function _submitReleve(){
+  var submit=document.getElementById('rh-submit');
+  if(submit){submit.disabled=true;submit.textContent='Vérification…';}
+  var anomalies=_detectEnergieDelta();
+  if(anomalies.length){
+    _showDeltaModal(anomalies,_doSubmit);
+  } else {
+    _doSubmit();
+  }
+}
+
+async function _doSubmit(){
   var submit=document.getElementById('rh-submit');
   if(submit){submit.disabled=true;submit.textContent='Envoi en cours…';}
 
@@ -928,6 +1002,28 @@ async function _submitReleve(){
         console.warn('R6 energie upsert warning:',err);
         // Non bloquant — le relevé est validé même si l'énergie échoue
       });
+
+      // Alerte seuil_alerte_bas pour les fluides énergie
+      var energieAlertePosts=[];
+      energieRemplis.forEach(function(k){
+        var f=_energieFluides.find(function(fl){return fl.id===k;});
+        if(!f||f.seuil_alerte_bas==null)return;
+        var val=_energieValeurs[k];
+        if(val!=null&&val<f.seuil_alerte_bas){
+          var u=f.unite?' '+f.unite:'';
+          energieAlertePosts.push(supaPost('alertes',{
+            client_id:_releve._clientId,
+            groupe_id:_releve.site_id,
+            type:'seuil_releve',
+            severite:'warning',
+            message:h(f.nom)+' : '+val+u+' (seuil bas : '+f.seuil_alerte_bas+u+')',
+            type_alerte:'seuil_releve',
+            lue:false,resolue:false
+          }));
+          nbAlertes++;
+        }
+      });
+      if(energieAlertePosts.length)await Promise.all(energieAlertePosts);
     }
 
     // Signalements : observations texte + OUI/NON avec alerte_severite
