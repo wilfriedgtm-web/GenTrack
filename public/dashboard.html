@@ -2487,6 +2487,7 @@ async function _rtSignalements(sid){
       '</div>'+
       '<select id="sg-zone-sel" onchange="_setSgZone(this.value||null)" style="font-size:12px;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;background:white;color:var(--dark);cursor:pointer;font-family:inherit">'+zoneOpts+'</select>'+
       '<button onclick="_sgCreerManuel(\''+sid+'\')" style="padding:7px 14px;border:1.5px solid var(--amber);border-radius:8px;background:var(--amber-pale);font-size:12px;font-weight:700;color:var(--amber-dark);cursor:pointer;white-space:nowrap">＋ Signalement</button>'+
+      '<button onclick="_copierLienEquipe(\''+sid+'\')" title="Lien équipe — à épingler dans le groupe WhatsApp" style="padding:7px 12px;border:1.5px solid #bfdbfe;border-radius:8px;background:#eff6ff;font-size:12px;font-weight:700;color:#1d4ed8;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px"><span>🔗</span><span>Lien équipe</span></button>'+
     '</div>'+
     kpiHtml+
     hotHtml+
@@ -2835,6 +2836,19 @@ async function _sgCreerMaintenance(sgId){
   });
   _closeCfgModal();
   if(_session)renderRespTech(_session,'signalements');
+}
+
+function _copierLienEquipe(sid){
+  var url='https://gen-track.vercel.app/equipe.html?site='+sid;
+  navigator.clipboard.writeText(url).then(function(){
+    var btn=event.currentTarget;
+    var orig=btn.innerHTML;
+    btn.innerHTML='<span>✅</span><span>Lien copié !</span>';
+    btn.style.background='#dcfce7';btn.style.borderColor='#86efac';btn.style.color='#15803d';
+    setTimeout(function(){btn.innerHTML=orig;btn.style.background='#eff6ff';btn.style.borderColor='#bfdbfe';btn.style.color='#1d4ed8';},2000);
+  }).catch(function(){
+    window.prompt('Copiez ce lien :',url);
+  });
 }
 
 function _sgCreerManuel(sid){
